@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Vacanza – Coming Soon</title>
+
+  <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: #1e1e1e; 
+      color: #f5f5f5;
+      text-align: center;
+    }
+
+    dotlottie-player {
+      width: 330px;  
+      height: 330px;
+      margin-bottom: 32px;
+    }
+
+    h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 12px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeInUp 1s ease forwards;
+      animation-delay: 0.2s;
+    }
+
+    p {
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      color: #cfcfcf;
+      margin: 0;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeInUp 1s ease forwards;
+      animation-delay: 0.6s;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  
+  <dotlottie-player
+    src="LocationAnimation.lottie"
+    background="transparent"
+    speed="1"
+    loop
+    autoplay>
+  </dotlottie-player>
+
+  
+  <h1>Coming Soon</h1>
+  <p>Vacanza will redefine your travel experience</p>
+  
+</body>
+</html>
