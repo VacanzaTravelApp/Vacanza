@@ -1,0 +1,138 @@
+==============================
+ VACANZA – Windows DB Installer
+==============================
+
+This guide allows Windows users to install the offline
+Vacanza PostgreSQL (with PostGIS) + pgAdmin environment
+through a SINGLE COMMAND using Docker.
+
+It also explains which fields are required when connecting
+to the cloud production (prod) PostgreSQL database.
+
+
+----------------------------------------
+1) Place the files in a preferred folder
+----------------------------------------
+Download `install_vacanza_db.ps1` and place it on your Desktop
+or any other folder.
+
+
+----------------------------------------
+2) Open PowerShell as Administrator
+----------------------------------------
+
+Press the Windows key → type “PowerShell” →
+Right-click → “Run as Administrator”
+
+
+----------------------------------------
+3) Allow PowerShell script execution
+----------------------------------------
+
+Enter the following command in PowerShell:
+
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+Type "Y" and press Enter to confirm.
+
+(Note: This only needs to be done ONCE per device.)
+
+
+----------------------------------------
+4) Run the installation script
+----------------------------------------
+
+Navigate to the folder where the script is located:
+
+cd "C:\Users\<YOUR_USERNAME>\Desktop"
+
+(or change directory to the folder containing the script)
+
+Then run:
+
+.\install_vacanza_db.ps1
+
+
+----------------------------------------
+5) Wait for the installation to complete
+----------------------------------------
+
+When the installation is done, PowerShell will display:
+
+- PostgreSQL (PostGIS) port: 5434
+- pgAdmin URL: http://localhost:5050
+
+pgAdmin login credentials:
+  Email:    admin@admin.com
+  Password: admin123
+
+
+----------------------------------------
+6) Connect to the OFFLINE database using pgAdmin
+----------------------------------------
+
+Open your browser and go to:
+
+http://localhost:5050
+
+After logging in:
+
+Object → Register → Server → Add
+
+General:
+  Name: VACANZA Offline DB
+
+Connection:
+  Host: host.docker.internal
+  Port: 5434
+  Username: vacanza_master
+  Password: vacanza_password
+  Save Password: ✔
+
+
+----------------------------------------
+7) Your offline database is now ready
+----------------------------------------
+
+The offline environment contains **only one database**:
+
+vacanza_prod
+
+(PostGIS extension is automatically enabled.)
+
+
+----------------------------------------
+8) If you need to connect to the VACANZA Cloud Database
+----------------------------------------
+
+To connect to the cloud PostgreSQL using pgAdmin,
+fill in the same "Register → Server" window with:
+
+These are the fields you will be ASKED FOR:
+(Provided by the project manager or server admin)
+
+General:
+  Name: VACANZA Cloud DB
+
+Connection:
+  Host name / address:   (CLOUD_PUBLIC_IP)
+  Port:                  5433
+  Maintenance DB:        postgres
+  Username:              vacanza_master
+  Password:              vacanza_password
+  Save password:         ✔
+
+Notes:
+- The cloud PostgreSQL contains three databases:
+    vacanza_main
+    vacanza_test
+    vacanza_prod
+- Without these credentials, cloud access is not possible.
+- Cloud access requires an internet connection.
+- Offline mode only works with the local database running on port 5434.
+
+
+----------------------------------------
+Installation complete!
+VACANZA offline + cloud database environment is ready.
+----------------------------------------

@@ -1,0 +1,132 @@
+==============================
+ VACANZA – macOS DB Installer
+==============================
+
+This guide helps macOS users install the offline
+Vacanza PostgreSQL (PostGIS) + pgAdmin environment
+using a SINGLE COMMAND through Docker.
+
+It also explains which fields are required to connect
+to the cloud production PostgreSQL database.
+
+
+----------------------------------------
+1) Open Terminal in the correct folder
+----------------------------------------
+
+Place the script file (mac_install_vacanza_db.sh)
+into any folder you prefer.
+
+Then navigate to that folder:
+
+Example:
+cd ~/Desktop
+or
+cd /Users/<YOUR_USERNAME>/Documents
+
+
+----------------------------------------
+2) Make the script executable
+----------------------------------------
+
+Run the following command:
+
+chmod +x mac_install_vacanza_db.sh
+
+(Note: This only needs to be done ONCE.)
+
+
+----------------------------------------
+3) Start the installation
+----------------------------------------
+
+Run:
+
+./mac_install_vacanza_db.sh
+
+
+----------------------------------------
+4) Wait for installation to complete
+----------------------------------------
+
+When installation finishes, Terminal will show:
+
+- PostgreSQL (PostGIS) port: 5434
+- pgAdmin URL:
+    http://localhost:5050
+
+pgAdmin login credentials:
+  Email:    admin@admin.com
+  Password: admin123
+
+
+----------------------------------------
+5) Connect to the OFFLINE database using pgAdmin
+----------------------------------------
+
+Open your browser:
+
+http://localhost:5050
+
+Then log in and register a new server:
+
+Object → Register → Server → Add
+
+General:
+  Name: VACANZA Offline DB
+
+Connection:
+  Host: host.docker.internal
+  Port: 5434
+  Username: vacanza_master
+  Password: vacanza_password
+  Save Password: ✔
+
+
+----------------------------------------
+6) Your offline database is now ready
+----------------------------------------
+
+Offline environment contains **one database**:
+
+vacanza_prod
+
+(PostGIS extension is already enabled.)
+
+
+----------------------------------------
+7) If you need to connect to the VACANZA Cloud Database
+----------------------------------------
+
+To connect to the cloud PostgreSQL using pgAdmin,
+fill in the same “Register → Server” window with:
+
+These are the fields you will be ASKED FOR:
+(Provided by the project manager / server admin)
+
+General:
+  Name: VACANZA Cloud DB
+
+Connection:
+  Host name / address:  (CLOUD_PUBLIC_IP)
+  Port:                 5433
+  Maintenance DB:       postgres
+  Username:             vacanza_master
+  Password:             vacanza_password
+  Save Password:        ✔
+
+Notes:
+- The cloud database contains three schemas:
+      vacanza_main
+      vacanza_test
+      vacanza_prod
+- Without these credentials, cloud access is not possible.
+- Cloud access requires an internet connection.
+- Offline mode only works with the local DB on port 5434.
+
+
+----------------------------------------
+Installation complete!
+VACANZA offline + cloud database environment is ready.
+----------------------------------------
+
