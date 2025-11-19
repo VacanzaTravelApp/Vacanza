@@ -1,2 +1,6 @@
 # Database ayarlaması karışmasın diye
 config_vacanza_db
+DB_Config
+DB_Config/vacanza-DB_Config
+
+.DS_Store
