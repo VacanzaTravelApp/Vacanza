@@ -1,0 +1,164 @@
+===============================
+VACANZA – Mobile Flutter Setup (Windows)
+
+Bu doküman Windows kullanıcılarının Vacanza mobil uygulamasını geliştirebilmesi için gerekli Flutter ortamını nasıl kuracağını adım adım açıklar.
+Tüm adımlar açıklamalıdır ve birebir uygulanmalıdır.
+
+=========================
+	1.	Gerekli Yazılımlar
+=========================
+
+Windows kullanıcılarının yüklemesi gereken araçlar:
+	•	Git
+	•	Android Studio
+	•	VS Code
+	•	Flutter SDK (Windows ZIP sürümü)
+	•	Chrome (Web testleri için)
+
+Bu dört araç olmadan Flutter projesi çalışmaz.
+
+==============================
+2) Git Kurulumu (Zorunlu)
+
+Git, hem GitHub bağlantısı hem de Flutter’ın bazı araçları için gereklidir.
+
+https://git-scm.com/downloads
+adresinden indirip NEXT → NEXT → NEXT diyerek kurun.
+
+Kurulum sonra terminalde:
+git –version
+yazınca sürüm görünmelidir.
+
+==============================
+3) Flutter SDK Kurulumu
+
+Flutter’ı Windows için ZIP dosyası olarak indirin:
+
+https://docs.flutter.dev/get-started/install/windows
+
+İndirdiğiniz ZIP’i şu klasöre çıkartın:
+
+C:\src\flutter
+
+(Sakın Program Files içine koymayın, sorun çıkarır.)
+
+==================================
+4) Flutter’ı PATH Değişkenine Ekleyin
+
+Başlat → “Environment Variables” yaz → Aç
+
+“User variables” bölümünde PATH’e şunu ekleyin:
+
+C:\src\flutter\bin
+
+Kaydedin ve kapatın.
+
+Yeni bir terminal açın ve yazın:
+
+flutter –version
+
+Bu komut çalışıyorsa PATH doğru ayarlanmıştır.
+
+=============================
+5) VS Code Kurulumu
+
+VS Code’u şu adresten indirin:
+
+https://code.visualstudio.com/
+
+Kurulduktan sonra Extensions bölümünden:
+	•	Flutter
+	•	Dart
+eklenti ikilisini yükleyin.
+
+(Yoksa debug, hot reload çalışmaz.)
+
+=================================
+6) Android Studio Kurulumu
+
+Android Studio → “More Actions” → SDK Manager
+
+Aşağıdakileri yükleyin:
+	•	Android API 33
+	•	Android API 34
+	•	Android SDK Platform Tools
+	•	Android SDK Command-line Tools (latest)
+
+Sonra:
+Android Studio → Device Manager → Create Device
+
+Ayarlar:
+	•	Telefon: Pixel 6 / 7 / 8
+	•	API Level: 33–35
+	•	Architecture: x86_64
+
+Android emülatörü açın.
+
+===============================
+7) Android Lisanslarını Onaylama
+
+Flutter’ın Android araçlarını kullanabilmesi için lisansların kabul edilmesi gerekir.
+
+Terminalde şu komutu çalıştırın:
+
+flutter doctor –android-licenses
+
+Sorular çıkacaktır. Tümüne “y” deyin.
+
+===============================
+8) Flutter Doctor Kontrolü
+
+Tüm kurulumun doğru olduğunu kontrol etmek için:
+
+flutter doctor
+
+Yeşil tiklerin çoğu tamamlanmış olmalıdır.
+
+===============================
+9) Vacanza Projesini Klonlama
+
+Projeyi bilgisayarınıza çekin:
+
+git clone https://github.com/VacanzaTravelApp/Vacanza
+cd Vacanza/mobile
+
+==============================
+10) Paketleri Yükleme
+
+flutter pub get
+
+Bu komut mobil klasöründeki tüm bağımlılıkları yükler.
+
+===============================
+11) Uygulamayı Çalıştırma
+
+Android emülatörü açıksa:
+
+flutter devices
+
+komutu cihazı göstermelidir.
+
+Uygulamayı çalıştırmak için:
+
+flutter run
+
+VS Code üzerinden debug etmek için:
+Run (F5)
+
+=============================
+12) Hot Reload
+
+VS Code ile başlatılan projede Hot Reload otomatik olarak aktiftir.
+Terminal ile başlatmışsanız “r” tuşu reload yapar.
+
+=============================
+13) Yaygın Hatalar
+
+Flutter bulunamadı → PATH yanlış
+Android lisansları eksik → flutter doctor –android-licenses
+SDK bulunamadı → Android Studio kurulumunu tekrar kontrol edin
+Emulator görünmüyor → Device Manager’dan başlatmayı unutmayın
+
+===============================
+Kurulum tamamlandı!
+Windows üzerinde Vacanza Flutter geliştirme hazır.
