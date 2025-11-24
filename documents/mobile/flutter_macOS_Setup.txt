@@ -1,37 +1,28 @@
 ===============================
-VACANZA – Mobile Flutter Setup
+VACANZA – Mobile Flutter Setup (macOS)
 
-Bu doküman Vacanza mobil uygulamasını geliştirmek isteyen ekip üyeleri için hazırlanmış tam kurulum rehberidir.
-Komutlar, araçlar ve adımlar macOS ve Windows/Linux için açıklanmıştır.
-Tüm adımlar birebir uygulanmalıdır.
+Bu doküman macOS kullanıcılarının Vacanza mobil uygulamasını geliştirebilmesi için gerekli Flutter ortamını nasıl kuracağını adım adım açıklar.
+Komutlar tüm IDE’ler ile uyumludur (IntelliJ, VS Code, Android Studio).
 
 =========================
-	1.	Gerekli Yazılımlar
+1. Gerekli Yazılımlar
 =========================
 
 macOS için gerekli:
-	•	Xcode
-	•	Xcode Command Line Tools
-	•	Android Studio
-	•	VS Code (ARM64)
-	•	Homebrew
-	•	Git
-	•	Flutter SDK
-
-Windows / Linux için gerekli:
-	•	Android Studio
-	•	VS Code
-	•	Git
-	•	Flutter SDK
-
-(Tüm ekip aynı araçları kullanmalıdır.)
+	• Xcode
+	• Xcode Command Line Tools
+	• Android Studio
+	• Herhangi bir IDE (VS Code / IntelliJ / Android Studio)
+	• Homebrew
+	• Git
+	• Flutter SDK
 
 ==============================
 2) Homebrew Kurulumu (macOS)
 
-Homebrew geliştirme araçlarını yüklemek için zorunludur. Terminalde çalıştırın:
+Terminalde:
 
-/bin/bash -c “$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)”
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 Kurulumdan sonra “brew” komutu çalışmalıdır.
 
@@ -40,106 +31,77 @@ Kurulumdan sonra “brew” komutu çalışmalıdır.
 
 Flutter’ı Homebrew ile kurun:
 
-brew install –cask flutter
+brew install --cask flutter
 
 PATH’e ekleyin:
 
-echo ‘export PATH=”$PATH:/opt/homebrew/bin/flutter”’ >> ~/.zshrc
+echo 'export PATH="$PATH:/opt/homebrew/bin/flutter"' >> ~/.zshrc
 source ~/.zshrc
-
-Flutter komutunun terminal tarafından tanınması için bu adım zorunludur.
 
 =============================
 4) Flutter Sistem Kontrolü
 
-Kurulumu doğrulamak için terminalde:
-
 flutter doctor
 
-Eksikler varsa flutter doctor ne yapılacağını söyler.
+Eksikler varsa ne yapılması gerektiği belirtilecektir.
 
 ==========================
-5) VS Code Kurulumu
+5) IDE Kurulumu
 
-Aşağıdaki iki eklenti yüklenmelidir:
-	•	Flutter
-	•	Dart
+İstediğiniz IDE kullanılabilir:
+	• IntelliJ
+	• VS Code
+	• Android Studio
 
-(Bu eklentiler olmadan debug ve hot reload çalışmaz.)
+Zorunlu eklentiler:
+	• Flutter
+	• Dart
 
 ================================
 6) Android Geliştirme Ortamı
 
-Android Studio’yu kurun.
+Android Studio → SDK Manager:
+	• Android API 33
+	• Android API 34
+	• Android API 35
+	• Android SDK Command-line Tools
 
-SDK Manager açın ve şunları etkinleştirin:
-	•	Android API 33
-	•	Android API 34
-	•	Android API 35
-	•	Android SDK Command-line Tools
+Android Studio → Device Manager → Create Device:
+	• Pixel 6/7/8
+	• API Level 33–35
+	• ARM64
 
 Ardından:
-Android Studio → Device Manager → Create Device
-
-Aşağıdaki ayarları kullanın:
-	•	Cihaz: Pixel 6 / Pixel 7 / Pixel 8
-	•	API Level: 33–35
-	•	Mimarî: ARM64
-
-Emülatörü başlatın.
-
-Cihazı Flutter’ın görmesi için terminalde:
 
 flutter devices
-
-“emulator-5554” veya benzeri görünüyor olmalıdır.
 
 =============================
 7) iOS Geliştirme Ortamı
 
-(macOS kullanıcıları içindir.)
+Xcode → Settings → Platforms:
+	Herhangi bir iOS sürümü yüklenebilir (16–26).
 
-Xcode’u App Store’dan kurun.
-
-Xcode → Settings → Platforms
-Herhangi bir iOS sürümü indirilebilir: iOS 16, iOS 17, iOS 18, iOS 19, hatta iOS 26.
-
-NOT:
-Vacanza Flutter projesi iOS’un TÜM sürümlerinde sorunsuz çalışır.
-Burada önemli olan tek şey projenin iCloud içinde olmamasıdır.
-
-iOS simülatörünü başlatmak için:
+iOS simülatörünü açmak için:
 
 open -a Simulator
 
-Bir cihaz seçin:
-	•	iPhone 15 Pro
-	•	iPhone 16 Pro
-	•	iPhone 17 Pro
-	•	vb.
-
-Flutter’ın cihazı görmesi için:
+Sonra:
 
 flutter devices
-
-Çıktıda iPhone simülatörü görünmelidir.
 
 =========================================
 8) ÖNEMLİ – iCloud KULLANMAYIN
 
-Proje dosyaları iCloud Desktop / iCloud Documents altında olursa:
-	•	Flutter.framework imzalanamaz
-	•	iOS simülatöründe uygulama çalışmaz
-	•	codesign hataları oluşur
+Proje iCloud altında olursa:
+	• Flutter.framework imzalanamaz
+	• iOS simülatörü açılmaz
+	• Codesign hataları oluşur
 
-Projeyi mutlaka normal bir dizine taşıyın:
-
-/Users//Developer/Vacanza
+Projenin dizini:
+~/Developer/Vacanza
 
 =============================
 9) Projeyi Klonlama
-
-Terminalde:
 
 git clone https://github.com/VacanzaTravelApp/Vacanza
 cd Vacanza/mobile
@@ -149,30 +111,20 @@ cd Vacanza/mobile
 
 flutter pub get
 
-Bu komut mobil klasöründeki tüm bağımlılıkları yükler.
-
 ===============================
 11) Uygulamayı Çalıştırma
 
-Android için:
-
+Android:
 flutter run -d emulator-5554
 
-iOS için (simülatör açık olmalıdır):
-
+iOS:
 flutter run
 
 ==============================
 12) Hot Reload Kullanımı
 
-VS Code → Run (F5) ile başlatırsanız:
-	•	Hot Reload
-	•	Hot Restart
-	•	Debugger
-
-otomatik olarak etkin olur.
-
-Terminalden “flutter run” ile başlatınca debug araçları görünmez.
+Herhangi bir IDE üzerinden debug başlatıldığında Hot Reload otomatik çalışır.
+Terminal üzerinden başlatıyorsanız “r” tuşu reload yapar.
 
 ==================================
 13) iOS Hataları ve Çözümleri
@@ -180,16 +132,9 @@ Terminalden “flutter run” ile başlatınca debug araçları görünmez.
 Hata:
 Failed to codesign Flutter.framework
 
-Nedenleri:
-	•	Proje iCloud içindedir
-	•	Simruntime bozulmuştur
-	•	Flutter cache bozulmuştur
-
 Çözüm:
 flutter clean
-flutter precache –ios
-
-Ardından simülatörü yeniden açın.
+flutter precache --ios
 
 ===============================
 14) Git Workflow (Takım İçin)
@@ -199,12 +144,7 @@ mobile/feature/
 mobile/fix/
 mobile/refactor/
 
-Commit örnekleri:
-[mobile] Initialize Flutter setup
-[mobile] Add base screens
-[mobile] Fix Android emulator issue
-[mobile] Improve iOS startup stability
-
-=======================================
+===============================
 Kurulum tamamlandı!
-Vacanza Mobile geliştirmeye hazır.
+macOS üzerinde Vacanza Flutter geliştirmeye hazırsınız.
+===============================
