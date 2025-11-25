@@ -1,0 +1,1 @@
+bu kısımda backend işler, halledilir

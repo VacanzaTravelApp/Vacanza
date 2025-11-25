@@ -1,0 +1,1 @@
+Bu kısımda endpointlerin kontrolü sağlanmaktadır
