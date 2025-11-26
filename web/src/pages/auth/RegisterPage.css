@@ -1,0 +1,101 @@
+/* Arka plan: full screen sky gradient */
+/* Full screen sky background + form sağ altta */
+.auth-layout {
+  min-height: 100vh;
+  width: 100%;
+  background: linear-gradient(
+    180deg,
+    #d7f0ff 0%,
+    #7fc8ff 35%,
+    #4a90e2 65%,
+    #1b3c77 100%
+  );
+  display: flex;
+  justify-content: flex-end;  /* sağa yasla */
+  align-items: flex-end;      /* alta yasla */
+  padding: 40px;
+}
+
+/* Kart */
+.auth-card {
+  width: 420px;
+  max-width: 100%;
+  background: rgba(3, 15, 40, 0.94);
+  border-radius: 28px;
+  padding: 32px 32px 28px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+
+/* Başlık */
+.auth-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.auth-title {
+  margin-bottom: 4px !important;
+  color: #ffffff !important;
+}
+
+.auth-title-accent {
+  color: #33d1ff;
+}
+
+.auth-subtitle {
+  font-size: 14px;
+  color: #d3e2f4;
+}
+
+/* Form alanları */
+.auth-form .ant-input,
+.auth-form .ant-input-affix-wrapper {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.auth-form .ant-input::placeholder,
+.auth-form .ant-input-affix-wrapper input::placeholder {
+  color: #b8c8e6;
+}
+
+/* Button */
+.auth-button {
+  border-radius: 999px !important;
+  height: 42px;
+  background: #1677ff;
+  font-weight: 500;
+  color: #ffffff !important;
+}
+
+
+/* Footer */
+.auth-footer {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.auth-footer-text {
+  font-size: 13px;
+  color: #e1e7f5;
+}
+
+.auth-link {
+  color: #33d1ff !important;
+}
+
+.auth-link-login {
+  font-weight: 600;
+}
+
+.ant-form-item-label > label {
+  color: #ffffff !important;
+  font-weight: 500;
+}
+
+.ant-checkbox + span {
+  color: #ffffff !important;
+}
