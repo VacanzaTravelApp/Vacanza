@@ -24,12 +24,17 @@ public class UserInfo {
     @Column(name = "info_id", nullable = false, updatable = false)
     private UUID infoId;
 
-    @OneToOne
-    @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = false)
+    //users table'i ile 1-1 iliski (SRS dokumanina gore)
+    //bir userin yalnizca 1 profil ekrani olabilir
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "user_id",
+            referencedColumnName = "user_id",
+            nullable = false,
+            unique = true
+    )
     private User user;
 
-    //first ve last name olarak ayirdim full name yerine
-    //maintainability daha kolay
     @Column(name = "first_name", nullable = false, length = 80)
     private String firstName;
 
@@ -47,7 +52,7 @@ public class UserInfo {
     private Gender gender;
 
     /*
-    bu srs'te yaziyodu ama olmasina su anlik gerek yok, sadece ingilizceyiz
+    buna su anlik gerek yok ama 2. dil geldiginde gerek olabilir
     @Column(name = "preferred_language", length = 10)
     private String preferredLanguage;
      */
@@ -62,12 +67,4 @@ public class UserInfo {
     protected void onCreate() {
         this.joinDate = Instant.now();
     }
-
-    /*
-    first ve last name olarak ayirdim, full name gerekirse method
-
-    public String getFullName() {
-        return firstName + " " + lastName;
-    }
-    */
 }

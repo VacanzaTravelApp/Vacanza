@@ -9,7 +9,13 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_users_email", columnNames = "email"),
+                @UniqueConstraint(name = "uk_users_firebase_uid", columnNames = "firebase_uid")
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -23,14 +29,11 @@ public class User {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
-    //firebase olup olmayacagina gore degisir
-    @Column(name = "firebase_uid", unique = true)
+    @Column(name = "firebase_uid", nullable = false, unique = true, length = 128)
     private String firebaseUid;
+
     @Column(name = "email", nullable = false, unique = true, length = 120)
     private String email;
-
-    @Column(name = "password_hash")
-    private String passwordHash;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
