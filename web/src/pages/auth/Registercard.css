@@ -1,0 +1,206 @@
+/* src/pages/auth/RegisterCard.css */
+
+.register-card {
+    /* Hafif Mavi/Beyaz Gradyan Arka Plan */
+    background: linear-gradient(145deg, #f9fcff, #ffffff); 
+    
+    padding: 40px;
+    border-radius: 20px;
+    
+    /* Yumuşak gölge */
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.03); 
+    
+    max-width: 400px;
+    width: 100%;
+}
+
+.card-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.vacanza-logo {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e90ff; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vacanza-logo .logo-icon {
+    margin-right: 8px;
+    font-size: 28px;
+}
+
+.card-header h3 {
+    font-size: 22px;
+    color: #333;
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+
+.header-subtext {
+    font-size: 14px;
+    color: #666;
+}
+
+/* --- Ant Design Özelleştirmeleri --- */
+
+/* Input'ların varsayılan kenar ve büyüklüğünü ayarla */
+.ant-input-affix-wrapper, .ant-input-password {
+    border-radius: 8px !important;
+    padding: 10px 15px !important; 
+    border: 1px solid #e0e0e0 !important;
+    transition: border-color 0.3s, box-shadow 0.3s; /* Geçiş ekledik */
+}
+
+/* --- HATA DURUMU İÇİN YENİ STİL --- */
+
+.ant-form-item-has-error .ant-input-affix-wrapper:not(.ant-input-affix-wrapper-disabled) {
+    border-color: #ff4d4f !important; 
+    box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2) !important;
+}
+
+.ant-form-item-has-error .ant-input {
+    border-color: #ff4d4f !important; 
+}
+
+.ant-form-item-has-error .ant-input-password input {
+    border-color: #ff4d4f !important;
+}
+
+.ant-form-item-has-error .ant-form-item-control-input-content .anticon-close-circle,
+.ant-form-item-has-error .ant-form-item-control-input-content .anticon-exclamation-circle {
+    color: #ff4d4f !important;
+}
+
+/* --- Kayıt Butonu (CTA) --- */
+/* Kayıt formu için düz mavi buton */
+.cta-button.ant-btn-primary {
+    width: 100%;
+    padding: 14px;
+    height: auto; 
+    background-color: #1e90ff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 16px;
+    transition: background-color 0.3s;
+}
+
+.cta-button.ant-btn-primary:hover,
+.cta-button.ant-btn-primary:focus {
+    background-color: #0d83e3; 
+}
+
+/* Giriş Butonu için Gradient Stil */
+.cta-button.login-gradient-button {
+    background: linear-gradient(90deg, #1e90ff, #00c6ff); 
+    border: none;
+    transition: all 0.3s;
+}
+
+.cta-button.login-gradient-button:hover,
+.cta-button.login-gradient-button:focus {
+    background: linear-gradient(90deg, #0d83e3, #00b0e5);
+}
+
+
+/* --- Alt Navigasyon (Özellik Butonları - Alt Kısım) --- */
+
+.alt-nav {
+    display: flex;
+    justify-content: center;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.alt-nav-item {
+    background: none;
+    border: none;
+    color: #555;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: default; /* Bunlar butondan çok bilgi göstergesi */
+    padding: 0 10px;
+}
+
+.alt-nav-icon {
+    margin-bottom: 5px;
+    color: #1e90ff;
+    font-size: 20px; 
+}
+
+
+/* --- Giriş Yap Yönlendirmesi --- */
+
+.login-redirect {
+    text-align: center;
+    margin-top: 30px;
+    font-size: 14px;
+    color: #777;
+}
+
+.login-link {
+    color: #1e90ff;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: 5px;
+}
+
+.login-link:hover {
+    text-decoration: underline;
+}
+
+
+/* --- Login Kartı Özel Stilleri (Forgot Password) --- */
+
+.login-options-row {
+    display: flex;
+    justify-content: flex-end; 
+    align-items: center;
+    width: 100%;
+    margin-top: -8px; 
+    margin-bottom: 5px;
+}
+
+.forgot-password-link {
+    color: #1e90ff; 
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.forgot-password-link:hover {
+    color: #0d83e3;
+    text-decoration: underline;
+}
+
+.remember-me-placeholder {
+    flex-grow: 1; 
+}
+
+/* --- Password Checks (Kayıt Kartı Özel) --- */
+
+.password-checks {
+    margin-top: -5px; 
+    margin-bottom: 15px; 
+    padding: 5px 0;
+}
+
+.check-item {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+.check-item svg {
+    margin-right: 5px;
+    font-size: 14px; 
+}
