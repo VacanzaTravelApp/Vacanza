@@ -9,3 +9,5 @@ npm install antd @ant-design/icons react-icons react-router-dom
 ## 2. Çalıştırma
 
 npm run dev
+
+damla
