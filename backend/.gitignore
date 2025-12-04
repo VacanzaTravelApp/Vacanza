@@ -33,3 +33,6 @@ build/
 .vscode/
 
 .env
+.env_offline
+
+/src/main/resources/vacanza-firebase.json
