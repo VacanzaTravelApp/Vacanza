@@ -44,6 +44,10 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
 
             } catch (FirebaseAuthException e) {
                 System.out.println("Firebase Token Verification Failed" + e.getMessage());
+
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+                return;
             }
         }
         filterChain.doFilter(request, response);
