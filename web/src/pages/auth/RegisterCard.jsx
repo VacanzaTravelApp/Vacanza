@@ -1,26 +1,65 @@
 // src/pages/auth/RegisterCard.jsx
+
 import React from 'react';
-import { Form, Input, Button, Checkbox, Row, Col, Space } from 'antd'; // Row ve Col eklendi
+// Ant Design bileşenleri ve hook'ları
+import { Form, Input, Button, Checkbox, Row, Col, Space } from 'antd'; 
+// Kullanılacak Ant Design ikonları
 import { 
   UserOutlined, 
   LockOutlined, 
   MailOutlined, 
-  GlobalOutlined, 
-  TeamOutlined, 
-  SettingOutlined,
-  SendOutlined 
+  SendOutlined,
+  CheckCircleOutlined, 
+  CloseCircleOutlined,
 } from '@ant-design/icons';
 import './RegisterCard.css'; 
 import { useNavigate } from 'react-router-dom';
 
+// PasswordChecks Bileşeni (Değişmedi - Ant Design İkonları ile)
+const PasswordChecks = ({ password }) => {
+    // Şifre kontrolleri
+    const checks = [
+        { text: '8+ characters', valid: password && password.length >= 8 },
+        { text: '1+ uppercase', valid: /[A-Z]/.test(password) },
+        { text: '1+ lowercase', valid: /[a-z]/.test(password) },
+        { text: '1 number', valid: /[0-9]/.test(password) },
+        { text: '1 special char', valid: /[^A-Za-z0-9]/.test(password) },
+    ];
+
+    if (!password) {
+        return null; 
+    }
+
+    return (
+        <Row gutter={[10, 5]} className="password-checks-container"> 
+            {checks.map((check) => (
+                <Col span={12} key={check.text}>
+                    <div className={`password-check-item ${check.valid ? 'valid' : 'invalid'}`}>
+                        <span className="check-indicator" style={{ marginRight: '8px' }}>
+                            {check.valid ? (
+                                <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                            ) : (
+                                <CloseCircleOutlined style={{ color: '#bfbfbf' }} />
+                            )} 
+                        </span>
+                        {check.text}
+                    </div>
+                </Col>
+            ))}
+        </Row>
+    );
+};
+
+
 const RegisterCard = () => {
   const navigate = useNavigate(); 
+  
+  const [form] = Form.useForm(); 
+  const password = Form.useWatch('password', form); 
 
   const onFinish = (values) => {
-    // Form başarılı bir şekilde gönderildiğinde burası çalışır.
     console.log('Registration Successful:', values);
     alert('Registration form successfully processed (Demo).');
-    // Ad ve soyad artık ayrı ayrı (values.firstName, values.lastName)
   };
 
   const handleLoginRedirect = () => {
@@ -30,7 +69,6 @@ const RegisterCard = () => {
   return (
     <div className="register-card">
       <div className="card-header">
-        {/* Vacanza Logo and Title */}
         <span className="vacanza-logo">
            <SendOutlined className="logo-icon" />
            Vacanza
@@ -42,15 +80,16 @@ const RegisterCard = () => {
       </div>
 
       <Form
+        form={form} 
         name="register"
         onFinish={onFinish} 
         scrollToFirstError
         layout="vertical" 
         className="auth-form"
       >
-        {/* YENİ: First Name ve Last Name - Yan Yana */}
-        <Row gutter={12}> {/* Yatay boşluk (gutter) ekledik */}
-            {/* First Name */}
+        {/* FIRST NAME ve MIDDLE NAME - YAN YANA (Ekran Görüntüsüne Uygun) */}
+        <Row gutter={12}>
+            {/* First Name (Span 12) */}
             <Col span={12}>
                 <Form.Item
                     name="firstName"
@@ -65,24 +104,36 @@ const RegisterCard = () => {
                 </Form.Item>
             </Col>
 
-            {/* Last Name */}
+            {/* Middle Name (Span 12) - Görünür oldu */}
             <Col span={12}>
                 <Form.Item
-                    name="lastName"
-                    rules={[{ required: true, message: 'Please enter your last name!' }]}
+                    name="middleName"
+                    // Zorunlu değil
                 >
                     <Input 
                         prefix={<UserOutlined />} 
-                        placeholder="Last Name" 
+                        placeholder="Middle Name (Optional)" 
                         size="large"
-                        autoComplete="family-name" 
                     />
                 </Form.Item>
             </Col>
         </Row>
 
+        {/* LAST NAME - ALT ALTA (Tam Genişlik) */}
+        <Form.Item
+            name="lastName"
+            rules={[{ required: true, message: 'Please enter your last name!' }]}
+        >
+            <Input 
+                prefix={<UserOutlined />} 
+                placeholder="Last Name" 
+                size="large"
+                autoComplete="family-name" 
+            />
+        </Form.Item>
 
-        {/* E-posta */}
+
+        {/* E-posta inputu (Değişmedi) */}
         <Form.Item
           name="email"
           rules={[
@@ -98,7 +149,7 @@ const RegisterCard = () => {
           />
         </Form.Item>
 
-        {/* Şifre (Password) */}
+        {/* Şifre (Password) inputu (Değişmedi) */}
         <Form.Item
           name="password"
           rules={[{ required: true, message: 'Please input your Password!' }]}
@@ -111,8 +162,12 @@ const RegisterCard = () => {
             autoComplete="new-password" 
           />
         </Form.Item>
+        
+        {/* Dinamik Password Checks Bileşeni (Değişmedi) */}
+        <PasswordChecks password={password} /> 
 
-        {/* Şifreyi Onayla (Confirm Password) */}
+
+        {/* Şifreyi Onayla (Confirm Password) inputu (Değişmedi) */}
         <Form.Item
           name="confirmPassword"
           dependencies={['password']}
@@ -137,7 +192,7 @@ const RegisterCard = () => {
           />
         </Form.Item>
 
-        {/* Onay ve Şartlar (Terms) */}
+        {/* Onay ve Şartlar (Değişmedi) */}
         <Form.Item
           name="agreedToTerms"
           valuePropName="checked"
@@ -148,10 +203,12 @@ const RegisterCard = () => {
             },
           ]}
         >
-
+            <Checkbox>
+                I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
+            </Checkbox>
         </Form.Item>
 
-        {/* Kayıt Butonu (Register Button) */}
+        {/* Kayıt Butonu (Değişmedi) */}
         <Form.Item>
           <Button type="primary" htmlType="submit" className="cta-button" size="large">
             Start Your Adventure
@@ -160,7 +217,7 @@ const RegisterCard = () => {
       </Form>
 
 
-      {/* Giriş Yap Yönlendirmesi (Login Redirect) */}
+      {/* Giriş Yap Yönlendirmesi (Değişmedi) */}
       <div className="login-redirect">
         Already have a Vacanza account? 
         <span onClick={handleLoginRedirect} className="login-link">
