@@ -14,7 +14,7 @@ public class FirebaseConfig {
 
     @PostConstruct
     public void init() throws IOException {
-        ClassPathResource resource = new ClassPathResource("firebase-service-account.json");
+        ClassPathResource resource = new ClassPathResource("vacanza-firebase.json");
 
         FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(resource.getInputStream()))
