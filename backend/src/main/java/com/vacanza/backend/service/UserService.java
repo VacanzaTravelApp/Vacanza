@@ -3,6 +3,7 @@ package com.vacanza.backend.service;
 
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.repo.UserRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,8 +17,11 @@ public class UserService {
     }
 
     public User findByFirebaseUid(String firebaseUid) {
-        return userRepository.findByFirebaseUid(firebaseUid).orElseThrow(() -> new RuntimeException("Firebase uid not found"));
+        return userRepository.findByFirebaseUid(firebaseUid).orElseThrow(() -> new RuntimeException("new ResourceNotFoundException(\"User not found with UID: \" + firebaseUid"));
     }
 
-    public
+    public User getCurrentUser() {
+        String uid = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return findByFirebaseUid(uid);
+    }
 }
