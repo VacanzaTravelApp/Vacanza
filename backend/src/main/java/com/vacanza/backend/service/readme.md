@@ -1,1 +1,1 @@
-bu kısımda backend işler, halledilir
+bu kısımda backend işler, halledilir  seeee
