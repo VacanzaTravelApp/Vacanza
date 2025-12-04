@@ -1,26 +1,58 @@
 // src/pages/auth/RegisterCard.jsx
 import React from 'react';
-import { Form, Input, Button, Checkbox, Row, Col, Space } from 'antd'; // Row ve Col eklendi
+// YENİ: Form'dan useForm ve Form.useWatch'u doğru bir şekilde alıyoruz
+import { Form, Input, Button, Checkbox, Row, Col, Space } from 'antd'; 
 import { 
   UserOutlined, 
   LockOutlined, 
   MailOutlined, 
-  GlobalOutlined, 
-  TeamOutlined, 
-  SettingOutlined,
-  SendOutlined 
+  SendOutlined,
 } from '@ant-design/icons';
 import './RegisterCard.css'; 
 import { useNavigate } from 'react-router-dom';
 
+// PasswordChecks (Şifre Kontrol) Bileşeni - Görünümde değişiklik yok
+const PasswordChecks = ({ password }) => {
+    // Şifre kontrollerini gerçekleştiren basit regex ifadeleri
+    const checks = [
+        { text: '8+ characters', valid: password && password.length >= 8 },
+        { text: '1+ uppercase', valid: /[A-Z]/.test(password) },
+        { text: '1+ lowercase', valid: /[a-z]/.test(password) },
+        { text: '1 number', valid: /[0-9]/.test(password) },
+        { text: '1 special char', valid: /[^A-Za-z0-9]/.test(password) },
+    ];
+
+    return (
+        <Row gutter={[10, 5]} className="password-checks-container"> 
+            {checks.map((check) => (
+                <Col span={12} key={check.text}>
+                    <div className={`password-check-item ${check.valid ? 'valid' : 'invalid'}`}>
+                        {/* Simge: ✅ (Geçerli) ve ⚪ (Geçersiz) */}
+                        <span className="check-indicator" style={{ color: check.valid ? '#52c41a' : '#bfbfbf' }}>
+                            {check.valid ? '✅' : '⚪'} 
+                        </span>
+                        {check.text}
+                    </div>
+                </Col>
+            ))}
+        </Row>
+    );
+};
+
+
 const RegisterCard = () => {
   const navigate = useNavigate(); 
+  
+  // 1. ADIM: Form instance'ı oluşturulur
+  const [form] = Form.useForm(); 
+  
+  // 2. ADIM: 'password' alanındaki değişiklikler izlenir. 
+  // Password değeri her değiştiğinde bileşen yeniden render edilir.
+  const password = Form.useWatch('password', form); 
 
   const onFinish = (values) => {
-    // Form başarılı bir şekilde gönderildiğinde burası çalışır.
     console.log('Registration Successful:', values);
     alert('Registration form successfully processed (Demo).');
-    // Ad ve soyad artık ayrı ayrı (values.firstName, values.lastName)
   };
 
   const handleLoginRedirect = () => {
@@ -30,7 +62,7 @@ const RegisterCard = () => {
   return (
     <div className="register-card">
       <div className="card-header">
-        {/* Vacanza Logo and Title */}
+        {/* ... (Başlık kısmı değişmedi) ... */}
         <span className="vacanza-logo">
            <SendOutlined className="logo-icon" />
            Vacanza
@@ -42,14 +74,15 @@ const RegisterCard = () => {
       </div>
 
       <Form
+        form={form} // 3. ADIM: Form instance'ı bileşene bağlanır
         name="register"
         onFinish={onFinish} 
         scrollToFirstError
         layout="vertical" 
         className="auth-form"
       >
-        {/* YENİ: First Name ve Last Name - Yan Yana */}
-        <Row gutter={12}> {/* Yatay boşluk (gutter) ekledik */}
+        {/* First Name ve Last Name - Yan Yana */}
+        <Row gutter={12}>
             {/* First Name */}
             <Col span={12}>
                 <Form.Item
@@ -111,6 +144,10 @@ const RegisterCard = () => {
             autoComplete="new-password" 
           />
         </Form.Item>
+        
+        {/* 4. ADIM: Parola değeri PasswordChecks bileşenine iletilir */}
+        <PasswordChecks password={password} /> 
+
 
         {/* Şifreyi Onayla (Confirm Password) */}
         <Form.Item
@@ -148,7 +185,9 @@ const RegisterCard = () => {
             },
           ]}
         >
-
+            <Checkbox>
+                I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
+            </Checkbox>
         </Form.Item>
 
         {/* Kayıt Butonu (Register Button) */}
