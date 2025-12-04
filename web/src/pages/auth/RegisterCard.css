@@ -204,3 +204,62 @@
     margin-right: 5px;
     font-size: 14px; 
 }
+
+
+.password-checks-container {
+    /* Genel form alanıyla aynı hizada başlaması için sola bir miktar boşluk ekler. */
+    padding-left: 5px; 
+    margin-bottom: 20px; 
+    padding-top: 5px;
+}
+
+/* 2. HER BİR KONTROL MADDESİ */
+.password-check-item {
+    font-size: 12px;
+    font-weight: 500; 
+    display: flex; 
+    align-items: center; 
+    padding: 3px 0;
+    
+    /* Geçersiz maddelerin metin rengi (Hafif gri) */
+    color: #8c8c8c; 
+}
+
+/* 3. SİMGE GÖSTERGESİ (✅ veya ⚪) */
+.check-indicator {
+    margin-right: 8px; 
+    font-size: 14px; 
+}
+
+/* 4. GEÇERLİ OLAN MADDELERİN STİLİ (Yeşil Renk) */
+.password-check-item.valid {
+    /* Geçerli maddelerin metin rengi (Koyu gri/siyah) */
+    color: #434343; 
+}
+
+/* YENİ: YEŞİL RENGİN UYGULANMASI */
+/* İkonların (check-indicator) geçerli olduğunda yeşil olmasını sağlar */
+.password-check-item.valid .check-indicator {
+    color: #52c41a !important; /* Mobil tasarımınızdaki yeşil tonu */
+}
+
+/* YENİ: GEÇERSİZLERİN RENGİNİ GRİ YAPMA */
+.password-check-item .check-indicator {
+    /* Geçersiz olanların simge rengini hafif gri yapar */
+    color: #bfbfbf; 
+}
+
+.password-checks-container {
+    padding-left: 5px; /* Sağa kaydırma */
+    margin-bottom: 20px; 
+    padding-top: 5px;
+}
+
+.password-check-item {
+    font-size: 12px;
+    font-weight: 500; 
+    display: flex; 
+    align-items: center; 
+    padding: 3px 0;
+    color: #8c8c8c; 
+}

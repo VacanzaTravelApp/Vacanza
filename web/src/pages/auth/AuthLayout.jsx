@@ -2,17 +2,17 @@
 
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-// Ant Design ikonlarını (Feature Card için) import ediyoruz
+// Importing Ant Design icons (for Feature Card)
 import { ThunderboltOutlined, WalletOutlined, StarOutlined, CalendarOutlined } from '@ant-design/icons';
-// React Icons (Ri) paketinden istatistikler için ikonları import ediyoruz
+// Importing icons for statistics from the React Icons (Ri) package
 import { RiUserSmileLine, RiEarthLine, RiMapPinLine } from 'react-icons/ri'; 
 
-// YENİ: React Icons'tan MdFlightTakeoff (Vacanza İkonu) import edildi
+// NEW: Imported MdFlightTakeoff (Vacanza Icon) from React Icons (Md) package
 import { MdFlightTakeoff } from 'react-icons/md'; 
 
 import './AuthLayout.css'; 
 
-// ... FeatureCard ve StatItem bileşenleri (DEĞİŞMEDİ) ...
+// ... FeatureCard and StatItem components (UNCHANGED) ...
 
 const FeatureCard = ({ icon, title, description }) => (
     <div className="feature-card">
@@ -34,28 +34,28 @@ const StatItem = ({ icon, number, text }) => (
 
 
 const AuthLayout = ({ children }) => {
-    // ... headerData kısmı (DEĞİŞMEDİ) ...
+    // ... headerData part (UNCHANGED) ...
     const location = useLocation();
     const isLoginPage = location.pathname === '/login'; 
 
     const headerData = isLoginPage
-        ? { // LOGIN EKRANI
-            slogan: "Tekrar Hoş Geldiniz!", 
-            description: "Planladığınız gezilerinize devam edin ve yeni rotalar keşfedin."
+        ? { // LOGIN SCREEN
+            slogan: "Welcome Back!", 
+            description: "Continue your planned journeys and discover new routes."
         }
-        : { // REGISTER EKRANI (Varsayılan)
-            slogan: "Seyahat Planlama Asistanınız", 
-            description: "Gezi öncesi ve sonrası her detayı planla, rotanı optimize et, heyecanı takip et."
+        : { // REGISTER SCREEN (Default)
+            slogan: "Your Travel Planning Assistant", 
+            description: "Plan every detail before and after your trip, optimize your route, and track the excitement."
         };
 
 
     return (
         <div className="auth-container">
-            {/* SOL GÖRSEL SÜTUN */}
+            {/* LEFT VISUAL COLUMN */}
             <div className="auth-visual-column">
                 <div className="vacanza-header">
                     
-                    {/* GÜNCELLENDİ: MdFlightTakeoff ikonu eklendi */}
+                    {/* UPDATED: Added MdFlightTakeoff icon */}
                     <span className="logo-text">
                         <MdFlightTakeoff style={{ marginRight: '10px', fontSize: '36px' }} />
                         Vacanza
@@ -65,27 +65,27 @@ const AuthLayout = ({ children }) => {
                     <p className="description">{headerData.description}</p>
                 </div>
 
-                {/* ... diğer bileşenler (DEĞİŞMEDİ) ... */}
+                {/* ... other components (UNCHANGED) ... */}
                 <div className="feature-grid">
                     <FeatureCard 
                         icon={<ThunderboltOutlined />} 
-                        title="Akıllı Rota Planlama" 
-                        description="AI destekli en verimli güzergah"
+                        title="Smart Route Planning" 
+                        description="AI-supported most efficient itinerary"
                     />
                     <FeatureCard 
                         icon={<WalletOutlined />} 
-                        title="Bütçe Takibi" 
-                        description="Harcamalarını anlık kontrol et"
+                        title="Budget Tracking" 
+                        description="Monitor your expenditures instantly"
                     />
                     <FeatureCard 
                         icon={<StarOutlined />} 
-                        title="Kişisel Öneriler" 
-                        description="Senin için özel gezi rotaları"
+                        title="Personalized Recommendations" 
+                        description="Custom travel routes just for you"
                     />
                     <FeatureCard 
                         icon={<CalendarOutlined />} 
-                        title="Program Yönetimi" 
-                        description="Günlük aktivite planlaması"
+                        title="Schedule Management" 
+                        description="Daily activity planning"
                     />
                 </div>
 
@@ -93,22 +93,22 @@ const AuthLayout = ({ children }) => {
                     <StatItem
                         icon={<RiUserSmileLine />} 
                         number="50.000+"
-                        text="Mutlu Gezgin"
+                        text="Happy Traveler"
                     />
                     <StatItem
                         icon={<RiEarthLine />} 
                         number="120+"
-                        text="Ülke"
+                        text="Countries"
                     />
                     <StatItem
                         icon={<RiMapPinLine />} 
                         number="1000+"
-                        text="Destinasyon"
+                        text="Destinations"
                     />
                 </div>
             </div>
 
-            {/* SAĞ FORM SÜTUNU */}
+            {/* RIGHT FORM COLUMN */}
             <div className="auth-form-column">
                 {children}
             </div>

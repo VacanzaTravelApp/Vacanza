@@ -8,11 +8,56 @@ html, body, #root {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+/*
+** 1. ANA KAPSAYICI (AUTH-CONTAINER): Havadar Mavi Degrade
+*/
 .auth-container {
-    display: flex; /* İki sütunu yan yana hizalar */
-    height: 100vh;
+    min-height: 100vh;
     width: 100%;
+    
+    /* GÜNCEL: Görseldeki en açık, havadar mavi tonları */
+    background: linear-gradient(
+        135deg, 
+        #bfe9ff, /* Çok açık, havadar gökyüzü mavisi (Başlangıç) */
+        #d0eaff, /* Çok açık, soğuk mavi (Orta) */
+        #ffffff  /* Saf Beyaz (Bitiş) */
+    );
+    
+    display: flex;
 }
+
+/* ---------------------------------------------------- */
+/* --- SOL SÜTUN (GÖRSEL) --- (Aynı) */
+
+.auth-visual-column {
+    flex: 1;
+    background-image: url('https://picsum.photos/1000/1000?random=1');
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    color: white; 
+    padding: 60px 40px; 
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; 
+    overflow: hidden;
+}
+
+.auth-visual-column::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4); 
+    z-index: 1;
+}
+
+.auth-visual-column > * {
+    z-index: 2; 
+}
+
 
 /* --- BAŞLIK KISMI STİLLERİ --- */
 
@@ -42,59 +87,26 @@ html, body, #root {
     line-height: 1.4;
 }
 
-/* --- SOL SÜTUN (GÖRSEL) --- */
-
-.auth-visual-column {
-    flex: 1;
-    background-image: url('https://picsum.photos/1000/1000?random=1'); /* BURAYA GÖRSEL YOLUNUZU EKLEYİN */
-    background-size: cover;
-    background-position: center;
-    position: relative;
-    color: white; 
-    padding: 60px 40px; 
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between; 
-    overflow: hidden;
-}
-
-/* Sol sütundaki görselin üzerine hafif koyu katman ekler */
-.auth-visual-column::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.4); 
-    z-index: 1;
-}
-
-.auth-visual-column > * {
-    z-index: 2; 
-}
-
-
 /* --- 4 ÖZELLİK KUTUCUĞU (FEATURE GRID) --- */
 
 .feature-grid { 
     display: grid;
     grid-template-columns: repeat(2, 1fr); 
-    gap: 12px; /* Kutucuklar arası boşluk azaltıldı */
-    margin-top: 30px; /* Header'dan boşluk azaltıldı */
+    gap: 12px; 
+    margin-top: 30px;
 }
 
 .feature-card {
     background: rgba(255, 255, 255, 0.15); 
     backdrop-filter: blur(8px); 
     border-radius: 12px;
-    padding: 15px; /* Padding azaltıldı, kartı küçültür */
+    padding: 15px; 
     border: 1px solid rgba(255, 255, 255, 0.2);
     cursor: default;
     transition: background 0.3s, transform 0.3s;
     
     display: flex;
-    align-items: flex-start; /* İkonu ve metni yukarı hizalar */
+    align-items: flex-start; 
     text-align: left;
     height: auto; 
 }
@@ -105,20 +117,20 @@ html, body, #root {
 }
 
 .card-icon {
-    font-size: 20px; /* İkon boyutu küçültüldü */
-    margin-right: 12px; /* Sağ boşluk azaltıldı */
+    font-size: 20px; 
+    margin-right: 12px; 
     flex-shrink: 0; 
 }
 
 .card-title {
     font-weight: 700;
-    font-size: 15px; /* Başlık fontu küçültüldü */
+    font-size: 15px; 
     margin: 0;
     line-height: 1.2;
 }
 
 .card-description {
-    font-size: 12px; /* Açıklama fontu küçültüldü */
+    font-size: 12px; 
     opacity: 0.8;
     margin-top: 3px;
 }
@@ -128,14 +140,15 @@ html, body, #root {
 
 .stats-container {
     display: flex;
-    justify-content: space-around; /* İstatistikleri aralıklı yayar */
+    justify-content: space-between; 
     padding-top: 25px; 
     margin-top: 40px; 
     border-top: 1px solid rgba(255, 255, 255, 0.3); 
     text-align: center;
+    padding-left: 10px;
+    padding-right: 10px;
 }
 
-/* Her bir istatistik bloğu (StatItem) */
 .stats-container > div {
     display: flex;
     flex-direction: column;
@@ -143,81 +156,51 @@ html, body, #root {
 }
 
 .stat-icon {
-    /* İkon Stili (Yeni eklendi) */
-    font-size: 28px; /* İkonu rakamdan daha büyük yaptık */
+    font-size: 28px; 
     color: #fff;
-    margin-bottom: 5px; /* Rakamdan boşluk */
-    /* İkonları rakamların üstüne taşıyoruz */
+    margin-bottom: 5px;
     order: -1; 
 }
 
 .stat-number {
-    /* İstatistik rakamları için stil */
     font-size: 24px; 
     font-weight: 800; 
     letter-spacing: 1px;
-    margin-bottom: 3px; 
+    margin-bottom: 5px; 
     display: block;
 }
 
 .stat-text {
-    /* Mutlu Gezgin, Ülke vb. metinler için stil */
     font-size: 14px;
     font-weight: 500;
     opacity: 0.8;
-    text-transform: capitalize; /* Baş harfleri büyük */
-    letter-spacing: 0.5px;
-}
-
-/* --- İSTATİSTİK KISMI (ALT ÇUBUK) --- */
-/* JSX'teki .stats-container yapısına göre düzenlendi */
-
-.stats-container {
-    display: flex;
-    justify-content: space-between; /* İstatistikleri yanlara yayar */
-    padding-top: 25px; 
-    margin-top: 40px; 
-    border-top: 1px solid rgba(255, 255, 255, 0.3); /* Üst çizgi */
-    text-align: center;
-    /* İstatistikler arasında boşluk oluşturmak için */
-    padding-left: 10px;
-    padding-right: 10px;
-}
-
-/* Her bir istatistik bloğu (50.000+, Ülke vb.) */
-.stats-container > div {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.stat-number {
-    /* İstatistik rakamları için stil */
-    font-size: 24px; /* Rakam boyutunu artır */
-    font-weight: 800; /* Daha kalın */
-    letter-spacing: 1px;
-    margin-bottom: 5px; /* Metinden ayır */
-    display: block;
-}
-
-.stat-text {
-    /* Mutlu Gezgin, Ülke vb. metinler için stil */
-    font-size: 14px;
-    font-weight: 500;
-    opacity: 0.8;
-    text-transform: uppercase; /* Görseldeki gibi büyük harf */
+    text-transform: uppercase; 
     letter-spacing: 0.5px;
 }
 
 
-/* --- SAĞ SÜTUN (FORM) --- */
-
+/* ---------------------------------------------------- */
+/*
+** 2. SAĞ SÜTUN (FORM)
+*/
 .auth-form-column {
     flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #f7f9fc; 
+    /* Degrade görünmesi için şeffaf */
+    background-color: transparent; 
 }
 
-
+/* ** 3. FORM KARTI GÖLGESİ VE ARKA PLAN 
+** Saf beyazlığı kırar, degradeyi hafifçe yansıtır.
+*/
+.auth-form-column > div { 
+    /* GÜNCEL: %95 Opak beyaz + Hafif Bulanıklık */
+    background-color: rgba(255, 255, 255, 0.95); 
+    backdrop-filter: blur(8px); 
+    
+    /* Gölge ve köşe yuvarlaklığı */
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); 
+    border-radius: 16px; 
+}
