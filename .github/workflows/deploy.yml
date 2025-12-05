@@ -1,28 +1,70 @@
-name: Deploy Backend to DigitalOcean
+name: Deploy Backend + Web to DigitalOcean (Production)
 
 on:
   push:
     branches:
-      - main
+      - Production
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Deploy to DO over SSH
+      - name: Deploy to Production Server Over SSH
+        id: deploy_step
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
-            cd /root/vacanza/Vacanza
-            git pull origin main
+            echo "===== 🚀 STARTING PRODUCTION DEPLOYMENT ====="
 
-            cd /root/vacanza/main
-            docker-compose down
+            ##############################################################
+            # BACKEND DEPLOY
+            ##############################################################
+            echo "➡️ Updating Backend (Production)..."
+            cd /root/vacanza-backend/prod
+            git pull origin Production
+            docker-compose down --remove-orphans
             docker-compose up --build -d
+            echo "✔ Backend Production Deploy Finished!"
+
+            ##############################################################
+            # WEB DEPLOY
+            ##############################################################
+            echo "➡️ Updating Web (Production)..."
+            cd /root/vacanza-web/prod
+            git pull origin Production
+            docker-compose down --remove-orphans
+            docker-compose up --build -d
+            echo "✔ Web Production Deploy Finished!"
+
+            echo "===== 🎉 ALL PRODUCTION SERVICES UPDATED SUCCESSFULLY ====="
+
+
+      ###########################################################################
+      # SUCCESS MATTERMOST NOTIFICATION
+      ###########################################################################
+      - name: Mattermost Success Notification
+        if: success()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ secrets.MM_WEBHOOK_URL }}
+          method: 'POST'
+          data: '{"username":"CI/CD Bot","icon_url":"https://cdn-icons-png.flaticon.com/512/5968/5968853.png","text":":rocket: **Production Deploy Successful!**\nBranch: Production\nServices: Backend + Web\nStatus: Completed"}'
+
+
+      ###########################################################################
+      # FAILURE MATTERMOST NOTIFICATION
+      ###########################################################################
+      - name: Mattermost Failure Notification
+        if: failure()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ secrets.MM_WEBHOOK_URL }}
+          method: 'POST'
+          data: '{"username":"CI/CD Bot","icon_url":"https://cdn-icons-png.flaticon.com/512/5968/5968853.png","text":":rotating_light: **Production Deploy FAILED!**\nBranch: Production\nCheck GitHub Actions logs."}'
