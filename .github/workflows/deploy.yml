@@ -3,7 +3,7 @@ name: Deploy Backend + Web to DigitalOcean (Production)
 on:
   push:
     branches:
-      - Production   # büyük P !!
+      - Production
 
 jobs:
   deploy:
@@ -13,10 +13,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-
-      ###########################################################################
-      # SSH DEPLOY OPERATIONS — SAME LOGIC AS OLD MAIN WORKFLOW, BUT FOR PROD
-      ###########################################################################
       - name: Deploy to Production Server Over SSH
         id: deploy_step
         uses: appleboy/ssh-action@v1.0.3
@@ -25,34 +21,26 @@ jobs:
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
-
             echo "===== 🚀 STARTING PRODUCTION DEPLOYMENT ====="
 
             ##############################################################
-            # BACKEND DEPLOY — Similar to old 'main' workflow
+            # BACKEND DEPLOY
             ##############################################################
             echo "➡️ Updating Backend (Production)..."
-
             cd /root/vacanza-backend/prod
             git pull origin Production
-
             docker-compose down --remove-orphans
             docker-compose up --build -d
-
             echo "✔ Backend Production Deploy Finished!"
 
-
             ##############################################################
-            # WEB DEPLOY — Same method but for vacanza-web
+            # WEB DEPLOY
             ##############################################################
             echo "➡️ Updating Web (Production)..."
-
             cd /root/vacanza-web/prod
             git pull origin Production
-
             docker-compose down --remove-orphans
             docker-compose up --build -d
-
             echo "✔ Web Production Deploy Finished!"
 
             echo "===== 🎉 ALL PRODUCTION SERVICES UPDATED SUCCESSFULLY ====="
@@ -67,15 +55,7 @@ jobs:
         with:
           url: ${{ secrets.MM_WEBHOOK_URL }}
           method: 'POST'
-          data: >
-            {
-              "username": "CI/CD Bot",
-              "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": ":rocket: **Production Deploy Successful!**\n
-                      Branch: *Production*\n
-                      Updated: **Backend + Web**\n
-                      Status: :white_check_mark: Completed\n"
-            }
+          data: '{"username":"CI/CD Bot","icon_url":"https://cdn-icons-png.flaticon.com/512/5968/5968853.png","text":":rocket: **Production Deploy Successful!**\nBranch: Production\nServices: Backend + Web\nStatus: Completed"}'
 
 
       ###########################################################################
@@ -87,12 +67,4 @@ jobs:
         with:
           url: ${{ secrets.MM_WEBHOOK_URL }}
           method: 'POST'
-          data: >
-            {
-              "username": "CI/CD Bot",
-              "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": ":rotating_light: **Production Deploy FAILED!**\n
-                      Branch: *Production*\n
-                      Please check GitHub Actions logs.\n
-                      Status: :x: Failed\n"
-            }
+          data: '{"username":"CI/CD Bot","icon_url":"https://cdn-icons-png.flaticon.com/512/5968/5968853.png","text":":rotating_light: **Production Deploy FAILED!**\nBranch: Production\nCheck GitHub Actions logs."}'
