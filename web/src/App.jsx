@@ -2,7 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import AuthLayout from './pages/auth/AuthLayout';
-import RegisterCard from './pages/auth/Registercard';
+import RegisterCard from './pages/auth/RegisterCard';
 import LoginCard from './pages/auth/LoginCard';
 import './pages/auth/AuthLayout.css'; 
 
