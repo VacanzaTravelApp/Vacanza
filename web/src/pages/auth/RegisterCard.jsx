@@ -1,8 +1,8 @@
 // src/pages/auth/RegisterCard.jsx
 
-import React from 'react';
-// Ant Design bileşenleri ve hook'ları
-import { Form, Input, Button, Checkbox, Row, Col, Space } from 'antd'; 
+import React, { useState } from 'react';
+// Ant Design bileşenleri, hook'ları ve mesajlar
+import { Form, Input, Button, Checkbox, Row, Col, Space, message } from 'antd'; 
 // Kullanılacak Ant Design ikonları
 import { 
   UserOutlined, 
@@ -15,9 +15,13 @@ import {
 import './RegisterCard.css'; 
 import { useNavigate } from 'react-router-dom';
 
-// PasswordChecks Bileşeni (Değişmedi - Ant Design İkonları ile)
+// 🚀 FIREBASE İMPORTLARI (STANDARTLAŞTIRILMIŞ)
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+// 🚨 GÜNCEL VE DAHA GÜVENİLİR IMPORT ŞEKLİ (firebase.js'i default export yaptığınızı varsayarak)
+import auth from '../../firebase'; 
+
+// PasswordChecks Bileşeni (Aynı kalır)
 const PasswordChecks = ({ password }) => {
-    // Şifre kontrolleri
     const checks = [
         { text: '8+ characters', valid: password && password.length >= 8 },
         { text: '1+ uppercase', valid: /[A-Z]/.test(password) },
@@ -53,14 +57,51 @@ const PasswordChecks = ({ password }) => {
 
 const RegisterCard = () => {
   const navigate = useNavigate(); 
-  
   const [form] = Form.useForm(); 
   const password = Form.useWatch('password', form); 
+  const [loading, setLoading] = useState(false); 
 
-  const onFinish = (values) => {
-    console.log('Registration Successful:', values);
-    alert('Registration form successfully processed (Demo).');
+  // GÜNCEL: Form gönderildiğinde Firebase kaydını deneyecek fonksiyon
+  const onFinish = async (values) => {
+    setLoading(true);
+    // 🚨 DÜZELTME: Sadece e-posta ve şifreyi alıyoruz (Linter uyarısını giderir)
+    const { email, password } = values; 
+
+    try {
+        // 🔥 FIREBASE KAYIT İŞLEMİ
+        // 🚨 DÜZELTME: userCredential değişkenini tanımlamadan fonksiyonu doğrudan çalıştırıyoruz
+        await createUserWithEmailAndPassword(auth, email, password);
+        
+        // Opsiyonel: Kullanıcı adını (displayName) Firebase'e kaydetme (Yorum satırında kaldı)
+        /* // Eğer bu kısmı kullanmak isterseniz, userCredential'ı geri getirmelisiniz.
+        await updateProfile(auth.currentUser, {
+            displayName: `${values.firstName} ${values.lastName}`
+        });
+        */
+        
+        // BAŞARILI: Kullanıcıyı /map sayfasına yönlendir
+        message.success('Kayıt başarılı! Haritaya yönlendiriliyorsunuz.');
+        console.log('Registration Successful, redirecting to /map');
+        navigate('/map'); 
+
+    } catch (error) {
+        // HATA: Firebase hata mesajlarını yakala ve kullanıcıya göster
+        console.error("Firebase Kayıt Hatası:", error.code, error.message);
+        
+        let errorMessage = "Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "Bu e-posta adresi zaten kullanımda.";
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = "Geçersiz e-posta formatı.";
+        }
+
+        message.error(errorMessage);
+
+    } finally {
+        setLoading(false); // İşlem bitince yükleme durumunu kapat
+    }
   };
+
 
   const handleLoginRedirect = () => {
     navigate('/login'); 
@@ -87,9 +128,9 @@ const RegisterCard = () => {
         layout="vertical" 
         className="auth-form"
       >
-        {/* FIRST NAME ve MIDDLE NAME - YAN YANA (Ekran Görüntüsüne Uygun) */}
+        {/* FIRST NAME ve MIDDLE NAME - YAN YANA (Aynı kalır) */}
         <Row gutter={12}>
-            {/* First Name (Span 12) */}
+            {/* First Name */}
             <Col span={12}>
                 <Form.Item
                     name="firstName"
@@ -104,11 +145,10 @@ const RegisterCard = () => {
                 </Form.Item>
             </Col>
 
-            {/* Middle Name (Span 12) - Görünür oldu */}
+            {/* Middle Name */}
             <Col span={12}>
                 <Form.Item
                     name="middleName"
-                    // Zorunlu değil
                 >
                     <Input 
                         prefix={<UserOutlined />} 
@@ -119,7 +159,7 @@ const RegisterCard = () => {
             </Col>
         </Row>
 
-        {/* LAST NAME - ALT ALTA (Tam Genişlik) */}
+        {/* LAST NAME - ALT ALTA (Aynı kalır) */}
         <Form.Item
             name="lastName"
             rules={[{ required: true, message: 'Please enter your last name!' }]}
@@ -133,7 +173,7 @@ const RegisterCard = () => {
         </Form.Item>
 
 
-        {/* E-posta inputu (Değişmedi) */}
+        {/* E-posta inputu (Aynı kalır) */}
         <Form.Item
           name="email"
           rules={[
@@ -149,7 +189,7 @@ const RegisterCard = () => {
           />
         </Form.Item>
 
-        {/* Şifre (Password) inputu (Değişmedi) */}
+        {/* Şifre (Password) inputu (Aynı kalır) */}
         <Form.Item
           name="password"
           rules={[{ required: true, message: 'Please input your Password!' }]}
@@ -163,11 +203,11 @@ const RegisterCard = () => {
           />
         </Form.Item>
         
-        {/* Dinamik Password Checks Bileşeni (Değişmedi) */}
+        {/* Dinamik Password Checks Bileşeni (Aynı kalır) */}
         <PasswordChecks password={password} /> 
 
 
-        {/* Şifreyi Onayla (Confirm Password) inputu (Değişmedi) */}
+        {/* Şifreyi Onayla (Confirm Password) inputu (Aynı kalır) */}
         <Form.Item
           name="confirmPassword"
           dependencies={['password']}
@@ -192,7 +232,7 @@ const RegisterCard = () => {
           />
         </Form.Item>
 
-        {/* Onay ve Şartlar (Değişmedi) */}
+        {/* Onay ve Şartlar (Aynı kalır) */}
         <Form.Item
           name="agreedToTerms"
           valuePropName="checked"
@@ -208,16 +248,22 @@ const RegisterCard = () => {
             </Checkbox>
         </Form.Item>
 
-        {/* Kayıt Butonu (Değişmedi) */}
+        {/* Kayıt Butonu (Aynı kalır) */}
         <Form.Item>
-          <Button type="primary" htmlType="submit" className="cta-button" size="large">
+          <Button 
+            type="primary" 
+            htmlType="submit" 
+            className="cta-button" 
+            size="large"
+            loading={loading}
+          >
             Start Your Adventure
           </Button>
         </Form.Item>
       </Form>
 
 
-      {/* Giriş Yap Yönlendirmesi (Değişmedi) */}
+      {/* Giriş Yap Yönlendirmesi (Aynı kalır) */}
       <div className="login-redirect">
         Already have a Vacanza account? 
         <span onClick={handleLoginRedirect} className="login-link">

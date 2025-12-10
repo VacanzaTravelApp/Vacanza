@@ -17,5 +17,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Export Firebase services
-export const auth = getAuth(app);
-export default app;
+export const auth = getAuth(app); 
+
+// GÜNCEL: Auth objesini de default olarak dışa aktarıyoruz. 
+// Bu, hem LoginCard hem de RegisterCard'daki import hatalarını düzeltir.
+export default auth; 
+
+// Not: Artık "export default app;" yerine "export default auth;" kullanıyoruz.
