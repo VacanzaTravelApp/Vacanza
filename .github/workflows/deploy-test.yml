@@ -1,9 +1,9 @@
-name: 🚀 Deploy Backend + Web to DigitalOcean (Production)
+name: 🚀 Deploy Backend + Web to DigitalOcean (Test)
 
 on:
   push:
     branches:
-      - Production
+      - Test
 
 jobs:
   deploy:
@@ -13,8 +13,8 @@ jobs:
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
 
-      - name: 🚀 Deploy to Production Server Over SSH
-        id: deploy_prod
+      - name: 🚀 Deploy to Test Server Over SSH
+        id: deploy_test
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
@@ -24,56 +24,56 @@ jobs:
             echo "===== 🚀 STARTING PRODUCTION DEPLOYMENT ====="
 
             ##############################################################
-            # BACKEND DEPLOY (Production)
+            # BACKEND DEPLOY (Test)
             ##############################################################
-            echo "🔥 Updating Backend (Production)..."
-            cd /root/vacanza-backend/prod
-            git pull origin Production
+            echo "🔥 Updating Backend (Test)..."
+            cd /root/vacanza-backend/test
+            git pull origin Test
             docker-compose down --remove-orphans
             docker-compose up --build -d
-            echo "✔ Backend Production Deploy Finished!"
+            echo "✔ Backend Test Deploy Finished!"
 
             ##############################################################
-            # WEB DEPLOY (Production)
+            # WEB DEPLOY (Test)
             ##############################################################
-            echo "🌍 Updating Web (Production)..."
-            cd /root/vacanza-web/prod
-            git pull origin Production
+            echo "🌍 Updating Web (Test)..."
+            cd /root/vacanza-web/test
+            git pull origin Test
             docker-compose down --remove-orphans
             docker-compose up --build -d
-            echo "✔ Web Production Deploy Finished!"
+            echo "✔ Web Test Deploy Finished!"
 
-            echo "===== 🎉 ALL PRODUCTION SERVICES UPDATED SUCCESSFULLY ====="
+            echo "===== 🎉 ALL Test SERVICES UPDATED SUCCESSFULLY ====="
 
 
       ###########################################################################
       # SUCCESS MATTERMOST NOTIFICATION
       ###########################################################################
-      - name: 📢 Mattermost Success Notification (Production)
+      - name: 📢 Mattermost Success Notification (Test)
         if: success()
         uses: fjogeleit/http-request-action@v1
         with:
-          url: ${{ secrets.MM_WEBHOOK_URL }}   # PROD WEBHOOK
+          url: ${{ secrets.MM_WEBHOOK_TEST_URL }}   # PROD WEBHOOK
           method: 'POST'
           data: >
             {
               "username": "CI/CD Bot",
               "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": "🚀 **Production Deploy Successful!**\n\n🌍 Environment: **Production**\n🛠 Services Updated: **Backend + Web**\n✨ Status: **Success**\n🔔 Time: `$(date)`"
+              "text": "🚀 **Test Deploy Successful!**\n\n🌍 Environment: **Test**\n🛠 Services Updated: **Backend + Web**\n✨ Status: **Success**\n🔔 Time: `$(date)`"
             }
 
       ###########################################################################
       # FAILURE MATTERMOST NOTIFICATION
       ###########################################################################
-      - name: ❌ Mattermost Failure Notification (Production)
+      - name: ❌ Mattermost Failure Notification (Test)
         if: failure()
         uses: fjogeleit/http-request-action@v1
         with:
-          url: ${{ secrets.MM_WEBHOOK_URL }}
+          url: ${{ secrets.MM_WEBHOOK_TEST_URL }}
           method: 'POST'
           data: >
             {
               "username": "CI/CD Bot",
               "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": "❌ **Production Deploy FAILED!**\n\n🚨 Environment: **Production**\n📛 Please check GitHub Actions logs.\n🕒 Time: `$(date)`"
+              "text": "❌ **Test Deploy FAILED!**\n\n🚨 Environment: **Test**\n📛 Please check GitHub Actions logs.\n🕒 Time: `$(date)`"
             }
