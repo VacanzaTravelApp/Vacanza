@@ -1,1 +1,0 @@
-Bu kısımda endpointlerden giden jsonun yapısı kontrolü sağlanmaktadır

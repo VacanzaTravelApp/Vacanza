@@ -1,4 +1,4 @@
-package com.vacanza.backend.dto.respond;
+package com.vacanza.backend.dto.response;
 
 import lombok.*;
 
@@ -10,7 +10,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class LoginHistoryDtoRespond {
+public class UserLoginHistoryResponseDTO {
 
     private UUID loginId;
     private UUID userId;

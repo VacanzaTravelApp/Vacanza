@@ -12,7 +12,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoginHistoryDtoRequest {
+public class UserLoginHistoryRequestDTO {
     private UUID loginId;
     private UUID userId;
     private String loginProvider;
