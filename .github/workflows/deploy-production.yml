@@ -20,6 +20,7 @@ jobs:
 
       - name: 🚀 Deploy to Production Server Over SSH
         id: deploy_prod
+        continue-on-error: true
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
