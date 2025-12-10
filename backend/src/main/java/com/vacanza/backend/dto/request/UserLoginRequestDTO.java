@@ -12,14 +12,13 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+//muhtemelen kullanilmayacak
 public class UserLoginRequestDTO {
     @NotBlank(message = "Email is required")
     @Email(message = "Email must be valid")
     private String email;
 
-    //Password is required
     @NotBlank(message = "Invalid password")
-    //Password must be at least 8 characters
     @Size(min = 8, max = 100, message = "Invalid password")
     private String password;
 }
