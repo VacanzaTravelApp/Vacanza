@@ -20,6 +20,7 @@ jobs:
 
       - name: 🚀 Deploy to Test Server Over SSH
         id: deploy_test
+        continue-on-error: true
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_TEST_HOST }}
