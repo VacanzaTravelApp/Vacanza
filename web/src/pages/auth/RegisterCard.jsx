@@ -15,9 +15,8 @@ import {
 import './RegisterCard.css'; 
 import { useNavigate } from 'react-router-dom';
 
-// 🚀 FIREBASE İMPORTLARI (STANDARTLAŞTIRILMIŞ)
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-// 🚨 GÜNCEL VE DAHA GÜVENİLİR IMPORT ŞEKLİ (firebase.js'i default export yaptığınızı varsayarak)
+// 🚀 FIREBASE İMPORTLARI (Gerekli fonksiyonlar eklendi)
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // <-- updateProfile EKLENDİ
 import auth from '../../firebase'; 
 
 // PasswordChecks Bileşeni (Aynı kalır)
@@ -64,20 +63,18 @@ const RegisterCard = () => {
   // GÜNCEL: Form gönderildiğinde Firebase kaydını deneyecek fonksiyon
   const onFinish = async (values) => {
     setLoading(true);
-    // 🚨 DÜZELTME: Sadece e-posta ve şifreyi alıyoruz (Linter uyarısını giderir)
-    const { email, password } = values; 
+    // 🚀 GÜNCELLEME: Tüm gerekli alanları values'tan çekiyoruz
+    const { email, password, firstName, lastName } = values; 
 
     try {
-        // 🔥 FIREBASE KAYIT İŞLEMİ
-        // 🚨 DÜZELTME: userCredential değişkenini tanımlamadan fonksiyonu doğrudan çalıştırıyoruz
-        await createUserWithEmailAndPassword(auth, email, password);
+        // 🔥 FIREBASE KAYIT İŞLEMİ (userCredential'ı yakalamak zorundayız!)
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
-        // Opsiyonel: Kullanıcı adını (displayName) Firebase'e kaydetme (Yorum satırında kaldı)
-        /* // Eğer bu kısmı kullanmak isterseniz, userCredential'ı geri getirmelisiniz.
-        await updateProfile(auth.currentUser, {
-            displayName: `${values.firstName} ${values.lastName}`
+        // 🔥 GÜNCELLEME: Kullanıcının Adını ve Soyadını (Display Name) Firebase'e kaydetme
+        // Bu bilgi, MapPage.jsx'te otomatik olarak çekilecektir.
+        await updateProfile(userCredential.user, {
+            displayName: `${firstName} ${lastName}` 
         });
-        */
         
         // BAŞARILI: Kullanıcıyı /map sayfasına yönlendir
         message.success('Kayıt başarılı! Haritaya yönlendiriliyorsunuz.');
@@ -93,6 +90,8 @@ const RegisterCard = () => {
             errorMessage = "Bu e-posta adresi zaten kullanımda.";
         } else if (error.code === 'auth/invalid-email') {
             errorMessage = "Geçersiz e-posta formatı.";
+        } else if (error.code === 'auth/weak-password') {
+             errorMessage = "Şifre çok zayıf. Lütfen daha güçlü bir şifre kullanın.";
         }
 
         message.error(errorMessage);
