@@ -1,5 +1,6 @@
 package com.vacanza.backend.entity;
 
+import com.vacanza.backend.entity.enums.Budget;
 import com.vacanza.backend.entity.enums.Gender;
 import jakarta.persistence.*;
 import lombok.*;
@@ -64,6 +65,11 @@ public class UserInfo {
     @Column(name = "preferred_language", length = 10)
     private String preferredLanguage;
      */
+
+    //budget enum eklendi
+    @Enumerated(EnumType.STRING)
+    @Column(name = "budget", length = 20)
+    private Budget budget;
 
     @Column(name = "profile_image_url")
     private String profileImageUrl;
