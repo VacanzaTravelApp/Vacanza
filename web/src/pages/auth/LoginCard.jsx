@@ -1,28 +1,55 @@
 // src/pages/auth/LoginCard.jsx
 
-import React from 'react';
-import { Form, Input, Button, Space } from 'antd'; // Checkbox kaldırıldı
+import React, { useState } from 'react'; // 👈 useState eklendi
+import { Form, Input, Button, Space, message } from 'antd'; // 👈 message eklendi
 import { 
     LockOutlined, 
     MailOutlined, 
-    SendOutlined, // Logo ikonu eklendi 
-    // Alt navigasyon ikonları (GlobalOutlined, TeamOutlined, SettingOutlined) kaldırıldı
+    SendOutlined, 
 } from '@ant-design/icons';
 import './RegisterCard.css'; 
 
 import { useNavigate } from 'react-router-dom';
 
+// 🚀 FIREBASE İMPORTLARI EKLENDİ
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../firebase'; // 👈 Kendi firebase.js dosyanızdan auth objesini import edin
+
 const LoginCard = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false); // 👈 Yükleme durumu eklendi
 
-  const onFinish = (values) => {
-    console.log('Login Successful:', values);
-    alert('Login successful! Redirecting to homepage.');
-    // navigate('/dashboard'); 
+  // GÜNCEL: Form gönderildiğinde Firebase girişini deneyecek fonksiyon
+  const onFinish = async (values) => {
+    setLoading(true);
+    const { email, password } = values; // Ant Design formundan e-posta ve şifreyi al
+
+    try {
+        // 🔥 FIREBASE GİRİŞ İŞLEMİ
+        await signInWithEmailAndPassword(auth, email, password);
+        
+        // BAŞARILI: Kullanıcıyı /map sayfasına yönlendir
+        message.success('Giriş başarılı! Haritaya yönlendiriliyorsunuz.');
+        console.log('Login Successful, redirecting to /map');
+        navigate('/map'); 
+
+    } catch (error) {
+        // HATA: Firebase hata mesajlarını yakala ve kullanıcıya göster
+        console.error("Firebase Giriş Hatası:", error.code, error.message);
+        
+        let errorMessage = "Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.";
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            errorMessage = "Kullanıcı adı veya şifre hatalı.";
+        }
+
+        message.error(errorMessage);
+
+    } finally {
+        setLoading(false); // İşlem bitince yükleme durumunu kapat
+    }
   };
 
   const handleRegisterRedirect = () => {
-    // '/register' yoluna yönlendirir
     navigate('/register'); 
   };
   
@@ -33,10 +60,12 @@ const LoginCard = () => {
 
 
   return (
-    <div className="register-card"> {/* Stil için RegisterCard CSS kullanılıyor */}
+    // ... (JSX kodunun geri kalanı aynı kalır) ...
+
+    <div className="register-card"> 
       <div className="card-header">
         <span className="vacanza-logo">
-            <SendOutlined className="logo-icon" /> {/* Logo ikonu eklendi */}
+            <SendOutlined className="logo-icon" /> 
             Vacanza
         </span>
         <h3>Welcome Back to Vacanza</h3>
@@ -48,7 +77,7 @@ const LoginCard = () => {
       <Form
         name="login"
         initialValues={{ remember: true }}
-        onFinish={onFinish} 
+        onFinish={onFinish} // 👈 Güncellenmiş fonksiyonu kullanıyoruz
         layout="vertical"
         className="auth-form"
       >
@@ -83,7 +112,6 @@ const LoginCard = () => {
 
         {/* Şifremi Unuttum? Linki */}
         <div className="login-options-row">
-            {/* Boşluk bırakmak için yer tutucu kullanıyoruz (CSS'teki flex-end için) */}
             <span className="remember-me-placeholder"></span> 
             
             <span onClick={handleForgotPassword} className="forgot-password-link">
@@ -92,13 +120,17 @@ const LoginCard = () => {
         </div>
 
         {/* Giriş Butonu */}
-        <Form.Item style={{ marginTop: '20px' }}> {/* Butonun üstüne boşluk ekledik */}
-          <Button type="primary" htmlType="submit" className="cta-button" size="large">
+        <Form.Item style={{ marginTop: '20px' }}>
+          <Button 
+            type="primary" 
+            htmlType="submit" 
+            className="cta-button" 
+            size="large"
+            loading={loading} // 👈 Yükleme durumunu butona bağladık
+          >
             Log In
           </Button>
         </Form.Item>
-        
-        {/* Alt Navigasyon (Özellik Butonları) bu tasarımda olmadığı için kaldırıldı. */}
       </Form>
 
 

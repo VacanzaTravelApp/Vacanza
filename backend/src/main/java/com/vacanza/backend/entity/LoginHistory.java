@@ -22,7 +22,7 @@ public class LoginHistory {
     @Column(name = "login_id", nullable = false, updatable = false)
     private UUID loginId;
 
-    // FK: users.user_id
+    // FK: users.user_id (user tablosu ile iliskilendirme)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

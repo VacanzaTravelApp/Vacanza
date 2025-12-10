@@ -10,4 +10,6 @@ npm install antd @ant-design/icons react-icons react-router-dom
 
 npm run dev
 
-damla
+## 3. Firebase için
+
+npm install firebase react-router-dom

@@ -1,11 +1,14 @@
 package com.vacanza.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.vacanza.backend.entity.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -21,6 +24,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+
 public class User {
 
     @Id
@@ -41,6 +45,13 @@ public class User {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    //relationship alani (kullanici birden fazla historye sahip olabilir
+    //json serialization loopu engelliyor
+    //kullanici silinirse ona bagli historyler de silinecek (cascase ile)
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JsonIgnore
+    private List<LoginHistory> loginHistoryList = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
