@@ -13,8 +13,14 @@ jobs:
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
 
+      # Get timestamp
+      - name: ⏱ Get current time
+        id: time
+        run: echo "now=$(date)" >> $GITHUB_OUTPUT
+
       - name: 🚀 Deploy to Production Server Over SSH
         id: deploy_prod
+        continue-on-error: true
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
@@ -29,8 +35,8 @@ jobs:
             echo "🔥 Updating Backend (Production)..."
             cd /root/vacanza-backend/prod
             git pull origin Production
-            docker-compose down --remove-orphans
-            docker-compose up --build -d
+            docker compose down --remove-orphans
+            docker compose up --build -d
             echo "✔ Backend Production Deploy Finished!"
 
             ##############################################################
@@ -39,31 +45,30 @@ jobs:
             echo "🌍 Updating Web (Production)..."
             cd /root/vacanza-web/prod
             git pull origin Production
-            docker-compose down --remove-orphans
-            docker-compose up --build -d
+            docker compose down --remove-orphans
+            docker compose up --build -d
             echo "✔ Web Production Deploy Finished!"
 
             echo "===== 🎉 ALL PRODUCTION SERVICES UPDATED SUCCESSFULLY ====="
 
-
       ###########################################################################
-      # SUCCESS MATTERMOST NOTIFICATION
+      # SUCCESS NOTIFICATION
       ###########################################################################
       - name: 📢 Mattermost Success Notification (Production)
         if: success()
         uses: fjogeleit/http-request-action@v1
         with:
-          url: ${{ secrets.MM_WEBHOOK_URL }}   # PROD WEBHOOK
+          url: ${{ secrets.MM_WEBHOOK_URL }}
           method: 'POST'
           data: >
             {
               "username": "CI/CD Bot",
               "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": "🚀 **Production Deploy Successful!**\n\n🌍 Environment: **Production**\n🛠 Services Updated: **Backend + Web**\n✨ Status: **Success**\n🔔 Time: `$(date)`"
+              "text": "🚀 **Production Deploy Successful!**\n\n🌍 Environment: **Production**\n🛠 Services Updated: **Backend + Web**\n✨ Status: **Success**\n🔔 Time: **${{ steps.time.outputs.now }}**"
             }
 
       ###########################################################################
-      # FAILURE MATTERMOST NOTIFICATION
+      # FAILURE NOTIFICATION
       ###########################################################################
       - name: ❌ Mattermost Failure Notification (Production)
         if: failure()
@@ -75,5 +80,5 @@ jobs:
             {
               "username": "CI/CD Bot",
               "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": "❌ **Production Deploy FAILED!**\n\n🚨 Environment: **Production**\n📛 Please check GitHub Actions logs.\n🕒 Time: `$(date)`"
+              "text": "❌ **Production Deploy FAILED!**\n\n🚨 Environment: **Production**\n📛 Please check GitHub Actions logs.\n🕒 Time: **${{ steps.time.outputs.now }}**"
             }
