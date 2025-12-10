@@ -13,15 +13,20 @@ jobs:
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
 
+      # Get timestamp
+      - name: ⏱ Get current time
+        id: time
+        run: echo "now=$(date)" >> $GITHUB_OUTPUT
+
       - name: 🚀 Deploy to Test Server Over SSH
         id: deploy_test
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DO_HOST }}
+          host: ${{ secrets.DO_TEST_HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
-            echo "===== 🚀 STARTING PRODUCTION DEPLOYMENT ====="
+            echo "===== 🚀 STARTING TEST DEPLOYMENT ====="
 
             ##############################################################
             # BACKEND DEPLOY (Test)
@@ -29,8 +34,8 @@ jobs:
             echo "🔥 Updating Backend (Test)..."
             cd /root/vacanza-backend/test
             git pull origin Test
-            docker-compose down --remove-orphans
-            docker-compose up --build -d
+            docker compose down --remove-orphans
+            docker compose up --build -d
             echo "✔ Backend Test Deploy Finished!"
 
             ##############################################################
@@ -39,31 +44,30 @@ jobs:
             echo "🌍 Updating Web (Test)..."
             cd /root/vacanza-web/test
             git pull origin Test
-            docker-compose down --remove-orphans
-            docker-compose up --build -d
+            docker compose down --remove-orphans
+            docker compose up --build -d
             echo "✔ Web Test Deploy Finished!"
 
-            echo "===== 🎉 ALL Test SERVICES UPDATED SUCCESSFULLY ====="
-
+            echo "===== 🎉 ALL TEST SERVICES UPDATED SUCCESSFULLY ====="
 
       ###########################################################################
-      # SUCCESS MATTERMOST NOTIFICATION
+      # SUCCESS NOTIFICATION
       ###########################################################################
       - name: 📢 Mattermost Success Notification (Test)
         if: success()
         uses: fjogeleit/http-request-action@v1
         with:
-          url: ${{ secrets.MM_WEBHOOK_TEST_URL }}   # PROD WEBHOOK
+          url: ${{ secrets.MM_WEBHOOK_TEST_URL }}
           method: 'POST'
           data: >
             {
               "username": "CI/CD Bot",
               "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": "🚀 **Test Deploy Successful!**\n\n🌍 Environment: **Test**\n🛠 Services Updated: **Backend + Web**\n✨ Status: **Success**\n🔔 Time: `$(date)`"
+              "text": "🚀 **Test Deploy Successful!**\n\n🌍 Environment: **Test**\n🛠 Services Updated: **Backend + Web**\n✨ Status: **Success**\n🔔 Time: **${{ steps.time.outputs.now }}**"
             }
 
       ###########################################################################
-      # FAILURE MATTERMOST NOTIFICATION
+      # FAILURE NOTIFICATION
       ###########################################################################
       - name: ❌ Mattermost Failure Notification (Test)
         if: failure()
@@ -75,5 +79,5 @@ jobs:
             {
               "username": "CI/CD Bot",
               "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": "❌ **Test Deploy FAILED!**\n\n🚨 Environment: **Test**\n📛 Please check GitHub Actions logs.\n🕒 Time: `$(date)`"
+              "text": "❌ **Test Deploy FAILED!**\n\n🚨 Environment: **Test**\n📛 Please check GitHub Actions logs.\n🕒 Time: **${{ steps.time.outputs.now }}**"
             }
