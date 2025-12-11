@@ -3,6 +3,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/animated_background.dart';
 import '../widgets/register_form.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
