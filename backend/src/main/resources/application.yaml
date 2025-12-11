@@ -5,6 +5,9 @@ spring:
   application:
     name: vacanza-backend
 
+  profiles:
+    active: dev # security kapatmak için dev ortamına ayarladım
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
