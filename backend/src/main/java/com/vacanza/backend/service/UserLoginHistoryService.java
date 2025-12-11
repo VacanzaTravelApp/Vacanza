@@ -17,12 +17,12 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-public class UserUserLoginHistoryService implements UserLoginHistoryImpl {
+public class UserLoginHistoryService implements UserLoginHistoryImpl {
 
     private final UserLoginHistoryRepository userLoginHistoryRepository;
     private final UserRepository userRepository;
 
-    public UserUserLoginHistoryService(UserLoginHistoryRepository userLoginHistoryRepository, UserRepository userRepository) {
+    public UserLoginHistoryService(UserLoginHistoryRepository userLoginHistoryRepository, UserRepository userRepository) {
         this.userLoginHistoryRepository = userLoginHistoryRepository;
         this.userRepository = userRepository;
     }
