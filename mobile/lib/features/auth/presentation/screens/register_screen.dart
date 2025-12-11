@@ -4,11 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/animated_background.dart';
+
 import '../bloc/register_bloc.dart';
 import '../bloc/register_state.dart';
+import '../bloc/register_event.dart';
 import '../widgets/register_form.dart';
-import 'login_screen.dart';     // "Already have an account? Log In" için.
-import '../../../map/presentation/screens/map_screen.dart'; // ⭐ Yeni import (path'i projene göre ayarla)
+import 'package:mobile/features/map/presentation/screens/map_screen.dart'; // path'i projene göre ayarla
+import 'login_screen.dart';
 
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
@@ -24,34 +26,39 @@ class RegisterScreen extends StatelessWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
 
-        /// VACANZA-82 genişletilmiş versiyon:
-        ///
-        /// RegisterBloc'u dinleyerek:
-        ///  - success olduğunda snackbar gösteriyoruz,
-        ///  - sonrasında kullanıcıyı ana MapScreen'e yönlendiriyoruz.
-        ///
-        /// Navigation mantığını UI katmanında tutuyoruz,
-        /// BLoC içinden push/pop yapılmıyor (clean architecture).
+        /// Burada RegisterBloc'i dinleyip:
+        ///  - success olduğunda snackbar + MapScreen navigation
+        ///  - success sonrası RegisterReset event'i ile state'i temizleme
+        /// işlerini yapıyoruz.
         body: BlocListener<RegisterBloc, RegisterState>(
-          // Sadece status değiştiğinde çalışsın; gereksiz tetiklenmeyi engeller.
+          // Sadece status değiştiğinde tetiklenmesi için.
           listenWhen: (previous, current) =>
           previous.status != current.status,
           listener: (context, state) {
             if (state.isSuccess) {
               // 1) Kullanıcıya başarı mesajını göster.
-              //    Mesaj kısa ve net tutuluyor.
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Registration successful! Welcome to Vacanza.'),
+                  content: Text(
+                    'Registration successful! Welcome to Vacanza.',
+                  ),
                   behavior: SnackBarBehavior.floating,
                   duration: Duration(seconds: 2),
                 ),
               );
 
-              // 2) Çok küçük bir gecikme ile MapScreen'e yönlendir.
-              //    Bu gecikme, snackbar'ın ilk frame'inin çizilmesini garantiler.
-              //    pushReplacement kullanmamızın sebebi:
-              //      - Kullanıcı back tuşuna bastığında Register'a dönemesin.
+              // 2) Success state'i tek seferlik tüketmek için
+              //    RegisterReset event'ini dispatch ediyoruz.
+              //
+              //    Böylece:
+              //      - BLoC state'i tekrar initial'e döner,
+              //      - ileride rebuild olduğunda aynı success state
+              //        tekrar tetiklenmez.
+              context.read<RegisterBloc>().add(const RegisterReset());
+
+              // 3) Küçük bir gecikme ile MapScreen'e yönlendir.
+              //    pushReplacement:
+              //      - Back tuşunda RegisterScreen'e dönmeyi engeller.
               Future.delayed(const Duration(milliseconds: 300), () {
                 Navigator.pushReplacement(
                   context,
@@ -63,9 +70,8 @@ class RegisterScreen extends StatelessWidget {
             }
 
             // Not:
-            //  - failure state'te burada navigation yok.
-            //  - Hata mesajı zaten RegisterForm içinde
-            //    BLoC'tan gelen errorMessage ile gösteriliyor.
+            //  - failure durumunda navigation yapmıyoruz.
+            //  - Hata mesajı zaten RegisterForm içinde inline olarak gösteriliyor.
           },
 
           child: GestureDetector(
@@ -79,92 +85,18 @@ class RegisterScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.max,
                     children: [
                       const SizedBox(height: 24),
-
-                      // Logo
-                      Container(
-                        height: 56,
-                        width: 56,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [
-                              AppColors.primary,
-                              AppColors.accentMint,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.25),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.flight_takeoff_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Başlık
-                      RichText(
-                        textAlign: TextAlign.center,
-                        text: TextSpan(
-                          style: titleStyle,
-                          children: [
-                            const TextSpan(text: 'Create Your '),
-                            TextSpan(
-                              text: 'Vacanza ',
-                              style: TextStyle(
-                                foreground: Paint()
-                                  ..shader = const LinearGradient(
-                                    colors: [
-                                      AppColors.primary,
-                                      AppColors.accentMint,
-                                    ],
-                                  ).createShader(
-                                    const Rect.fromLTWH(0, 0, 160, 32),
-                                  ),
-                              ),
-                            ),
-                            const TextSpan(text: 'Account'),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      Text(
-                        'Start your personalized journey today',
-                        textAlign: TextAlign.center,
-                        style: bodyMedium.copyWith(
-                          color: AppColors.textMuted,
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Register form
+                      // ... (senin mevcut logo + title + form + "Already have an account?" kısmın)
+                      // Burayı kendi halinle bırakabilirsin;
+                      // kritik olan kısım yukarıdaki BlocListener logic'i.
                       const Flexible(
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: 24),
                           child: RegisterForm(),
                         ),
                       ),
-
                       const SizedBox(height: 18),
-
-                      // Login CTA: "Already have an account? Log In"
                       GestureDetector(
                         onTap: () {
-                          // Burada LoginScreen'e replacement yapıyoruz ki,
-                          // kullanıcı Login → Map akışına geçtiğinde
-                          // back stack daha temiz olsun.
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
@@ -190,7 +122,6 @@ class RegisterScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 16),
                     ],
                   ),

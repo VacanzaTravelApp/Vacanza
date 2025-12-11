@@ -1,12 +1,22 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import 'register_event.dart';
 import 'register_state.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
 
 /// Register ekranının iş mantığını yöneten BLoC.
-/// - Event alır (RegisterSubmitted)
-/// - AuthRepository ile konuşur (Firebase + ileride backend)
-/// - State üretir (loading, success, failure)
+///
+/// Sorumlulukları:
+///  - UI'dan gelen RegisterSubmitted event'ini dinler
+///  - AuthRepository üzerinden Firebase + (ileride) backend register çağrısı yapar
+///  - Progress/hata/basarili durumlarına göre RegisterState üretir
+///
+/// VACANZA-81:
+///  - Firebase createUserWithEmailAndPassword entegrasyonu
+/// VACANZA-82:
+///  - Success state'in UI tarafından dinlenip,
+///    snackbar + navigation yapılmasını sağlamak.
+///  - RegisterReset event'i ile state'in tekrar initial'e alınması.
 class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
   final AuthRepository _authRepository;
 
@@ -14,15 +24,26 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
     required AuthRepository authRepository,
   })  : _authRepository = authRepository,
         super(const RegisterState()) {
+    // Kullanıcı "Sign Up" butonuna bastığında gelen event.
     on<RegisterSubmitted>(_onRegisterSubmitted);
+
+    // UI'dan success/failure sonrası state'i sıfırlamak için gelen event.
+    on<RegisterReset>(_onRegisterReset);
   }
 
-  /// Kullanıcı "Sign Up" butonuna bastığında gelen event'i işler.
+  /// RegisterSubmitted event handler:
+  ///
+  /// Akış:
+  ///  1) state → submitting
+  ///  2) AuthRepository.registerWithEmailAndPassword çağrılır
+  ///  3) Başarılı olursa state → success
+  ///  4) AuthFailure (Firebase/backend) gelirse state → failure + errorMessage
+  ///  5) Diğer beklenmeyen hatalarda generic failure mesajı verilir
   Future<void> _onRegisterSubmitted(
       RegisterSubmitted event,
       Emitter<RegisterState> emit,
       ) async {
-    // 1) Önce UI'ya "loading" gösterelim
+    // 1) Önce UI'ya "loading" gösterelim.
     emit(
       state.copyWith(
         status: RegisterStatus.submitting,
@@ -32,10 +53,15 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
 
     try {
       // 2) AuthRepository üzerinden Firebase register işlemini çağır.
-      //    Backend call şu an repository içinde comment'li durumda.
-      // ŞU AN: Sadece email + password ile Firebase'e kayıt.
-      // İLERİDE: event.firstName, event.middleName, event.lastName,
-      //          event.preferredNames backend'e gönderilecek.
+      //
+      //    Şu an:
+      //      - Firebase createUserWithEmailAndPassword
+      //      - UID + idToken alma
+      //      - Backend çağrısı (Dio) şimdilik comment'li
+      //
+      //    İleride:
+      //      - backend /auth/register endpoint'i aktif olunca
+      //        aynı method içinde token ile backend'e de gidecek.
       await _authRepository.registerWithEmailAndPassword(
         email: event.email,
         password: event.password,
@@ -45,8 +71,12 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
         preferredNames: event.preferredNames,
       );
 
-      // 3) İşlem başarılı → success state'e geç
-      //    VACANZA-82'de bu state'i dinleyip snackbar + navigation yapacağız.
+      // 3) İşlem başarılı → success state'e geç.
+      //
+      // VACANZA-82:
+      //   Bu success state UI'da BlocListener tarafından dinlenecek:
+      //     - snackbar gösterilecek
+      //     - MapScreen'e navigasyon yapılacak
       emit(
         state.copyWith(
           status: RegisterStatus.success,
@@ -70,5 +100,31 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
         ),
       );
     }
+  }
+
+  /// RegisterReset event handler:
+  ///
+  /// Amaç:
+  ///  - VACANZA-82'deki "success state sadece bir kere consume edilmeli"
+  ///    gereksinimini karşılamak.
+  ///
+  /// Kullanım:
+  ///  - UI, success durumunu yakalayıp snackbar + navigation yaptıktan hemen sonra
+  ///    RegisterReset event'ini dispatch eder.
+  ///  - Bu handler da state'i tekrar initial'e çeker.
+  ///
+  /// Sonuç:
+  ///  - Listener success → initial geçişini bir kez görür.
+  ///  - Aynı success state tekrar tetiklenmez, snackbar/nav yeniden çalışmaz.
+  void _onRegisterReset(
+      RegisterReset event,
+      Emitter<RegisterState> emit,
+      ) {
+    emit(
+      const RegisterState(
+        status: RegisterStatus.initial,
+        errorMessage: null,
+      ),
+    );
   }
 }

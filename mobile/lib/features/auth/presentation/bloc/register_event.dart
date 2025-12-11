@@ -1,7 +1,10 @@
 import 'package:equatable/equatable.dart';
 
-/// Tüm register eventlerinin base sınıfı.
-/// Şimdilik tek eventimiz var: RegisterSubmitted
+/// Tüm register event'lerinin base sınıfı.
+///
+/// Şu anda 2 eventimiz var:
+///  - RegisterSubmitted: kullanıcı "Sign Up" butonuna bastığında gelir.
+///  - RegisterReset: success/failure sonrası state'i tekrar initial'e almak için kullanılır.
 abstract class RegisterEvent extends Equatable {
   const RegisterEvent();
 
@@ -42,4 +45,22 @@ class RegisterSubmitted extends RegisterEvent {
     password,
     preferredNames,
   ];
+}
+
+/// Success/failure gibi senaryolardan sonra
+/// RegisterState'i tekrar "sıfırlamak" için kullanılan event.
+///
+/// VACANZA-82 notu:
+///   "Success state sadece bir kere consume edilmeli; tekrar rebuild'lerde
+///    snackbar tekrar tetiklenmemeli"
+///
+/// Bunu sağlamak için:
+///   - success alındıktan sonra UI tarafı RegisterReset event'ini atar
+///   - BLoC bu eventi yakalayıp state'i tekrar initial'e çeker
+///   - Böylece listener success -> initial geçişinde sadece 1 kez çalışır.
+class RegisterReset extends RegisterEvent {
+  const RegisterReset();
+
+  @override
+  List<Object?> get props => [];
 }
