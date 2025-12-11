@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'firebase_options.dart';
 import 'core/theme/app_colors.dart';
+import 'features/auth/data/repositories/auth_repository.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  print("🔥 Firebase initialized apps: ${Firebase.apps}");
   runApp(const VacanzaApp());
 }
 
@@ -20,19 +15,45 @@ class VacanzaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
-    return MaterialApp(
-      title: 'Vacanza',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: AppColors.primary,
-          brightness: Brightness.light,
+    return MultiRepositoryProvider(
+      providers: [
+        // -----------------------------
+        // AUTH REPOSITORY PROVIDER
+        // -----------------------------
+        //
+        // Uygulamanın tamamında AuthRepository'ye ihtiyaç duyacağız
+        // (register, login, logout, token yenileme vs.)
+        //
+        // Burada 1 kere oluşturup yukarıdan sağlıyoruz.
+        // Örnek erişim:
+        //   final authRepo = context.read<AuthRepository>();
+        //
+        RepositoryProvider<AuthRepository>(
+          create: (_) => AuthRepository(),
         ),
-        fontFamily: 'SF Pro', // varsa kalsın, yoksa da sorun değil
+
+        // İLERİDE:
+        // Buraya yeni repository'ler eklenebilir:
+        // - ProfileRepository
+        // - TripsRepository
+        // - MapRepository
+        // vs.
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Vacanza',
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: AppColors.primary,
+            brightness: Brightness.light,
+          ),
+          fontFamily: 'SF Pro', // yoksa kaldırabiliriz
+        ),
+        // Şimdilik ilk ekran RegisterScreen.
+        // İleride auth flow oturunca burayı bir "AppRouter" ile değiştirebiliriz.
+        home: const RegisterScreen(),
       ),
-      home: const RegisterScreen(),
     );
   }
 }
