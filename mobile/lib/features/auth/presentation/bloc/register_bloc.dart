@@ -33,6 +33,9 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
     try {
       // 2) AuthRepository üzerinden Firebase register işlemini çağır.
       //    Backend call şu an repository içinde comment'li durumda.
+      // ŞU AN: Sadece email + password ile Firebase'e kayıt.
+      // İLERİDE: event.firstName, event.middleName, event.lastName,
+      //          event.preferredNames backend'e gönderilecek.
       await _authRepository.registerWithEmailAndPassword(
         email: event.email,
         password: event.password,
