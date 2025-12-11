@@ -1,4 +1,4 @@
-package com.vacanza.backend.entity;
-
-public class UserSession {
-}
+//package com.vacanza.backend.entity;
+//
+//public class UserSession {
+//}
