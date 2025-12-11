@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'core/theme/app_colors.dart';
 
 // Firebase options (flutterfire configure ile oluşan dosya)
+import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'firebase_options.dart';
 
 // Auth katmanı
@@ -79,6 +80,11 @@ class VacanzaApp extends StatelessWidget {
             ),
           ),
 
+          BlocProvider<LoginBloc>(
+            create: (context) => LoginBloc(
+              authRepository: context.read<AuthRepository>(),
+            ),
+          ),
           // İLERİDE:
           // - LoginBloc
           // - ProfileBloc
