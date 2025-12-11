@@ -61,6 +61,13 @@ class FirebaseAuthService {
       throw Exception('ID token alınamadı: currentUser null.');
     }
 
-    return await user.getIdToken();
+    // BURASI ÖNEMLİ: önce token'ı al, null check yap
+    final token = await user.getIdToken(); // String? olabilir
+
+    if (token == null) {
+      throw Exception('ID token alınamadı: Firebase null token döndürdü.');
+    }
+
+    return token; // burada artık String olarak promote oluyor
   }
 }
