@@ -41,8 +41,8 @@ public class UserLoginHistoryService implements UserLoginHistoryImpl {
     }
 
     @Transactional(readOnly = true)
-    public List<UserLoginHistoryResponseDTO> getAllLoginHistoriesByUserId(UUID userId) {
-        return userLoginHistoryRepository.findByUserUserId(userId)
+    public List<UserLoginHistoryResponseDTO> getAllLoginHistoriesByUserId(UserLoginHistoryRequestDTO request) {
+        return userLoginHistoryRepository.findByUserUserId(request.getUserId())
                 .stream()
                 .map(item -> UserLoginHistoryResponseDTO.builder()
                         .loginId(item.getLoginId())
