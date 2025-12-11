@@ -3,7 +3,7 @@ package com.vacanza.backend.exceptions.enums;
 import lombok.Getter;
 
 @Getter
-public enum LoginHistoryExceptionEnum {
+public enum UserLoginHistoryExceptionEnum {
 
     //NULL Info
     NullUserId("There is no user with this ID"),
@@ -11,7 +11,7 @@ public enum LoginHistoryExceptionEnum {
 
     private final String explanation;
 
-    LoginHistoryExceptionEnum (String explanation) {
+    UserLoginHistoryExceptionEnum(String explanation) {
         this.explanation = explanation;
     }
 }
