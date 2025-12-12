@@ -29,7 +29,11 @@ class FirebaseAuthService {
 
     return user;
   }
-
+  /// Firebase tarafındaki oturumu kapatır.
+  /// Logout sırasında çağrılacak.
+  Future<void> signOut() async {
+    await _auth.signOut();
+  }
   /// Yeni bir kullanıcı oluşturur.
   ///
   /// Firebase tarafında:

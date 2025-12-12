@@ -197,6 +197,14 @@ class AuthRepository {
       // 2) Firebase ID token al
       final idToken = await _firebaseService.getIdToken();
 
+      /// Kullanıcı logout işlemi.
+      /// - SecureStorage tokenları temizlenir
+      /// - Firebase session kapatılır
+      Future<void> logout() async {
+        await _storage.clearSession();
+        await _firebaseService.signOut();
+      }
+
       // 3) BACKEND LOGIN (backend hazır olduğunda aktif edilecek)
       // ------------------------------------------------------------------
       // final response = await _apiClient.login(
@@ -220,6 +228,7 @@ class AuthRepository {
       await _storage.writeAccessToken('dev-login-access-${user.uid}');
       await _storage.writeRefreshToken('dev-login-refresh-${user.uid}');
     }
+
 
     on fb.FirebaseAuthException catch (e) {
       final code = e.code.toLowerCase();
