@@ -1,12 +1,11 @@
 // src/pages/MapPage.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { Layout, Button, Card, Avatar, FloatButton, Space, message } from "antd";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Layout, Button, Card, Avatar, Space, message } from "antd";
 import {
   LogoutOutlined,
   UserOutlined,
   GlobalOutlined,
   CompassOutlined,
-  ReloadOutlined,
   HeatMapOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
@@ -22,6 +21,8 @@ const INITIAL_VIEW_STATE = {
   longitude: 32.8597,
   latitude: 39.9334,
   zoom: 8,
+  bearing: 0,
+  pitch: 0, // 2D default
 };
 
 const STYLES = [
@@ -34,6 +35,7 @@ const STYLES = [
 
 export default function MapPage() {
   const navigate = useNavigate();
+  const mapRef = useRef(null);
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -41,8 +43,10 @@ export default function MapPage() {
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
   const [styleIndex, setStyleIndex] = useState(0);
 
-  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+  // 2D / 3D UI state
+  const [is3D, setIs3D] = useState(false);
 
+  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
   const mapStyle = useMemo(() => STYLES[styleIndex], [styleIndex]);
 
   useEffect(() => {
@@ -70,10 +74,36 @@ export default function MapPage() {
     }
   };
 
-  const handleRecenter = () => setViewState(INITIAL_VIEW_STATE);
-
   const handleMapStyleChange = () =>
     setStyleIndex((prev) => (prev + 1) % STYLES.length);
+
+  const handleToggle2D3D = () => {
+    const nextIs3D = !is3D;
+    setIs3D(nextIs3D);
+
+    const nextPitch = nextIs3D ? 60 : 0;
+
+    // Smooth camera transition
+    try {
+      const map = mapRef.current?.getMap?.();
+      if (map) {
+        map.easeTo({
+          pitch: nextPitch,
+          bearing: 0,
+          duration: 650,
+        });
+      }
+    } catch (e) {
+      console.error("2D/3D easeTo error:", e);
+    }
+
+    // Keep React state in sync (important for controlled Map)
+    setViewState((prev) => ({
+      ...prev,
+      pitch: nextPitch,
+      bearing: 0,
+    }));
+  };
 
   if (loading) {
     return (
@@ -131,6 +161,7 @@ export default function MapPage() {
             overflow: "hidden",
             boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
             background: "#f5f5f5",
+            position: "relative",
           }}
         >
           {!MAPBOX_TOKEN ? (
@@ -140,6 +171,7 @@ export default function MapPage() {
             </div>
           ) : (
             <Map
+              ref={mapRef}
               {...viewState}
               onMove={(e) => setViewState(e.viewState)}
               style={{ width: "100%", height: "100%" }}
@@ -152,52 +184,100 @@ export default function MapPage() {
               <GeolocateControl position="bottom-right" trackUserLocation />
             </Map>
           )}
-        </div>
 
-        <Card
-          style={{
-            position: "absolute",
-            top: 40,
-            left: 40,
-            zIndex: 50,
-            width: 260,
-            backgroundColor: "rgba(255,255,255,0.95)",
-            backdropFilter: "blur(10px)",
-          }}
-          bodyStyle={{ display: "flex", alignItems: "center", padding: 16 }}
-        >
-          <Avatar
-            size={48}
-            icon={<UserOutlined />}
-            src={user.photoURL}
-            style={{ marginRight: 15, backgroundColor: "#1890ff" }}
-          />
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>{displayName}</div>
-            <div style={{ fontSize: 12, color: "#888" }}>{userEmail}</div>
+          {/* ✅ Sağ üst: 2D/3D + Stil değiştir (artık yukarı taşındı) */}
+          <div
+            style={{
+              position: "absolute",
+              top: 18,
+              right: 18,
+              zIndex: 60,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            {/* 2D/3D toggle */}
+            <button
+              type="button"
+              onClick={handleToggle2D3D}
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: "999px",
+                border: is3D ? "2px solid #1890ff" : "1px solid #e5e7eb",
+                background: "#fff",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+                display: "grid",
+                placeItems: "center",
+                cursor: "pointer",
+              }}
+              aria-label="2D / 3D Toggle"
+              title="2D / 3D"
+            >
+              <CompassOutlined style={{ fontSize: 20, color: is3D ? "#1890ff" : "#555" }} />
+            </button>
+
+            {/* 2D/3D badge */}
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "4px 10px",
+                borderRadius: 999,
+                background: "#fff",
+                border: is3D ? "1px solid #1890ff" : "1px solid #e5e7eb",
+                color: is3D ? "#1890ff" : "#444",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+                lineHeight: "12px",
+              }}
+            >
+              {is3D ? "3D" : "2D"}
+            </div>
+
+            {/* ✅ Harita stilini değiştir (yukarı taşındı) */}
+            <Button
+              shape="circle"
+              icon={<HeatMapOutlined />}
+              onClick={handleMapStyleChange}
+              style={{
+                width: 48,
+                height: 48,
+                background: "#fff",
+                boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+                border: "1px solid #e5e7eb",
+              }}
+              title="Harita Stilini Değiştir"
+            />
           </div>
-        </Card>
 
-        <Space
-          direction="vertical"
-          style={{ position: "absolute", bottom: 40, right: 40, zIndex: 50 }}
-        >
-          <FloatButton
-            icon={<HeatMapOutlined />}
-            tooltip={<div>Harita Stilini Değiştir</div>}
-            onClick={handleMapStyleChange}
-          />
-          <FloatButton
-            icon={<CompassOutlined />}
-            tooltip={<div>2D / 3D (şimdilik dummy)</div>}
-            onClick={() => message.info("2D/3D sonra ekleyeceğiz")}
-          />
-          <FloatButton
-            icon={<ReloadOutlined />}
-            tooltip={<div>Haritayı Yeniden Ortala</div>}
-            onClick={handleRecenter}
-          />
-        </Space>
+          {/* ❌ Sağ alt style butonu kaldırıldı (boş yer bırakmadım) */}
+
+          <Card
+            style={{
+              position: "absolute",
+              top: 40,
+              left: 40,
+              zIndex: 50,
+              width: 260,
+              backgroundColor: "rgba(255,255,255,0.95)",
+              backdropFilter: "blur(10px)",
+            }}
+            bodyStyle={{ display: "flex", alignItems: "center", padding: 16 }}
+          >
+            <Avatar
+              size={48}
+              icon={<UserOutlined />}
+              src={user.photoURL}
+              style={{ marginRight: 15, backgroundColor: "#1890ff" }}
+            />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>{displayName}</div>
+              <div style={{ fontSize: 12, color: "#888" }}>{userEmail}</div>
+            </div>
+          </Card>
+        </div>
       </Content>
 
       <Footer style={{ textAlign: "center", padding: "12px 50px", background: "#fff" }}>
