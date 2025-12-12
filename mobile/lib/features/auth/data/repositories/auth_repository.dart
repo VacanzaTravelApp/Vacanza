@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 
+import 'package:mobile/core/network/jwt_interceptor.dart'; // ✅ eklendi
 import 'package:mobile/features/auth/data/firebase/firebase_auth_service.dart';
 import 'package:mobile/features/auth/data/api/auth_api_client.dart';
 import 'package:mobile/features/auth/data/storage/secure_storage_service.dart';
@@ -26,16 +27,39 @@ class AuthFailure implements Exception {
 ///  - Buna rağmen dummy tokenlar yazarak app'in geri kalanı test edilebiliyor
 class AuthRepository {
   final FirebaseAuthService _firebaseService;
-  final AuthApiClient _apiClient;
+
+  /// ✅ _apiClient artık "late final"
+  /// Çünkü constructor body içinde aynı Dio ile kuracağız.
+  late final AuthApiClient _apiClient;
+
   final SecureStorageService _storage;
+
+  /// ✅ TEK dio instance
+  /// Interceptor bunun üstüne takılacak ve AuthApiClient de bunu kullanacak.
+  final Dio _dio;
 
   AuthRepository({
     FirebaseAuthService? firebaseService,
     AuthApiClient? apiClient,
     SecureStorageService? storage,
+    Dio? dio,
   })  : _firebaseService = firebaseService ?? FirebaseAuthService(),
-        _apiClient = apiClient ?? AuthApiClient(),
-        _storage = storage ?? SecureStorageService();
+        _storage = storage ?? SecureStorageService(),
+        _dio = dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: 'http://10.0.2.2:8080', // TODO: prod URL eklenecek
+                connectTimeout: const Duration(seconds: 10),
+                receiveTimeout: const Duration(seconds: 10),
+              ),
+            ) {
+    // ✅ 1) Interceptor'ı TEK Dio instance'ına ekliyoruz
+    _dio.interceptors.add(JwtInterceptor(storage: _storage));
+
+    // ✅ 2) AuthApiClient'i aynı Dio ile kuruyoruz
+    //    (Dışarıdan apiClient inject edilirse onu kullanır.)
+    _apiClient = apiClient ?? AuthApiClient(dio: _dio);
+  }
 
   // =======================================================================
   // REGISTER FLOW (Firebase Register + ileride Backend Register + Token Save)
@@ -100,25 +124,14 @@ class AuthRepository {
     // ----------------- Firebase login hataları -----------------
     on fb.FirebaseAuthException catch (e) {
       switch (e.code) {
-      // Yeni Firebase SDK'larda çoğu yanlış credential hatası
-      // "invalid-credential" veya "invalid-login-credentials" olarak geliyor.
-      //
-      // Bu case hem:
-      //  - email kayıtlı ama şifre yanlış
-      //  - email kayıtlı değil
-      // durumlarını kapsıyor. Güvenlik açısından da
-      // "email var mı yok mu" bilgisini sızdırmamak için
-      // generic bir mesaj dönmek mantıklı.
         case 'invalid-credential':
         case 'invalid-login-credentials':
           throw const AuthFailure('Email veya şifre hatalı.');
 
         case 'user-not-found':
-        // Bazı projelerde hala gelebilir, o yüzden bırakıyoruz.
           throw const AuthFailure('Bu email ile kayıtlı kullanıcı bulunamadı.');
 
         case 'wrong-password':
-        // Eski versiyonlara uyumluluk için.
           throw const AuthFailure('Email veya şifre hatalı.');
 
         case 'invalid-email':
@@ -130,8 +143,6 @@ class AuthRepository {
           );
 
         default:
-        // Debug için kodu da görmek isteyebiliriz ama
-        // kullanıcıya sade bir mesaj vermek daha iyi.
           throw const AuthFailure(
             'Giriş yapılamadı. Lütfen email ve şifrenizi kontrol edin.',
           );
@@ -210,27 +221,14 @@ class AuthRepository {
       await _storage.writeRefreshToken('dev-login-refresh-${user.uid}');
     }
 
-    // Firebase login hataları
-    // ----------------- Firebase login hataları -----------------
-    // ----------------- Firebase login errors -----------------
     on fb.FirebaseAuthException catch (e) {
-      // Bazı Firebase SDK sürümlerinde error code büyük/küçük karışık geliyor.
-      // Hepsini lowercase'e çekip daha stabil bir switch-case yazıyoruz.
       final code = e.code.toLowerCase();
 
       switch (code) {
-      // Yeni Firebase sürümlerinde hem "wrong password"
-      // hem de "user not found" çoğunlukla bu iki koda indirgenmiştir:
-      //
-      // - invalid-credential
-      // - invalid-login-credentials
-      //
-      // Güvenlik için kullanıcıya "email var mı yok mu" bilgisi verilmez.
         case 'invalid-credential':
         case 'invalid-login-credentials':
           throw const AuthFailure('Email or password is incorrect.');
 
-      // Bazı eski cihazlarda veya eski Firebase versiyonlarında hala gelebilir.
         case 'user-not-found':
           throw const AuthFailure('No user found with this email.');
 
@@ -248,8 +246,6 @@ class AuthRepository {
             'Too many login attempts. Please try again later.',
           );
 
-      // ❗ ÖNEMLİ: artık kullanıcıya ham Firebase error code göstermiyoruz.
-      // UI tarafında sadece genel bir hata göstermek daha doğru.
         default:
           throw const AuthFailure(
             'Login failed. Please check your email and password.',
@@ -257,7 +253,6 @@ class AuthRepository {
       }
     }
 
-    // Backend login hataları (ileriye dönük)
     on DioException catch (e) {
       final status = e.response?.statusCode;
       final data = e.response?.data;
