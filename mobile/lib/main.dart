@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
 
 import 'core/theme/app_colors.dart';
-
-// Firebase options (flutterfire configure ile oluşan dosya)
-import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'firebase_options.dart';
 
-// Auth katmanı
+// Auth data layer
 import 'features/auth/data/repositories/auth_repository.dart';
+
+// Auth BLoCs
 import 'features/auth/presentation/bloc/register_bloc.dart';
-import 'features/auth/presentation/bloc/register_state.dart';
-import 'features/auth/presentation/screens/register_screen.dart';
+import 'features/auth/presentation/bloc/login_bloc.dart';
+
+// Entry gate that decides Login vs Map on app start
+import 'features/auth/presentation/screens/auth_gate.dart';
 
 void main() async {
+  // Flutter binding'i initialize ediyoruz (Firebase gibi async init'ler için şart).
   WidgetsFlutterBinding.ensureInitialized();
 
   // ----------------------------------------
@@ -42,7 +45,7 @@ class VacanzaApp extends StatelessWidget {
         // (register, login, logout, token yenileme vs).
         //
         // Burada 1 kere oluşturup widget tree'ye yukarıdan enjekte ediyoruz.
-        // Erişim örneği:
+        // Örnek erişim:
         //
         //   final authRepo = context.read<AuthRepository>();
         //
@@ -63,16 +66,11 @@ class VacanzaApp extends StatelessWidget {
           // 🧠 RegisterBloc Provider
           // ----------------------------------------
           //
-          // Sadece "Register" ekranının iş mantığını yönetir:
-          // - RegisterSubmitted eventini alır
+          // "Register" ekranının iş mantığını yönetir:
+          // - RegisterSubmitted event'ini alır
           // - AuthRepository üzerinden Firebase register çağırır
-          // - (Backend hazır olunca) /auth/register endpointine de gidecek
+          // - (Backend hazır olunca) /auth/register endpoint'ine de gidecek
           // - UI için status (initial/submitting/success/failure) üretir
-          //
-          // Bu sayede:
-          //   context.read<RegisterBloc>().add(RegisterSubmitted(...));
-          //   context.watch<RegisterBloc>().state
-          // gibi kullanım mümkün hale gelir.
           //
           BlocProvider<RegisterBloc>(
             create: (context) => RegisterBloc(
@@ -80,13 +78,22 @@ class VacanzaApp extends StatelessWidget {
             ),
           ),
 
+          // ----------------------------------------
+          // 🧠 LoginBloc Provider
+          // ----------------------------------------
+          //
+          // "Login" ekranının iş mantığını yönetir:
+          // - LoginSubmitted event'ini alır
+          // - AuthRepository.loginWithEmailAndPassword üzerinden
+          //   Firebase login + (ileride) backend login akışını yönetir.
+          //
           BlocProvider<LoginBloc>(
             create: (context) => LoginBloc(
               authRepository: context.read<AuthRepository>(),
             ),
           ),
+
           // İLERİDE:
-          // - LoginBloc
           // - ProfileBloc
           // - MapBloc
           // gibi bloklar da buraya eklenecek.
@@ -100,15 +107,20 @@ class VacanzaApp extends StatelessWidget {
               seedColor: AppColors.primary,
               brightness: Brightness.light,
             ),
-            fontFamily: 'SF Pro', // yoksa silebilirsin
+            fontFamily: 'SF Pro', // yoksa kaldırılabilir
           ),
 
-          // Şimdilik başlangıç ekranı RegisterScreen.
-          // VACANZA-82 ve sonrası ile:
-          // - register success → home/map/profil akışını
-          // - auth state'e göre yönlendirmeyi
-          // ayrı bir router veya AuthGate ile yapacağız.
-          home: const RegisterScreen(),
+          // Artık doğrudan RegisterScreen veya LoginScreen açmıyoruz.
+          //
+          // AuthGate:
+          //  - App açıldığında SecureStorage içindeki access_token'a bakar
+          //  - Token varsa → MapScreen
+          //  - Token yoksa → LoginScreen
+          //
+          // Böylece VACANZA-85'te istenen "authenticated state'e geçiş"
+          // ve "app tekrar açıldığında doğrudan Home'a gitme" kurgusu sağlanmış olur.
+          //home: const AuthGate(), just for now until VACANZA 87
+          home: const LoginScreen(),
         ),
       ),
     );
