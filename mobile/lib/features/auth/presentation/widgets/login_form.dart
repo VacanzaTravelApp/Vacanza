@@ -11,17 +11,14 @@ import 'package:mobile/features/auth/presentation/bloc/login_bloc.dart';
 import 'package:mobile/features/auth/presentation/bloc/login_event.dart';
 import 'package:mobile/features/auth/presentation/bloc/login_state.dart';
 
-/// Login formunun UI + basit validasyon + BLoC entegrasyonunu yöneten widget.
+/// Login form widget that manages:
+/// - UI (email + password fields, forgot password link, button)
+/// - basic validation (email format + password not empty)
+/// - BLoC integration (dispatch LoginSubmitted, read loading/error from state)
 ///
-/// Görsel yapı VACANZA-83'teki ile birebir aynı:
-///  - Email alanı
-///  - Password alanı
-///  - "Forgot Password?" linki
-///  - Gradient "Log In" butonu
-///
-/// Farklar:
-///  - _submit içindeki sahte delay kaldırıldı, yerine LoginBloc'e event gönderiliyor.
-///  - Loading durumu ve hata mesajı artık LoginState üzerinden okunuyor.
+/// IMPORTANT:
+/// - No artificial delay.
+/// - Loading spinner is driven by LoginState.status (submitting).
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
 
@@ -35,17 +32,15 @@ class _LoginFormState extends State<LoginForm> {
   final _email = TextEditingController();
   final _password = TextEditingController();
 
-  /// Local form validasyon flag'i.
-  /// Sadece email formatı + password boş mu kontrolü için kullanıyoruz.
+  /// Local validation flag (only for enabling/disabling the button).
   bool _formValid = false;
 
-  /// Email format kontrolü için kullandığımız regex.
+  /// Email regex used both in real-time rules and validator.
   final _emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,}$');
 
   @override
   void initState() {
     super.initState();
-    // Inputlar değiştikçe formun valid olup olmadığını yeniden hesaplıyoruz.
     _email.addListener(_update);
     _password.addListener(_update);
   }
@@ -57,7 +52,7 @@ class _LoginFormState extends State<LoginForm> {
     super.dispose();
   }
 
-  /// Email + password alanlarının geçerli olup olmadığını günceller.
+  /// Re-compute whether the form is eligible to submit.
   void _update() {
     final emailValid = _emailRegex.hasMatch(_email.text.trim());
     final passValid = _password.text.isNotEmpty;
@@ -67,21 +62,15 @@ class _LoginFormState extends State<LoginForm> {
     });
   }
 
-  /// Form submit edildiğinde çağrılır.
-  ///
-  /// 1) Form validator'ları geçmezse hiçbir şey yapmaz.
-  /// 2) Klavyeyi kapatır.
-  /// 3) LoginBloc'e LoginSubmitted event'i gönderir.
-  ///
-  /// Asıl login iş akışı (Firebase + backend + token saklama)
-  /// AuthRepository + LoginBloc içinde yönetilir.
+  /// Submit handler:
+  /// - runs validators
+  /// - closes keyboard
+  /// - dispatches LoginSubmitted to LoginBloc
   void _submit(BuildContext context) {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    // Klavyeyi kapat
     FocusScope.of(context).unfocus();
 
-    // BLoC'e login event'ini gönder
     context.read<LoginBloc>().add(
       LoginSubmitted(
         email: _email.text.trim(),
@@ -92,17 +81,13 @@ class _LoginFormState extends State<LoginForm> {
 
   @override
   Widget build(BuildContext context) {
-    // LoginState'i dinleyerek:
-    //  - loading state'i
-    //  - hata mesajını
-    // UI'a yansıtacağız.
     return BlocBuilder<LoginBloc, LoginState>(
       builder: (context, state) {
         final isSubmitting = state.isSubmitting;
 
-        // Butonun aktif olup olmaması:
-        //  - Form local olarak valid olmalı (_formValid)
-        //  - Şu anda login isteği atılıyor olmamalı (isSubmitting == false)
+        /// Button is enabled when:
+        /// - local form is valid
+        /// - not currently submitting
         final canSubmit = _formValid && !isSubmitting;
 
         return Form(
@@ -128,7 +113,7 @@ class _LoginFormState extends State<LoginForm> {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () {
-                    // TODO: VACANZA-XX: Forgot Password akışı burada tasarlanacak.
+                    // TODO: Implement forgot password flow later.
                   },
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
@@ -146,8 +131,7 @@ class _LoginFormState extends State<LoginForm> {
 
               const SizedBox(height: 12),
 
-              // Eğer login denemesinde hata aldıysak (Firebase/AuthRepository),
-              // BLoC failure state'ten gelen errorMessage'ı butonun üstünde gösteriyoruz.
+              // Inline error (from BLoC / repository)
               if (state.isFailure && state.errorMessage != null) ...[
                 Text(
                   state.errorMessage!,
@@ -162,7 +146,6 @@ class _LoginFormState extends State<LoginForm> {
               // LOGIN BUTTON
               GradientButton(
                 text: "Log In",
-                // Loading spinner artık BLoC'teki status'e bağlı.
                 loading: isSubmitting,
                 active: canSubmit,
                 enabled: canSubmit,
