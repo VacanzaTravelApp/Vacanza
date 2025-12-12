@@ -8,9 +8,6 @@ import LoginCard from './pages/auth/LoginCard';
 import './pages/auth/AuthLayout.css'; 
 import MapPage from './pages/MapPage';
 
-// 🚀 GÜNCELLEME 1: MapPage bileşenini import edin
-import MapPage from './pages/MapPage'; // MapPage'in yolu doğru olduğundan emin olun
-
 const App = () => {
     return (
         <Router>
