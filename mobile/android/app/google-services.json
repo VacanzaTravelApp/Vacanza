@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "424211182688",
+    "project_id": "vacanza-b364c",
+    "storage_bucket": "vacanza-b364c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:424211182688:android:24bd3bc0399d8de8e3bf05",
+        "android_client_info": {
+          "package_name": "com.example.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfWhcCHwvOsALQHXX0wVtM9dYNj3tdLWs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
