@@ -1,15 +1,20 @@
 import 'package:dio/dio.dart';
 import 'package:mobile/features/auth/data/storage/secure_storage_service.dart';
 
-/// JWT access token'i her outbound request'e otomatik olarak ekleyen interceptor.
+/// JWT interceptor (Authorization header injector)
 ///
 /// Amaç:
-///  - Her istekte elle "Authorization: Bearer ..." header'ı eklemek zorunda kalmamak
-///  - Tüm protected endpoint'lerin aynı yerden, merkezi şekilde token almasını sağlamak
+///  - Her request'te elle "Authorization: Bearer <token>" eklememek
+///  - Merkezi şekilde token eklemek
+///
+/// ÖNEMLİ (Yeni Mantık):
+///  - Backend artık kendi JWT'sini üretmüyor.
+///  - Bu yüzden Bearer token olarak Firebase'in ürettiği **ID Token** gönderilecek.
+///  - Biz bu ID Token'ı şimdilik SecureStorage'da `access_token` key'i altında tutuyoruz.
+///    (İleride istersek key adını refactor ederiz ama şu an çalışanı bozmuyoruz.)
 ///
 /// NOT:
-///  - Şu an sadece header ekleme işini yapıyor.
-///  - 401 yakalayıp otomatik logout / refresh mekanizması VACANZA-88 kapsamına girecek.
+///  - 401 yakalama / refresh / otomatik logout gibi işler VACANZA-88'de ele alınacak.
 class JwtInterceptor extends Interceptor {
   final SecureStorageService _storage;
 
@@ -23,24 +28,19 @@ class JwtInterceptor extends Interceptor {
       RequestInterceptorHandler handler,
       ) async {
     try {
-      // SecureStorage içinden access_token'ı oku.
-      final accessToken = await _storage.readAccessToken();
+      // SecureStorage içinden token oku.
+      // Yeni mantıkta bu token: Firebase ID Token.
+      final token = await _storage.readAccessToken();
 
       // Token null değil ve boş değilse Authorization header'ına ekle.
-      if (accessToken != null && accessToken.isNotEmpty) {
-        options.headers['Authorization'] = 'Bearer $accessToken';
+      if (token != null && token.isNotEmpty) {
+        options.headers['Authorization'] = 'Bearer $token';
       }
     } catch (_) {
-      // Storage okurken bir hata olursa:
-      //  - Uygulamayı kırmıyoruz
-      //  - Sadece header eklememiş oluyoruz
-      //  - İstek yine de gitmeye devam ediyor
+      // Storage okurken hata olursa request'i kırmıyoruz.
+      // Sadece header eklenmemiş olur.
     }
 
-    // İsteği bir sonraki aşamaya (Dio pipeline) gönder.
     handler.next(options);
   }
-
-// onError / onResponse tarafında şimdilik JWT ile ilgili özel bir işlem yok.
-// 401 durumunda otomatik logout / redirect işleri VACANZA-88'de ele alınacak.
 }
