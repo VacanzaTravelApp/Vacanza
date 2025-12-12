@@ -97,16 +97,44 @@ class AuthRepository {
     }
 
     // Firebase kaynaklı hatalar
+    // ----------------- Firebase login hataları -----------------
     on fb.FirebaseAuthException catch (e) {
       switch (e.code) {
-        case 'email-already-in-use':
-          throw const AuthFailure('Bu email adresi zaten kayıtlı.');
+      // Yeni Firebase SDK'larda çoğu yanlış credential hatası
+      // "invalid-credential" veya "invalid-login-credentials" olarak geliyor.
+      //
+      // Bu case hem:
+      //  - email kayıtlı ama şifre yanlış
+      //  - email kayıtlı değil
+      // durumlarını kapsıyor. Güvenlik açısından da
+      // "email var mı yok mu" bilgisini sızdırmamak için
+      // generic bir mesaj dönmek mantıklı.
+        case 'invalid-credential':
+        case 'invalid-login-credentials':
+          throw const AuthFailure('Email veya şifre hatalı.');
+
+        case 'user-not-found':
+        // Bazı projelerde hala gelebilir, o yüzden bırakıyoruz.
+          throw const AuthFailure('Bu email ile kayıtlı kullanıcı bulunamadı.');
+
+        case 'wrong-password':
+        // Eski versiyonlara uyumluluk için.
+          throw const AuthFailure('Email veya şifre hatalı.');
+
         case 'invalid-email':
           throw const AuthFailure('Geçersiz email formatı.');
-        case 'weak-password':
-          throw const AuthFailure('Şifre çok zayıf.');
+
+        case 'too-many-requests':
+          throw const AuthFailure(
+            'Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin.',
+          );
+
         default:
-          throw AuthFailure('Firebase register hatası: ${e.code}');
+        // Debug için kodu da görmek isteyebiliriz ama
+        // kullanıcıya sade bir mesaj vermek daha iyi.
+          throw const AuthFailure(
+            'Giriş yapılamadı. Lütfen email ve şifrenizi kontrol edin.',
+          );
       }
     }
 
@@ -183,19 +211,49 @@ class AuthRepository {
     }
 
     // Firebase login hataları
+    // ----------------- Firebase login hataları -----------------
+    // ----------------- Firebase login errors -----------------
     on fb.FirebaseAuthException catch (e) {
-      switch (e.code) {
+      // Bazı Firebase SDK sürümlerinde error code büyük/küçük karışık geliyor.
+      // Hepsini lowercase'e çekip daha stabil bir switch-case yazıyoruz.
+      final code = e.code.toLowerCase();
+
+      switch (code) {
+      // Yeni Firebase sürümlerinde hem "wrong password"
+      // hem de "user not found" çoğunlukla bu iki koda indirgenmiştir:
+      //
+      // - invalid-credential
+      // - invalid-login-credentials
+      //
+      // Güvenlik için kullanıcıya "email var mı yok mu" bilgisi verilmez.
+        case 'invalid-credential':
+        case 'invalid-login-credentials':
+          throw const AuthFailure('Email or password is incorrect.');
+
+      // Bazı eski cihazlarda veya eski Firebase versiyonlarında hala gelebilir.
         case 'user-not-found':
-          throw const AuthFailure('Bu email ile kayıtlı kullanıcı bulunamadı.');
+          throw const AuthFailure('No user found with this email.');
+
         case 'wrong-password':
-          throw const AuthFailure('Email veya şifre hatalı.');
+          throw const AuthFailure('Email or password is incorrect.');
+
         case 'invalid-email':
-          throw const AuthFailure('Geçersiz email formatı.');
+          throw const AuthFailure('Invalid email format.');
+
+        case 'user-disabled':
+          throw const AuthFailure('This user account has been disabled.');
+
         case 'too-many-requests':
           throw const AuthFailure(
-              'Çok fazla deneme yapıldı. Lütfen daha sonra tekrar deneyin.');
+            'Too many login attempts. Please try again later.',
+          );
+
+      // ❗ ÖNEMLİ: artık kullanıcıya ham Firebase error code göstermiyoruz.
+      // UI tarafında sadece genel bir hata göstermek daha doğru.
         default:
-          throw AuthFailure('Firebase login hatası: ${e.code}');
+          throw const AuthFailure(
+            'Login failed. Please check your email and password.',
+          );
       }
     }
 
