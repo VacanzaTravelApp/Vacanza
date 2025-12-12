@@ -1,4 +1,5 @@
 // src/App.jsx
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import AuthLayout from './pages/auth/AuthLayout';
@@ -6,6 +7,9 @@ import RegisterCard from './pages/auth/Registercard';
 import LoginCard from './pages/auth/LoginCard';
 import './pages/auth/AuthLayout.css'; 
 import MapPage from './pages/MapPage';
+
+// 🚀 GÜNCELLEME 1: MapPage bileşenini import edin
+import MapPage from './pages/MapPage'; // MapPage'in yolu doğru olduğundan emin olun
 
 const App = () => {
     return (
@@ -30,6 +34,10 @@ const App = () => {
                         <LoginCard />
                     </AuthLayout>
                 } />
+                
+                {/* 🚀 GÜNCELLEME 2: Harita Sayfası Rotasını Ekleyin */}
+                {/* MapPage bileşeni kendi Layout yapısını içerdiği için AuthLayout kullanmaya gerek yok. */}
+                <Route path="/map" element={<MapPage />} /> 
 
             </Routes>
         </Router>
