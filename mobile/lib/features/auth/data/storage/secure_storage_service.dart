@@ -15,6 +15,13 @@ class SecureStorageService {
   static const String _kAccessTokenKey = 'access_token';
   static const String _kRefreshTokenKey = 'refresh_token';
 
+  /// Logout sırasında tüm auth session bilgisini temizler.
+  /// Şimdilik sadece access + refresh token'ları siliyoruz.
+  Future<void> clearSession() async {
+    await _storage.delete(key: _kAccessTokenKey);
+    await _storage.delete(key: _kRefreshTokenKey);
+  }
+
   /// Access token'ı yazar.
   Future<void> writeAccessToken(String token) async {
     await _storage.write(key: _kAccessTokenKey, value: token);

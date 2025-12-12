@@ -4,8 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 ///
 /// Amaç:
 ///  - Firebase SDK kullanımını tek yerde toplamak
-///  - Repository’nin daha okunaklı ve test edilebilir olması
-///  - Login / register / idToken alma işlerini soyutlamak
+///  - Repository'nin daha okunaklı ve test edilebilir olması
 ///
 /// NOT:
 ///  - Firebase'de register başarılı olursa kullanıcı otomatik olarak login olur.
@@ -15,7 +14,6 @@ class FirebaseAuthService {
   final fb.FirebaseAuth _auth = fb.FirebaseAuth.instance;
 
   /// Kullanıcıyı email + şifre ile Firebase üzerinden login eder.
-  /// Başarılı olursa [fb.User] döner.
   Future<fb.User> login(String email, String password) async {
     final cred = await _auth.signInWithEmailAndPassword(
       email: email,
@@ -34,7 +32,7 @@ class FirebaseAuthService {
   ///
   /// Firebase tarafında:
   ///  - kullanıcı create edilir
-  ///  - aynı anda otomatik olarak sign-in olur (currentUser dolar)
+  ///  - aynı anda otomatik sign-in olur (currentUser dolar)
   Future<fb.User> register(String email, String password) async {
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email,
@@ -49,25 +47,31 @@ class FirebaseAuthService {
     return user;
   }
 
+  /// Firebase tarafındaki oturumu kapatır.
+  Future<void> signOut() async {
+    await _auth.signOut();
+  }
+
   /// Şu an login olan kullanıcıyı döner.
   fb.User? getCurrentUser() => _auth.currentUser;
 
   /// Şu an login olan kullanıcının Firebase ID Token'ını döner.
   ///
   /// Backend token doğrulama için bu ID token'ı kullanır.
+  /// DİKKAT:
+  /// bazı SDK sürümlerinde getIdToken() String? gibi davranabiliyor;
+  /// bu yüzden null check ile sağlamlaştırıyoruz.
   Future<String> getIdToken() async {
     final user = _auth.currentUser;
     if (user == null) {
       throw Exception('ID token alınamadı: currentUser null.');
     }
 
-    // BURASI ÖNEMLİ: önce token'ı al, null check yap
-    final token = await user.getIdToken(); // String? olabilir
-
+    final token = await user.getIdToken(); // bazen String? gibi davranabiliyor
     if (token == null) {
       throw Exception('ID token alınamadı: Firebase null token döndürdü.');
     }
 
-    return token; // burada artık String olarak promote oluyor
+    return token;
   }
 }

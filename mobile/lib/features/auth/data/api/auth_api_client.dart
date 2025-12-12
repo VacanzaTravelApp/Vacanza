@@ -1,83 +1,95 @@
 import 'package:dio/dio.dart';
 
+import 'package:mobile/features/auth/data/models/auth_backend_result.dart';
+
 /// Backend'in /auth endpointleri ile HTTP seviyesinde konuşan client.
 ///
 /// SORUMLULUK:
-///  - /auth/login
-///  - /auth/register
+///  - Sadece HTTP çağrısı atar.
+///  - Authorization header'a Bearer token ekler.
+///  - Response'u AuthBackendResult'a mapler.
 ///
-/// İş mantığı BU SINIFTA YOK.
-/// Sadece istek atar, cevabı map'ler ve repository'e geri döner.
-///
-/// ŞU AN:
-///  - AuthRepository içinde bu metodları çağıran kod COMMENT'li olacak.
-///  - Backend hazır olduğunda commentler kaldırılıp gerçek akış aktif edilecek.
+/// İş mantığı (Firebase login/register, storage yazma, fallback vs.) BURADA YOK.
+/// O işler AuthRepository'de.
 class AuthApiClient {
   final Dio _dio;
 
-  AuthApiClient({Dio? dio})
-      : _dio = dio ??
-      Dio(
-        BaseOptions(
-          baseUrl: 'http://10.0.2.2:8080', // TODO: prod URL eklenecek
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 10),
-        ),
-      );
+  /// ÖNEMLİ:
+  /// Dio burada "create" edilmez; dışarıdan verilir.
+  ///
+  /// Neden?
+  /// - Çünkü tek bir Dio instance kullanmak istiyoruz.
+  /// - JwtInterceptor, baseUrl, timeout vs. tek yerde yönetilsin.
+  /// - Yoksa farklı Dio oluşur → interceptor çalışmaz.
+  AuthApiClient({required Dio dio}) : _dio = dio;
 
-  /// /auth/login çağrısı.
+  /// POST /auth/login
   ///
-  /// Beklenen request body:
-  ///  {
-  ///    "firebaseUid": "...",
-  ///    "firebaseIdToken": "..."
-  ///  }
+  /// Header:
+  ///   Authorization: Bearer <firebaseIdToken>
   ///
-  /// Beklenen response örneği:
-  ///  {
-  ///    "access_token": "...",
-  ///    "refresh_token": "..."
-  ///  }
-  Future<Map<String, dynamic>> login({
-    required String firebaseUid,
+  /// Body:
+  ///   backend ne istiyorsa o (şimdilik boş olabilir)
+  ///
+  /// Backend döner:
+  ///   authenticated + user
+  Future<AuthBackendResult> login({
     required String firebaseIdToken,
+    Map<String, dynamic>? body,
   }) async {
     final response = await _dio.post(
       '/auth/login',
-      data: {
-        'firebaseUid': firebaseUid,
-        'firebaseIdToken': firebaseIdToken,
-      },
+      data: body ?? const {},
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $firebaseIdToken',
+        },
+      ),
     );
 
-    if (response.data is Map<String, dynamic>) {
-      return response.data as Map<String, dynamic>;
+    if (response.data is Map) {
+      return AuthBackendResult.fromJson(
+        (response.data as Map).cast<String, dynamic>(),
+      );
     }
 
     throw Exception('Backend login response beklenen formatta değil.');
   }
 
-  /// /auth/register çağrısı.
+  /// POST /auth/register
   ///
-  /// Beklenen body örneği (repository tarafında hazırlanacak):
-  ///  {
-  ///    "firebaseUid": "...",
-  ///    "firebaseIdToken": "...",
-  ///    "email": "...",
-  ///    "firstName": "...",
-  ///    "middleName": "...",
-  ///    "lastName": "...",
-  ///    "preferredNames": [...]
-  ///  }
+  /// Header:
+  ///   Authorization: Bearer <firebaseIdToken>
   ///
-  /// Backend'den yine access + refresh token dönmesi bekleniyor.
-  Future<Map<String, dynamic>> register({
+  /// Body:
+  ///   {
+  ///     "email": "...",
+  ///     "firstName": "...",
+  ///     "middleName": "...",
+  ///     "lastName": "...",
+  ///     "preferredNames": [...]
+  ///   }
+  ///
+  /// Backend döner:
+  ///   authenticated + user
+  Future<AuthBackendResult> register({
+    required String firebaseIdToken,
     required Map<String, dynamic> body,
   }) async {
-    final response = await _dio.post('/auth/register', data: body);
+    final response = await _dio.post(
+      '/auth/register',
+      data: body,
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer $firebaseIdToken',
+        },
+      ),
+    );
 
-    if (response.data is Map<String, dynamic>) {
-      return response.data as Map<String, dynamic>;
+    if (response.data is Map) {
+      return AuthBackendResult.fromJson(
+        (response.data as Map).cast<String, dynamic>(),
+      );
     }
 
     throw Exception('Backend register response beklenen formatta değil.');
