@@ -9,6 +9,7 @@ import 'firebase_options.dart';
 // Auth data layer
 import 'features/auth/data/repositories/auth_repository.dart';
 
+import 'package:mobile/core/navigation/navigation_service.dart';
 // Auth BLoCs
 import 'features/auth/presentation/bloc/register_bloc.dart';
 import 'features/auth/presentation/bloc/login_bloc.dart';
@@ -99,6 +100,7 @@ class VacanzaApp extends StatelessWidget {
           // gibi bloklar da buraya eklenecek.
         ],
         child: MaterialApp(
+          navigatorKey: NavigationService.navigatorKey,
           debugShowCheckedModeBanner: false,
           title: 'Vacanza',
           theme: ThemeData(
