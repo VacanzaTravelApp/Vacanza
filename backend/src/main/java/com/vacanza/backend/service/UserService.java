@@ -6,7 +6,7 @@ import com.vacanza.backend.dto.response.UserLoginHistoryResponseDTO;
 import com.vacanza.backend.dto.response.UserLoginResponseDTO;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.enums.Role;
-import com.vacanza.backend.exceptions.enums.LoginHistoryExceptionEnum;
+import com.vacanza.backend.exceptions.enums.UserLoginHistoryExceptionEnum;
 import com.vacanza.backend.exceptions.enums.UserExceptionEnum;
 import com.vacanza.backend.repo.UserRepository;
 import com.vacanza.backend.service.impl.UserImpl;
