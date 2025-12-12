@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 
 import 'package:mobile/core/widgets/animated_background.dart';
 import 'package:mobile/core/theme/app_colors.dart';
@@ -10,15 +11,16 @@ import 'package:mobile/features/map/presentation/screens/map_screen.dart';
 
 /// Uygulama açıldığında ilk çalışan "gate" ekranı.
 ///
-/// Amaç:
-///  - SecureStorage içindeki access token'a bakmak
-///  - Token varsa → kullanıcıyı direkt MapScreen'e göndermek
-///  - Token yoksa → LoginScreen açmak
+/// Yeni Mantık:
+///  - Backend token üretmiyor.
+///  - Biz "authenticated" saymak için:
+///      1) SecureStorage'da token var mı?  (Bearer olarak gidecek Firebase ID Token)
+///      2) Firebase tarafında currentUser var mı? (Firebase session açık mı?)
+///    ikisini birlikte kontrol ediyoruz.
 ///
 /// Bu sprint için:
-///  - Sadece "token var mı yok mu" kontrolü yapıyoruz.
-///  - Token'ın gerçekten valid / expired olup olmadığını
-///    kontrol eden full auth guard mekanizması Sprint 2'ye kalacak.
+///  - Token'ın expire olup olmadığı gibi derin kontrol YOK.
+///  - Full guard / refresh / 401 handling işleri ileride (VACANZA-88 vb.).
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -27,14 +29,9 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  /// Secure storage servisi.
-  /// Buradan access token'ı okuyacağız.
   final SecureStorageService _storage = SecureStorageService();
 
-  /// Async kontrol devam ediyor mu?
   bool _isChecking = true;
-
-  /// Kullanıcının login olmuş kabul edilip edilmeyeceği.
   bool _isAuthenticated = false;
 
   @override
@@ -43,25 +40,24 @@ class _AuthGateState extends State<AuthGate> {
     _checkAuthStatus();
   }
 
-  /// Uygulama açıldığında bir kere çalışan kontrol:
-  ///  - access_token oku
-  ///  - null/boş değilse kullanıcıyı "authenticated" say
+  /// Basit auth kontrolü:
+  ///  - Storage token var mı?
+  ///  - Firebase currentUser var mı?
+  ///
+  /// İkisi de varsa kullanıcıyı MapScreen'e alıyoruz.
   Future<void> _checkAuthStatus() async {
     try {
-      final accessToken = await _storage.readAccessToken();
+      final token = await _storage.readAccessToken();
+      final firebaseUser = fb.FirebaseAuth.instance.currentUser;
 
-      // Şimdilik çok basit bir kural:
-      //  - Token null değil ve boş string değilse login kabul ediyoruz.
-      //  - JWT'nin süresi / geçerliliği Sprint 2'de detaylı ele alınacak.
-      final loggedIn = accessToken != null && accessToken.isNotEmpty;
+      final hasToken = token != null && token.isNotEmpty;
+      final hasFirebaseSession = firebaseUser != null;
 
       setState(() {
-        _isAuthenticated = loggedIn;
+        _isAuthenticated = hasToken && hasFirebaseSession;
         _isChecking = false;
       });
     } catch (_) {
-      // Herhangi bir hata olsa bile uygulamanın crash olmasını istemiyoruz.
-      // Bu durumda "sanki token yokmuş" gibi login ekranına düşer.
       setState(() {
         _isAuthenticated = false;
         _isChecking = false;
@@ -71,7 +67,6 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    // 1) Kontrol devam ediyorken basit bir splash-style ekran gösteriyoruz.
     if (_isChecking) {
       final bodyMedium = AppTextStyles.bodyMedium(context);
 
@@ -102,13 +97,6 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
-    // 2) Kontrol bittiğinde:
-    //  - _isAuthenticated true ise → MapScreen
-    //  - değilse → LoginScreen
-    if (_isAuthenticated) {
-      return const MapScreen();
-    } else {
-      return const LoginScreen();
-    }
+    return _isAuthenticated ? const MapScreen() : const LoginScreen();
   }
 }
