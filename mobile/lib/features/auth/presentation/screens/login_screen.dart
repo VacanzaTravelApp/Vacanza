@@ -11,6 +11,7 @@ import 'package:mobile/features/auth/presentation/screens/register_screen.dart';
 // Login BLoC importları
 import 'package:mobile/features/auth/presentation/bloc/login_bloc.dart';
 import 'package:mobile/features/auth/presentation/bloc/login_state.dart';
+import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
 
 // Login başarıya ulaştığında yönleneceğimiz ana ekran (şimdilik mock map)
 import 'package:mobile/features/map/presentation/screens/map_screen.dart';
@@ -44,7 +45,7 @@ class LoginScreen extends StatelessWidget {
     // istemediğimiz için pushAndRemoveUntil kullanıyoruz.
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
-        builder: (_) => const MapScreen(),
+        builder: (_) => const HomeMapScreen(),
       ),
           (route) => false,
     );
