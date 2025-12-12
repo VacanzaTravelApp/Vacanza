@@ -19,6 +19,7 @@ import 'package:mobile/features/auth/presentation/bloc/register_event.dart';
 
 // Login ekranı (altta “Already have an account?” yazısı için)
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
+import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
 
 // Register sonrası yönleneceğimiz ana map ekranı (şimdilik mock)
 import 'package:mobile/features/map/presentation/screens/map_screen.dart';
@@ -96,7 +97,7 @@ class RegisterScreen extends StatelessWidget {
               Future.delayed(const Duration(milliseconds: 300), () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const MapScreen()),
+                  MaterialPageRoute(builder: (_) => const HomeMapScreen()),
                 );
               });
             }
