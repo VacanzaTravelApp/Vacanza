@@ -5,6 +5,7 @@ import com.vacanza.backend.dto.request.UserLoginRequestDTO;
 import com.vacanza.backend.dto.response.UserLoginHistoryResponseDTO;
 import com.vacanza.backend.dto.response.UserLoginResponseDTO;
 import com.vacanza.backend.entity.User;
+import com.vacanza.backend.entity.enums.Role;
 import com.vacanza.backend.exceptions.enums.LoginHistoryExceptionEnum;
 import com.vacanza.backend.exceptions.enums.UserExceptionEnum;
 import com.vacanza.backend.repo.UserRepository;
@@ -14,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -65,29 +67,22 @@ public class UserService implements UserImpl {
                 .build();
     }
 
-    /*@Transactional
+    @Transactional
     public User addNewUser(UserLoginRequestDTO request) {
 
+    if(userRepository.existsByEmail(request.getEmail())) {
+        throw new RuntimeException(UserExceptionEnum.EMAIL_ALREADY_EXIST.getExplanation());
+    }else{
+        User user = new User();
+        user.setEmail(request.getEmail());
+        user.setFirebaseUid(user.getFirebaseUid());
+        user.setRole(Role.USER);
+        user.setCreatedAt(Instant.now());
 
-        if(request.getEmail() == null){
-            throw new RuntimeException(UserExceptionEnum.EMAIL_NOT_VERIFIED.getExplanation());
+        return  userRepository.save(user);
+
         }
 
-        else{
-
-            User newUser = new User();
-            newUser.setEmail(request.getEmail());
-        }
-
-        newUser.setFirebaseUid(request.getFirebaseUid());
-
-        newUser.setName(request.getName());
-        newUser.setRole(request.getRole());   // Optional: validate role
-        newUser.setVerified(false);           // or true if Firebase emailVerified claim is used
-        newUser.setJoinDate(Instant.now());
-
-        // 6. Save to DB
-        return userRepository.save(newUser);
-    }*/
+    }
 
 }
