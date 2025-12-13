@@ -1,10 +1,12 @@
 package com.vacanza.backend.service;
 
+import com.vacanza.backend.dto.request.UserInfoRequestDTO;
 import com.vacanza.backend.dto.response.UserInfoResponseDTO;
 import com.vacanza.backend.dto.response.UserLoginResponseDTO;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.UserInfo;
 import com.vacanza.backend.exceptions.enums.UserExceptionEnum;
+import com.vacanza.backend.exceptions.enums.UserInfoExceptionEnum;
 import com.vacanza.backend.repo.UserInfoRepository;
 import com.vacanza.backend.repo.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class UserInfoService implements UserInfoImpl {
     private final UserRepository userRepository;
     private final UserService userService;
 
+    @Transactional(readOnly = true)
     public UserInfoResponseDTO getUserInfo() {
 
         // 1. Get the string UID again
@@ -30,13 +33,73 @@ public class UserInfoService implements UserInfoImpl {
 
         // 2. Find the User Entity
         User currentUser = userRepository.findByFirebaseUid(firebaseUid)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException(UserInfoExceptionEnum.USER_NOT_FOUND.getExplanation()));
+
+        // 3. Get the profile
+        UserInfo userInfo = userInfoRepository.findByUser(currentUser)
+                .orElseThrow(() -> new RuntimeException(UserInfoExceptionEnum.PROFILE_NOT_FOUND.getExplanation()));
+
+        // 4. Map to DTO
+        return mapToResponseDTO(userInfo);
 
     }
 
+    @Transactional
+    public UserInfoResponseDTO updateUserInfo(UserInfoRequestDTO request) {
+        // A. Get User
+        String firebaseUid = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
+        User currentUser = userRepository.findByFirebaseUid(firebaseUid)
+                .orElseThrow(() -> new RuntimeException(UserInfoExceptionEnum.USER_NOT_FOUND.getExplanation()));
 
+        // B. Find or Create Profile
+        UserInfo userInfo = userInfoRepository.findByUser(currentUser)
+                .orElse(new UserInfo());
 
+        // C. Update Entity Fields
+        if (userInfo.getUser() == null) {
+            userInfo.setUser(currentUser);
+        }
+        userInfo.setFirstName(request.getFirstName());
+        userInfo.setMiddleName(request.getMiddleName());
+        userInfo.setLastName(request.getLastName());
+        userInfo.setPreferredName(request.getPreferredName());
+        userInfo.setCountry(request.getCountry());
+        userInfo.setBirthDate(request.getBirthDate());
+        userInfo.setGender(request.getGender());
+        userInfo.setBudget(request.getBudget());
+        userInfo.setProfileImageUrl(request.getProfileImageUrl());
 
+        // D. Save
+        UserInfo savedInfo = userInfoRepository.save(userInfo);
 
+        // E. Return DTO using Builder
+        return mapToResponseDTO(savedInfo);
+    }
+
+    private UserInfoResponseDTO mapToResponseDTO(UserInfo info) {
+        return UserInfoResponseDTO.builder()
+                .infoId(info.getInfoId())
+                .userId(info.getUser().getUserId())
+                .firstName(info.getFirstName())
+                .middleName(info.getMiddleName())
+                .lastName(info.getLastName())
+                .preferredName(info.getPreferredName())
+                .displayName(info.getDisplayName())
+                .country(info.getCountry())
+                .birthDate(info.getBirthDate())
+                .gender(info.getGender())
+                .budget(info.getBudget())
+                .profileImageUrl(info.getProfileImageUrl())
+                .joinDate(info.getJoinDate())
+                .build();
+    }
 }
+
+
+
+
+
+
+
+
