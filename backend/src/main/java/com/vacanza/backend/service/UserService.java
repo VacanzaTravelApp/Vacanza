@@ -72,20 +72,19 @@ public class UserService implements UserImpl {
     }
 
     @Transactional
-    public User addNewUser(UserLoginRequestDTO request) {
+    public UserLoginResponseDTO addNewUser(UserLoginRequestDTO request) {
 
-        // Get Firebase UID (set by FirebaseTokenFilter)
         String firebaseUid = (String) SecurityContextHolder
                 .getContext()
                 .getAuthentication()
                 .getPrincipal();
 
-        // Prevent duplicate users (important)
-        if (userRepository.existsByFirebaseUid(firebaseUid)) {
-            return userRepository.findByFirebaseUid(firebaseUid)
-                    .orElseThrow(); // idempotent behavior
-        }
 
+        if (userRepository.existsByFirebaseUid(firebaseUid)) {
+            User existingUser = userRepository.findByFirebaseUid(firebaseUid)
+                    .orElseThrow();
+            return mapToLoginResponse(existingUser);
+        }
 
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException(
@@ -93,14 +92,27 @@ public class UserService implements UserImpl {
             );
         }
 
-        // Create user
         User user = new User();
         user.setFirebaseUid(firebaseUid);
         user.setEmail(request.getEmail());
         user.setRole(Role.USER);
         user.setCreatedAt(Instant.now());
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        return mapToLoginResponse(savedUser);
     }
 
+    private UserLoginResponseDTO mapToLoginResponse(User user) {
+        return UserLoginResponseDTO.builder()
+                .authenticated(true)
+                .user(
+                        UserLoginResponseDTO.UserInfo.builder()
+                                .userId(user.getUserId())
+                                .email(user.getEmail())
+                                .role(String.valueOf(user.getRole()))
+                                .build()
+                )
+                .build();
+    }
 }
