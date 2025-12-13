@@ -35,13 +35,13 @@ public class UserService implements UserImpl {
 
         return userRepository.findAll()
                 .stream()
-                .map(item -> UserLoginResponseDTO.builder()
+                .map(user -> UserLoginResponseDTO.builder()
+                        .authenticated(true)
                         .user(
                                 UserLoginResponseDTO.UserInfo.builder()
-                                        .userId(item.getUserId())
-                                        .email(item.getEmail())
-                                        .role(String.valueOf(item.getRole()))
-                                        //.verified(item.isVerified())
+                                        .userId(user.getUserId())
+                                        .email(user.getEmail())
+                                        .role(user.getRole().name())
                                         .build()
                         )
                         .build()
@@ -50,19 +50,23 @@ public class UserService implements UserImpl {
     }
 
     @Transactional(readOnly = true)
-    public UserLoginResponseDTO getUserByUserId(UUID userId) {
+    public UserLoginResponseDTO getCurrentUser() {
 
-        User user = userRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException(UserExceptionEnum.USER_NOT_FOUND.getExplanation()));
+        String firebaseUid = (String)SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        User user = userRepository.findByFirebaseUid(firebaseUid)
+                .orElseThrow(() ->
+                        new RuntimeException(UserExceptionEnum.USER_NOT_FOUND.getExplanation())
+                );
 
         return UserLoginResponseDTO.builder()
                 .authenticated(true)
-                .user(UserLoginResponseDTO.UserInfo.builder()
-                        .userId(user.getUserId())
-                        .email(user.getEmail())
-                        .role(String.valueOf(user.getRole()))
-                        //.verified(user.isVerified())
-                        .build()
+                .user(
+                        UserLoginResponseDTO.UserInfo.builder()
+                                .userId(user.getUserId())
+                                .email(user.getEmail())
+                                .role(user.getRole().name())
+                                .build()
                 )
                 .build();
     }
@@ -70,19 +74,33 @@ public class UserService implements UserImpl {
     @Transactional
     public User addNewUser(UserLoginRequestDTO request) {
 
-    if(userRepository.existsByEmail(request.getEmail())) {
-        throw new RuntimeException(UserExceptionEnum.EMAIL_ALREADY_EXIST.getExplanation());
-    }else{
+        // Get Firebase UID (set by FirebaseTokenFilter)
+        String firebaseUid = (String) SecurityContextHolder
+                .getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        // Prevent duplicate users (important)
+        if (userRepository.existsByFirebaseUid(firebaseUid)) {
+            return userRepository.findByFirebaseUid(firebaseUid)
+                    .orElseThrow(); // idempotent behavior
+        }
+
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException(
+                    UserExceptionEnum.EMAIL_ALREADY_EXIST.getExplanation()
+            );
+        }
+
+        // Create user
         User user = new User();
+        user.setFirebaseUid(firebaseUid);
         user.setEmail(request.getEmail());
-        user.setFirebaseUid(user.getFirebaseUid());
         user.setRole(Role.USER);
         user.setCreatedAt(Instant.now());
 
-        return  userRepository.save(user);
-
-        }
-
+        return userRepository.save(user);
     }
 
 }
