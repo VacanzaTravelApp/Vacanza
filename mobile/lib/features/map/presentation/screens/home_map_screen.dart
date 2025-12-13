@@ -1,40 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../data/models/map_view_mode.dart';
+import '../bloc/map_bloc.dart';
+import '../bloc/map_event.dart';
+import '../bloc/map_state.dart';
 import '../widgets/home_map/home_map_scaffold.dart';
 
 /// Login sonrası kullanıcıyı karşılayan ana harita ekranı.
-/// Bu ekran Mapbox gelene kadar sadece UI iskeleti + state içerir.
+/// 156 kapsamında state (mode + recenter) BLoC'tan okunur.
 ///
-/// State:
-/// - MapViewMode (2D/3D/Satellite)
-/// - Recenter / Map style gibi butonlar şimdilik mock handler çağırır.
-class HomeMapScreen extends StatefulWidget {
+/// Mapbox 137 gelince:
+/// - MapInitialized(controller) gerçek controller ile dispatch edilecek
+/// - RecenterPressed event'inde controller üzerinden kamera resetlenecek
+class HomeMapScreen extends StatelessWidget {
   const HomeMapScreen({super.key});
 
-  @override
-  State<HomeMapScreen> createState() => _HomeMapScreenState();
-}
-
-class _HomeMapScreenState extends State<HomeMapScreen> {
-  MapViewMode _mode = MapViewMode.mode2D;
-
-  /// Map görünüm modunu sıradaki moda alır (2D -> 3D -> SAT -> 2D).
-  void _toggleMode() {
-    setState(() {
-      _mode = _mode.next();
-    });
-  }
-
-  /// Map style / layer açma gibi aksiyonlar şimdilik placeholder.
-  void _openMapStyle() {
+  void _openMapStyle(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Map style (mock)')),
     );
   }
 
-  /// Recenter aksiyonu şimdilik placeholder.
-  void _recenter() {
+  void _recenterMockFeedback(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Recenter (mock)')),
     );
@@ -42,11 +29,24 @@ class _HomeMapScreenState extends State<HomeMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return HomeMapScaffold(
-      mode: _mode,
-      onToggleMode: _toggleMode,
-      onOpenMapStyle: _openMapStyle,
-      onRecenter: _recenter,
+    return BlocProvider(
+      create: (_) => MapBloc(),
+      child: BlocBuilder<MapBloc, MapState>(
+        builder: (context, state) {
+          return HomeMapScaffold(
+            mode: state.viewMode,
+            onOpenMapStyle: () => _openMapStyle(context),
+            onToggleMode: () =>
+                context.read<MapBloc>().add(const ToggleViewModePressed()),
+            onRecenter: () {
+              context.read<MapBloc>().add(const RecenterPressed());
+
+              // Mapbox yokken kullanıcı hissi (opsiyonel)
+              _recenterMockFeedback(context);
+            },
+          );
+        },
+      ),
     );
   }
 }
