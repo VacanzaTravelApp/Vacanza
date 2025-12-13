@@ -1,14 +1,13 @@
 package com.vacanza.backend.controller;
 
 
+import com.vacanza.backend.dto.request.UserLoginRequestDTO;
 import com.vacanza.backend.dto.response.UserLoginResponseDTO;
 import com.vacanza.backend.service.UserService;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -23,6 +22,18 @@ public class UserController {
     public ResponseEntity<List<UserLoginResponseDTO>> getAllUser() {
         List<UserLoginResponseDTO> response = userService.getAllUsers();
         return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @GetMapping("/get-current-user")
+    public ResponseEntity<UserLoginResponseDTO> getCurrentUser() {
+        UserLoginResponseDTO response = userService.getCurrentUser();
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PostMapping("/add-new-user")
+    public ResponseEntity<UserLoginResponseDTO> addNewUser(@RequestBody UserLoginRequestDTO request) {
+        UserLoginResponseDTO response = userService.addNewUser(request);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
 
