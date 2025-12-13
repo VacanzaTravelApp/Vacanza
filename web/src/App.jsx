@@ -7,6 +7,8 @@ import RegisterCard from './pages/auth/Registercard';
 import LoginCard from './pages/auth/LoginCard';
 import './pages/auth/AuthLayout.css'; 
 import MapPage from './pages/MapPage';
+//import "mapbox-gl/dist/mapbox-gl.css";
+
 
 const App = () => {
     return (
