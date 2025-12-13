@@ -1,10 +1,10 @@
 import 'package:equatable/equatable.dart';
 
-/// Harita ekranında kullanıcı aksiyonlarını temsil eden event'ler.
+/// Map ekranında kullanıcı aksiyonlarını ve lifecycle olaylarını temsil eden event'ler.
 ///
-/// NOT:
-/// - 137'de Mapbox controller gelince bu controller gerçek tipine çevrilecek.
-/// - Şimdilik Mapbox bağımlılığı yaratmamak için Object? kullanıyoruz.
+/// Bu task (156) Mapbox şart değil.
+/// O yüzden controller tipi şimdilik `Object` olarak tutulur.
+/// 137'de Mapbox controller geldiğinde bu Object yerine gerçek tipi koyacağız.
 abstract class MapEvent extends Equatable {
   const MapEvent();
 
@@ -12,13 +12,10 @@ abstract class MapEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-/// Harita/controller hazır olduğunda tetiklenir.
-///
-/// controller:
-/// - Şimdilik Object? (Mapbox yokken bile event contract hazır olsun diye)
-/// - 137'de MapboxMapController gibi gerçek tipe çekilecek.
+/// Harita controller'ı hazır olduğunda dispatch edilir.
+/// (Mapbox 137'de gelince gerçek controller burada gelecek.)
 class MapInitialized extends MapEvent {
-  final Object? controller;
+  final Object controller;
 
   const MapInitialized({required this.controller});
 
@@ -26,10 +23,12 @@ class MapInitialized extends MapEvent {
   List<Object?> get props => [controller];
 }
 
-class MapToggleViewModePressed extends MapEvent {
-  const MapToggleViewModePressed();
+/// Sağdaki "2D/3D/SAT" butonuna basıldı.
+class ToggleViewModePressed extends MapEvent {
+  const ToggleViewModePressed();
 }
 
-class MapRecenterPressed extends MapEvent {
-  const MapRecenterPressed();
+/// Sağdaki "Recenter" butonuna basıldı.
+class RecenterPressed extends MapEvent {
+  const RecenterPressed();
 }

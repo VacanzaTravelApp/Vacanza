@@ -1,35 +1,44 @@
 import 'package:equatable/equatable.dart';
 
-enum MapViewMode { twoD, threeD }
+import '../../data/models/map_view_mode.dart';
 
-/// Harita ekranı state'i.
+/// Map ekranının state'i.
 ///
-/// isMapReady:
-/// - Controller setlenmeden true olmaz.
-/// lastErrorMessage:
-/// - Map init / controller işlemleri gibi kritik noktalarda hata gösterimi için.
+/// Minimum istenenler:
+/// - MapViewMode (twoD/threeD/sat)
+/// - isMapReady (controller hazır mı)
+/// - lastErrorMessage? (opsiyonel)
+///
+/// Ek olarak:
+/// - recenterTick: "one-shot" UI aksiyonu tetiklemek için kullanıyoruz.
+///   Recenter basılınca +1 olur. Mapbox geldiğinde bu tick'i dinleyip kamerayı resetleyeceğiz.
 class MapState extends Equatable {
   final MapViewMode viewMode;
   final bool isMapReady;
+  final String? lastErrorMessage;
 
-  /// Recenter gibi "one-shot" tetikleyiciler için.
-  /// Her basışta artar, UI tarafı bu tick değişimini dinler.
+  /// Recenter için one-shot tetikleyici.
   final int recenterTick;
 
-  final String? lastErrorMessage;
+  /// Controller'ı state'e koyuyoruz çünkü:
+  /// - 137'de Mapbox controller üzerinden kamera/tilt işlemleri yapacağız.
+  /// - Bu taskta Mapbox olmadığı için `Object?` olarak saklıyoruz.
+  final Object? controller;
 
   const MapState({
     required this.viewMode,
     required this.isMapReady,
     required this.recenterTick,
-    required this.lastErrorMessage,
+    this.lastErrorMessage,
+    this.controller,
   });
 
   factory MapState.initial() => const MapState(
-    viewMode: MapViewMode.twoD,
+    viewMode: MapViewMode.mode2D,
     isMapReady: false,
     recenterTick: 0,
     lastErrorMessage: null,
+    controller: null,
   );
 
   MapState copyWith({
@@ -37,15 +46,24 @@ class MapState extends Equatable {
     bool? isMapReady,
     int? recenterTick,
     String? lastErrorMessage,
+    Object? controller,
+    bool clearError = false,
   }) {
     return MapState(
       viewMode: viewMode ?? this.viewMode,
       isMapReady: isMapReady ?? this.isMapReady,
       recenterTick: recenterTick ?? this.recenterTick,
-      lastErrorMessage: lastErrorMessage,
+      lastErrorMessage: clearError ? null : (lastErrorMessage ?? this.lastErrorMessage),
+      controller: controller ?? this.controller,
     );
   }
 
   @override
-  List<Object?> get props => [viewMode, isMapReady, recenterTick, lastErrorMessage];
+  List<Object?> get props => [
+    viewMode,
+    isMapReady,
+    lastErrorMessage,
+    recenterTick,
+    controller,
+  ];
 }
