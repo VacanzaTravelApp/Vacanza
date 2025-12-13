@@ -23,40 +23,34 @@ public class UserInfoService implements UserInfoImpl {
 
     private final UserInfoRepository userInfoRepository;
     private final UserRepository userRepository;
-    private final UserService userService;
 
+    @Override
     @Transactional(readOnly = true)
     public UserInfoResponseDTO getUserInfo() {
 
-        // 1. Get the string UID again
-        String firebaseUid = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        User currentUser = getCurrentAuthenticatedUser();
 
-        // 2. Find the User Entity
-        User currentUser = userRepository.findByFirebaseUid(firebaseUid)
-                .orElseThrow(() -> new RuntimeException(UserInfoExceptionEnum.USER_NOT_FOUND.getExplanation()));
-
-        // 3. Get the profile
+        //  Get the profile
         UserInfo userInfo = userInfoRepository.findByUser(currentUser)
                 .orElseThrow(() -> new RuntimeException(UserInfoExceptionEnum.PROFILE_NOT_FOUND.getExplanation()));
 
-        // 4. Map to DTO
+        // Map to DTO
         return mapToResponseDTO(userInfo);
 
     }
 
+    @Override
     @Transactional
     public UserInfoResponseDTO updateUserInfo(UserInfoRequestDTO request) {
-        // A. Get User
-        String firebaseUid = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        User currentUser = userRepository.findByFirebaseUid(firebaseUid)
-                .orElseThrow(() -> new RuntimeException(UserInfoExceptionEnum.USER_NOT_FOUND.getExplanation()));
+        // Get the user
+        User currentUser = getCurrentAuthenticatedUser();
 
-        // B. Find or Create Profile
+        //  Find or Create Profile
         UserInfo userInfo = userInfoRepository.findByUser(currentUser)
                 .orElse(new UserInfo());
 
-        // C. Update Entity Fields
+        // Update Entity Fields
         if (userInfo.getUser() == null) {
             userInfo.setUser(currentUser);
         }
@@ -70,10 +64,10 @@ public class UserInfoService implements UserInfoImpl {
         userInfo.setBudget(request.getBudget());
         userInfo.setProfileImageUrl(request.getProfileImageUrl());
 
-        // D. Save
+        // Save
         UserInfo savedInfo = userInfoRepository.save(userInfo);
 
-        // E. Return DTO using Builder
+        // Return DTO using Builder
         return mapToResponseDTO(savedInfo);
     }
 
@@ -93,6 +87,13 @@ public class UserInfoService implements UserInfoImpl {
                 .profileImageUrl(info.getProfileImageUrl())
                 .joinDate(info.getJoinDate())
                 .build();
+    }
+
+    private User getCurrentAuthenticatedUser() {
+        String firebaseUid = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        return userRepository.findByFirebaseUid(firebaseUid)
+                .orElseThrow(() -> new RuntimeException(UserInfoExceptionEnum.USER_NOT_FOUND.getExplanation()));
     }
 }
 
