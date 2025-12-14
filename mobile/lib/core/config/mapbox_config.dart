@@ -13,7 +13,7 @@ class MapboxConfig {
   /// - Mobil uygulama içinde bulunması normaldir.
   /// - Secret token ile karıştırma.
   static const String accessToken =
-      'pk.eyJ1IjoicHJpeGltYSIsImEiOiJjbTlkMDdhdHcwbW92Mmtxd2swbXMyNTd0In0.c4zFX1Yh1mP4ioGHYiJrfQ ';
+      'pk.eyJ1IjoicHJpeGltYSIsImEiOiJjbTlkMDdhdHcwbW92Mmtxd2swbXMyNTd0In0.c4zFX1Yh1mP4ioGHYiJrfQ';
 
 
   static final CameraOptions initialCamera = CameraOptions(

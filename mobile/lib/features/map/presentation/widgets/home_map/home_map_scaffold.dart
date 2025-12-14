@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mobile/features/map/presentation/widgets/home_map/map_canvas_placeholder.dart';
+import 'package:mobile/features/map/presentation/widgets/home_map/map_canvas_mapbox.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/action_bar.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/profile_badge.dart';
 
