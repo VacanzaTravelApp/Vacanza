@@ -2,76 +2,84 @@ package com.vacanza.backend.service;
 
 import com.vacanza.backend.dto.request.UserInfoRequestDTO;
 import com.vacanza.backend.dto.response.UserInfoResponseDTO;
-import com.vacanza.backend.dto.response.UserLoginResponseDTO;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.UserInfo;
-import com.vacanza.backend.exceptions.enums.UserExceptionEnum;
-import com.vacanza.backend.exceptions.enums.UserInfoExceptionEnum;
 import com.vacanza.backend.repo.UserInfoRepository;
-import com.vacanza.backend.repo.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.vacanza.backend.security.CurrentUserProvider;
+
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import com.vacanza.backend.service.impl.UserInfoImpl;
+import org.springframework.util.StringUtils;
 
-import java.util.UUID;
+import java.time.Instant;
 
+/**
+ * Profile service for UserInfo.
+ * Creates profile if not exists, updates otherwise.
+ */
 @Service
-@RequiredArgsConstructor
-public class UserInfoService implements UserInfoImpl {
+public class UserInfoService {
 
     private final UserInfoRepository userInfoRepository;
-    private final UserRepository userRepository;
+    private final CurrentUserProvider currentUserProvider;
 
-    @Override
-    @Transactional(readOnly = true)
+    public UserInfoService(UserInfoRepository userInfoRepository,
+                           CurrentUserProvider currentUserProvider) {
+        this.userInfoRepository = userInfoRepository;
+        this.currentUserProvider = currentUserProvider;
+    }
+
     public UserInfoResponseDTO getUserInfo() {
+        User user = currentUserProvider.getCurrentUserEntity();
 
-        User currentUser = getCurrentAuthenticatedUser();
+        UserInfo info = userInfoRepository.findByUser(user)
+                .orElseThrow(() -> new IllegalStateException("User profile not found"));
 
-        //  Get the profile
-        UserInfo userInfo = userInfoRepository.findByUser(currentUser)
-                .orElseThrow(() -> new RuntimeException(UserInfoExceptionEnum.PROFILE_NOT_FOUND.getExplanation()));
-
-        // Map to DTO
-        return mapToResponseDTO(userInfo);
-
+        return toResponse(info);
     }
 
-    @Override
-    @Transactional
     public UserInfoResponseDTO updateUserInfo(UserInfoRequestDTO request) {
+        User user = currentUserProvider.getCurrentUserEntity();
 
-        // Get the user
-        User currentUser = getCurrentAuthenticatedUser();
+        UserInfo info = userInfoRepository.findByUser(user).orElse(null);
 
-        //  Find or Create Profile
-        UserInfo userInfo = userInfoRepository.findByUser(currentUser)
-                .orElse(new UserInfo());
+        if (info == null) {
+            // Creating new profile -> DB has NOT NULL first/last name constraints
+            if (!StringUtils.hasText(request.getFirstName()) || !StringUtils.hasText(request.getLastName())) {
+                throw new IllegalArgumentException("firstName and lastName are required to create profile");
+            }
 
-        // Update Entity Fields
-        if (userInfo.getUser() == null) {
-            userInfo.setUser(currentUser);
+            info = UserInfo.builder()
+                    .user(user)
+                    .firstName(request.getFirstName())
+                    .middleName(request.getMiddleName())
+                    .lastName(request.getLastName())
+                    .preferredName(request.getPreferredName())
+                    .country(request.getCountry())
+                    .birthDate(request.getBirthDate())
+                    .gender(request.getGender())
+                    .budget(request.getBudget())
+                    .profileImageUrl(request.getProfileImageUrl())
+                    .joinDate(Instant.now())
+                    .build();
+        } else {
+            // Update strategy: overwrite if provided (simple + safe)
+            if (StringUtils.hasText(request.getFirstName())) info.setFirstName(request.getFirstName());
+            info.setMiddleName(request.getMiddleName());
+            if (StringUtils.hasText(request.getLastName())) info.setLastName(request.getLastName());
+            info.setPreferredName(request.getPreferredName());
+
+            info.setCountry(request.getCountry());
+            info.setBirthDate(request.getBirthDate());
+            info.setGender(request.getGender());
+            info.setBudget(request.getBudget());
+            info.setProfileImageUrl(request.getProfileImageUrl());
         }
-        userInfo.setFirstName(request.getFirstName());
-        userInfo.setMiddleName(request.getMiddleName());
-        userInfo.setLastName(request.getLastName());
-        userInfo.setPreferredName(request.getPreferredName());
-        userInfo.setCountry(request.getCountry());
-        userInfo.setBirthDate(request.getBirthDate());
-        userInfo.setGender(request.getGender());
-        userInfo.setBudget(request.getBudget());
-        userInfo.setProfileImageUrl(request.getProfileImageUrl());
 
-        // Save
-        UserInfo savedInfo = userInfoRepository.save(userInfo);
-
-        // Return DTO using Builder
-        return mapToResponseDTO(savedInfo);
+        UserInfo saved = userInfoRepository.save(info);
+        return toResponse(saved);
     }
 
-    private UserInfoResponseDTO mapToResponseDTO(UserInfo info) {
+    private UserInfoResponseDTO toResponse(UserInfo info) {
         return UserInfoResponseDTO.builder()
                 .infoId(info.getInfoId())
                 .userId(info.getUser().getUserId())
@@ -88,19 +96,4 @@ public class UserInfoService implements UserInfoImpl {
                 .joinDate(info.getJoinDate())
                 .build();
     }
-
-    private User getCurrentAuthenticatedUser() {
-        String firebaseUid = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        return userRepository.findByFirebaseUid(firebaseUid)
-                .orElseThrow(() -> new RuntimeException(UserInfoExceptionEnum.USER_NOT_FOUND.getExplanation()));
-    }
 }
-
-
-
-
-
-
-
-
