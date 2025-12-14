@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../data/models/map_view_mode.dart';
 import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
@@ -14,12 +13,34 @@ class HomeMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return BlocProvider<MapBloc>(
+      // Bu ekran açılınca MapBloc oluşturulur.
+      create: (_) => MapBloc(),
+      child: const _HomeMapView(),
+    );
+  }
+}
+
+/// Provider'dan gelen MapBloc state'ini dinleyen gerçek UI.
+/// (Provider ile UI'yi ayırıyoruz ki test/okunabilirlik iyi olsun.)
+class _HomeMapView extends StatelessWidget {
+  const _HomeMapView();
+
+  @override
+  Widget build(BuildContext context) {
     return BlocBuilder<MapBloc, MapState>(
       builder: (context, state) {
         return HomeMapScaffold(
           mode: state.viewMode,
-          onToggleMode: () => context.read<MapBloc>().add(const ToggleViewModePressed()),
-          onRecenter: () => context.read<MapBloc>().add(const RecenterPressed()),
+        //  onOpenMapStyle: () {
+            // Task 138 kapsamı değil; şimdilik boş bırak.
+         // },
+          onToggleMode: () {
+            context.read<MapBloc>().add(ToggleViewModePressed());
+          },
+          onRecenter: () {
+            context.read<MapBloc>().add(RecenterPressed());
+          },
         );
       },
     );

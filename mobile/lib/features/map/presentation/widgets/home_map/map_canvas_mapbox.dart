@@ -9,11 +9,6 @@ import '../../bloc/map_bloc.dart';
 import '../../bloc/map_event.dart';
 import '../../bloc/map_state.dart';
 
-/// Gerçek Mapbox harita widget'ı.
-/// - Map oluşturulunca controller alınır ve MapInitialized dispatch edilir.
-/// - BLoC state değişince (2D/3D, recenter) kamera burada değiştirilir.
-///
-/// Not: Kamera/animasyon gibi side-effect işleri bloc yerine widget tarafında yapılır.
 class MapCanvasMapbox extends StatefulWidget {
   const MapCanvasMapbox({super.key});
 
@@ -27,19 +22,16 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   @override
   Widget build(BuildContext context) {
     return BlocListener<MapBloc, MapState>(
-      listenWhen: (prev, next) {
-        // Sadece gerçekten işimiz olan değişikliklerde tetiklenelim.
-        return prev.viewMode != next.viewMode ||
-            prev.recenterTick != next.recenterTick;
-      },
+      listenWhen: (prev, next) =>
+      prev.viewMode != next.viewMode ||
+          prev.recenterTick != next.recenterTick,
       listener: (context, state) async {
-        if (_map == null) return; // controller yoksa crash yok
+        if (_map == null) return;
 
-        // 2D / 3D geçişi -> pitch değiştir
+        // View mode değiştiyse style + kamera uygula
         await _applyViewMode(state.viewMode);
 
-        // recenter -> başlangıç kamerasına dön
-        // (recenterTick artınca burası tetiklenir)
+        // Recenter tetiklendiyse başlangıç konumuna dön
         if (state.recenterTick > 0) {
           await _recenter(state.viewMode);
         }
@@ -47,46 +39,54 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       child: MapWidget(
         key: const ValueKey('mapbox-map'),
         cameraOptions: MapboxConfig.initialCamera,
-        onMapCreated: (mapboxMap) {
+        onMapCreated: (mapboxMap) async {
           _map = mapboxMap;
+
+          // İlk açılış: street style
+          await _map!.loadStyleURI(MapboxConfig.styleStreets);
+
           context.read<MapBloc>().add(MapInitialized(mapboxMap));
         },
       ),
     );
   }
 
-  /// Mode'a göre kamera pitch ayarlar (2D: 0, 3D: 55).
+  /// Mode'a göre:
+  /// - 2D/3D: Streets style
+  /// - Satellite: Satellite style
+  /// - 3D: pitch 55, diğerleri pitch 0
   Future<void> _applyViewMode(MapViewMode mode) async {
     if (_map == null) return;
 
-    final camera = (mode == MapViewMode.mode3D)
+    // 1) Style seç
+    final String styleUri = (mode == MapViewMode.satellite)
+        ? MapboxConfig.styleSatellite
+        : MapboxConfig.styleStreets;
+
+    await _map!.loadStyleURI(styleUri);
+
+    // 2) Kamera seç
+    final CameraOptions camera = (mode == MapViewMode.mode3D)
         ? MapboxConfig.camera3D
         : MapboxConfig.camera2D;
 
-    // Yumuşak geçiş için easeTo kullanıyoruz.
     await _map!.easeTo(
       camera,
-      MapAnimationOptions(
-        duration: 450, // ms
-        startDelay: 0,
-      ),
+      MapAnimationOptions(duration: 450, startDelay: 0),
     );
   }
 
-  /// Recenter: başlangıç konumuna dönerken, mevcut mode'u da korur.
+  /// Recenter: bulunduğun mode'a göre aynı kamera presetine döner
   Future<void> _recenter(MapViewMode mode) async {
     if (_map == null) return;
 
-    final camera = (mode == MapViewMode.mode3D)
+    final CameraOptions camera = (mode == MapViewMode.mode3D)
         ? MapboxConfig.camera3D
         : MapboxConfig.camera2D;
 
     await _map!.easeTo(
       camera,
-      MapAnimationOptions(
-        duration: 550,
-        startDelay: 0,
-      ),
+      MapAnimationOptions(duration: 550, startDelay: 0),
     );
   }
 }

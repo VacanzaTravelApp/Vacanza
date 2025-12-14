@@ -28,10 +28,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
   }
 
   void _onToggleMode(ToggleViewModePressed event, Emitter<MapState> emit) {
-    // Sat/diğer modları şimdilik kullanmıyoruz: 2D <-> 3D
-    final next = (state.viewMode == MapViewMode.mode2D)
-        ? MapViewMode.mode3D
-        : MapViewMode.mode2D;
+    final next = state.viewMode.next();
 
     emit(state.copyWith(viewMode: next));
 

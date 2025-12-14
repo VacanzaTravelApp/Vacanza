@@ -8,6 +8,9 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 class MapboxConfig {
   /// Mapbox public access token
   ///
+  ///
+    static const String styleStreets = 'mapbox://styles/mapbox/streets-v12';
+     static const String styleSatellite = 'mapbox://styles/mapbox/satellite-streets-v12';
   /// NOT:
   /// - Bu token PUBLIC token'dır.
   /// - Mobil uygulama içinde bulunması normaldir.
