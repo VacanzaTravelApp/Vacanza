@@ -23,15 +23,25 @@ public class CurrentUserProvider {
 
     public String getFirebaseUid() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
         if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing Authorization Bearer token");
         }
-        return String.valueOf(auth.getPrincipal());
+
+        String principal = String.valueOf(auth.getPrincipal());
+        if (principal.isBlank() || "anonymousUser".equalsIgnoreCase(principal)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing Authorization Bearer token");
+        }
+
+        return principal;
     }
 
     public User getCurrentUserEntity() {
         String uid = getFirebaseUid();
         return userRepository.findByFirebaseUid(uid)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found in database"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "Authenticated user not found in database"
+                ));
     }
 }
