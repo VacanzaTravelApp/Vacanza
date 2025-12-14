@@ -2,16 +2,13 @@ package com.vacanza.backend.security;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
-
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.enums.Role;
 import com.vacanza.backend.repo.UserRepository;
-
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -24,14 +21,16 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- validates Firebase ID Token sent by frontend:
- authorization: Bearer <firebase_id_token>
- If valid:
-     db sync
-     sets SecurityContext principal as firebaseUid
-     adds role
- If invalid:
-     responds with 401 Unauthorized
+ * Validates Firebase ID Token sent by frontend:
+ * Authorization: Bearer <firebase_id_token>
+ * <p>
+ * If valid:
+ * - sync user to DB (users table)
+ * - sets SecurityContext principal = firebaseUid, authority = ROLE_*
+ * - sets request attributes: firebaseEmail, firebaseEmailVerified
+ * <p>
+ * If invalid:
+ * - responds 401 Unauthorized
  */
 @Component
 public class FirebaseTokenFilter extends OncePerRequestFilter {
@@ -49,57 +48,59 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-
-        // no bearer
-        if (header == null || !header.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        String token = header.substring("Bearer ".length()).trim();
+        boolean contextSetByThisFilter = false;
 
         try {
+            String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+
+            // No bearer -> just continue (endpoints that require auth will fail in CurrentUserProvider)
+            if (header == null || !header.startsWith("Bearer ")) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String token = header.substring("Bearer ".length()).trim();
+
             FirebaseToken decoded = FirebaseAuth.getInstance().verifyIdToken(token);
 
             String uid = decoded.getUid();
-            String email = decoded.getEmail();
+            String email = decoded.getEmail(); // can be null for some providers
             boolean emailVerified = Boolean.TRUE.equals(decoded.isEmailVerified());
 
-            //db sync
+            // DB sync: create user if missing
             User user = userRepository.findByFirebaseUid(uid)
                     .orElseGet(() -> userRepository.save(
                             User.builder()
                                     .firebaseUid(uid)
-                                    .email(email)
+                                    .email(email != null ? email : ("uid:" + uid))
                                     .role(Role.USER)
                                     .build()
                     ));
 
-            //role based access (for later)
             List<SimpleGrantedAuthority> authorities = List.of(
                     new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
             );
 
             UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            user.getFirebaseUid(), // principal
-                            null,
-                            authorities
-                    );
+                    new UsernamePasswordAuthenticationToken(user.getFirebaseUid(), null, authorities);
 
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            contextSetByThisFilter = true;
 
-            //pass useful info down the chain
+            // Useful attributes for controllers/services
             request.setAttribute("firebaseEmail", email);
             request.setAttribute("firebaseEmailVerified", emailVerified);
 
             filterChain.doFilter(request, response);
 
         } catch (Exception ex) {
-            //token invalid/expired/revoked
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        } finally {
+            // IMPORTANT: In dev profile (no SecurityFilterChain context cleanup), avoid thread-local leaks.
+            if (contextSetByThisFilter) {
+                SecurityContextHolder.clearContext();
+            }
         }
     }
 }
