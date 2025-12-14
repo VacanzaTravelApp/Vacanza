@@ -1,118 +1,67 @@
 package com.vacanza.backend.service;
 
-
-import com.vacanza.backend.dto.request.UserLoginRequestDTO;
-import com.vacanza.backend.dto.response.UserLoginHistoryResponseDTO;
 import com.vacanza.backend.dto.response.UserLoginResponseDTO;
 import com.vacanza.backend.entity.User;
-import com.vacanza.backend.entity.enums.Role;
-import com.vacanza.backend.exceptions.enums.UserLoginHistoryExceptionEnum;
-import com.vacanza.backend.exceptions.enums.UserExceptionEnum;
+import com.vacanza.backend.entity.UserInfo;
+import com.vacanza.backend.repo.UserInfoRepository;
 import com.vacanza.backend.repo.UserRepository;
-import com.vacanza.backend.service.impl.UserImpl;
-import jdk.jshell.spi.ExecutionControl;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import com.vacanza.backend.security.CurrentUserProvider;
 
-import java.time.Instant;
+import org.springframework.stereotype.Service;
+
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ User service:
+    Reads current user from SecurityContext via CurrentUserProvider
+    Maps to DTO expected by frontend
+ */
 @Service
-public class UserService implements UserImpl {
+public class UserService {
 
     private final UserRepository userRepository;
+    private final UserInfoRepository userInfoRepository;
+    private final CurrentUserProvider currentUserProvider;
 
-
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository,
+                       UserInfoRepository userInfoRepository,
+                       CurrentUserProvider currentUserProvider) {
         this.userRepository = userRepository;
+        this.userInfoRepository = userInfoRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
-
     public List<UserLoginResponseDTO> getAllUsers() {
-
         return userRepository.findAll()
                 .stream()
-                .map(user -> UserLoginResponseDTO.builder()
-                        .authenticated(true)
-                        .user(
-                                UserLoginResponseDTO.UserInfo.builder()
-                                        .userId(user.getUserId())
-                                        .email(user.getEmail())
-                                        .role(user.getRole().name())
-                                        .build()
-                        )
-                        .build()
-                )
+                .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
     public UserLoginResponseDTO getCurrentUser() {
+        User user = currentUserProvider.getCurrentUserEntity();
+        return toResponse(user);
+    }
 
-        String firebaseUid = (String)SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    private UserLoginResponseDTO toResponse(User user) {
+        boolean profileCompleted = userInfoRepository.existsByUser(user);
 
-        User user = userRepository.findByFirebaseUid(firebaseUid)
-                .orElseThrow(() ->
-                        new RuntimeException(UserExceptionEnum.USER_NOT_FOUND.getExplanation())
-                );
+        //if profile exists, use displayName from UserInfo; otherwise fallback to email
+        String displayName = user.getEmail();
+        UserInfo info = userInfoRepository.findByUser(user).orElse(null);
+        if (info != null) {
+            displayName = info.getDisplayName();
+        }
 
         return UserLoginResponseDTO.builder()
                 .authenticated(true)
-                .user(
-                        UserLoginResponseDTO.UserInfo.builder()
-                                .userId(user.getUserId())
-                                .email(user.getEmail())
-                                .role(user.getRole().name())
-                                .build()
-                )
+                .user(UserLoginResponseDTO.UserInfo.builder()
+                        .userId(user.getUserId())
+                        .email(user.getEmail())
+                        .displayName(displayName)
+                        .build())
                 .build();
-    }
-
-    @Transactional
-    public UserLoginResponseDTO addNewUser(UserLoginRequestDTO request) {
-
-        String firebaseUid = (String) SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getPrincipal();
-
-
-        if (userRepository.existsByFirebaseUid(firebaseUid)) {
-            User existingUser = userRepository.findByFirebaseUid(firebaseUid)
-                    .orElseThrow();
-            return mapToLoginResponse(existingUser);
-        }
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException(
-                    UserExceptionEnum.EMAIL_ALREADY_EXIST.getExplanation()
-            );
-        }
-
-        User user = new User();
-        user.setFirebaseUid(firebaseUid);
-        user.setEmail(request.getEmail());
-        user.setRole(Role.USER);
-        user.setCreatedAt(Instant.now());
-
-        User savedUser = userRepository.save(user);
-
-        return mapToLoginResponse(savedUser);
-    }
-
-    private UserLoginResponseDTO mapToLoginResponse(User user) {
-        return UserLoginResponseDTO.builder()
-                .authenticated(true)
-                .user(
-                        UserLoginResponseDTO.UserInfo.builder()
-                                .userId(user.getUserId())
-                                .email(user.getEmail())
-                                .role(String.valueOf(user.getRole()))
-                                .build()
-                )
-                .build();
+        //if we want to add sth in this DTO we can extend it
     }
 }
