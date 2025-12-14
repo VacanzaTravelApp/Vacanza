@@ -6,16 +6,15 @@ import com.vacanza.backend.entity.UserInfo;
 import com.vacanza.backend.repo.UserInfoRepository;
 import com.vacanza.backend.repo.UserRepository;
 import com.vacanza.backend.security.CurrentUserProvider;
-
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- User service:
-    Reads current user from SecurityContext via CurrentUserProvider
-    Maps to DTO expected by frontend
+ * User service:
+ * Reads current user from SecurityContext via CurrentUserProvider
+ * Maps to DTO expected by frontend
  */
 @Service
 public class UserService {

@@ -3,19 +3,20 @@ package com.vacanza.backend.controller;
 import com.vacanza.backend.dto.request.UserLoginHistoryRequestDTO;
 import com.vacanza.backend.dto.response.UserLoginHistoryResponseDTO;
 import com.vacanza.backend.service.UserLoginHistoryService;
-
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 /**
  * Fixes:
-    no GET with request body
-    create must be POST (not GET)
-    current user's history uses token -> no userId in request
+ * no GET with request body
+ * create must be POST (not GET)
+ * current user's history uses token -> no userId in request
  */
 @RestController
 @RequestMapping(path = "/user-login-history")

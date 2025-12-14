@@ -2,7 +2,10 @@ package com.vacanza.backend.dto.request;
 
 import com.vacanza.backend.entity.enums.Budget;
 import com.vacanza.backend.entity.enums.Gender;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
