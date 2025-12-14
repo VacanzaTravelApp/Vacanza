@@ -2,14 +2,15 @@ package com.vacanza.backend.security;
 
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.repo.UserRepository;
-
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
-    to resolve the currently authenticated user.
-    principal is set by FirebaseTokenFilter as firebaseUid.
+ * Resolves current user from SecurityContext.
+ * principal is set by FirebaseTokenFilter as firebaseUid.
  */
 @Component
 public class CurrentUserProvider {
@@ -23,7 +24,7 @@ public class CurrentUserProvider {
     public String getFirebaseUid() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
-            throw new IllegalStateException("No authenticated user in SecurityContext");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing Authorization Bearer token");
         }
         return String.valueOf(auth.getPrincipal());
     }
@@ -31,6 +32,6 @@ public class CurrentUserProvider {
     public User getCurrentUserEntity() {
         String uid = getFirebaseUid();
         return userRepository.findByFirebaseUid(uid)
-                .orElseThrow(() -> new IllegalStateException("Authenticated user not found in database"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authenticated user not found in database"));
     }
 }
