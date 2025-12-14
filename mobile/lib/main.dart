@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
 
+import 'core/config/mapbox_config.dart';
 import 'core/theme/app_colors.dart';
 import 'firebase_options.dart';
 
@@ -20,6 +22,7 @@ import 'features/auth/presentation/screens/auth_gate.dart';
 void main() async {
   // Flutter binding'i initialize ediyoruz (Firebase gibi async init'ler için şart).
   WidgetsFlutterBinding.ensureInitialized();
+  MapboxOptions.setAccessToken(MapboxConfig.accessToken);
 
   // ----------------------------------------
   // 🔥 Firebase init
