@@ -1,86 +1,72 @@
 package com.vacanza.backend.service;
 
-import com.vacanza.backend.dto.request.UserRegisterRequestDTO;
 import com.vacanza.backend.dto.response.UserAuthenticationDTO;
-import com.vacanza.backend.dto.response.UserRegisterResponseDTO;
+import com.vacanza.backend.entity.LoginHistory;
 import com.vacanza.backend.entity.User;
-import com.vacanza.backend.entity.UserInfo;
 import com.vacanza.backend.repo.UserInfoRepository;
+import com.vacanza.backend.repo.UserLoginHistoryRepository;
 import com.vacanza.backend.security.CurrentUserProvider;
 import com.vacanza.backend.service.impl.AuthImpl;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
+/**
+ * /auth/me implementation:
+ * - resolves current user from SecurityContext (set by FirebaseTokenFilter)
+ * - returns identity + role + verified + profileCompleted
+ * - writes login_history entry (server-side)
+ */
 @Service
+@AllArgsConstructor
 public class AuthService implements AuthImpl {
 
     private final CurrentUserProvider currentUserProvider;
     private final UserInfoRepository userInfoRepository;
-
-    public AuthService(CurrentUserProvider currentUserProvider,
-                       UserInfoRepository userInfoRepository) {
-        this.currentUserProvider = currentUserProvider;
-        this.userInfoRepository = userInfoRepository;
-    }
+    private final UserLoginHistoryRepository loginHistoryRepository;
 
     @Override
+    @Transactional
     public UserAuthenticationDTO getMe(HttpServletRequest request) {
         User user = currentUserProvider.getCurrentUserEntity();
 
         boolean profileCompleted = userInfoRepository.existsByUser(user);
 
-        Object verifiedAttr = request.getAttribute("firebaseEmailVerified");
-        boolean verified = verifiedAttr instanceof Boolean && (Boolean) verifiedAttr;
+        // Filter sets these attributes when token is present+verified.
+        boolean emailVerified = Boolean.TRUE.equals(request.getAttribute("firebaseEmailVerified"));
+
+        // Log login history (server-side). Minimal: each /auth/me call logs one record.
+        loginHistoryRepository.save(
+                LoginHistory.builder()
+                        .user(user)
+                        .loginProvider("firebase")
+                        .loginTime(Instant.now())
+                        .ipAddress(resolveClientIp(request))
+                        .build()
+        );
 
         return UserAuthenticationDTO.builder()
                 .userId(user.getUserId())
                 .firebaseUid(user.getFirebaseUid())
                 .email(user.getEmail())
                 .role(user.getRole().name())
-                .verified(verified)
+                .verified(emailVerified)
                 .profileCompleted(profileCompleted)
                 .build();
     }
 
-    @Override
-    public UserRegisterResponseDTO onboard(UserRegisterRequestDTO req) {
-        User user = currentUserProvider.getCurrentUserEntity();
-
-        UserInfo info = userInfoRepository.findByUser(user).orElse(null);
-
-        if (info == null) {
-            if (!StringUtils.hasText(req.getFirstName()) || !StringUtils.hasText(req.getLastName())) {
-                return UserRegisterResponseDTO.builder()
-                        .success(false)
-                        .message("firstName and lastName are required")
-                        .userId(user.getUserId())
-                        .build();
-            }
-
-            info = UserInfo.builder()
-                    .user(user)
-                    .firstName(req.getFirstName())
-                    .middleName(req.getMiddleName())
-                    .lastName(req.getLastName())
-                    .preferredName(req.getPreferredName())
-                    .joinDate(Instant.now())
-                    .build();
-        } else {
-            if (StringUtils.hasText(req.getFirstName())) info.setFirstName(req.getFirstName());
-            info.setMiddleName(req.getMiddleName());
-            if (StringUtils.hasText(req.getLastName())) info.setLastName(req.getLastName());
-            info.setPreferredName(req.getPreferredName());
+    /**
+     * Tries to resolve client IP behind proxy/load balancer too.
+     */
+    private String resolveClientIp(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            // Take first IP in list
+            return xff.split(",")[0].trim();
         }
-
-        userInfoRepository.save(info);
-
-        return UserRegisterResponseDTO.builder()
-                .success(true)
-                .message("Profile saved")
-                .userId(user.getUserId())
-                .build();
+        return request.getRemoteAddr();
     }
 }
