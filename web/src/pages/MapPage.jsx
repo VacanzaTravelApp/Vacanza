@@ -1,4 +1,4 @@
-// src/pages/MapPage.jsx
+// src/pages/MapPage.jsx (UPDATED TO ENGLISH)
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Layout, Button, Card, Avatar, Space, message } from "antd";
 import {
@@ -25,12 +25,13 @@ const INITIAL_VIEW_STATE = {
   pitch: 0, // 2D default
 };
 
+// Mapbox Style URLs
 const STYLES = [
-  "mapbox://styles/mapbox/streets-v12",
   "mapbox://styles/mapbox/outdoors-v12",
-  "mapbox://styles/mapbox/light-v11",
-  "mapbox://styles/mapbox/dark-v11",
-  "mapbox://styles/mapbox/satellite-v9",
+  "mapbox://styles/mapbox/streets-v12",
+  "mapbox://styles/mapbox/navigation-preview-night-v4",
+  "mapbox://styles/mapbox/satellite-streets-v12",
+  "mapbox://styles/mapbox/monochrome",
 ];
 
 export default function MapPage() {
@@ -41,7 +42,8 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
 
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
-  const [styleIndex, setStyleIndex] = useState(0);
+  // ⭐ STARTING STYLE INDEX IS SET TO 1 (Streets Style, based on the new STYLES array)
+  const [styleIndex, setStyleIndex] = useState(1); 
 
   // 2D / 3D UI state
   const [is3D, setIs3D] = useState(false);
@@ -52,7 +54,7 @@ export default function MapPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        message.error("Oturum yok, giriş ekranına yönlendirildin.");
+        message.error("No session found, redirecting to login.");
         navigate("/login");
         return;
       }
@@ -66,10 +68,10 @@ export default function MapPage() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      message.success("Çıkış yapıldı.");
+      message.success("Logged out successfully.");
       navigate("/login");
     } catch (e) {
-      message.error("Çıkış yapılamadı.");
+      message.error("Failed to log out.");
       console.error(e);
     }
   };
@@ -108,7 +110,7 @@ export default function MapPage() {
   if (loading) {
     return (
       <div style={{ height: "100vh", display: "grid", placeItems: "center" }}>
-        Yükleniyor...
+        Loading...
       </div>
     );
   }
@@ -141,7 +143,7 @@ export default function MapPage() {
         </div>
 
         <Button type="default" icon={<LogoutOutlined />} onClick={handleLogout}>
-          Çıkış Yap
+          Log Out
         </Button>
       </Header>
 
@@ -166,8 +168,8 @@ export default function MapPage() {
         >
           {!MAPBOX_TOKEN ? (
             <div style={{ height: "100%", display: "grid", placeItems: "center" }}>
-              Mapbox token bulunamadı. <br />
-              `.env` içine <b>VITE_MAPBOX_ACCESS_TOKEN=...</b> ekle ve dev’i restartla.
+              Mapbox token not found. <br />
+              Add <b>VITE_MAPBOX_ACCESS_TOKEN=...</b> to `.env` and restart dev server.
             </div>
           ) : (
             <Map
@@ -185,7 +187,7 @@ export default function MapPage() {
             </Map>
           )}
 
-          {/* ✅ Sağ üst: 2D/3D + Stil değiştir (artık yukarı taşındı) */}
+          {/* ✅ Top right: 2D/3D + Style change */}
           <div
             style={{
               position: "absolute",
@@ -236,7 +238,7 @@ export default function MapPage() {
               {is3D ? "3D" : "2D"}
             </div>
 
-            {/* ✅ Harita stilini değiştir (yukarı taşındı) */}
+            {/* ✅ Change Map Style */}
             <Button
               shape="circle"
               icon={<HeatMapOutlined />}
@@ -248,11 +250,9 @@ export default function MapPage() {
                 boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
                 border: "1px solid #e5e7eb",
               }}
-              title="Harita Stilini Değiştir"
+              title="Change Map Style"
             />
           </div>
-
-          {/* ❌ Sağ alt style butonu kaldırıldı (boş yer bırakmadım) */}
 
           <Card
             style={{

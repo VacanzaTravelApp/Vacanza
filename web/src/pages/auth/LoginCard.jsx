@@ -29,7 +29,6 @@ const LoginCard = () => {
         await signInWithEmailAndPassword(auth, email, password);
         
         // BAŞARILI: Kullanıcıyı /map sayfasına yönlendir
-        message.success('Giriş başarılı! Haritaya yönlendiriliyorsunuz.');
         console.log('Login Successful, redirecting to /map');
         navigate('/map'); 
 
