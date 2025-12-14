@@ -4,17 +4,16 @@ import com.vacanza.backend.security.FirebaseTokenFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
-
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- non-dev security configuration.
- stateless API
- requires Firebase Bearer token for protected endpoints
- adds FirebaseTokenFilter to validate Firebase ID tokens
+ * non-dev security configuration.
+ * stateless API
+ * requires Firebase Bearer token for protected endpoints
+ * adds FirebaseTokenFilter to validate Firebase ID tokens
  */
 
 @Configuration
@@ -35,10 +34,9 @@ public class SecurityConfigNonDev {
                 .httpBasic(hb -> hb.disable())
                 .formLogin(fl -> fl.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints if you need
                         .requestMatchers("/health", "/error").permitAll()
-                        // Everything else requires authentication
-                        .anyRequest().authenticated()
+                        // anonymous ROLE_ANONYMOUS olduğu için buradan geçemez
+                        .anyRequest().hasAnyRole("USER", "ADMIN")
                 )
                 .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class);
 
