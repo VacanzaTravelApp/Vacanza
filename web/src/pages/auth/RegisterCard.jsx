@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 // Ant Design bileşenleri, hook'ları ve mesajlar
-import { Form, Input, Button, Checkbox, Row, Col, Space, message } from 'antd'; 
+import { Form, Input, Button, Checkbox, Row, Col, Typography } from 'antd'; // Typography eklendi
 // Kullanılacak Ant Design ikonları
 import { 
   UserOutlined, 
@@ -15,10 +15,12 @@ import {
 import './RegisterCard.css'; 
 import { useNavigate } from 'react-router-dom';
 
-// 🚀 FIREBASE İMPORTLARI (STANDARTLAŞTIRILMIŞ)
+// 🚀 FIREBASE İMPORTLARI
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-// 🚨 GÜNCEL VE DAHA GÜVENİLİR IMPORT ŞEKLİ (firebase.js'i default export yaptığınızı varsayarak)
+// 🚨 GÜNCEL VE DAHA GÜVENİLİR IMPORT ŞEKLİ
 import auth from '../../firebase'; 
+
+const { Text } = Typography; // Hata mesajını biçimlendirmek için
 
 // PasswordChecks Bileşeni (Aynı kalır)
 const PasswordChecks = ({ password }) => {
@@ -60,42 +62,49 @@ const RegisterCard = () => {
   const [form] = Form.useForm(); 
   const password = Form.useWatch('password', form); 
   const [loading, setLoading] = useState(false); 
+  // 🔥 YENİ: Hata mesajını formun altında göstermek için state
+  const [errorMessage, setErrorMessage] = useState(null); 
+
 
   // GÜNCEL: Form gönderildiğinde Firebase kaydını deneyecek fonksiyon
   const onFinish = async (values) => {
     setLoading(true);
-    // 🚨 DÜZELTME: Sadece e-posta ve şifreyi alıyoruz (Linter uyarısını giderir)
+    setErrorMessage(null); // Yeni denemede eski hatayı temizle
+    
+    // Sadece e-posta ve şifreyi alıyoruz
     const { email, password } = values; 
 
     try {
         // 🔥 FIREBASE KAYIT İŞLEMİ
-        // 🚨 DÜZELTME: userCredential değişkenini tanımlamadan fonksiyonu doğrudan çalıştırıyoruz
         await createUserWithEmailAndPassword(auth, email, password);
         
-        // Opsiyonel: Kullanıcı adını (displayName) Firebase'e kaydetme (Yorum satırında kaldı)
-        /* // Eğer bu kısmı kullanmak isterseniz, userCredential'ı geri getirmelisiniz.
-        await updateProfile(auth.currentUser, {
-            displayName: `${values.firstName} ${values.lastName}`
-        });
-        */
-        
-        // BAŞARILI: Kullanıcıyı /map sayfasına yönlendir
-        message.success('Kayıt başarılı! Haritaya yönlendiriliyorsunuz.');
-        console.log('Registration Successful, redirecting to /map');
+        // Başarı mesajı kaldırıldı, sadece yönlendirme kalır
         navigate('/map'); 
 
     } catch (error) {
         // HATA: Firebase hata mesajlarını yakala ve kullanıcıya göster
         console.error("Firebase Kayıt Hatası:", error.code, error.message);
         
-        let errorMessage = "Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.";
-        if (error.code === 'auth/email-already-in-use') {
-            errorMessage = "Bu e-posta adresi zaten kullanımda.";
-        } else if (error.code === 'auth/invalid-email') {
-            errorMessage = "Geçersiz e-posta formatı.";
+        let customError;
+        
+        // 🔥 HATA YÖNETİMİ (İngilizce)
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                // 🔥 İstenen "Aynı e-posta" hatası
+                customError = 'This email address is already registered.'; 
+                break;
+            case 'auth/invalid-email':
+                customError = 'The email address is not valid.';
+                break;
+            case 'auth/weak-password':
+                customError = 'The password is too weak. Please use a stronger password.';
+                break;
+            default:
+                customError = 'An error occurred during registration. Please try again.';
         }
 
-        message.error(errorMessage);
+        // Hata mesajını formun altında göstermek için state'e kaydet
+        setErrorMessage(customError); 
 
     } finally {
         setLoading(false); // İşlem bitince yükleme durumunu kapat
@@ -248,7 +257,7 @@ const RegisterCard = () => {
             </Checkbox>
         </Form.Item>
 
-        {/* Kayıt Butonu (Aynı kalır) */}
+        {/* Kayıt Butonu */}
         <Form.Item>
           <Button 
             type="primary" 
@@ -260,6 +269,14 @@ const RegisterCard = () => {
             Start Your Adventure
           </Button>
         </Form.Item>
+        
+        {/* 🔥 GÜNCEL KONUM: Hata Mesajı Alanı - Butonun hemen ALTINDA */}
+        {errorMessage && (
+            <div style={{ marginTop: -10, marginBottom: 15, textAlign: 'center' }}>
+                <Text type="danger">{errorMessage}</Text>
+            </div>
+        )}
+        {/* ----------------------------------------------------------- */}
       </Form>
 
 

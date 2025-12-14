@@ -1,51 +1,74 @@
 // src/pages/auth/LoginCard.jsx
 
-import React, { useState } from 'react'; // 👈 useState eklendi
-import { Form, Input, Button, Space, message } from 'antd'; // 👈 message eklendi
+import React, { useState } from 'react';
+import { Form, Input, Button, Typography } from 'antd'; // Typography eklendi
 import { 
     LockOutlined, 
     MailOutlined, 
     SendOutlined, 
 } from '@ant-design/icons';
+// Import ettiğiniz CSS dosyasının adını korudum
 import './RegisterCard.css'; 
 
 import { useNavigate } from 'react-router-dom';
 
-// 🚀 FIREBASE İMPORTLARI EKLENDİ
+// 🚀 FIREBASE IMPORTS
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase'; // 👈 Kendi firebase.js dosyanızdan auth objesini import edin
+import { auth } from '../../firebase'; // Import the auth object from your firebase.js file
+
+const { Text } = Typography;
 
 const LoginCard = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false); // 👈 Yükleme durumu eklendi
+  const [loading, setLoading] = useState(false); 
+  // Hata mesajını formun altında göstermek için state
+  const [errorMessage, setErrorMessage] = useState(null); 
 
-  // GÜNCEL: Form gönderildiğinde Firebase girişini deneyecek fonksiyon
+  // Firebase giriş denemesi
   const onFinish = async (values) => {
     setLoading(true);
-    const { email, password } = values; // Ant Design formundan e-posta ve şifreyi al
+    setErrorMessage(null); // Yeni denemede eski hatayı temizle
+    
+    const { email, password } = values; 
 
     try {
-        // 🔥 FIREBASE GİRİŞ İŞLEMİ
+        // 🔥 FIREBASE LOGIN PROCESS
         await signInWithEmailAndPassword(auth, email, password);
         
-        // BAŞARILI: Kullanıcıyı /map sayfasına yönlendir
-        message.success('Giriş başarılı! Haritaya yönlendiriliyorsunuz.');
-        console.log('Login Successful, redirecting to /map');
+        // SUCCESS: Redirect the user to the /map page
         navigate('/map'); 
 
     } catch (error) {
-        // HATA: Firebase hata mesajlarını yakala ve kullanıcıya göster
-        console.error("Firebase Giriş Hatası:", error.code, error.message);
+        console.error("Firebase Login Error:", error.code, error.message);
         
-        let errorMessage = "Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.";
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-            errorMessage = "Kullanıcı adı veya şifre hatalı.";
+        let customError;
+        
+        // 🔥 GÜNCELLENMİŞ HATA YÖNETİMİ
+        switch (error.code) {
+            case 'auth/user-not-found':
+                customError = 'No registered user found for this email address.';
+                break;
+            case 'auth/wrong-password':
+                // 🔥 ŞİFRE YANLIŞ HATASI BURADA YAKALANDI
+                customError = 'Incorrect password. Please try again.';
+                break;
+            case 'auth/invalid-email':
+                customError = 'The email address is not valid.';
+                break;
+            case 'auth/invalid-credential':
+                 // Eğer Firebase auth/user-not-found veya auth/wrong-password döndürmek yerine
+                 // genel auth/invalid-credential döndürüyorsa, kullanıcıyı bulunamadı olarak yönlendiriyoruz.
+                customError = 'Invalid email or password.';
+                break;
+            default:
+                customError = 'An error occurred during login. Please try again.';
         }
 
-        message.error(errorMessage);
+        // Hata mesajını state'e kaydet (Butonun altında gösterilecek)
+        setErrorMessage(customError); 
 
     } finally {
-        setLoading(false); // İşlem bitince yükleme durumunu kapat
+        setLoading(false); // İşlem bitince loading state'i kapat
     }
   };
 
@@ -60,8 +83,6 @@ const LoginCard = () => {
 
 
   return (
-    // ... (JSX kodunun geri kalanı aynı kalır) ...
-
     <div className="register-card"> 
       <div className="card-header">
         <span className="vacanza-logo">
@@ -77,11 +98,11 @@ const LoginCard = () => {
       <Form
         name="login"
         initialValues={{ remember: true }}
-        onFinish={onFinish} // 👈 Güncellenmiş fonksiyonu kullanıyoruz
+        onFinish={onFinish}
         layout="vertical"
         className="auth-form"
       >
-        {/* E-posta */}
+        {/* E-mail */}
         <Form.Item
           name="email"
           rules={[
@@ -97,7 +118,7 @@ const LoginCard = () => {
           />
         </Form.Item>
 
-        {/* Şifre */}
+        {/* Password */}
         <Form.Item
           name="password"
           rules={[{ required: true, message: 'Please input your Password!' }]}
@@ -110,7 +131,7 @@ const LoginCard = () => {
           />
         </Form.Item>
 
-        {/* Şifremi Unuttum? Linki */}
+        {/* Forgot Password? Link */}
         <div className="login-options-row">
             <span className="remember-me-placeholder"></span> 
             
@@ -119,22 +140,30 @@ const LoginCard = () => {
             </span>
         </div>
 
-        {/* Giriş Butonu */}
+        {/* Login Button */}
         <Form.Item style={{ marginTop: '20px' }}>
           <Button 
             type="primary" 
             htmlType="submit" 
             className="cta-button" 
             size="large"
-            loading={loading} // 👈 Yükleme durumunu butona bağladık
+            loading={loading}
           >
             Log In
           </Button>
         </Form.Item>
+        
+        {/* 🔥 GÜNCEL KONUM: Hata Mesajı Alanı - Login butonundan hemen SONRA/ALTINDA */}
+        {errorMessage && (
+            <div style={{ marginTop: -10, marginBottom: 15, textAlign: 'center' }}>
+                <Text type="danger">{errorMessage}</Text>
+            </div>
+        )}
+        {/* ---------------------------------------------------------------------- */}
       </Form>
 
 
-      {/* Kayıt Ol Yönlendirmesi */}
+      {/* Redirect to Register */}
       <div className="login-redirect">
         Don't have an Vacanza account? 
         <span onClick={handleRegisterRedirect} className="login-link">

@@ -1,30 +1,26 @@
 // firebase.js
 
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-// import { getAnalytics } from "firebase/analytics"; 👈 Bu satırı kaldırdık
+import { getAuth } from "firebase/auth";
 
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyBubQwHOJPQfK-kZMeaxC3gcbZMuZIjARM",
-  authDomain: "vacanza-b563c.firebaseapp.com",
-  projectId: "vacanza-b563c",
-  storageBucket: "vacanza-b563c.firebasestorage.app",
-  messagingSenderId: "376677055070",
-  appId: "1:376677055070:web:086882466450b2297352cf",
-  measurementId: "G-9QDBWYT7BQ" 
+  apiKey: "AIzaSyBjBpzaQ6X5LdZR-Oxft8eh1Sg4q5OknWE",
+  authDomain: "vacanza-b364c.firebaseapp.com",
+  projectId: "vacanza-b364c",
+  storageBucket: "vacanza-b364c.firebasestorage.app",
+  messagingSenderId: "424211182688",
+  appId: "1:424211182688:web:7e4c7ddeb6c7ed04e3bf05",
+  measurementId: "G-CRPL3K2FG9"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-
-// 🚀 Ek: Authentication'ı export etmeyi unutmayalım!
-import { getAuth } from "firebase/auth";
-
+// Export Firebase services
 export const auth = getAuth(app); 
+
+// UPDATED: Exporting the Auth object as default. 
+// This fixes import errors in components like LoginCard and RegisterCard.
 export default auth; 
+
+// Note: We are now using "export default auth;" instead of "export default app;".
