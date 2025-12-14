@@ -12,12 +12,14 @@ import LoginCard from './pages/auth/LoginCard';
 import MapPage from './pages/MapPage'; 
 
 import './pages/auth/AuthLayout.css'; 
+import MapPage from './pages/MapPage';
+//import "mapbox-gl/dist/mapbox-gl.css";
+
 
 const App = () => {
     return (
         <Router>
             <Routes>
-
                 {/* 1. KÖK ROTA YÖNLENDİRMESİ: "/" rotası doğrudan "/register" rotasına yönlendirilir. */}
                 <Route path="/" element={<Navigate to="/register" replace />} />
 
@@ -34,6 +36,10 @@ const App = () => {
                         <LoginCard />
                     </AuthLayout>
                 } />
+                
+                {/* 🚀 GÜNCELLEME 2: Harita Sayfası Rotasını Ekleyin */}
+                {/* MapPage bileşeni kendi Layout yapısını içerdiği için AuthLayout kullanmaya gerek yok. */}
+                <Route path="/map" element={<MapPage />} /> 
 
                 {/* 4. HARİTA SAYFASI ROTASI: Başarılı Kayıt/Giriş sonrası bu rota açılır. */}
                 <Route path="/map" element={<MapPage />} /> 

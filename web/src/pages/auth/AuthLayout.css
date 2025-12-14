@@ -48,7 +48,6 @@ html, body, #root {
 
 .auth-visual-column {
     flex: 1;
-    /* Kendi arka plan görselini kaldırıyoruz */
     background-image: none;
     background-color: transparent; 
     
@@ -62,7 +61,7 @@ html, body, #root {
 }
 
 .auth-visual-column::before {
-    /* Sol sütundaki gereksiz iç koyu katmanı kaldırıyoruz */
+
     content: none;
 }
 
