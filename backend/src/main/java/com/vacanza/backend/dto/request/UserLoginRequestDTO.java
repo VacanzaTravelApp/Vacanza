@@ -1,4 +1,11 @@
-package com.vacanza.backend.dto.request;
+//muhtemelen kullanilmayacak
+//Firebase ile login frontend’de olur
+// backend login endpointine email/password göndermek anlamsız
+
+
+//backend login yapmaz, token dogrular
+
+/*package com.vacanza.backend.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -12,7 +19,6 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-//muhtemelen kullanilmayacak
 public class UserLoginRequestDTO {
     @NotBlank(message = "Email is required")
     @Email(message = "Email must be valid")
@@ -22,3 +28,4 @@ public class UserLoginRequestDTO {
     @Size(min = 8, max = 100, message = "Invalid password")
     private String password;
 }
+*/
