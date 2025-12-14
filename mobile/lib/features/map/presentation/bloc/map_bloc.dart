@@ -1,62 +1,52 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
+import '../../data/models/map_view_mode.dart';
 import 'map_event.dart';
 import 'map_state.dart';
 
-/// HomeMapScreen için state yönetimi.
-///
-/// Bu task (156) Mapbox olmadan da çalışmalı:
-/// - ToggleViewModePressed -> viewMode değişir
-/// - RecenterPressed -> recenterTick artar (UI/print ile doğrulanır)
-/// - Controller nullken crash olmamalı
+/// HomeMapScreen'deki UI state yönetimini tek yerde tutar.
+/// MapboxMap controller BLoC'a sadece "hazır" bilgisi için gelir.
+/// Kamera değişimi gibi side-effect işleri widget tarafında BlocListener ile yapılır
+/// (çünkü bloc içinde mapbox çağrıları yaparsan test/maintain zorlaşır).
 class MapBloc extends Bloc<MapEvent, MapState> {
+  MapboxMap? _controller;
+
   MapBloc() : super(MapState.initial()) {
-    on<MapInitialized>(_onMapInitialized);
-    on<ToggleViewModePressed>(_onToggleViewMode);
-    on<RecenterPressed>(_onRecenterPressed);
+    on<MapInitialized>(_onInitialized);
+    on<ToggleViewModePressed>(_onToggleMode);
+    on<RecenterPressed>(_onRecenter);
   }
 
-  void _onMapInitialized(MapInitialized event, Emitter<MapState> emit) {
-    // Mapbox 137 ile gelince burada gerçek controller setlenecek.
-    emit(
-      state.copyWith(
-        controller: event.controller,
-        isMapReady: true,
-        clearError: true,
-      ),
-    );
+  void _onInitialized(MapInitialized event, Emitter<MapState> emit) {
+    _controller = event.controller;
+    emit(state.copyWith(isMapReady: true));
 
-    // Acceptance Criteria: log/print ile doğrulama
+    // Debug amaçlı (AC: state değişimi log/print ile doğrulanabilir)
     // ignore: avoid_print
     print('[MapBloc] MapInitialized -> isMapReady=true');
   }
 
-  void _onToggleViewMode(ToggleViewModePressed event, Emitter<MapState> emit) {
-    // MapViewMode modelinde `next()` zaten var.
-    final nextMode = state.viewMode.next();
+  void _onToggleMode(ToggleViewModePressed event, Emitter<MapState> emit) {
+    // Sat/diğer modları şimdilik kullanmıyoruz: 2D <-> 3D
+    final next = (state.viewMode == MapViewMode.mode2D)
+        ? MapViewMode.mode3D
+        : MapViewMode.mode2D;
 
-    emit(
-      state.copyWith(
-        viewMode: nextMode,
-        clearError: true,
-      ),
-    );
+    emit(state.copyWith(viewMode: next));
 
     // ignore: avoid_print
-    print('[MapBloc] ToggleViewModePressed -> viewMode=${nextMode.label}');
+    print('[MapBloc] ToggleViewModePressed -> viewMode=${next.label}');
   }
 
-  void _onRecenterPressed(RecenterPressed event, Emitter<MapState> emit) {
-    // Controller yoksa bile crash istemiyoruz.
-    // Şimdilik sadece tick arttırıyoruz. Mapbox gelince bu tick -> kamerayı resetleyecek.
-    emit(
-      state.copyWith(
-        recenterTick: state.recenterTick + 1,
-        clearError: true,
-      ),
-    );
+  void _onRecenter(RecenterPressed event, Emitter<MapState> emit) {
+    // Controller yoksa crash yok: sadece state tick artırıp listener’a sinyal veriyoruz.
+    emit(state.copyWith(recenterTick: state.recenterTick + 1));
 
     // ignore: avoid_print
     print('[MapBloc] RecenterPressed -> recenterTick=${state.recenterTick + 1}');
   }
+
+  /// İstersen ileride UI'da "controller var mı" kontrolü için okunabilir.
+  bool get hasController => _controller != null;
 }
