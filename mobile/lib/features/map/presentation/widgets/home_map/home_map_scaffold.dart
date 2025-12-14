@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:mobile/features/map/presentation/widgets/home_map/map_canvas_mapbox.dart';
-import 'package:mobile/features/map/presentation/widgets/home_map/action_bar.dart';
-import 'package:mobile/features/map/presentation/widgets/home_map/profile_badge.dart';
 
 import '../../../data/models/map_view_mode.dart';
+import 'action_bar.dart';
+import 'map_canvas_mapbox.dart';
+import 'profile_badge.dart';
 
+/// Map ekranının ana layout container'ı.
+/// Stack ile:
+/// - Ortada gerçek Mapbox map
+/// - Sol üst profil badge
+/// - Sağda action bar
 class HomeMapScaffold extends StatelessWidget {
   final MapViewMode mode;
-  final VoidCallback onOpenMapStyle;
   final VoidCallback onToggleMode;
   final VoidCallback onRecenter;
 
   const HomeMapScaffold({
     super.key,
     required this.mode,
-    required this.onOpenMapStyle,
     required this.onToggleMode,
     required this.onRecenter,
   });
@@ -25,10 +28,12 @@ class HomeMapScaffold extends StatelessWidget {
       body: SafeArea(
         child: Stack(
           children: [
-            Positioned.fill(
+            // 1) Harita alanı (Mapbox)
+            const Positioned.fill(
               child: MapCanvasMapbox(),
             ),
 
+            // 2) Sol üst profil badge
             const Positioned(
               top: 12,
               left: 12,
@@ -38,12 +43,12 @@ class HomeMapScaffold extends StatelessWidget {
               ),
             ),
 
+            // 3) Sağ tarafta aksiyon bar
             Positioned(
               top: 90,
               right: 12,
               child: ActionBar(
                 mode: mode,
-                onOpenMapStyle: onOpenMapStyle,
                 onToggleMode: onToggleMode,
                 onRecenter: onRecenter,
               ),
