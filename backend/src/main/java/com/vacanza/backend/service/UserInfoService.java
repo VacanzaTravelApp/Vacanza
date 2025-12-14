@@ -6,80 +6,83 @@ import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.UserInfo;
 import com.vacanza.backend.repo.UserInfoRepository;
 import com.vacanza.backend.security.CurrentUserProvider;
-
+import com.vacanza.backend.service.impl.UserInfoImpl;
+import lombok.AllArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
-import java.time.Instant;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Profile service for UserInfo.
- * Creates profile if not exists, updates otherwise.
+ * Profile upsert:
+ * - if user_info doesn't exist: requires firstName + lastName, then create
+ * - if exists: updates only non-null fields (doesn't overwrite required with null)
  */
 @Service
-public class UserInfoService {
+@AllArgsConstructor
+public class UserInfoService implements UserInfoImpl {
 
-    private final UserInfoRepository userInfoRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final UserInfoRepository userInfoRepository;
 
-    public UserInfoService(UserInfoRepository userInfoRepository,
-                           CurrentUserProvider currentUserProvider) {
-        this.userInfoRepository = userInfoRepository;
-        this.currentUserProvider = currentUserProvider;
-    }
-
+    @Override
+    @Transactional(readOnly = true)
     public UserInfoResponseDTO getUserInfo() {
         User user = currentUserProvider.getCurrentUserEntity();
-
         UserInfo info = userInfoRepository.findByUser(user)
-                .orElseThrow(() -> new IllegalStateException("User profile not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User profile not found"));
 
-        return toResponse(info);
+        return toDto(info);
     }
 
-    public UserInfoResponseDTO updateUserInfo(UserInfoRequestDTO request) {
+    @Override
+    @Transactional
+    public UserInfoResponseDTO updateUserInfo(UserInfoRequestDTO req) {
         User user = currentUserProvider.getCurrentUserEntity();
 
         UserInfo info = userInfoRepository.findByUser(user).orElse(null);
 
+        // Create (first time onboarding) requires mandatory fields
         if (info == null) {
-            // Creating new profile -> DB has NOT NULL first/last name constraints
-            if (!StringUtils.hasText(request.getFirstName()) || !StringUtils.hasText(request.getLastName())) {
-                throw new IllegalArgumentException("firstName and lastName are required to create profile");
+            if (isBlank(req.getFirstName()) || isBlank(req.getLastName())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "firstName and lastName are required to create profile"
+                );
             }
 
             info = UserInfo.builder()
                     .user(user)
-                    .firstName(request.getFirstName())
-                    .middleName(request.getMiddleName())
-                    .lastName(request.getLastName())
-                    .preferredName(request.getPreferredName())
-                    .country(request.getCountry())
-                    .birthDate(request.getBirthDate())
-                    .gender(request.getGender())
-                    .budget(request.getBudget())
-                    .profileImageUrl(request.getProfileImageUrl())
-                    .joinDate(Instant.now())
+                    .firstName(req.getFirstName().trim())
+                    .lastName(req.getLastName().trim())
+                    .middleName(req.getMiddleName())
+                    .preferredName(req.getPreferredName())
+                    .country(req.getCountry())
+                    .birthDate(req.getBirthDate())
+                    .gender(req.getGender())
+                    .budget(req.getBudget())
+                    .profileImageUrl(req.getProfileImageUrl())
                     .build();
-        } else {
-            // Update strategy: overwrite if provided (simple + safe)
-            if (StringUtils.hasText(request.getFirstName())) info.setFirstName(request.getFirstName());
-            info.setMiddleName(request.getMiddleName());
-            if (StringUtils.hasText(request.getLastName())) info.setLastName(request.getLastName());
-            info.setPreferredName(request.getPreferredName());
 
-            info.setCountry(request.getCountry());
-            info.setBirthDate(request.getBirthDate());
-            info.setGender(request.getGender());
-            info.setBudget(request.getBudget());
-            info.setProfileImageUrl(request.getProfileImageUrl());
+            return toDto(userInfoRepository.save(info));
         }
 
-        UserInfo saved = userInfoRepository.save(info);
-        return toResponse(saved);
+        // Update: only apply non-null values (do not overwrite with null)
+        if (req.getFirstName() != null) info.setFirstName(req.getFirstName().trim());
+        if (req.getLastName() != null) info.setLastName(req.getLastName().trim());
+        if (req.getMiddleName() != null) info.setMiddleName(req.getMiddleName());
+        if (req.getPreferredName() != null) info.setPreferredName(req.getPreferredName());
+
+        if (req.getCountry() != null) info.setCountry(req.getCountry());
+        if (req.getBirthDate() != null) info.setBirthDate(req.getBirthDate());
+        if (req.getGender() != null) info.setGender(req.getGender());
+        if (req.getBudget() != null) info.setBudget(req.getBudget());
+        if (req.getProfileImageUrl() != null) info.setProfileImageUrl(req.getProfileImageUrl());
+
+        return toDto(userInfoRepository.save(info));
     }
 
-    private UserInfoResponseDTO toResponse(UserInfo info) {
+    private UserInfoResponseDTO toDto(UserInfo info) {
         return UserInfoResponseDTO.builder()
                 .infoId(info.getInfoId())
                 .userId(info.getUser().getUserId())
@@ -95,5 +98,9 @@ public class UserInfoService {
                 .profileImageUrl(info.getProfileImageUrl())
                 .joinDate(info.getJoinDate())
                 .build();
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 }
