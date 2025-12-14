@@ -11,7 +11,6 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-//user auth response sayilabilir
 public class UserLoginResponseDTO {
 
     private boolean authenticated;
@@ -25,8 +24,7 @@ public class UserLoginResponseDTO {
     public static class UserInfo {
         private UUID userId;
         private String email;
-        private String name; //belki hitap icin kullanilir
-        private String role;
-        private boolean verified;
+        private String displayName;
+        //private String profilePicture;
     }
 }
