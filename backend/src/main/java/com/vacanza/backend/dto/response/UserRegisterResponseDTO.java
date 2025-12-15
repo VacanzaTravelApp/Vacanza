@@ -13,6 +13,7 @@ import java.util.UUID;
 @AllArgsConstructor
 //userinfo icin lazim olabilir
 //backend register etmeyecek ama sync icin gerekli
+
 public class UserRegisterResponseDTO {
     private boolean success;
     private String message;

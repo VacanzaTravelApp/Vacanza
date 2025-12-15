@@ -37,6 +37,7 @@ public class LoginHistory {
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
+    //backende token ile erisim basarili oldu logu
     @PrePersist
     protected void onCreate() {
         if (this.loginTime == null) {

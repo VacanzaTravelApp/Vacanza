@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Layout, Button, Card, Avatar, Space, message } from "antd";
+import { Layout, Button, Card, Avatar, Space } from "antd";
 import {
   LogoutOutlined,
   UserOutlined,
@@ -24,12 +24,13 @@ const INITIAL_VIEW_STATE = {
   pitch: 0, // 2D default
 };
 
+// Mapbox Style URLs
 const STYLES = [
-  "mapbox://styles/mapbox/streets-v12",
   "mapbox://styles/mapbox/outdoors-v12",
-  "mapbox://styles/mapbox/light-v11",
-  "mapbox://styles/mapbox/dark-v11",
-  "mapbox://styles/mapbox/satellite-v9",
+  "mapbox://styles/mapbox/streets-v12",
+  "mapbox://styles/mapbox/navigation-preview-night-v4",
+  "mapbox://styles/mapbox/satellite-streets-v12",
+  "mapbox://styles/mapbox/monochrome",
 ];
 
 export default function MapPage() {
@@ -60,17 +61,16 @@ export default function MapPage() {
       setUser(currentUser);
       setLoading(false);
     });
-
     return () => unsub();
   }, [navigate]);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      message.success("Çıkış yapıldı.");
+      //message.success("Logged out successfully.");
       navigate("/login");
     } catch (e) {
-      message.error("Çıkış yapılamadı.");
+      //message.error("Failed to log out.");
       console.error(e);
     }
   };
@@ -84,7 +84,6 @@ export default function MapPage() {
 
     const nextPitch = nextIs3D ? 60 : 0;
 
-    // Smooth camera transition
     try {
       const map = mapRef.current?.getMap?.();
       if (map) {
@@ -98,7 +97,6 @@ export default function MapPage() {
       console.error("2D/3D easeTo error:", e);
     }
 
-    // Keep React state in sync (important for controlled Map)
     setViewState((prev) => ({
       ...prev,
       pitch: nextPitch,
@@ -109,7 +107,7 @@ export default function MapPage() {
   if (loading) {
     return (
       <div style={{ height: "100vh", display: "grid", placeItems: "center" }}>
-        Yükleniyor...
+        Loading...
       </div>
     );
   }
@@ -148,7 +146,7 @@ export default function MapPage() {
         </div>
 
         <Button type="default" icon={<LogoutOutlined />} onClick={handleLogout}>
-          Çıkış Yap
+          Log Out
         </Button>
       </Header>
 
@@ -251,7 +249,7 @@ export default function MapPage() {
                 boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
                 border: "1px solid #e5e7eb",
               }}
-              title="Harita Stilini Değiştir"
+              title="Change Map Style"
             />
           </div>
 
