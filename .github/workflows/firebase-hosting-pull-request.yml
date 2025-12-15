@@ -18,3 +18,4 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_VACANZA_B563C }}
           projectId: vacanza-b563c
+          entryPoint: web
