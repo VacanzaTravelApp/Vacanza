@@ -1,6 +1,7 @@
 // src/pages/MapPage.jsx
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Layout, Button, Card, Avatar, Space, message } from "antd";
+import { Layout, Button, Card, Avatar, Space } from "antd";
 import {
   LogoutOutlined,
   UserOutlined,
@@ -9,6 +10,7 @@ import {
   HeatMapOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import "mapbox-gl/dist/mapbox-gl.css"; // Mapbox CSS importu eklendi
 
 import Map, { NavigationControl, GeolocateControl } from "react-map-gl";
 
@@ -25,12 +27,13 @@ const INITIAL_VIEW_STATE = {
   pitch: 0, // 2D default
 };
 
+// Mapbox Style URLs
 const STYLES = [
-  "mapbox://styles/mapbox/streets-v12",
   "mapbox://styles/mapbox/outdoors-v12",
-  "mapbox://styles/mapbox/light-v11",
-  "mapbox://styles/mapbox/dark-v11",
-  "mapbox://styles/mapbox/satellite-v9",
+  "mapbox://styles/mapbox/streets-v12",
+  "mapbox://styles/mapbox/navigation-preview-night-v4",
+  "mapbox://styles/mapbox/satellite-streets-v12",
+  "mapbox://styles/mapbox/monochrome",
 ];
 
 export default function MapPage() {
@@ -41,9 +44,7 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
 
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
-  const [styleIndex, setStyleIndex] = useState(0);
-
-  // 2D / 3D UI state
+  const [styleIndex, setStyleIndex] = useState(1); 
   const [is3D, setIs3D] = useState(false);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
@@ -52,24 +53,23 @@ export default function MapPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        message.error("Oturum yok, giriş ekranına yönlendirildin.");
+        //message.error("No session found, redirecting to login.");
         navigate("/login");
         return;
       }
       setUser(currentUser);
       setLoading(false);
     });
-
     return () => unsub();
   }, [navigate]);
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      message.success("Çıkış yapıldı.");
+      //message.success("Logged out successfully.");
       navigate("/login");
     } catch (e) {
-      message.error("Çıkış yapılamadı.");
+      //message.error("Failed to log out.");
       console.error(e);
     }
   };
@@ -83,7 +83,6 @@ export default function MapPage() {
 
     const nextPitch = nextIs3D ? 60 : 0;
 
-    // Smooth camera transition
     try {
       const map = mapRef.current?.getMap?.();
       if (map) {
@@ -97,7 +96,6 @@ export default function MapPage() {
       console.error("2D/3D easeTo error:", e);
     }
 
-    // Keep React state in sync (important for controlled Map)
     setViewState((prev) => ({
       ...prev,
       pitch: nextPitch,
@@ -108,7 +106,7 @@ export default function MapPage() {
   if (loading) {
     return (
       <div style={{ height: "100vh", display: "grid", placeItems: "center" }}>
-        Yükleniyor...
+        Loading...
       </div>
     );
   }
@@ -141,7 +139,7 @@ export default function MapPage() {
         </div>
 
         <Button type="default" icon={<LogoutOutlined />} onClick={handleLogout}>
-          Çıkış Yap
+          Log Out
         </Button>
       </Header>
 
@@ -166,8 +164,8 @@ export default function MapPage() {
         >
           {!MAPBOX_TOKEN ? (
             <div style={{ height: "100%", display: "grid", placeItems: "center" }}>
-              Mapbox token bulunamadı. <br />
-              `.env` içine <b>VITE_MAPBOX_ACCESS_TOKEN=...</b> ekle ve dev’i restartla.
+              Mapbox token not found. <br />
+              Add <b>VITE_MAPBOX_ACCESS_TOKEN=...</b> to `.env` and restart dev server.
             </div>
           ) : (
             <Map
@@ -180,12 +178,16 @@ export default function MapPage() {
               attributionControl={false}
               onError={(e) => console.error("Map error:", e)}
             >
-              <NavigationControl position="bottom-right" />
+              {/* 🔥 GÜNCELLEME: showCompass={false} eklenerek "Reset bearing to north" butonu kaldırıldı. */}
+              {/* Zoom (+/-) butonları sağ altta kalır. */}
+              <NavigationControl position="bottom-right" showCompass={false} /> 
+              
+              {/* Konum alma butonu sağ altta kalır. */}
               <GeolocateControl position="bottom-right" trackUserLocation />
             </Map>
           )}
 
-          {/* ✅ Sağ üst: 2D/3D + Stil değiştir (artık yukarı taşındı) */}
+          {/* 2D/3D VE STİL DEĞİŞTİRME BUTONLARI: Sağ Üst Köşe (İstediğiniz gibi) */}
           <div
             style={{
               position: "absolute",
@@ -236,7 +238,7 @@ export default function MapPage() {
               {is3D ? "3D" : "2D"}
             </div>
 
-            {/* ✅ Harita stilini değiştir (yukarı taşındı) */}
+            {/* Change Map Style */}
             <Button
               shape="circle"
               icon={<HeatMapOutlined />}
@@ -248,11 +250,9 @@ export default function MapPage() {
                 boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
                 border: "1px solid #e5e7eb",
               }}
-              title="Harita Stilini Değiştir"
+              title="Change Map Style"
             />
           </div>
-
-          {/* ❌ Sağ alt style butonu kaldırıldı (boş yer bırakmadım) */}
 
           <Card
             style={{
