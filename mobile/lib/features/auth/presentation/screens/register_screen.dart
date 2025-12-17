@@ -22,7 +22,6 @@ import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
 import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
 
 // Register sonrası yönleneceğimiz ana map ekranı (şimdilik mock)
-import 'package:mobile/features/map/presentation/screens/map_screen.dart';
 
 
 /// ------------------------------------------------------------

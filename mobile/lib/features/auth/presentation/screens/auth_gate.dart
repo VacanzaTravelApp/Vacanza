@@ -8,7 +8,6 @@ import 'package:mobile/core/theme/app_text_styles.dart';
 import 'package:mobile/features/auth/data/storage/secure_storage_service.dart';
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
 import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
-import 'package:mobile/features/map/presentation/screens/map_screen.dart';
 
 /// Uygulama açıldığında ilk çalışan "gate" ekranı.
 ///
@@ -98,6 +97,6 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
-    return _isAuthenticated ? const MapScreen() : const LoginScreen();
+    return _isAuthenticated ? const HomeMapScreen() : const LoginScreen();
   }
 }

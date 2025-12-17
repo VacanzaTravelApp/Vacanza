@@ -14,7 +14,6 @@ import 'package:mobile/features/auth/presentation/bloc/login_state.dart';
 import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
 
 // Login başarıya ulaştığında yönleneceğimiz ana ekran (şimdilik mock map)
-import 'package:mobile/features/map/presentation/screens/map_screen.dart';
 
 /// Login ekranı UI + BLoC entegrasyonu - VACANZA-83/84
 ///
