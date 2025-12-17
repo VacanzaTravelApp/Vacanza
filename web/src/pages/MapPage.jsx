@@ -1,4 +1,3 @@
-// src/pages/MapPage.jsx
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Layout, Button, Card, Avatar, Space } from "antd";
@@ -10,8 +9,6 @@ import {
   HeatMapOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import "mapbox-gl/dist/mapbox-gl.css"; // Mapbox CSS importu eklendi
-
 import Map, { NavigationControl, GeolocateControl } from "react-map-gl";
 
 import { auth } from "../firebase";
@@ -44,8 +41,13 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true);
 
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
-  const [styleIndex, setStyleIndex] = useState(1); 
+  
+  // 2D / 3 UI state
+  const [styleIndex, setStyleIndex] = useState(1);
   const [is3D, setIs3D] = useState(false);
+
+  // ✅ NEW: Profile dropdown open/close
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
   const mapStyle = useMemo(() => STYLES[styleIndex], [styleIndex]);
@@ -53,7 +55,6 @@ export default function MapPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        //message.error("No session found, redirecting to login.");
         navigate("/login");
         return;
       }
@@ -116,6 +117,10 @@ export default function MapPage() {
   const displayName = user.displayName || user.email?.split("@")?.[0] || "User";
   const userEmail = user.email || "";
 
+  // ✅ Mock data (Sprint requirement)
+  const MOCK_PREFERRED_NAME = "alcaydamla";
+  const MOCK_TRAVEL_STYLE = "Explorer / Budget";
+
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Header
@@ -132,7 +137,9 @@ export default function MapPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center" }}>
-          <GlobalOutlined style={{ fontSize: 24, color: "#1890ff", marginRight: 10 }} />
+          <GlobalOutlined
+            style={{ fontSize: 24, color: "#1890ff", marginRight: 10 }}
+          />
           <span style={{ fontSize: 20, fontWeight: 700, color: "#333" }}>
             Vacanza Map
           </span>
@@ -164,8 +171,6 @@ export default function MapPage() {
         >
           {!MAPBOX_TOKEN ? (
             <div style={{ height: "100%", display: "grid", placeItems: "center" }}>
-              Mapbox token not found. <br />
-              Add <b>VITE_MAPBOX_ACCESS_TOKEN=...</b> to `.env` and restart dev server.
             </div>
           ) : (
             <Map
@@ -178,16 +183,12 @@ export default function MapPage() {
               attributionControl={false}
               onError={(e) => console.error("Map error:", e)}
             >
-              {/* 🔥 GÜNCELLEME: showCompass={false} eklenerek "Reset bearing to north" butonu kaldırıldı. */}
-              {/* Zoom (+/-) butonları sağ altta kalır. */}
-              <NavigationControl position="bottom-right" showCompass={false} /> 
-              
-              {/* Konum alma butonu sağ altta kalır. */}
+
+              <NavigationControl position="bottom-right" showCompass={false} />
               <GeolocateControl position="bottom-right" trackUserLocation />
             </Map>
           )}
 
-          {/* 2D/3D VE STİL DEĞİŞTİRME BUTONLARI: Sağ Üst Köşe (İstediğiniz gibi) */}
           <div
             style={{
               position: "absolute",
@@ -200,7 +201,6 @@ export default function MapPage() {
               gap: 10,
             }}
           >
-            {/* 2D/3D toggle */}
             <button
               type="button"
               onClick={handleToggle2D3D}
@@ -218,10 +218,11 @@ export default function MapPage() {
               aria-label="2D / 3D Toggle"
               title="2D / 3D"
             >
-              <CompassOutlined style={{ fontSize: 20, color: is3D ? "#1890ff" : "#555" }} />
+              <CompassOutlined
+                style={{ fontSize: 20, color: is3D ? "#1890ff" : "#555" }}
+              />
             </button>
 
-            {/* 2D/3D badge */}
             <div
               style={{
                 fontSize: 12,
@@ -237,8 +238,6 @@ export default function MapPage() {
             >
               {is3D ? "3D" : "2D"}
             </div>
-
-            {/* Change Map Style */}
             <Button
               shape="circle"
               icon={<HeatMapOutlined />}
@@ -260,22 +259,90 @@ export default function MapPage() {
               top: 40,
               left: 40,
               zIndex: 50,
-              width: 260,
+              width: 280,
               backgroundColor: "rgba(255,255,255,0.95)",
               backdropFilter: "blur(10px)",
+              borderRadius: 16,
             }}
-            bodyStyle={{ display: "flex", alignItems: "center", padding: 16 }}
+            bodyStyle={{ padding: 16 }}
           >
-            <Avatar
-              size={48}
-              icon={<UserOutlined />}
-              src={user.photoURL}
-              style={{ marginRight: 15, backgroundColor: "#1890ff" }}
-            />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>{displayName}</div>
-              <div style={{ fontSize: 12, color: "#888" }}>{userEmail}</div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <Avatar
+                  size={48}
+                  icon={<UserOutlined />}
+                  src={user.photoURL}
+                  style={{ marginRight: 12, backgroundColor: "#1890ff" }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{displayName}</div>
+                  <div style={{ fontSize: 12, color: "#888" }}>{userEmail}</div>
+                </div>
+              </div>
+
+              {/* only arrow clickable */}
+           <button
+  type="button"
+  onClick={() => setProfileOpen((p) => !p)}
+  style={{
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    padding: 4,
+    display: "flex",
+    alignItems: "center",
+  }}
+  aria-label="Open profile info"
+>
+
+                <span
+                  style={{
+                    display: "inline-block",
+                    transform: profileOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "0.2s",
+                    fontSize: 18,
+                    lineHeight: "18px",
+              color: "#1890ff", // 👈 MAVİ (Ant Design blue)
+                  }}
+                >
+                  ⌄
+                </span>
+              </button>
             </div>
+
+            {profileOpen && (
+              <div
+                style={{
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTop: "1px solid #f0f0f0",
+                  fontSize: 13,
+                  color: "#555",
+                }}
+              >
+                <div style={{ marginBottom: 6 }}>
+                  <b>Preferred name:</b> {MOCK_PREFERRED_NAME}
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <b>Travel style:</b> {MOCK_TRAVEL_STYLE}
+                </div>
+
+                <Button
+                  type="link"
+                  style={{ padding: 0, height: "auto" }}
+                  onClick={() => navigate("/profile-details")}
+                >
+                  View details →
+                </Button>
+              </div>
+            )}
           </Card>
         </div>
       </Content>
