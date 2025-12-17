@@ -1,12 +1,8 @@
-/// Harita görünüm modu.
-/// Mapbox entegrasyonu gelene kadar sadece UI state olarak kullanılacak.
-/// İleride Mapbox style/layer switch burada belirlenen moda bağlanacak.
-enum MapViewMode {
-  mode2D,
-  mode3D,
-  satellite;
 
-  /// UI üzerinde gösterilecek kısa etiket.
+
+enum MapViewMode { mode2D, mode3D, satellite }
+
+extension MapViewModeX on MapViewMode {
   String get label {
     switch (this) {
       case MapViewMode.mode2D:
@@ -18,7 +14,7 @@ enum MapViewMode {
     }
   }
 
-  /// Mode toggle için sıradaki moda geçiş.
+  /// 2D -> 3D -> SAT -> 2D
   MapViewMode next() {
     switch (this) {
       case MapViewMode.mode2D:

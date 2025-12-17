@@ -2,23 +2,29 @@ import 'package:flutter/material.dart';
 
 /// Action bar içinde kullanılan ortak ikon butonu.
 /// - Yuvarlak form
-/// - Hafif blur hissi
 /// - Shadow
 /// - Tek tip padding/ölçü
+/// - isActive=true ise highlight görünür (task 138)
 class ActionIconButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
+  final bool isActive;
 
   const ActionIconButton({
     super.key,
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.isActive = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bg = isActive ? const Color(0xFF0096FF) : Colors.white.withOpacity(0.90);
+    final iconColor = isActive ? Colors.white : Colors.black87;
+    final borderColor = isActive ? const Color(0xFF0096FF) : Colors.white.withOpacity(0.6);
+
     return Tooltip(
       message: tooltip,
       child: Material(
@@ -30,9 +36,9 @@ class ActionIconButton extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.90),
+              color: bg,
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withOpacity(0.6)),
+              border: Border.all(color: borderColor),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.12),
@@ -41,7 +47,7 @@ class ActionIconButton extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.black87),
+            child: Icon(icon, color: iconColor),
           ),
         ),
       ),
