@@ -68,7 +68,9 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
         firstName: event.firstName,
         middleName: event.middleName.isEmpty ? null : event.middleName,
         lastName: event.lastName,
-        preferredNames: event.preferredNames,
+
+        // ✅ Backend: preferredName tek string bekliyor
+        preferredName: event.preferredNames.isEmpty ? null : event.preferredNames.first,
       );
 
       // 3) İşlem başarılı → success state'e geç.

@@ -4,11 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:mobile/core/network/jwt_interceptor.dart';
 import 'package:mobile/features/auth/data/api/auth_api_client.dart';
 import 'package:mobile/features/auth/data/firebase/firebase_auth_service.dart';
-import 'package:mobile/features/auth/data/models/auth_backend_result.dart';
+import 'package:mobile/features/auth/data/models/user_authentication_dto.dart';
+import 'package:mobile/features/auth/data/models/user_register_response.dart';
 import 'package:mobile/features/auth/data/storage/secure_storage_service.dart';
 
-/// UI/BLoC katmanına döneceğimiz anlamlı hata tipi.
-/// Firebase ve backend hatalarını tek tipte temsil ediyoruz.
+/// UI/BLoC katmanına tek tipte hata dönmek için kullandığımız exception.
 class AuthFailure implements Exception {
   final String message;
   const AuthFailure(this.message);
@@ -18,137 +18,104 @@ class AuthFailure implements Exception {
 }
 
 /// AuthRepository:
-///  - FirebaseAuthService: gerçek Firebase login/register
-///  - AuthApiClient: backend /auth/register & /auth/login (opsiyonel, feature flag ile)
-///  - SecureStorageService: token saklama
 ///
-/// Bu repository hem Login hem Register için ortak "entry point".
+/// Sorumluluk:
+/// - Firebase register/login
+/// - Firebase ID Token alma
+/// - Token'ı SecureStorage'a yazma (interceptor ve session restore için)
+/// - Backend'e sync çağrıları:
+///   - POST /auth/register
+///   - GET  /auth/login
 ///
-/// ÖNEMLİ STRATEJİ (senin istediğin):
-///  - Backend token üretmiyor.
-///  - Biz "session" gibi davranması için cihazda Firebase ID Token saklıyoruz.
-///  - Her request'te Bearer olarak bunu gönderiyoruz.
-///  - Backend sadece "authenticated + user" gibi bilgi döndürüyor.
-///
-/// Backend henüz yokken:
-///  - HTTP çağrısı yapmadan "mock" AuthBackendResult dönüyoruz.
-///  - Ama yine de token storage’a yazıyoruz → AuthGate çalışıyor.
+/// NOT:
+/// - Backend "login/register" aslında auth değil, SYNC endpoint.
+/// - Email+password backend'e ASLA gitmiyor.
 class AuthRepository {
   final FirebaseAuthService _firebaseService;
   final SecureStorageService _storage;
 
-  /// Tek Dio instance.
-  /// - Interceptor burada takılı
-  /// - ApiClient de aynı Dio'yu kullanıyor
   final Dio _dio;
-
   late final AuthApiClient _apiClient;
-
-  /// Backend entegrasyonu aç/kapa bayrağı.
-  /// Backend hazır olduğunda true yapacaksın.
-  final bool _backendEnabled;
 
   AuthRepository({
     FirebaseAuthService? firebaseService,
     SecureStorageService? storage,
     Dio? dio,
-    bool backendEnabled = false,
   })  : _firebaseService = firebaseService ?? FirebaseAuthService(),
         _storage = storage ?? SecureStorageService(),
-        _backendEnabled = backendEnabled,
         _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: 'http://10.0.2.2:8080', // TODO: prod URL
+                baseUrl: 'http://165.232.69.83:9002', // Android emulator -> localhost
                 connectTimeout: const Duration(seconds: 10),
                 receiveTimeout: const Duration(seconds: 10),
               ),
             ) {
-    // 1) JwtInterceptor'ı TEK dio instance'ına ekliyoruz.
-    //    Not: burada okunan access_token artık "Firebase ID Token" olacak.
+    // ✅ Interceptor: her request'e SecureStorage'tan token basar.
+    // Not: Auth endpointlerinde biz ayrıca header geçiyoruz, sorun değil.
     _dio.interceptors.add(JwtInterceptor(storage: _storage));
 
-    // 2) AuthApiClient aynı dio ile oluşturulur (interceptor/ayarlar ortak kalsın)
     _apiClient = AuthApiClient(dio: _dio);
   }
 
   // ==========================================================
-  // LOGOUT FLOW
+  // LOGOUT
   // ==========================================================
   /// Logout:
-  /// - SecureStorage tokenlarını siler
-  /// - Firebase session'ı kapatır
-  ///
-  /// UI (MapScreen vs) bunu çağırıp Login'e pushReplacement atar.
+  /// - storage tokenlarını siler
+  /// - firebase signOut yapar
   Future<void> logout() async {
     await _storage.clearSession();
     await _firebaseService.signOut();
   }
 
   // ==========================================================
-  // REGISTER FLOW
+  // REGISTER FLOW (Firebase + backend register sync)
   // ==========================================================
-  /// Register akışı (Firebase + opsiyonel backend):
-  ///
-  /// 1) Firebase register (otomatik login olur)
-  /// 2) Firebase ID Token alınır
-  /// 3) Token SecureStorage'a yazılır  ✅ (AuthGate / interceptor için)
-  /// 4) Backend ENABLED ise:
-  ///    - POST /auth/register (Bearer token + user body)
-  ///    - backend authenticated + user döner
-  /// 5) Backend DISABLED ise:
-  ///    - mock AuthBackendResult döner
-  Future<AuthBackendResult> registerWithEmailAndPassword({
+  /// Akış:
+  /// 1) Firebase createUserWithEmailAndPassword
+  /// 2) Firebase ID Token al (FIREBASE_ID_TOKEN)
+  /// 3) SecureStorage'a yaz (session restore + interceptor için)
+  /// 4) POST /auth/register ile backend'e isimleri sync et
+  Future<UserRegisterResponse> registerWithEmailAndPassword({
     required String email,
     required String password,
     required String firstName,
     String? middleName,
     required String lastName,
-    required List<String> preferredNames,
+    String? preferredName,
   }) async {
     try {
-      // 1) Firebase: create user (auto-login)
-      final user = await _firebaseService.register(email, password);
+      // 1) Firebase register (otomatik login)
+      await _firebaseService.register(email, password);
 
-      // 2) Firebase ID Token: backend verification / session
+      // 2) Token al
       final firebaseIdToken = await _firebaseService.getIdToken();
 
-      // 3) Storage: app’in authenticated sayması için tokenı yazıyoruz.
-      //    Backend JWT üretmiyorsa bile bu token "access_token" key'inde saklanacak.
+      // 3) Token'ı cihazda sakla (session restore için)
       await _storage.writeAccessToken(firebaseIdToken);
 
-      // 4) Backend implementasyonu geldiğinde:
-      //    - _backendEnabled = true yapacaksın
-      //    - Aşağıdaki HTTP çağrısı gerçek backend'e gidecek
-      if (_backendEnabled) {
-        final result = await _apiClient.register(
-          firebaseIdToken: firebaseIdToken,
-          body: {
-            // Backend'e giden JSON: user profil bilgileri
-            'email': email,
-            'firstName': firstName,
-            'middleName': middleName,
-            'lastName': lastName,
-            'preferredNames': preferredNames,
-          },
-        );
+      // 4) Backend register sync
+      final res = await _apiClient.registerSync(
+        firebaseIdToken: firebaseIdToken,
+        body: {
+          'firstName': firstName,
+          'middleName': middleName,
+          'lastName': lastName,
+          'preferredName': preferredName,
+        },
+      );
 
-        // Backend'in authenticated=false döndürmesi durumunda:
-        // UI bunu failure sayabilir (istersen burada kontrol ekleriz).
-        return result;
+      // Backend "success=false" döndürebilir → bunu failure sayalım.
+      if (!res.success) {
+        throw AuthFailure(res.message.isNotEmpty
+            ? res.message
+            : 'Register sync başarısız.');
       }
 
-      // 5) Backend yokken mock:
-      return AuthBackendResult.mock(
-        email: email,
-        firebaseUid: user.uid,
-        firstName: firstName,
-        middleName: middleName,
-        lastName: lastName,
-        preferredNames: preferredNames,
-      );
+      return res;
     } on fb.FirebaseAuthException catch (e) {
-      // Firebase register hatalarını kullanıcı dostu mesajlara mapliyoruz.
+      // Firebase tarafı hatalar
       switch (e.code) {
         case 'email-already-in-use':
           throw const AuthFailure('Bu email adresi zaten kayıtlı.');
@@ -160,64 +127,61 @@ class AuthRepository {
           throw AuthFailure('Firebase register hatası: ${e.code}');
       }
     } on DioException catch (e) {
-      // Backend enabled iken buraya düşebilir.
+      // Backend tarafı hatalar (400/401/500 vs)
+      final status = e.response?.statusCode;
       final data = e.response?.data;
+
+      // Backend message alanı döndürüyorsa yakala
       if (data is Map && data['message'] is String) {
         throw AuthFailure(data['message'] as String);
       }
-      throw const AuthFailure('Register sırasında sunucu hatası oluştu.');
+
+      throw AuthFailure(
+        status == null
+            ? 'Register sırasında sunucuya ulaşılamadı.'
+            : 'Register sırasında sunucu hatası: HTTP $status',
+      );
+    } on AuthFailure {
+      rethrow;
     } catch (_) {
       throw const AuthFailure('Register sırasında beklenmeyen hata oluştu.');
     }
   }
 
   // ==========================================================
-  // LOGIN FLOW
+  // LOGIN FLOW (Firebase + backend login sync)
   // ==========================================================
-  /// Login akışı (Firebase + opsiyonel backend):
+  /// Akış:
+  /// 1) Firebase signInWithEmailAndPassword
+  /// 2) Token al
+  /// 3) SecureStorage'a yaz
+  /// 4) GET /auth/login ile backend'den "me" benzeri data al
   ///
-  /// 1) Firebase login
-  /// 2) Firebase ID Token alınır
-  /// 3) Token SecureStorage'a yazılır ✅
-  /// 4) Backend ENABLED ise:
-  ///    - POST /auth/login (Bearer token + opsiyonel body)
-  ///    - backend authenticated + user döner
-  /// 5) Backend DISABLED ise:
-  ///    - mock AuthBackendResult döner
-  Future<AuthBackendResult> loginWithEmailAndPassword({
+  /// Return:
+  /// - UserAuthenticationDTO (backend user bilgisi)
+  Future<UserAuthenticationDTO> loginWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
     try {
       // 1) Firebase login
-      final user = await _firebaseService.login(email, password);
+      await _firebaseService.login(email, password);
 
-      // 2) Firebase ID Token
+      // 2) Token al
       final firebaseIdToken = await _firebaseService.getIdToken();
 
-      // 3) Storage
+      // 3) Storage'a yaz
       await _storage.writeAccessToken(firebaseIdToken);
 
-      // 4) Backend implementasyonu geldiğinde:
-      //    - _backendEnabled = true
-      //    - /auth/login gerçek çağrılır
-      if (_backendEnabled) {
-        final result = await _apiClient.login(
-          firebaseIdToken: firebaseIdToken,
-          body: const {}, // backend isterse burayı genişletiriz
-        );
-        return result;
+      // 4) Backend login sync
+      final auth = await _apiClient.loginSync(firebaseIdToken: firebaseIdToken);
+
+      if (auth.userId.isEmpty) {
+        throw const AuthFailure('Backend authentication başarısız.');
       }
-
-      // 5) Backend yokken mock
-      return AuthBackendResult.mock(
-        email: email,
-        firebaseUid: user.uid,
-      );
+      return auth;
     } on fb.FirebaseAuthException catch (e) {
-      // Firebase login error code’ları SDK sürümüne göre değişebiliyor.
       final code = e.code.toLowerCase();
-
       switch (code) {
         case 'invalid-credential':
         case 'invalid-login-credentials':
@@ -230,13 +194,68 @@ class AuthRepository {
           throw const AuthFailure('Giriş yapılamadı. Bilgileri kontrol et.');
       }
     } on DioException catch (e) {
+      final status = e.response?.statusCode;
       final data = e.response?.data;
+
       if (data is Map && data['message'] is String) {
         throw AuthFailure(data['message'] as String);
       }
-      throw const AuthFailure('Login sırasında sunucu hatası oluştu.');
+
+      // Rehbere göre 401 token invalid => logout
+      if (status == 401) {
+        throw const AuthFailure('Session expired. Please login again.');
+      }
+
+      throw AuthFailure(
+        status == null
+            ? 'Login sırasında sunucuya ulaşılamadı.'
+            : 'Login sırasında sunucu hatası: HTTP $status',
+      );
+    } on AuthFailure {
+      rethrow;
     } catch (_) {
       throw const AuthFailure('Login sırasında beklenmeyen hata oluştu.');
+    }
+  }
+
+  // ==========================================================
+  // SESSION RESTORE (app açılış)
+  // ==========================================================
+  /// App açılışında:
+  /// - Firebase currentUser varsa token alır
+  /// - Backend GET /auth/login atar
+  /// - 200 ise "authenticated"
+  /// - 401 ise session yok
+  Future<UserAuthenticationDTO> restoreSession() async {
+    try {
+      final currentUser = _firebaseService.getCurrentUser();
+      if (currentUser == null) {
+        throw const AuthFailure('No Firebase session.');
+      }
+
+      // Token al (gerekirse yenileyebilirsin: getIdToken(true) istersen service'e eklenir)
+      final firebaseIdToken = await _firebaseService.getIdToken();
+
+      // Storage güncelle (interceptor için)
+      await _storage.writeAccessToken(firebaseIdToken);
+
+      // Backend check
+      final auth = await _apiClient.loginSync(firebaseIdToken: firebaseIdToken);
+      if (!auth.authenticated) {
+        throw const AuthFailure('Session invalid.');
+      }
+
+      return auth;
+    } on AuthFailure {
+      rethrow;
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 401) {
+        throw const AuthFailure('Session expired.');
+      }
+      throw const AuthFailure('Session restore sırasında sunucu hatası oluştu.');
+    } catch (_) {
+      throw const AuthFailure('Session restore sırasında hata oluştu.');
     }
   }
 }
