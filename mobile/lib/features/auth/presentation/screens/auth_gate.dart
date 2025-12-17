@@ -9,18 +9,17 @@ import 'package:mobile/features/auth/data/storage/secure_storage_service.dart';
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
 import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
 
-/// Uygulama açıldığında ilk çalışan "gate" ekranı.
+/// AuthGate
 ///
-/// Yeni Mantık:
-///  - Backend token üretmiyor.
-///  - Biz "authenticated" saymak için:
-///      1) SecureStorage'da token var mı?  (Bearer olarak gidecek Firebase ID Token)
-///      2) Firebase tarafında currentUser var mı? (Firebase session açık mı?)
-///    ikisini birlikte kontrol ediyoruz.
+/// TEK VE NET KURAL:
+/// Bir kullanıcı authenticated sayılabilmesi için:
+///   1) FirebaseAuth.currentUser != null
+///   2) Firebase ID Token başarıyla alınabilmeli
 ///
-/// Bu sprint için:
-///  - Token'ın expire olup olmadığı gibi derin kontrol YOK.
-///  - Full guard / refresh / 401 handling işleri ileride (VACANZA-88 vb.).
+/// Token her app açılışında yeniden alınır ve SecureStorage'a yazılır.
+/// Böylece:
+/// - Logout sonrası map ASLA açılmaz
+/// - App restart'ta session deterministik olur
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -31,43 +30,80 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   final SecureStorageService _storage = SecureStorageService();
 
-  bool _isChecking = true;
-  bool _isAuthenticated = false;
+  bool _checking = true;
+  bool _authenticated = false;
 
   @override
   void initState() {
     super.initState();
-    _checkAuthStatus();
+    _resolveSession();
   }
 
-  /// Basit auth kontrolü:
-  ///  - Storage token var mı?
-  ///  - Firebase currentUser var mı?
+  /// 🔐 SESSION RESOLVE (TEK GERÇEK SOURCE)
   ///
-  /// İkisi de varsa kullanıcıyı MapScreen'e alıyoruz.
-  Future<void> _checkAuthStatus() async {
+  /// Akış:
+  /// 1) Firebase currentUser var mı?
+  /// 2) Yoksa -> LOGIN
+  /// 3) Varsa -> getIdToken(forceRefresh: true)
+  /// 4) Token geldiyse -> SecureStorage'a yaz
+  /// 5) -> HOME MAP
+  ///
+  /// HATA OLURSA:
+  /// - Firebase signOut
+  /// - SecureStorage temizle
+  /// - LOGIN
+  Future<void> _resolveSession() async {
     try {
-      final token = await _storage.readAccessToken();
       final firebaseUser = fb.FirebaseAuth.instance.currentUser;
 
-      final hasToken = token != null && token.isNotEmpty;
-      final hasFirebaseSession = firebaseUser != null;
+      // 1️⃣ Firebase session yok → LOGIN
+      if (firebaseUser == null) {
+        _goUnauthenticated();
+        return;
+      }
 
+      // 2️⃣ TOKEN'I ZORLA YENİDEN AL
+      final idToken = await firebaseUser.getIdToken(true);
+
+      if (idToken == null || idToken.isEmpty) {
+        throw Exception('Firebase ID Token alınamadı');
+      }
+
+      // 3️⃣ TOKEN'I STORAGE'A YAZ
+      await _storage.writeAccessToken(idToken);
+
+      // 4️⃣ AUTH OK
       setState(() {
-        _isAuthenticated = hasToken && hasFirebaseSession;
-        _isChecking = false;
+        _authenticated = true;
+        _checking = false;
       });
-    } catch (_) {
-      setState(() {
-        _isAuthenticated = false;
-        _isChecking = false;
-      });
+    } catch (e) {
+      // ❌ HER TÜRLÜ FAIL → HARD LOGOUT
+      await _hardLogout();
+      _goUnauthenticated();
     }
+  }
+
+  Future<void> _hardLogout() async {
+    try {
+      await _storage.clearSession();
+      await fb.FirebaseAuth.instance.signOut();
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  void _goUnauthenticated() {
+    setState(() {
+      _authenticated = false;
+      _checking = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isChecking) {
+    // ⏳ Loading
+    if (_checking) {
       final bodyMedium = AppTextStyles.bodyMedium(context);
 
       return AnimatedBackground(
@@ -97,6 +133,9 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
-    return _isAuthenticated ? const HomeMapScreen() : const LoginScreen();
+    // ✅ NET KARAR
+    return _authenticated
+        ? const HomeMapScreen()
+        : const LoginScreen();
   }
 }
