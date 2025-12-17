@@ -47,8 +47,8 @@ jobs:
             git reset --hard origin/Production
 
             cd /root/vacanza-backend/prod
-            docker compose down --remove-orphans
-            docker compose up --build -d
+            docker compose -p vacanza-prod-backend down --remove-orphans
+            docker compose -p vacanza-prod-backend up --build -d
 
             docker ps | grep vacanza-prod-backend
 
@@ -64,13 +64,12 @@ jobs:
             git reset --hard origin/Production
 
             cd /root/vacanza-web/prod
-            docker compose down --remove-orphans
-            docker compose up --build -d
+            docker compose -p vacanza-prod-web down --remove-orphans
+            docker compose -p vacanza-prod-web up --build -d
 
             docker ps | grep vacanza-web-prod
 
             echo "✔ Web Production Deploy Finished!"
-
             echo "===== 🎉 ALL PRODUCTION SERVICES UPDATED SUCCESSFULLY ====="
 
       ##############################################################
