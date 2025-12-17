@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,6 +37,11 @@ public class UserLoginHistoryService implements UserLoginHistoryImpl {
                         .ipAddress(item.getIpAddress())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<UserLoginHistoryResponseDTO> getMyLoginHistories() {
+        return List.of();
     }
 
     @Transactional(readOnly = true)

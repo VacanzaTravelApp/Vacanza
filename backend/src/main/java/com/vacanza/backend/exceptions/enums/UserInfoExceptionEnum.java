@@ -10,5 +10,7 @@ public enum UserInfoExceptionEnum {
 
     private final String explanation;
 
-    UserInfoExceptionEnum(String explanation) {this.explanation = explanation;}
+    UserInfoExceptionEnum(String explanation) {
+        this.explanation = explanation;
+    }
 }
