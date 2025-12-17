@@ -4,11 +4,11 @@ WORKDIR /app
 
 # Bağımlılıkları cache'e alma
 COPY backend/pom.xml .
-RUN mvn -q dependency:go-offline
+RUN mvn -q -DskipTests dependency:resolve
 
 # Kodları kopyala ve build et
 COPY backend/src ./src
-RUN mvn -q package -DskipTests
+RUN mvn -q -DskipTests package
 
 # ========== RUNTIME STAGE ==========
 FROM eclipse-temurin:17-jre
