@@ -125,7 +125,7 @@ class VacanzaApp extends StatelessWidget {
           // Böylece VACANZA-85'te istenen "authenticated state'e geçiş"
           // ve "app tekrar açıldığında doğrudan Home'a gitme" kurgusu sağlanmış olur.
           //home: const AuthGate(), just for now until VACANZA 87
-          home: const LoginScreen(),
+          home: const AuthGate(),
         ),
       ),
     );
