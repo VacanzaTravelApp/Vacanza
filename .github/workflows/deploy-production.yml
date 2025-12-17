@@ -10,45 +10,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📦 Checkout Repository
-        uses: actions/checkout@v3
-
-      # Get timestamp
-      - name: ⏱ Get current time
-        id: time
-        run: echo "now=$(date)" >> $GITHUB_OUTPUT
-
       - name: 🚀 Deploy to Production Server Over SSH
-        id: deploy_prod
-        continue-on-error: true
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
+            set -e
+
             echo "===== 🚀 STARTING PRODUCTION DEPLOYMENT ====="
 
             ##############################################################
             # BACKEND DEPLOY (Production)
             ##############################################################
             echo "🔥 Updating Backend (Production)..."
+
+            cd /root/vacanza-backend/prod/Vacanza
+            git fetch origin
+            git reset --hard origin/Production
+
             cd /root/vacanza-backend/prod
-            git pull origin Production
             docker compose down --remove-orphans
             docker compose up --build -d
+
+            docker ps | grep vacanza-prod-backend
+
             echo "✔ Backend Production Deploy Finished!"
 
             ##############################################################
             # WEB DEPLOY (Production)
             ##############################################################
             echo "🌍 Updating Web (Production)..."
+
+            cd /root/vacanza-web/prod/Vacanza
+            git fetch origin
+            git reset --hard origin/Production
+
             cd /root/vacanza-web/prod
-            git pull origin Production
             docker compose down --remove-orphans
             docker compose up --build -d
-            echo "✔ Web Production Deploy Finished!"
 
+            docker ps | grep vacanza-web-prod
+
+            echo "✔ Web Production Deploy Finished!"
             echo "===== 🎉 ALL PRODUCTION SERVICES UPDATED SUCCESSFULLY ====="
 
       ###########################################################################
