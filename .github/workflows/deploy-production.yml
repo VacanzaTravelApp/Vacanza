@@ -33,8 +33,10 @@ jobs:
             # BACKEND DEPLOY (Production)
             ##############################################################
             echo "🔥 Updating Backend (Production)..."
-            cd /root/vacanza-backend/prod
+            cd /root/vacanza-backend/prod/Vacanza
             git pull origin Production
+
+            cd /root/vacanza-backend/prod
             docker compose down --remove-orphans
             docker compose up --build -d
             echo "✔ Backend Production Deploy Finished!"
@@ -43,8 +45,10 @@ jobs:
             # WEB DEPLOY (Production)
             ##############################################################
             echo "🌍 Updating Web (Production)..."
-            cd /root/vacanza-web/prod
+            cd /root/vacanza-web/prod/Vacanza
             git pull origin Production
+
+            cd /root/vacanza-web/prod
             docker compose down --remove-orphans
             docker compose up --build -d
             echo "✔ Web Production Deploy Finished!"
