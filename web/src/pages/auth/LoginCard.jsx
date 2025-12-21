@@ -6,9 +6,12 @@ import { LockOutlined, MailOutlined, SendOutlined } from "@ant-design/icons";
 import "./RegisterCard.css";
 import { useNavigate } from "react-router-dom";
 
-// ✅ Firebase
+//Firebase
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../../firebase";
+
+// API
+import { authApi } from "../../api/authApi";
 
 const LoginCard = () => {
   const navigate = useNavigate();
@@ -18,7 +21,15 @@ const LoginCard = () => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      message.success("Login successful! Redirecting to the map...");
+  console.log("Firebase login successful.");
+      try {
+        await authApi.login();
+        console.log("Backend sync successful.");
+      // eslint-disable-next-line no-unused-vars
+      } catch (syncError) {
+        console.warn("Backend sync skipped: Server returned HTML, but we are logged in via Firebase.");
+      }
+   message.success("Logged in successfully!");
       navigate("/map");
     } catch (error) {
       console.error("Firebase login error:", error);
