@@ -1,61 +1,49 @@
 // src/pages/auth/LoginCard.jsx
+
 import React, { useState } from "react";
 import { Form, Input, Button, message } from "antd";
 import { LockOutlined, MailOutlined, SendOutlined } from "@ant-design/icons";
 import "./RegisterCard.css";
 import { useNavigate } from "react-router-dom";
 
+// ✅ Firebase
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../../firebase";
-import { authApi } from "../../api/authApi";
 
-export default function LoginCard() {
+const LoginCard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [form] = Form.useForm();
 
   const onFinish = async ({ email, password }) => {
     setLoading(true);
-
     try {
-      // 1) Firebase login
       await signInWithEmailAndPassword(auth, email, password);
-
-      // 2) Backend sync (GET /auth/login)
-      await authApi.login();
-
-      message.success("Login successful. Redirecting to the map...");
+      message.success("Login successful! Redirecting to the map...");
       navigate("/map");
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Firebase login error:", error);
 
-      let errorMessage = "Login failed. Please try again.";
-      if (error?.code === "auth/user-not-found" || error?.code === "auth/wrong-password") {
-        errorMessage = "Invalid email or password.";
-      }
-      if (error?.response?.status === 401) {
-        errorMessage = "Session is not valid. Please login again.";
-      }
+      let msg = "Login failed. Please try again.";
+      if (error?.code === "auth/invalid-email") msg = "Please enter a valid email address.";
+      if (error?.code === "auth/user-not-found") msg = "No user found with this email.";
+      if (error?.code === "auth/invalid-credential" || error?.code === "auth/wrong-password")
+        msg = "Incorrect email or password.";
 
-      message.error(errorMessage);
+      message.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleForgotPassword = async () => {
-    const email = form.getFieldValue("email");
-
-    if (!email) {
-      message.info("Please enter your email first.");
-      return;
-    }
+    const userEmail = window.prompt("Enter your email to reset your password:");
+    if (!userEmail) return;
 
     try {
-      await sendPasswordResetEmail(auth, email);
+      await sendPasswordResetEmail(auth, userEmail);
       message.success("Password reset email sent. Please check your inbox.");
-    } catch (err) {
-      console.error("Reset password error:", err);
+    } catch (error) {
+      console.error("Reset password error:", error);
       message.error("Could not send reset email. Please check the email address.");
     }
   };
@@ -64,33 +52,25 @@ export default function LoginCard() {
     <div className="register-card">
       <div className="card-header">
         <span className="vacanza-logo">
-          <SendOutlined className="logo-icon" /> Vacanza
+          <SendOutlined className="logo-icon" />
+          Vacanza
         </span>
         <h3>Welcome Back</h3>
-        <p className="header-subtext">Sign in to continue your journey</p>
+        <p className="header-subtext">Sign in to continue</p>
       </div>
 
-      <Form
-        form={form}
-        name="login"
-        onFinish={onFinish}
-        layout="vertical"
-        className="auth-form"
-      >
+      <Form name="login" onFinish={onFinish} layout="vertical" className="auth-form">
         <Form.Item
           name="email"
           rules={[
-            { type: "email", message: "Please enter a valid email address." },
-            { required: true, message: "Please enter your email." },
+            { type: "email", message: "Please enter a valid email address!" },
+            { required: true, message: "Please enter your email!" },
           ]}
         >
-          <Input prefix={<MailOutlined />} placeholder="Email" size="large" autoComplete="email" />
+          <Input prefix={<MailOutlined />} placeholder="Email address" size="large" autoComplete="email" />
         </Form.Item>
 
-        <Form.Item
-          name="password"
-          rules={[{ required: true, message: "Please enter your password." }]}
-        >
+        <Form.Item name="password" rules={[{ required: true, message: "Please enter your password!" }]}>
           <Input.Password
             prefix={<LockOutlined />}
             placeholder="Password"
@@ -100,7 +80,7 @@ export default function LoginCard() {
         </Form.Item>
 
         <div className="login-options-row">
-          <span />
+          <span className="remember-me-placeholder" />
           <span onClick={handleForgotPassword} className="forgot-password-link">
             Forgot Password?
           </span>
@@ -114,11 +94,13 @@ export default function LoginCard() {
       </Form>
 
       <div className="login-redirect">
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <span onClick={() => navigate("/register")} className="login-link">
           Sign Up
         </span>
       </div>
     </div>
   );
-}
+};
+
+export default LoginCard;

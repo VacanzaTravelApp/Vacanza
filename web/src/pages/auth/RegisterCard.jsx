@@ -1,3 +1,5 @@
+// src/pages/auth/RegisterCard.jsx
+
 import React, { useState } from "react";
 import { Form, Input, Button, Checkbox, Row, Col, message } from "antd";
 import {
@@ -11,13 +13,14 @@ import {
 import "./RegisterCard.css";
 import { useNavigate } from "react-router-dom";
 
+// ✅ Firebase
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "../../firebase";
-import { authApi } from "../../api/authApi";
 
+// PasswordChecks component (same behavior, clean)
 const PasswordChecks = ({ password }) => {
   const checks = [
-    { text: "8+ characters", valid: password && password.length >= 8 },
+    { text: "8+ characters", valid: password?.length >= 8 },
     { text: "1+ uppercase", valid: /[A-Z]/.test(password || "") },
     { text: "1+ lowercase", valid: /[a-z]/.test(password || "") },
     { text: "1 number", valid: /[0-9]/.test(password || "") },
@@ -55,57 +58,28 @@ const RegisterCard = () => {
   const onFinish = async (values) => {
     setLoading(true);
 
-    const {
-      email,
-      password,
-      firstName,
-      middleName,
-      lastName,
-      preferredName,
-    } = values;
+    const { email, password, firstName, lastName } = values;
 
     try {
-      // 1) Firebase register
+      // ✅ Firebase register
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-      // Optional: set displayName in Firebase (for UI)
-      const displayName = preferredName?.trim()
-        ? preferredName.trim()
-        : `${firstName} ${lastName}`.trim();
-
+      // ✅ Set displayName
+      const displayName = `${firstName} ${lastName}`.trim();
       await updateProfile(userCredential.user, { displayName });
-
-      // 2) Backend profile sync: POST /auth/register (Bearer token is auto attached by http.js)
-      await authApi.register({
-        firstName,
-        middleName: middleName || null,
-        lastName,
-        preferredName: preferredName || null,
-      });
 
       message.success("Registration successful! Redirecting to the map...");
       navigate("/map");
     } catch (error) {
-      console.error("Register error:", error);
+      console.error("Firebase registration error:", error);
 
-      // Firebase errors
-      const code = error?.code;
+      // Better messages
+      let msg = "Registration failed. Please try again.";
+      if (error?.code === "auth/email-already-in-use") msg = "This email is already in use.";
+      if (error?.code === "auth/invalid-email") msg = "Please enter a valid email address.";
+      if (error?.code === "auth/weak-password") msg = "Password is too weak. Please choose a stronger one.";
 
-      let errorMessage = "Registration failed. Please try again.";
-      if (code === "auth/email-already-in-use") errorMessage = "This email is already in use.";
-      if (code === "auth/invalid-email") errorMessage = "Invalid email address.";
-      if (code === "auth/weak-password") errorMessage = "Password is too weak.";
-
-      // Backend errors (axios)
-      if (error?.response?.status === 401) {
-        errorMessage = "Token validation failed. Please log in again.";
-      }
-      if (error?.response?.data?.message) {
-        // if backend sends message
-        errorMessage = error.response.data.message;
-      }
-
-      message.error(errorMessage);
+      message.error(msg);
     } finally {
       setLoading(false);
     }
@@ -115,7 +89,8 @@ const RegisterCard = () => {
     <div className="register-card">
       <div className="card-header">
         <span className="vacanza-logo">
-          <SendOutlined className="logo-icon" /> Vacanza
+          <SendOutlined className="logo-icon" />
+          Vacanza
         </span>
         <h3>Start Your Adventure</h3>
         <p className="header-subtext">Create an account to continue</p>
@@ -133,9 +108,9 @@ const RegisterCard = () => {
           <Col span={12}>
             <Form.Item
               name="firstName"
-              rules={[{ required: true, message: "Please enter your first name." }]}
+              rules={[{ required: true, message: "Please enter your first name!" }]}
             >
-              <Input prefix={<UserOutlined />} placeholder="First Name" size="large" />
+              <Input prefix={<UserOutlined />} placeholder="First Name" size="large" autoComplete="given-name" />
             </Form.Item>
           </Col>
 
@@ -148,28 +123,24 @@ const RegisterCard = () => {
 
         <Form.Item
           name="lastName"
-          rules={[{ required: true, message: "Please enter your last name." }]}
+          rules={[{ required: true, message: "Please enter your last name!" }]}
         >
-          <Input prefix={<UserOutlined />} placeholder="Last Name" size="large" />
-        </Form.Item>
-
-        <Form.Item name="preferredName">
-          <Input prefix={<UserOutlined />} placeholder="Preferred Name (Optional)" size="large" />
+          <Input prefix={<UserOutlined />} placeholder="Last Name" size="large" autoComplete="family-name" />
         </Form.Item>
 
         <Form.Item
           name="email"
           rules={[
-            { type: "email", message: "Invalid email format." },
-            { required: true, message: "Please enter your email." },
+            { type: "email", message: "Please enter a valid email address!" },
+            { required: true, message: "Please enter your email!" },
           ]}
         >
-          <Input prefix={<MailOutlined />} placeholder="Email" size="large" autoComplete="email" />
+          <Input prefix={<MailOutlined />} placeholder="Email address" size="large" autoComplete="email" />
         </Form.Item>
 
         <Form.Item
           name="password"
-          rules={[{ required: true, message: "Please enter your password." }]}
+          rules={[{ required: true, message: "Please enter your password!" }]}
           hasFeedback
         >
           <Input.Password
@@ -187,11 +158,11 @@ const RegisterCard = () => {
           dependencies={["password"]}
           hasFeedback
           rules={[
-            { required: true, message: "Please confirm your password." },
+            { required: true, message: "Please confirm your password!" },
             ({ getFieldValue }) => ({
               validator(_, value) {
                 if (!value || getFieldValue("password") === value) return Promise.resolve();
-                return Promise.reject(new Error("Passwords do not match."));
+                return Promise.reject(new Error("Passwords do not match!"));
               },
             }),
           ]}
@@ -210,7 +181,7 @@ const RegisterCard = () => {
           rules={[
             {
               validator: (_, value) =>
-                value ? Promise.resolve() : Promise.reject(new Error("You must accept the terms.")),
+                value ? Promise.resolve() : Promise.reject(new Error("You must accept the terms and conditions.")),
             },
           ]}
         >
