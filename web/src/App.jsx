@@ -1,46 +1,46 @@
-// src/App.jsx
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import AuthLayout from './pages/auth/AuthLayout';
-import RegisterCard from './pages/auth/RegisterCard';
-import LoginCard from './pages/auth/LoginCard';
-import './pages/auth/AuthLayout.css'; 
-import MapPage from './pages/MapPage';
-//import "mapbox-gl/dist/mapbox-gl.css";
+import AuthLayout from "./pages/auth/AuthLayout";
+import RegisterCard from "./pages/auth/Registercard";
+import LoginCard from "./pages/auth/LoginCard";
+import MapPage from "./pages/MapPage";
 
+import "./pages/auth/AuthLayout.css";
 
 const App = () => {
-    return (
-        <Router>
-            <Routes>
-{/* HARİTA ROTASI (Giriş Başarılı Olduğunda Buraya Yönlendirilir) */}
-        {/* Giriş yapan kullanıcının göreceği ana ekran */}
-        <Route path="/map" element={<MapPage />} /> {/* <-- Bu rotayı ekleyin */}
-                {/* 1. Açılışta Register'a yönlendir */}
-                <Route path="/" element={<Navigate to="/register" replace />} />
+  return (
+    <Router>
+      <Routes>
+        {/* Açılış */}
+        <Route path="/" element={<Navigate to="/register" replace />} />
 
-                {/* 2. Kayıt Ol Sayfası */}
-                <Route path="/register" element={
-                    <AuthLayout>
-                        <RegisterCard />
-                    </AuthLayout>
-                } />
+        {/* Auth sayfaları */}
+        <Route
+          path="/register"
+          element={
+            <AuthLayout>
+              <RegisterCard />
+            </AuthLayout>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <AuthLayout>
+              <LoginCard />
+            </AuthLayout>
+          }
+        />
 
-                {/* 3. Giriş Yap Sayfası */}
-                <Route path="/login" element={
-                    <AuthLayout>
-                        <LoginCard />
-                    </AuthLayout>
-                } />
-                
-                {/* 🚀 GÜNCELLEME 2: Harita Sayfası Rotasını Ekleyin */}
-                {/* MapPage bileşeni kendi Layout yapısını içerdiği için AuthLayout kullanmaya gerek yok. */}
-                <Route path="/map" element={<MapPage />} /> 
+        {/* App ekranı */}
+        <Route path="/map" element={<MapPage />} />
 
-            </Routes>
-        </Router>
-    );
+        {/* 404 fallback */}
+        <Route path="*" element={<Navigate to="/register" replace />} />
+      </Routes>
+    </Router>
+  );
 };
 
 export default App;

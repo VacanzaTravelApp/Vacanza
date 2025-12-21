@@ -1,148 +1,124 @@
 // src/pages/auth/LoginCard.jsx
+import React, { useState } from "react";
+import { Form, Input, Button, message } from "antd";
+import { LockOutlined, MailOutlined, SendOutlined } from "@ant-design/icons";
+import "./RegisterCard.css";
+import { useNavigate } from "react-router-dom";
 
-import React, { useState } from 'react'; // 👈 useState eklendi
-import { Form, Input, Button, Space, message } from 'antd'; // 👈 message eklendi
-import { 
-    LockOutlined, 
-    MailOutlined, 
-    SendOutlined, 
-} from '@ant-design/icons';
-import './RegisterCard.css'; 
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "../../firebase";
+import { authApi } from "../../api/authApi";
 
-import { useNavigate } from 'react-router-dom';
-
-// 🚀 FIREBASE İMPORTLARI EKLENDİ
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../firebase'; // 👈 Kendi firebase.js dosyanızdan auth objesini import edin
-
-const LoginCard = () => {
+export default function LoginCard() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false); // 👈 Yükleme durumu eklendi
+  const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
 
-  // GÜNCEL: Form gönderildiğinde Firebase girişini deneyecek fonksiyon
-  const onFinish = async (values) => {
+  const onFinish = async ({ email, password }) => {
     setLoading(true);
-    const { email, password } = values; // Ant Design formundan e-posta ve şifreyi al
 
     try {
-        // 🔥 FIREBASE GİRİŞ İŞLEMİ
-        await signInWithEmailAndPassword(auth, email, password);
-        
-        // BAŞARILI: Kullanıcıyı /map sayfasına yönlendir
-        message.success('Giriş başarılı! Haritaya yönlendiriliyorsunuz.');
-        console.log('Login Successful, redirecting to /map');
-        navigate('/map'); 
+      // 1) Firebase login
+      await signInWithEmailAndPassword(auth, email, password);
 
+      // 2) Backend sync (GET /auth/login)
+      await authApi.login();
+
+      message.success("Login successful. Redirecting to the map...");
+      navigate("/map");
     } catch (error) {
-        // HATA: Firebase hata mesajlarını yakala ve kullanıcıya göster
-        console.error("Firebase Giriş Hatası:", error.code, error.message);
-        
-        let errorMessage = "Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.";
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-            errorMessage = "Kullanıcı adı veya şifre hatalı.";
-        }
+      console.error("Login error:", error);
 
-        message.error(errorMessage);
+      let errorMessage = "Login failed. Please try again.";
+      if (error?.code === "auth/user-not-found" || error?.code === "auth/wrong-password") {
+        errorMessage = "Invalid email or password.";
+      }
+      if (error?.response?.status === 401) {
+        errorMessage = "Session is not valid. Please login again.";
+      }
 
+      message.error(errorMessage);
     } finally {
-        setLoading(false); // İşlem bitince yükleme durumunu kapat
+      setLoading(false);
     }
   };
 
-  const handleRegisterRedirect = () => {
-    navigate('/register'); 
-  };
-  
-  const handleForgotPassword = () => {
-      alert('Forgot Password link clicked!');
-      // navigate('/forgot-password');
-  };
+  const handleForgotPassword = async () => {
+    const email = form.getFieldValue("email");
 
+    if (!email) {
+      message.info("Please enter your email first.");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      message.success("Password reset email sent. Please check your inbox.");
+    } catch (err) {
+      console.error("Reset password error:", err);
+      message.error("Could not send reset email. Please check the email address.");
+    }
+  };
 
   return (
-    // ... (JSX kodunun geri kalanı aynı kalır) ...
-
-    <div className="register-card"> 
+    <div className="register-card">
       <div className="card-header">
         <span className="vacanza-logo">
-            <SendOutlined className="logo-icon" /> 
-            Vacanza
+          <SendOutlined className="logo-icon" /> Vacanza
         </span>
-        <h3>Welcome Back to Vacanza</h3>
-        <p className="header-subtext">
-          Sign in to continue your journey
-        </p>
+        <h3>Welcome Back</h3>
+        <p className="header-subtext">Sign in to continue your journey</p>
       </div>
 
       <Form
+        form={form}
         name="login"
-        initialValues={{ remember: true }}
-        onFinish={onFinish} // 👈 Güncellenmiş fonksiyonu kullanıyoruz
+        onFinish={onFinish}
         layout="vertical"
         className="auth-form"
       >
-        {/* E-posta */}
         <Form.Item
           name="email"
           rules={[
-            { type: 'email', message: 'The input is not a valid E-mail!' },
-            { required: true, message: 'Please input your E-mail!' },
+            { type: "email", message: "Please enter a valid email address." },
+            { required: true, message: "Please enter your email." },
           ]}
         >
-          <Input 
-            prefix={<MailOutlined />} 
-            placeholder="Enter your email" 
-            size="large" 
-            autoComplete="email"
-          />
+          <Input prefix={<MailOutlined />} placeholder="Email" size="large" autoComplete="email" />
         </Form.Item>
 
-        {/* Şifre */}
         <Form.Item
           name="password"
-          rules={[{ required: true, message: 'Please input your Password!' }]}
+          rules={[{ required: true, message: "Please enter your password." }]}
         >
-          <Input.Password 
-            prefix={<LockOutlined />} 
-            placeholder="Enter your password" 
-            size="large" 
+          <Input.Password
+            prefix={<LockOutlined />}
+            placeholder="Password"
+            size="large"
             autoComplete="current-password"
           />
         </Form.Item>
 
-        {/* Şifremi Unuttum? Linki */}
         <div className="login-options-row">
-            <span className="remember-me-placeholder"></span> 
-            
-            <span onClick={handleForgotPassword} className="forgot-password-link">
-                Forgot Password?
-            </span>
+          <span />
+          <span onClick={handleForgotPassword} className="forgot-password-link">
+            Forgot Password?
+          </span>
         </div>
 
-        {/* Giriş Butonu */}
-        <Form.Item style={{ marginTop: '20px' }}>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
-            className="cta-button" 
-            size="large"
-            loading={loading} // 👈 Yükleme durumunu butona bağladık
-          >
+        <Form.Item style={{ marginTop: 20 }}>
+          <Button type="primary" htmlType="submit" className="cta-button" size="large" loading={loading}>
             Log In
           </Button>
         </Form.Item>
       </Form>
 
-
-      {/* Kayıt Ol Yönlendirmesi */}
       <div className="login-redirect">
-        Don't have an Vacanza account? 
-        <span onClick={handleRegisterRedirect} className="login-link">
+        Don't have an account?{" "}
+        <span onClick={() => navigate("/register")} className="login-link">
           Sign Up
         </span>
       </div>
     </div>
   );
-};
-
-export default LoginCard;
+}
