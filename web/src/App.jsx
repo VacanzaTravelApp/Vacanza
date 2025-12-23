@@ -7,6 +7,7 @@ import './pages/auth/AuthLayout.css';
 import MapPage from './pages/MapPage';
 //import "mapbox-gl/dist/mapbox-gl.css";
 
+import "./pages/auth/AuthLayout.css";
 
 const App = () => {
     return (
