@@ -12,7 +12,6 @@ import {
 import './RegisterCard.css'; 
 import { useNavigate } from 'react-router-dom';
 
-// 🚀 FIREBASE İMPORTLARI (Gerekli fonksiyonlar eklendi)
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // <-- updateProfile EKLENDİ
 import auth from '../../firebase'; 
 
