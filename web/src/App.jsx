@@ -1,5 +1,3 @@
-// src/App.jsx
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import AuthLayout from './pages/auth/AuthLayout';
@@ -14,30 +12,20 @@ const App = () => {
     return (
         <Router>
             <Routes>
-{/* HARİTA ROTASI (Giriş Başarılı Olduğunda Buraya Yönlendirilir) */}
-        {/* Giriş yapan kullanıcının göreceği ana ekran */}
-        <Route path="/map" element={<MapPage />} /> {/* <-- Bu rotayı ekleyin */}
-                {/* 1. Açılışta Register'a yönlendir */}
+        <Route path="/map" element={<MapPage />} /> 
+            
                 <Route path="/" element={<Navigate to="/register" replace />} />
-
-                {/* 2. Kayıt Ol Sayfası */}
                 <Route path="/register" element={
                     <AuthLayout>
                         <RegisterCard />
                     </AuthLayout>
                 } />
-
-                {/* 3. Giriş Yap Sayfası */}
                 <Route path="/login" element={
                     <AuthLayout>
                         <LoginCard />
                     </AuthLayout>
                 } />
-                
-                {/* 🚀 GÜNCELLEME 2: Harita Sayfası Rotasını Ekleyin */}
-                {/* MapPage bileşeni kendi Layout yapısını içerdiği için AuthLayout kullanmaya gerek yok. */}
                 <Route path="/map" element={<MapPage />} /> 
-
             </Routes>
         </Router>
     );

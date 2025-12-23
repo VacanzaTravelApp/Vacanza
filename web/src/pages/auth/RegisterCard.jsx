@@ -1,9 +1,6 @@
-// src/pages/auth/RegisterCard.jsx
-
 import React, { useState } from 'react';
 // Ant Design bileşenleri, hook'ları ve mesajlar
 import { Form, Input, Button, Checkbox, Row, Col, Space, message } from 'antd'; 
-// Kullanılacak Ant Design ikonları
 import { 
   UserOutlined, 
   LockOutlined, 
@@ -60,29 +57,23 @@ const RegisterCard = () => {
   const password = Form.useWatch('password', form); 
   const [loading, setLoading] = useState(false); 
 
-  // GÜNCEL: Form gönderildiğinde Firebase kaydını deneyecek fonksiyon
+
   const onFinish = async (values) => {
     setLoading(true);
-    // 🚀 GÜNCELLEME: Tüm gerekli alanları values'tan çekiyoruz
     const { email, password, firstName, lastName } = values; 
 
     try {
-        // 🔥 FIREBASE KAYIT İŞLEMİ (userCredential'ı yakalamak zorundayız!)
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        
-        // 🔥 GÜNCELLEME: Kullanıcının Adını ve Soyadını (Display Name) Firebase'e kaydetme
-        // Bu bilgi, MapPage.jsx'te otomatik olarak çekilecektir.
+      
         await updateProfile(userCredential.user, {
             displayName: `${firstName} ${lastName}` 
         });
         
-        // BAŞARILI: Kullanıcıyı /map sayfasına yönlendir
         message.success('Kayıt başarılı! Haritaya yönlendiriliyorsunuz.');
         console.log('Registration Successful, redirecting to /map');
         navigate('/map'); 
 
     } catch (error) {
-        // HATA: Firebase hata mesajlarını yakala ve kullanıcıya göster
         console.error("Firebase Kayıt Hatası:", error.code, error.message);
         
         let errorMessage = "Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.";
@@ -97,7 +88,7 @@ const RegisterCard = () => {
         message.error(errorMessage);
 
     } finally {
-        setLoading(false); // İşlem bitince yükleme durumunu kapat
+        setLoading(false);
     }
   };
 
@@ -127,9 +118,7 @@ const RegisterCard = () => {
         layout="vertical" 
         className="auth-form"
       >
-        {/* FIRST NAME ve MIDDLE NAME - YAN YANA (Aynı kalır) */}
         <Row gutter={12}>
-            {/* First Name */}
             <Col span={12}>
                 <Form.Item
                     name="firstName"
@@ -144,7 +133,6 @@ const RegisterCard = () => {
                 </Form.Item>
             </Col>
 
-            {/* Middle Name */}
             <Col span={12}>
                 <Form.Item
                     name="middleName"
@@ -157,8 +145,6 @@ const RegisterCard = () => {
                 </Form.Item>
             </Col>
         </Row>
-
-        {/* LAST NAME - ALT ALTA (Aynı kalır) */}
         <Form.Item
             name="lastName"
             rules={[{ required: true, message: 'Please enter your last name!' }]}
@@ -171,8 +157,6 @@ const RegisterCard = () => {
             />
         </Form.Item>
 
-
-        {/* E-posta inputu (Aynı kalır) */}
         <Form.Item
           name="email"
           rules={[
@@ -187,8 +171,6 @@ const RegisterCard = () => {
             autoComplete="email" 
           />
         </Form.Item>
-
-        {/* Şifre (Password) inputu (Aynı kalır) */}
         <Form.Item
           name="password"
           rules={[{ required: true, message: 'Please input your Password!' }]}
@@ -202,11 +184,8 @@ const RegisterCard = () => {
           />
         </Form.Item>
         
-        {/* Dinamik Password Checks Bileşeni (Aynı kalır) */}
         <PasswordChecks password={password} /> 
 
-
-        {/* Şifreyi Onayla (Confirm Password) inputu (Aynı kalır) */}
         <Form.Item
           name="confirmPassword"
           dependencies={['password']}
@@ -231,7 +210,6 @@ const RegisterCard = () => {
           />
         </Form.Item>
 
-        {/* Onay ve Şartlar (Aynı kalır) */}
         <Form.Item
           name="agreedToTerms"
           valuePropName="checked"
@@ -246,8 +224,6 @@ const RegisterCard = () => {
                 I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
             </Checkbox>
         </Form.Item>
-
-        {/* Kayıt Butonu (Aynı kalır) */}
         <Form.Item>
           <Button 
             type="primary" 
@@ -260,9 +236,6 @@ const RegisterCard = () => {
           </Button>
         </Form.Item>
       </Form>
-
-
-      {/* Giriş Yap Yönlendirmesi (Aynı kalır) */}
       <div className="login-redirect">
         Already have a Vacanza account? 
         <span onClick={handleLoginRedirect} className="login-link">
