@@ -1,11 +1,10 @@
-// src/pages/auth/RegisterCard.jsx
-
-import React, { useState } from "react";
-import { Form, Input, Button, Checkbox, Row, Col, message } from "antd";
-import {
-  UserOutlined,
-  LockOutlined,
-  MailOutlined,
+import React, { useState } from 'react';
+// Ant Design bileşenleri, hook'ları ve mesajlar
+import { Form, Input, Button, Checkbox, Row, Col, Space, message } from 'antd'; 
+import { 
+  UserOutlined, 
+  LockOutlined, 
+  MailOutlined, 
   SendOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -55,23 +54,35 @@ const RegisterCard = () => {
   const password = Form.useWatch("password", form);
   const [loading, setLoading] = useState(false);
 
+
   const onFinish = async (values) => {
     setLoading(true);
-
-    const { email, password, firstName, lastName } = values;
+    const { email, password, firstName, lastName } = values; 
 
     try {
-      // ✅ Firebase register
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-      // ✅ Set displayName
-      const displayName = `${firstName} ${lastName}`.trim();
-      await updateProfile(userCredential.user, { displayName });
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+        await updateProfile(userCredential.user, {
+            displayName: `${firstName} ${lastName}` 
+        });
+        
+        message.success('Kayıt başarılı! Haritaya yönlendiriliyorsunuz.');
+        console.log('Registration Successful, redirecting to /map');
+        navigate('/map'); 
 
       message.success("Registration successful! Redirecting to the map...");
       navigate("/map");
     } catch (error) {
-      console.error("Firebase registration error:", error);
+        console.error("Firebase Kayıt Hatası:", error.code, error.message);
+        
+        let errorMessage = "Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.";
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = "Bu e-posta adresi zaten kullanımda.";
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = "Geçersiz e-posta formatı.";
+        } else if (error.code === 'auth/weak-password') {
+             errorMessage = "Şifre çok zayıf. Lütfen daha güçlü bir şifre kullanın.";
+        }
 
       // Better messages
       let msg = "Registration failed. Please try again.";
@@ -81,7 +92,7 @@ const RegisterCard = () => {
 
       message.error(msg);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
@@ -105,22 +116,32 @@ const RegisterCard = () => {
         className="auth-form"
       >
         <Row gutter={12}>
-          <Col span={12}>
-            <Form.Item
-              name="firstName"
-              rules={[{ required: true, message: "Please enter your first name!" }]}
-            >
-              <Input prefix={<UserOutlined />} placeholder="First Name" size="large" autoComplete="given-name" />
-            </Form.Item>
-          </Col>
+            <Col span={12}>
+                <Form.Item
+                    name="firstName"
+                    rules={[{ required: true, message: 'Please enter your first name!' }]}
+                >
+                    <Input 
+                        prefix={<UserOutlined />} 
+                        placeholder="First Name" 
+                        size="large"
+                        autoComplete="given-name" 
+                    />
+                </Form.Item>
+            </Col>
 
-          <Col span={12}>
-            <Form.Item name="middleName">
-              <Input prefix={<UserOutlined />} placeholder="Middle Name (Optional)" size="large" />
-            </Form.Item>
-          </Col>
+            <Col span={12}>
+                <Form.Item
+                    name="middleName"
+                >
+                    <Input 
+                        prefix={<UserOutlined />} 
+                        placeholder="Middle Name (Optional)" 
+                        size="large"
+                    />
+                </Form.Item>
+            </Col>
         </Row>
-
         <Form.Item
           name="lastName"
           rules={[{ required: true, message: "Please enter your last name!" }]}
@@ -137,7 +158,6 @@ const RegisterCard = () => {
         >
           <Input prefix={<MailOutlined />} placeholder="Email address" size="large" autoComplete="email" />
         </Form.Item>
-
         <Form.Item
           name="password"
           rules={[{ required: true, message: "Please enter your password!" }]}
@@ -150,8 +170,8 @@ const RegisterCard = () => {
             autoComplete="new-password"
           />
         </Form.Item>
-
-        <PasswordChecks password={password} />
+        
+        <PasswordChecks password={password} /> 
 
         <Form.Item
           name="confirmPassword"
@@ -189,14 +209,12 @@ const RegisterCard = () => {
             I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
           </Checkbox>
         </Form.Item>
-
         <Form.Item>
           <Button type="primary" htmlType="submit" className="cta-button" size="large" loading={loading}>
             Create Account
           </Button>
         </Form.Item>
       </Form>
-
       <div className="login-redirect">
         Already have an account?{" "}
         <span onClick={() => navigate("/login")} className="login-link">
