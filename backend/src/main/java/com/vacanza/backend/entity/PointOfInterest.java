@@ -8,7 +8,13 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "points_of_interest")
+@Table(
+        name = "points_of_interest",
+        indexes = {
+                // 👇 THIS LINE completes the "Composite Index" requirement
+                @Index(name = "idx_poi_location", columnList = "latitude, longitude")
+        }
+)
 @Getter
 @Setter
 @AllArgsConstructor
