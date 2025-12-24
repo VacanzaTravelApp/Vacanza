@@ -1,4 +1,4 @@
-package com.vacanza.backend.runner;
+/*package com.vacanza.backend.runner;
 
 import com.vacanza.backend.entity.PointOfInterest;
 import com.vacanza.backend.repo.PointOfInterestRepository;
@@ -68,4 +68,4 @@ public class SpatialTestRunner implements CommandLineRunner {
             System.out.println("⚠️ FAILURE: Expected 1 place (Ankara), but got " + results.size());
         }
     }
-}
+} */
