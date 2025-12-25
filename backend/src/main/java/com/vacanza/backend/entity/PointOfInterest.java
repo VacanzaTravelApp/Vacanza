@@ -26,7 +26,7 @@ public class PointOfInterest {
     @GeneratedValue
     @UuidGenerator
     @Column(name = "poi_id", updatable = false, nullable = false)
-    private UUID poi_id;
+    private UUID poiId;
 
     @Column(nullable = false, length = 500)
     private String name;
