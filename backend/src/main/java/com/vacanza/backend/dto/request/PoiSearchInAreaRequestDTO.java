@@ -10,18 +10,34 @@ import java.util.List;
 @AllArgsConstructor
 public class PoiSearchInAreaRequestDTO {
 
-    private SelectionType selectionType; // POLYGON ya da BBOX
-
-    private Bbox bbox;                   // selectionType=BBOX için zorunlu
-    private List<LatLng> polygon;        // selectionType=POLYGON için zorunlu
-
-    private List<String> categories;     // optional (boş/null => tüm kategoriler)
-    private Integer page;                // optional (default 0)
-    private Integer limit;               // optional (default 200)
-    private SortType sort;               // optional
-
     public enum SelectionType { POLYGON, BBOX }
-    public enum SortType { DISTANCE_TO_CENTER, RATING_DESC }
+    public enum SortType { RATING_DESC, DISTANCE_TO_CENTER }
+
+    private SelectionType selectionType;
+
+    // selectionType=BBOX ise dolu olmalı
+    private Bbox bbox;
+
+    // selectionType=POLYGON ise dolu olmalı (min 3 point)
+    private List<LatLng> polygon;
+
+    // optional: kategori filtresi (null/empty => filtre yok)
+    private List<String> categories;
+
+    // optional pagination
+    private Integer page;   // default 0
+    private Integer limit;  // default 200, max 500
+
+    // optional sort
+    private SortType sort;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class LatLng {
+        private Double lat;
+        private Double lng;
+    }
 
     @Data
     @NoArgsConstructor
@@ -31,13 +47,5 @@ public class PoiSearchInAreaRequestDTO {
         private Double minLng;
         private Double maxLat;
         private Double maxLng;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class LatLng {
-        private Double lat;
-        private Double lng;
     }
 }

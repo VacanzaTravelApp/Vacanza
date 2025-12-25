@@ -15,51 +15,62 @@ public class PoiAreaRequestValidator {
     private static final int MAX_POLYGON_VERTICES = 200;
 
     public void validate(PoiSearchInAreaRequestDTO req) {
-        if (req == null || req.getSelectionType() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "selectionType is required");
-        }
+        require(req != null, HttpStatus.BAD_REQUEST, "REQ_NULL", "request body is required");
+        require(req.getSelectionType() != null, HttpStatus.BAD_REQUEST, "SELECTION_TYPE_REQUIRED", "selectionType is required");
 
         int page = req.getPage() == null ? 0 : req.getPage();
         int limit = req.getLimit() == null ? DEFAULT_LIMIT : req.getLimit();
 
-        if (page < 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page must be >= 0");
-        if (limit <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be > 0");
-        if (limit > MAX_LIMIT) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "limit is too large");
+        require(page >= 0, HttpStatus.BAD_REQUEST, "PAGE_INVALID", "page must be >= 0");
+        require(limit > 0, HttpStatus.BAD_REQUEST, "LIMIT_INVALID", "limit must be > 0");
+        require(limit <= MAX_LIMIT, HttpStatus.UNPROCESSABLE_ENTITY, "LIMIT_TOO_LARGE", "limit must be <= " + MAX_LIMIT);
 
         if (req.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
-            if (req.getBbox() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bbox is required for BBOX selectionType");
-            }
             validateBbox(req.getBbox());
         } else {
-            List<PoiSearchInAreaRequestDTO.LatLng> polygon = req.getPolygon();
-            if (polygon == null || polygon.size() < 3) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "polygon (min 3 points) is required for POLYGON selectionType");
-            }
-            if (polygon.size() > MAX_POLYGON_VERTICES) {
-                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "polygon has too many vertices");
-            }
-            for (var p : polygon) validateLatLng(p.getLat(), p.getLng());
+            validatePolygon(req.getPolygon());
         }
     }
 
     private void validateBbox(PoiSearchInAreaRequestDTO.Bbox b) {
-        if (b.getMinLat() == null || b.getMinLng() == null || b.getMaxLat() == null || b.getMaxLng() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bbox fields are required");
-        }
+        require(b != null, HttpStatus.BAD_REQUEST, "BBOX_REQUIRED", "bbox is required for selectionType=BBOX");
+
+        require(b.getMinLat() != null && b.getMinLng() != null && b.getMaxLat() != null && b.getMaxLng() != null,
+                HttpStatus.BAD_REQUEST, "BBOX_FIELDS_REQUIRED", "bbox fields (minLat,minLng,maxLat,maxLng) are required");
+
         validateLatLng(b.getMinLat(), b.getMinLng());
         validateLatLng(b.getMaxLat(), b.getMaxLng());
 
-        if (b.getMinLat() > b.getMaxLat() || b.getMinLng() > b.getMaxLng()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bbox min values must be <= max values");
+        require(b.getMinLat() <= b.getMaxLat() && b.getMinLng() <= b.getMaxLng(),
+                HttpStatus.BAD_REQUEST, "BBOX_RANGE_INVALID", "bbox min values must be <= max values");
+    }
+
+    private void validatePolygon(List<PoiSearchInAreaRequestDTO.LatLng> polygon) {
+        require(polygon != null && polygon.size() >= 3,
+                HttpStatus.BAD_REQUEST, "POLYGON_REQUIRED", "polygon (min 3 points) is required for selectionType=POLYGON");
+
+        require(polygon.size() <= MAX_POLYGON_VERTICES,
+                HttpStatus.UNPROCESSABLE_ENTITY, "POLYGON_TOO_MANY_VERTICES", "polygon vertex count must be <= " + MAX_POLYGON_VERTICES);
+
+        for (PoiSearchInAreaRequestDTO.LatLng p : polygon) {
+            require(p != null, HttpStatus.BAD_REQUEST, "POLYGON_POINT_NULL", "polygon point cannot be null");
+            validateLatLng(p.getLat(), p.getLng());
         }
+
+        // İstersen burada “polygon closed mu?” kontrolü de eklenebilir (FE kapatmayabilir, biz kapatmak zorunda değiliz)
+        // self-intersect kontrolü şu an yok (MVP)
     }
 
     private void validateLatLng(Double lat, Double lng) {
-        if (lat == null || lng == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "lat/lng cannot be null");
+        require(lat != null && lng != null, HttpStatus.BAD_REQUEST, "LAT_LNG_REQUIRED", "lat/lng cannot be null");
+        require(lat >= -90 && lat <= 90, HttpStatus.UNPROCESSABLE_ENTITY, "LAT_OUT_OF_RANGE", "lat must be between -90 and 90");
+        require(lng >= -180 && lng <= 180, HttpStatus.UNPROCESSABLE_ENTITY, "LNG_OUT_OF_RANGE", "lng must be between -180 and 180");
+    }
+
+    private void require(boolean condition, HttpStatus status, String code, String message) {
+        if (!condition) {
+            // FE için “hata kodu” gibi okunabilir bir prefix ekliyoruz
+            throw new ResponseStatusException(status, code + ": " + message);
         }
-        if (lat < -90 || lat > 90) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "lat out of range");
-        if (lng < -180 || lng > 180) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "lng out of range");
     }
 }
