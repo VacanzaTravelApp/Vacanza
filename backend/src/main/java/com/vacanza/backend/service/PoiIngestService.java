@@ -1,163 +1,162 @@
 package com.vacanza.backend.service;
 
 import com.vacanza.backend.entity.PointOfInterest;
-
-
 import com.vacanza.backend.integration.GeoapifyClient;
 import com.vacanza.backend.integration.GeoapifyResponse;
 import com.vacanza.backend.repo.PointOfInterestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class PoiIngestService {
-    
+
     private final GeoapifyClient geoapifyClient;
     private final PointOfInterestRepository poiRepository;
 
-    public int ingestFromGeoapifyArea(
-            String filter,
-            List<String> categories,
-            int limit
-    ) {
-        try {
-            GeoapifyResponse resp = geoapifyClient
-                    .search(filter, categories, limit)
-                    .block();
+    /**
+     * Geoapify'den area (rect veya polygon filter) içinde POI çekip DB'ye kaydeder.
+     *
+     * IMPORTANT:
+     * - geoapifyCategories genelde 1 adet category ile çağrılmalı (loop ile).
+     * - DB'de sakladığımız category INTERNAL category olmalı: museum/restaurant/market/cafe/other
+     */
+    @Transactional
+    public int ingestFromGeoapifyArea(String filter, List<String> geoapifyCategories, int limit) {
 
-            if (resp == null || resp.getFeatures() == null) return 0;
+        // Geoapify "categories" parametresi boşsa default verelim
+        List<String> safeGeoapifyCategories =
+                (geoapifyCategories == null || geoapifyCategories.isEmpty())
+                        ? List.of("tourism.sights")
+                        : geoapifyCategories;
 
-            int saved = 0;
+        // Bu ingest çağrısında "biz neyi arattık?" (Geoapify taxonomy)
+        // Örn: "entertainment.museum" veya "catering.restaurant"
+        String requestedGeoapifyCategory = safeGeoapifyCategories.get(0);
 
-            for (var f : resp.getFeatures()) {
-                if (f.getGeometry() == null) continue;
-                if (f.getGeometry().getCoordinates() == null) continue;
+        // "Biz neyi arattık?" → INTERNAL fallback (museum/restaurant/...)
+        // Geoapify response category null gelirse bunu kullanacağız.
+        String fallbackInternalCategory = mapRequestedGeoapifyCategoryToInternal(requestedGeoapifyCategory);
 
-                Double lng = f.getGeometry().getCoordinates().get(0);
-                Double lat = f.getGeometry().getCoordinates().get(1);
+        GeoapifyResponse resp = geoapifyClient
+                .search(filter, safeGeoapifyCategories, limit)
+                .block();
 
-                String externalId = "geoapify:" + f.getProperties().getPlace_id();
+        if (resp == null || resp.getFeatures() == null || resp.getFeatures().isEmpty()) {
+            return 0;
+        }
 
-                PointOfInterest poi = poiRepository
-                        .findByExternalId(externalId)
-                        .orElseGet(PointOfInterest::new);
+        int saved = 0;
 
-                poi.setExternalId(externalId);
-                poi.setName(
-                        f.getProperties().getName() != null
-                                ? f.getProperties().getName()
-                                : "Unnamed"
-                );
-                poi.setCategory(f.getProperties().getCategory());
-                poi.setLatitude(lat);
-                poi.setLongitude(lng);
-                poi.setRating(f.getProperties().getRating());
-                poi.setPriceLevel(f.getProperties().getPrice_level());
-
-                poiRepository.save(poi);
-                saved++;
+        for (GeoapifyResponse.Feature f : resp.getFeatures()) {
+            if (f == null || f.getProperties() == null || f.getGeometry() == null) {
+                continue;
             }
 
-            return saved;
+            // Geoapify coords: [lng, lat]
+            List<Double> coords = f.getGeometry().getCoordinates();
+            if (coords == null || coords.size() < 2 || coords.get(0) == null || coords.get(1) == null) {
+                continue;
+            }
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            return 0; // ingest fail => API 500 olmasın
+            double lng = coords.get(0);
+            double lat = coords.get(1);
+
+            // external id (place_id) null olursa bunu skip et (idempotency için şart)
+            String externalId = f.getProperties().getPlace_id();
+            if (externalId == null || externalId.isBlank()) {
+                continue;
+            }
+
+            // Duplicate kontrolü (DB zaten unique ise yine iyi ama burada da koruyalım)
+            if (poiRepository.existsByExternalId(externalId)) {
+                continue;
+            }
+
+            // Name null gelirse default
+            String name = f.getProperties().getName();
+            if (name == null || name.isBlank()) {
+                name = "Unnamed";
+            }
+
+            // 🔥 EN ÖNEMLİ YER:
+            // Geoapify'nin döndürdüğü category bazen null geliyor.
+            // O zaman "biz ne arattıysak" (fallbackInternalCategory) onu DB'ye yazıyoruz.
+            String geoapifyCategoryFromResponse = f.getProperties().getCategory();
+            String internalCategory = mapGeoapifyResponseCategoryToInternal(
+                    geoapifyCategoryFromResponse,
+                    fallbackInternalCategory
+            );
+
+            PointOfInterest poi = new PointOfInterest();
+            poi.setExternalId(externalId);
+            poi.setName(name);
+            poi.setCategory(internalCategory);
+
+            poi.setLatitude(lat);
+            poi.setLongitude(lng);
+
+            // Opsiyonel alanlar
+            poi.setRating(f.getProperties().getRating());
+            poi.setPriceLevel(f.getProperties().getPrice_level());
+
+            // description vs. varsa burada set edebilirsin
+            // poi.setDescription(...);
+
+            poiRepository.save(poi);
+            saved++;
         }
+
+        return saved;
     }
 
-//    private final OverpassClient overpassClient;
-//    private final PointOfInterestRepository poiRepository;
-//
-//    /**
-//     * Fetch POIs from OSM Overpass within the given bbox and persist them into DB.
-//     *
-//     * Returns:
-//     * - number of saved/updated records
-//     * - 0 if Overpass returns empty or any error happens (so API won't 500)
-//     */
-//    public int ingestFromOverpassBbox(
-//            double minLat,
-//            double minLng,
-//            double maxLat,
-//            double maxLng,
-//            List<String> normalizedCategories,
-//            int limit
-//    ) {
-//        try {
-//            System.out.println("INGEST start (OSM) bbox={minLat=" + minLat
-//                    + ", minLng=" + minLng
-//                    + ", maxLat=" + maxLat
-//                    + ", maxLng=" + maxLng + "} cats=" + normalizedCategories);
-//
-//            OverpassResponse resp = overpassClient.searchByBbox(
-//                    minLat, minLng, maxLat, maxLng, normalizedCategories, limit
-//            );
-//
-//            if (resp == null || resp.getElements() == null) {
-//                System.out.println("INGEST saved=0 (resp/elements null)");
-//                return 0;
-//            }
-//
-//            int saved = 0;
-//
-//            for (var el : resp.getElements()) {
-//                if (el == null) continue;
-//                if (el.getId() == null) continue;
-//
-//                // şimdilik sadece node
-//                if (!"node".equalsIgnoreCase(el.getType())) continue;
-//                if (el.getLat() == null || el.getLon() == null) continue;
-//
-//                Map<String, String> tags = el.getTags();
-//                String name = (tags != null) ? tags.get("name") : null;
-//                if (name == null || name.isBlank()) name = "Unnamed";
-//
-//                // category: tags içinde öncelik amenity/tourism/leisure
-//                String category = extractCategory(tags);
-//                category = (category == null || category.isBlank())
-//                        ? "unknown"
-//                        : category.trim().toLowerCase(Locale.ROOT);
-//
-//                // externalId: OSM node id
-//                String externalId = "osm:node:" + el.getId();
-//
-//                PointOfInterest entity = poiRepository.findByExternalId(externalId)
-//                        .orElseGet(PointOfInterest::new);
-//
-//                entity.setExternalId(externalId);
-//                entity.setName(name);
-//                entity.setCategory(category);
-//                entity.setLatitude(el.getLat());
-//                entity.setLongitude(el.getLon());
-//
-//                // OSM'de rating/price yok → null bırak
-//                // entity.setRating(null);
-//                // entity.setPriceLevel(null);
-//
-//                poiRepository.save(entity);
-//                saved++;
-//            }
-//
-//            System.out.println("INGEST saved=" + saved);
-//            return saved;
-//
-//        } catch (Exception e) {
-//            System.out.println("INGEST failed -> return 0");
-//            e.printStackTrace();
-//            return 0;
-//        }
-//    }
-//
-//    private String extractCategory(Map<String, String> tags) {
-//        if (tags == null) return null;
-//        if (tags.get("amenity") != null) return tags.get("amenity");
-//        if (tags.get("tourism") != null) return tags.get("tourism");
-//        if (tags.get("leisure") != null) return tags.get("leisure");
-//        if (tags.get("shop") != null) return tags.get("shop");
-//        return null;
-//    }
+    /**
+     * "Biz request'te hangi Geoapify category ile arattık?" → INTERNAL category.
+     * Bu fallback olarak kullanılacak (Geoapify response category null gelirse).
+     */
+    private String mapRequestedGeoapifyCategoryToInternal(String requestedGeoapifyCategory) {
+        if (requestedGeoapifyCategory == null) return "other";
+
+        // requested category zaten Geoapify taxonomy
+        if (requestedGeoapifyCategory.startsWith("entertainment.museum")) return "museum";
+        if (requestedGeoapifyCategory.startsWith("catering.restaurant")) return "restaurant";
+        if (requestedGeoapifyCategory.startsWith("catering.cafe")) return "cafe";
+        if (requestedGeoapifyCategory.startsWith("commercial.supermarket")) return "market";
+
+        // tourism.sights gibi geniş şeyler geldiğinde:
+        if (requestedGeoapifyCategory.startsWith("tourism.")) return "other";
+
+        return "other";
+    }
+
+    /**
+     * Geoapify response category → INTERNAL category.
+     * Eğer response category null/unknown gelirse fallbackInternalCategory kullanılır.
+     */
+    private String mapGeoapifyResponseCategoryToInternal(String geoapifyCategoryFromResponse,
+                                                         String fallbackInternalCategory) {
+
+        if (fallbackInternalCategory == null || fallbackInternalCategory.isBlank()) {
+            fallbackInternalCategory = "other";
+        }
+
+        // response category yoksa => fallback
+        if (geoapifyCategoryFromResponse == null || geoapifyCategoryFromResponse.isBlank()) {
+            return fallbackInternalCategory;
+        }
+
+        // response category varsa onu daha doğru eşle
+        if (geoapifyCategoryFromResponse.startsWith("entertainment.museum")) return "museum";
+        if (geoapifyCategoryFromResponse.startsWith("catering.restaurant")) return "restaurant";
+        if (geoapifyCategoryFromResponse.startsWith("catering.cafe")) return "cafe";
+        if (geoapifyCategoryFromResponse.startsWith("commercial.supermarket")) return "market";
+
+        // başka şey geldiyse, yine fallback’e dön (biz ne arattıysak o)
+        return fallbackInternalCategory;
+    }
+
+
 }

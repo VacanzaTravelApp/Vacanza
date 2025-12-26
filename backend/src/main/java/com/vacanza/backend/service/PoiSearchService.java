@@ -11,109 +11,121 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
 public class PoiSearchService implements PoiSearchImpl {
 
-    // ===== Defaults & Guards =====
+    // =====================================================
+    // ===================== CONSTANTS =====================
+    // =====================================================
+
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_LIMIT = 200;
 
-    /**
-     * Hard guard to avoid huge result sets / abuse.
-     */
+    /** Hard guard: UI veya abuse sonucu çok fazla POI dönmesin */
     private static final int MAX_RESULT_COUNT = 5000;
 
-    /**
-     * DB query guard (viewport / user-selection should be small).
-     * area = (maxLat-minLat) * (maxLng-minLng)
-     */
+    /** DB query için maksimum bbox alanı */
     private static final double MAX_BBOX_AREA = 25.0;
 
-    /**
-     * Ingest guard can be larger than DB guard for debugging / initial seed,
-     * but still capped to avoid accidentally pulling too large areas.
-     */
+    /** Ingest için daha geniş ama yine de sınırlı alan */
     private static final double MAX_INGEST_BBOX_AREA = 400.0;
+
+    /** Geoapify polygon karmaşıklık limiti */
+    private static final int MAX_GEOAPIFY_POLYGON_POINTS = 10;
+
+    // =====================================================
+    // ================= DEPENDENCIES ======================
+    // =====================================================
 
     private final PointOfInterestRepository poiRepository;
     private final PoiAreaRequestValidator validator;
     private final PoiIngestService poiIngestService;
 
+    // =====================================================
+    // ============ FRONTEND → GEOAPIFY MAP =================
+    // =====================================================
+
+    /**
+     * Frontend category → Geoapify taxonomy map
+     * Frontend ASLA Geoapify category bilmez.
+     */
+    private static final Map<String, List<String>> GEOAPIFY_CATEGORY_MAP = Map.of(
+            "museum", List.of("tourism.museum"),
+            "restaurant", List.of("catering.restaurant"),
+            "cafe", List.of("catering.cafe"),
+            "bar", List.of("catering.bar"),
+            "hotel", List.of("accommodation.hotel"),
+            "park", List.of("leisure.park"),
+            "cinema", List.of("entertainment.cinema")
+    );
+
+    // =====================================================
+    // ===================== MAIN FLOW =====================
+    // =====================================================
+
     @Override
     public PoiSearchInAreaResponseDTO searchInArea(PoiSearchInAreaRequestDTO request) {
 
-        // 1) Validate request (structure + limits)
+        // 1) Structural + logical validation
         validator.validate(request);
 
-        // 2) Apply defaults
+        // 2) Pagination defaults
         int page = request.getPage() != null ? request.getPage() : DEFAULT_PAGE;
         int limit = request.getLimit() != null ? request.getLimit() : DEFAULT_LIMIT;
 
-        // 3) Resolve selection -> bbox
+        // 3) Resolve bbox (polygon → bbox if needed)
         PoiSearchInAreaRequestDTO.Bbox bbox = resolveBbox(request);
 
-        // 4) DB abuse guard (small viewport expected)
+        // 4) DB safety guard
         guardBboxSize(bbox);
 
-        // 5) Normalize categories for case-insensitive filter
-        List<String> normalizedCategories =
-                (request.getCategories() == null) ? List.of()
+        // 5) Normalize FRONTEND categories (DB filter için)
+        List<String> dbCategories =
+                request.getCategories() == null
+                        ? List.of()
                         : request.getCategories().stream()
                         .map(PoiSearchService::normalizeCategory)
-                        .filter(c -> c != null && !c.isBlank())
+                        .filter(s -> s != null && !s.isBlank())
                         .distinct()
                         .toList();
 
-        // 6) Fetch ALL matching POIs (before pagination)
-        List<PointOfInterest> all = fetchByBbox(bbox, normalizedCategories);
+        // 6) Fetch from DB first
+        List<PointOfInterest> all = fetchByBbox(bbox, dbCategories);
         System.out.println("FETCH RESULT SIZE = " + all.size());
 
-
-        // ---------------------------------------------------------------------
-        // 7) If DB is empty for this area → INGEST ONCE → re-query DB
-        // ---------------------------------------------------------------------
-
+        // =================================================
+        // 7) DB EMPTY → INGEST FROM GEOAPIFY
+        // =================================================
         if (all.isEmpty()) {
+
             guardIngestBboxSize(bbox);
 
-            // -----------------------------
-            // OLD (OSM / Overpass) — DISABLED
-            // -----------------------------
-            /*
-            int saved = poiIngestService.ingestFromOverpassBbox(
-                    bbox.getMinLat(), bbox.getMinLng(),
-                    bbox.getMaxLat(), bbox.getMaxLng(),
-                    normalizedCategories,
-                    500
-            );
-            */
+            // Geoapify filter (polygon or bbox, safe)
+            String geoapifyFilter = buildGeoapifyFilter(request);
+            System.out.println("DB EMPTY -> INGEST (GEOAPIFY) filter=" + geoapifyFilter);
 
-            // -----------------------------
-            // NEW (Geoapify)
-            // -----------------------------
-            String filter = buildGeoapifyFilter(request, bbox);
-
-            System.out.println("DB EMPTY -> INGEST (GEOAPIFY) filter=" + filter);
+            // 🔥 EN KRİTİK NOKTA:
+            // Frontend categories → Geoapify categories
+            List<String> geoapifyCategories =
+                    mapToGeoapifyCategories(request.getCategories());
 
             int saved = poiIngestService.ingestFromGeoapifyArea(
-                    filter,
-                    normalizedCategories,
-                    500
+                    geoapifyFilter,
+                    geoapifyCategories,
+                    20
             );
 
             System.out.println("INGEST saved=" + saved);
 
-            // Re-fetch from DB after ingest
-            all = fetchByBbox(bbox, normalizedCategories);
+            // Re-fetch after ingest
+            all = fetchByBbox(bbox, dbCategories);
         }
 
-        // 8) Guard: too many results even after DB filtering
+        // 8) Hard guard
         if (all.size() > MAX_RESULT_COUNT) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
@@ -121,22 +133,24 @@ public class PoiSearchService implements PoiSearchImpl {
             );
         }
 
-        // 9) Sorting (null-safe)
-        PoiSearchInAreaRequestDTO.SortType sortType =
+        // 9) Sorting
+        PoiSearchInAreaRequestDTO.SortType sort =
                 request.getSort() != null
                         ? request.getSort()
                         : PoiSearchInAreaRequestDTO.SortType.RATING_DESC;
 
-        if (sortType == PoiSearchInAreaRequestDTO.SortType.DISTANCE_TO_CENTER) {
+        if (sort == PoiSearchInAreaRequestDTO.SortType.DISTANCE_TO_CENTER) {
             sortByDistanceToBboxCenter(all, bbox);
         } else {
-            all.sort(Comparator.comparing(
-                    PointOfInterest::getRating,
-                    Comparator.nullsLast(Double::compareTo)
-            ).reversed());
+            all.sort(
+                    Comparator.comparing(
+                            PointOfInterest::getRating,
+                            Comparator.nullsLast(Double::compareTo)
+                    ).reversed()
+            );
         }
 
-        // 10) countsByCategory calculated from TOTAL results (before pagination)
+        // 10) countsByCategory (UI filter panel için)
         Map<String, Integer> countsByCategory = all.stream()
                 .collect(Collectors.groupingBy(
                         p -> normalizeCategory(p.getCategory()),
@@ -148,23 +162,23 @@ public class PoiSearchService implements PoiSearchImpl {
         int to = Math.min(from + limit, all.size());
         List<PointOfInterest> pageItems = all.subList(from, to);
 
-        // 12) Map entity -> summary DTO
-        List<PoiSearchInAreaResponseDTO.PoiSummaryDTO> summaries =
+        // 12) Entity → DTO
+        List<PoiSearchInAreaResponseDTO.PoiSummaryDTO> pois =
                 pageItems.stream()
                         .map(this::toSummary)
                         .toList();
 
-        // 13) Build response
+        // 13) Response
         return PoiSearchInAreaResponseDTO.builder()
                 .count(all.size())
-                .pois(summaries)
+                .pois(pois)
                 .countsByCategory(countsByCategory)
                 .build();
     }
 
-    // ======================================================================
-    // ============================ HELPERS ==================================
-    // ======================================================================
+    // =====================================================
+    // ===================== HELPERS =======================
+    // =====================================================
 
     private PoiSearchInAreaRequestDTO.Bbox resolveBbox(PoiSearchInAreaRequestDTO request) {
         if (request.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
@@ -173,11 +187,9 @@ public class PoiSearchService implements PoiSearchImpl {
         return bboxFromPolygon(request.getPolygon());
     }
 
-    private static String normalizeCategory(String s) {
-        return (s == null) ? null : s.trim().toLowerCase(java.util.Locale.ROOT);
-    }
-
-    private PoiSearchInAreaRequestDTO.Bbox bboxFromPolygon(List<PoiSearchInAreaRequestDTO.LatLng> polygon) {
+    private PoiSearchInAreaRequestDTO.Bbox bboxFromPolygon(
+            List<PoiSearchInAreaRequestDTO.LatLng> polygon
+    ) {
         double minLat = Double.POSITIVE_INFINITY;
         double minLng = Double.POSITIVE_INFINITY;
         double maxLat = Double.NEGATIVE_INFINITY;
@@ -194,16 +206,18 @@ public class PoiSearchService implements PoiSearchImpl {
     }
 
     private void guardBboxSize(PoiSearchInAreaRequestDTO.Bbox bbox) {
-        double area = (bbox.getMaxLat() - bbox.getMinLat())
-                * (bbox.getMaxLng() - bbox.getMinLng());
+        double area =
+                (bbox.getMaxLat() - bbox.getMinLat())
+                        * (bbox.getMaxLng() - bbox.getMinLng());
         if (area > MAX_BBOX_AREA) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "BBOX_TOO_LARGE");
         }
     }
 
     private void guardIngestBboxSize(PoiSearchInAreaRequestDTO.Bbox bbox) {
-        double area = (bbox.getMaxLat() - bbox.getMinLat())
-                * (bbox.getMaxLng() - bbox.getMinLng());
+        double area =
+                (bbox.getMaxLat() - bbox.getMinLat())
+                        * (bbox.getMaxLng() - bbox.getMinLng());
         if (area > MAX_INGEST_BBOX_AREA) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "INGEST_BBOX_TOO_LARGE");
         }
@@ -213,7 +227,7 @@ public class PoiSearchService implements PoiSearchImpl {
             PoiSearchInAreaRequestDTO.Bbox bbox,
             List<String> categories
     ) {
-        if (categories == null || categories.isEmpty()) {
+        if (categories.isEmpty()) {
             return poiRepository.findByLatitudeBetweenAndLongitudeBetween(
                     bbox.getMinLat(), bbox.getMaxLat(),
                     bbox.getMinLng(), bbox.getMaxLng()
@@ -264,24 +278,89 @@ public class PoiSearchService implements PoiSearchImpl {
                 .build();
     }
 
+    private static String normalizeCategory(String s) {
+        return s == null ? null : s.trim().toLowerCase();
+    }
+
     /**
-     * Builds Geoapify filter string from request.
-     *
-     * BBOX    -> rect:minLon,minLat,maxLon,maxLat
-     * POLYGON -> polygon:lng lat,lng lat,lng lat
+     * Builds Geoapify filter safely.
+     * - POLYGON çok karmaşıksa → bbox fallback
+     * - Locale.US → decimal separator fix
      */
-    private String buildGeoapifyFilter(
-            PoiSearchInAreaRequestDTO request,
-            PoiSearchInAreaRequestDTO.Bbox bbox
-    ) {
-        if (request.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
-            return "rect:"
-                    + bbox.getMinLng() + "," + bbox.getMinLat() + ","
-                    + bbox.getMaxLng() + "," + bbox.getMaxLat();
+    private String buildGeoapifyFilter(PoiSearchInAreaRequestDTO req) {
+
+        if (req.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
+            var b = req.getBbox();
+            return String.format(
+                    Locale.US,
+                    "rect:%f,%f,%f,%f",
+                    b.getMinLng(),
+                    b.getMinLat(),
+                    b.getMaxLng(),
+                    b.getMaxLat()
+            );
         }
 
-        return "polygon:" + request.getPolygon().stream()
-                .map(p -> p.getLng() + " " + p.getLat())
-                .collect(Collectors.joining(","));
+        var polygon = req.getPolygon();
+        if (polygon == null || polygon.size() < 3) {
+            throw new IllegalArgumentException("Polygon must have at least 3 points");
+        }
+
+        // Geoapify polygon complexity guard
+        if (polygon.size() > MAX_GEOAPIFY_POLYGON_POINTS) {
+            var bbox = bboxFromPolygon(polygon);
+            return String.format(
+                    Locale.US,
+                    "rect:%f,%f,%f,%f",
+                    bbox.getMinLng(),
+                    bbox.getMinLat(),
+                    bbox.getMaxLng(),
+                    bbox.getMaxLat()
+            );
+        }
+
+        StringBuilder sb = new StringBuilder("polygon:");
+        for (int i = 0; i < polygon.size(); i++) {
+            var p = polygon.get(i);
+            sb.append(p.getLng()).append(" ").append(p.getLat());
+            if (i < polygon.size() - 1) sb.append(",");
+        }
+
+        return sb.toString();
     }
+
+    /**
+     * Frontend categories → Geoapify taxonomy
+     * Eğer frontend boş gönderirse default sights kullanılır.
+     */
+    private List<String> mapToGeoapifyCategories(List<String> frontendCategories) {
+
+        if (frontendCategories == null || frontendCategories.isEmpty()) {
+            return List.of("tourism.sights");
+        }
+
+        List<String> result = new ArrayList<>();
+
+        for (String c : frontendCategories) {
+            switch (c.toLowerCase()) {
+                case "museum" -> result.add("entertainment.museum"); // 🔥 FIX
+                case "restaurant" -> result.add("catering.restaurant");
+                case "cafe" -> result.add("catering.cafe");
+                case "supermarket", "market" -> result.add("commercial.supermarket");
+            }
+        }
+
+        if (result.isEmpty()) {
+            result.add("tourism.sights");
+        }
+
+        return result;
+    }
+
+
+
+
+
+
+
 }

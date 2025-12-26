@@ -96,9 +96,9 @@ public class WebClientConfig {
             var newUrl = UriComponentsBuilder
                     .fromUri(request.url())
                     .queryParam("apiKey", props.getApiKey())
-                    .build(true)
+                    .build(false)
                     .toUri();
-
+            System.out.println("🔥 FINAL GEOAPIFY URL = " + newUrl);
             var newRequest = ClientRequest
                     .from(request)
                     .url(newUrl)
