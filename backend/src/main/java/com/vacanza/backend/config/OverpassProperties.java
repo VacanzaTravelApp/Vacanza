@@ -6,8 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Getter
 @Setter
-@ConfigurationProperties(prefix = "foursquare")
-public class FoursquareProperties {
-    private String baseUrl;
-    private String apiKey;
+@ConfigurationProperties(prefix = "overpass")
+public class OverpassProperties {
+    private String baseUrl = "https://overpass-api.de/api";
 }

@@ -24,13 +24,16 @@ import java.util.List;
  * Validates Firebase ID Token sent by frontend:
  * Authorization: Bearer <firebase_id_token>
  *
- * If valid:
- * - sync user to DB (users table)
- * - sets SecurityContext principal = firebaseUid, authority = ROLE_*
- * - sets request attributes: firebaseEmail, firebaseEmailVerified
- *
- * If invalid:
- * - responds 401 Unauthorized
+ * Behavior:
+ * - OPTIONS (preflight) requests are always allowed.
+ * - If Authorization header is missing or not Bearer => do nothing, continue filter chain.
+ *   (SecurityConfig decides if endpoint is public or requires authentication.)
+ * - If Bearer token is present:
+ *   - verify token using Firebase Admin SDK
+ *   - ensure user exists in DB (users table)
+ *   - set SecurityContext principal=firebaseUid, authority=ROLE_*
+ *   - attach request attributes: firebaseEmail, firebaseEmailVerified
+ * - If Bearer token is present but invalid/expired => 401
  */
 @Component
 public class FirebaseTokenFilter extends OncePerRequestFilter {
@@ -54,16 +57,16 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             return;
         }
 
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+
+        // No bearer -> just continue.
+        // Public endpoints will succeed; protected endpoints will be blocked by SecurityConfig.
+        if (header == null || !header.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
-            String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-
-            // No bearer -> just continue.
-            // Endpoints that require auth will fail in CurrentUserProvider / SecurityConfig.
-            if (header == null || !header.startsWith("Bearer ")) {
-                filterChain.doFilter(request, response);
-                return;
-            }
-
             String token = header.substring("Bearer ".length()).trim();
 
             // Verify Firebase ID token (throws if invalid/expired)
@@ -79,7 +82,6 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
                             User.builder()
                                     .firebaseUid(uid)
                                     // If email is null, set a safe placeholder to avoid null constraints.
-                                    // (If you have unique constraint on email, consider a separate nullable column.)
                                     .email(email != null ? email : ("uid:" + uid))
                                     .role(Role.USER)
                                     .build()
@@ -103,7 +105,7 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
 
         } catch (Exception ex) {
-            // Token invalid/expired/verification failed
+            // Token invalid/expired/verification failed (only when Bearer is present)
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         }
     }

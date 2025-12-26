@@ -26,7 +26,6 @@ public class PoiSearchService implements PoiSearchImpl {
 
     /**
      * Hard guard to avoid huge result sets / abuse.
-     * If you expect more, raise carefully or add better paging.
      */
     private static final int MAX_RESULT_COUNT = 5000;
 
@@ -38,8 +37,7 @@ public class PoiSearchService implements PoiSearchImpl {
 
     /**
      * Ingest guard can be larger than DB guard for debugging / initial seed,
-     * but still capped to avoid accidentally pulling the entire world.
-     * Tune this after MVP.
+     * but still capped to avoid accidentally pulling too large areas.
      */
     private static final double MAX_INGEST_BBOX_AREA = 400.0;
 
@@ -76,14 +74,22 @@ public class PoiSearchService implements PoiSearchImpl {
         List<PointOfInterest> all = fetchByBbox(bbox, normalizedCategories);
 
         // 7) If DB is empty for this area: ingest from Foursquare once, persist, then re-query DB
-        // NOTE: Ingest uses a separate guard to allow slightly bigger areas during seeding/debug.
+        // NOTE: ingest may return 0 on 429/401/etc. (PoiIngestService handles it and won't 500)
+        // 7) If DB is empty for this area: ingest from OSM once, persist, then re-query DB
+
         if (all.isEmpty()) {
             guardIngestBboxSize(bbox);
 
-            poiIngestService.ingestFromFoursquareBbox(
+            System.out.println("DB EMPTY -> INGEST (OSM) bbox=" + bbox);
+
+            int saved = poiIngestService.ingestFromOverpassBbox(
                     bbox.getMinLat(), bbox.getMinLng(),
-                    bbox.getMaxLat(), bbox.getMaxLng()
+                    bbox.getMaxLat(), bbox.getMaxLng(),
+                    normalizedCategories,
+                    500 // ingest limit (istersen 200 de yap)
             );
+
+            System.out.println("INGEST saved=" + saved);
 
             all = fetchByBbox(bbox, normalizedCategories);
         }
@@ -112,7 +118,6 @@ public class PoiSearchService implements PoiSearchImpl {
         }
 
         // 10) countsByCategory should be calculated from TOTAL results (before pagination)
-        // (UI filter panel typically needs full counts)
         Map<String, Integer> countsByCategory = all.stream()
                 .collect(Collectors.groupingBy(
                         p -> normalizeCategory(p.getCategory()),

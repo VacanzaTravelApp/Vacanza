@@ -40,6 +40,7 @@ public class SecurityConfigNonDev {
                 }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/health", "/error").permitAll()
+                        .requestMatchers("/pois/**").permitAll()   // POI endpoints public
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class);

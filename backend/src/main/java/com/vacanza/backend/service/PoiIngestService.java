@@ -1,56 +1,109 @@
 package com.vacanza.backend.service;
 
 import com.vacanza.backend.entity.PointOfInterest;
-import com.vacanza.backend.integration.FoursquarePlacesClient;
-import com.vacanza.backend.integration.FsqPlacesSearchResponse;
+import com.vacanza.backend.integration.OverpassClient;
+import com.vacanza.backend.integration.OverpassResponse;
 import com.vacanza.backend.repo.PointOfInterestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class PoiIngestService {
 
-    private final FoursquarePlacesClient foursquareClient;
+    private final OverpassClient overpassClient;
     private final PointOfInterestRepository poiRepository;
 
-    public int ingestFromFoursquareBbox(double minLat, double minLng, double maxLat, double maxLng) {
-        FsqPlacesSearchResponse resp = foursquareClient.searchByBbox(minLat, minLng, maxLat, maxLng, 50);
-        if (resp == null || resp.getResults() == null) return 0;
+    /**
+     * Fetch POIs from OSM Overpass within the given bbox and persist them into DB.
+     *
+     * Returns:
+     * - number of saved/updated records
+     * - 0 if Overpass returns empty or any error happens (so API won't 500)
+     */
+    public int ingestFromOverpassBbox(
+            double minLat,
+            double minLng,
+            double maxLat,
+            double maxLng,
+            List<String> normalizedCategories,
+            int limit
+    ) {
+        try {
+            System.out.println("INGEST start (OSM) bbox={minLat=" + minLat
+                    + ", minLng=" + minLng
+                    + ", maxLat=" + maxLat
+                    + ", maxLng=" + maxLng + "} cats=" + normalizedCategories);
 
-        int saved = 0;
+            OverpassResponse resp = overpassClient.searchByBbox(
+                    minLat, minLng, maxLat, maxLng, normalizedCategories, limit
+            );
 
-        for (var p : resp.getResults()) {
-            if (p.getFsqId() == null) continue;
-            if (p.getGeocodes() == null || p.getGeocodes().getMain() == null) continue;
-            if (p.getGeocodes().getMain().getLatitude() == null || p.getGeocodes().getMain().getLongitude() == null) continue;
-
-            String categoryName = null;
-            if (p.getCategories() != null && !p.getCategories().isEmpty() && p.getCategories().get(0) != null) {
-                categoryName = p.getCategories().get(0).getName();
-                if (categoryName != null) categoryName = categoryName.trim().toLowerCase(Locale.ROOT);
+            if (resp == null || resp.getElements() == null) {
+                System.out.println("INGEST saved=0 (resp/elements null)");
+                return 0;
             }
-            if (categoryName == null || categoryName.isBlank()) categoryName = "unknown";
 
-            PointOfInterest entity = poiRepository.findByExternalId(p.getFsqId())
-                    .orElseGet(PointOfInterest::new);
+            int saved = 0;
 
-            entity.setExternalId(p.getFsqId());
-            entity.setName(p.getName() != null ? p.getName() : "Unnamed");
-            entity.setCategory(categoryName);
-            entity.setLatitude(p.getGeocodes().getMain().getLatitude());
-            entity.setLongitude(p.getGeocodes().getMain().getLongitude());
+            for (var el : resp.getElements()) {
+                if (el == null) continue;
+                if (el.getId() == null) continue;
 
-            // optional mappings
-            entity.setRating(p.getRating());
-            if (p.getPrice() != null) entity.setPriceLevel(String.valueOf(p.getPrice()));
+                // şimdilik sadece node
+                if (!"node".equalsIgnoreCase(el.getType())) continue;
+                if (el.getLat() == null || el.getLon() == null) continue;
 
-            poiRepository.save(entity);
-            saved++;
+                Map<String, String> tags = el.getTags();
+                String name = (tags != null) ? tags.get("name") : null;
+                if (name == null || name.isBlank()) name = "Unnamed";
+
+                // category: tags içinde öncelik amenity/tourism/leisure
+                String category = extractCategory(tags);
+                category = (category == null || category.isBlank())
+                        ? "unknown"
+                        : category.trim().toLowerCase(Locale.ROOT);
+
+                // externalId: OSM node id
+                String externalId = "osm:node:" + el.getId();
+
+                PointOfInterest entity = poiRepository.findByExternalId(externalId)
+                        .orElseGet(PointOfInterest::new);
+
+                entity.setExternalId(externalId);
+                entity.setName(name);
+                entity.setCategory(category);
+                entity.setLatitude(el.getLat());
+                entity.setLongitude(el.getLon());
+
+                // OSM'de rating/price yok → null bırak
+                // entity.setRating(null);
+                // entity.setPriceLevel(null);
+
+                poiRepository.save(entity);
+                saved++;
+            }
+
+            System.out.println("INGEST saved=" + saved);
+            return saved;
+
+        } catch (Exception e) {
+            System.out.println("INGEST failed -> return 0");
+            e.printStackTrace();
+            return 0;
         }
+    }
 
-        return saved;
+    private String extractCategory(Map<String, String> tags) {
+        if (tags == null) return null;
+        if (tags.get("amenity") != null) return tags.get("amenity");
+        if (tags.get("tourism") != null) return tags.get("tourism");
+        if (tags.get("leisure") != null) return tags.get("leisure");
+        if (tags.get("shop") != null) return tags.get("shop");
+        return null;
     }
 }
