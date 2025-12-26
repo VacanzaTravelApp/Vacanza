@@ -13,8 +13,6 @@ import '../../bloc/map_bloc.dart';
 import '../../bloc/map_event.dart';
 import '../../bloc/map_state.dart';
 
-
-
 class MapCanvasMapbox extends StatefulWidget {
   const MapCanvasMapbox({super.key});
 
@@ -24,6 +22,8 @@ class MapCanvasMapbox extends StatefulWidget {
 
 class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   MapboxMap? _map;
+
+  bool _initialViewportSent = false;
 
   Timer? _debounce;
   static const Duration _debounceDuration = Duration(milliseconds: 500);
@@ -38,7 +38,8 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   Widget build(BuildContext context) {
     return BlocListener<MapBloc, MapState>(
       listenWhen: (prev, next) =>
-      prev.viewMode != next.viewMode || prev.recenterTick != next.recenterTick,
+      prev.viewMode != next.viewMode ||
+          prev.recenterTick != next.recenterTick,
       listener: (context, state) async {
         if (_map == null) return;
 
@@ -53,7 +54,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       child: MapWidget(
         key: const ValueKey('mapbox-map'),
         cameraOptions: MapboxConfig.initialCamera,
-        styleUri: MapboxConfig.styleStandard, // ilk açılış
+        styleUri: MapboxConfig.styleStandard,
         onMapCreated: (mapboxMap) async {
           _map = mapboxMap;
 
@@ -64,14 +65,17 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
           if (mounted) {
             context.read<MapBloc>().add(MapInitialized(mapboxMap));
           }
-
-          // ✅ VACANZA-200: ilk açılışta 1 kere viewport bbox üret
-          await _emitViewportBboxNow();
         },
 
-        // ✅ VACANZA-200: pan/zoom bitince debounce ile bbox üret
-        // Eğer sende bu callback yoksa IDE autocomplete ile "idle" olanı seç.
+        // ✅ VACANZA-200:
+        // - İlk açılışta 1 kere bbox üret
+        // - Pan/zoom bitince debounce ile bbox üret
         onMapIdleListener: (_) {
+          if (!_initialViewportSent) {
+            _initialViewportSent = true;
+            unawaited(_emitViewportBboxNow());
+            return;
+          }
           _scheduleViewportBbox();
         },
       ),
@@ -84,8 +88,8 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
   void _scheduleViewportBbox() {
     _debounce?.cancel();
-    _debounce = Timer(_debounceDuration, () async {
-      await _emitViewportBboxNow();
+    _debounce = Timer(_debounceDuration, () {
+      unawaited(_emitViewportBboxNow());
     });
   }
 
@@ -106,7 +110,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       // 1) Şu anki kamerayı al
       final cs = await _map!.getCameraState();
 
-      // 2) Bu kamera için ekranda görünen koordinat bounds'unu hesapla (Viewport!)
+      // 2) Bu kamera için viewport bounds hesapla
       final CoordinateBounds cb = await _map!.coordinateBoundsForCamera(
         CameraOptions(
           center: cs.center,
@@ -116,9 +120,9 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
         ),
       );
 
-      // 3) CoordinateBounds -> SW/NE
-      final sw = cb.southwest.coordinates; // (lng, lat)
-      final ne = cb.northeast.coordinates; // (lng, lat)
+      // 3) CoordinateBounds -> SW/NE (lng, lat)
+      final sw = cb.southwest.coordinates;
+      final ne = cb.northeast.coordinates;
 
       final minLng = (sw[0] as num).toDouble();
       final minLat = (sw[1] as num).toDouble();
@@ -140,36 +144,24 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   // Existing: View Mode / Camera
   // ----------------------------------------------------------
 
-  /// ✅ Mode'a göre:
-  /// - 2D: Standard + show3dObjects=false + pitch=0
-  /// - 3D: Standard + show3dObjects=true  + pitch=60 + zoom=16
-  /// - SAT: Standard Satellite
   Future<void> _applyViewMode(MapViewMode mode) async {
     if (_map == null) return;
 
-    // 1) Style seç
     final String styleUri = (mode == MapViewMode.satellite)
         ? MapboxConfig.styleStandardSatellite
         : MapboxConfig.styleStandard;
 
-    // Style değişecekse önce load et
     await _map!.loadStyleURI(styleUri);
 
-    // 2) Standard style config
     final bool enable3D = (mode == MapViewMode.mode3D);
 
-    // Satellite style’da bu config her zaman uygulanmayabilir,
-    // o yüzden sadece Standard’da deneyelim.
     if (styleUri == MapboxConfig.styleStandard) {
       await _map!.style.setStyleImportConfigProperties(
         "basemap",
-        <String, Object>{
-          "show3dObjects": enable3D,
-        },
+        <String, Object>{"show3dObjects": enable3D},
       );
     }
 
-    // 3) Kamera uygula
     final CameraOptions camera =
     enable3D ? MapboxConfig.camera3D : MapboxConfig.camera2D;
 
