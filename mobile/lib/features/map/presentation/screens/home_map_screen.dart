@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../poi_search/data/api/poi_search_in_area_request_dto.dart';
+import '../../../poi_search/data/api/poi_search_api_client.dart';
+import '../../../poi_search/data/api/poi_search_in_area_request_dto.dart'; // PoiSort buradan geliyor
+import '../../../poi_search/data/repositories/poi_search_repository.dart';
+import '../../../poi_search/data/repositories/poi_search_repository_impl.dart';
 import '../../../poi_search/presentation/bloc/area_query_bloc.dart';
 import '../../../poi_search/presentation/bloc/area_query_state.dart';
 import '../../../poi_search/presentation/bloc/poi_search_bloc.dart';
-import '../../../poi_search/data/api/poi_search_api_client.dart';
 
 import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
@@ -17,19 +19,27 @@ class HomeMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
+    return MultiRepositoryProvider(
       providers: [
-        BlocProvider<MapBloc>(create: (_) => MapBloc()),
-        BlocProvider<AreaQueryBloc>(create: (_) => AreaQueryBloc()),
-
-        // ✅ yeni: POI search bloc
-        BlocProvider<PoiSearchBloc>(
-          create: (ctx) => PoiSearchBloc(
-            api: ctx.read<PoiSearchApiClient>(),
+        RepositoryProvider<PoiSearchRepository>(
+          create: (ctx) => PoiSearchRepositoryImpl(
+            ctx.read<PoiSearchApiClient>(),
           ),
         ),
       ],
-      child: const _HomeMapView(),
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<MapBloc>(create: (_) => MapBloc()),
+          BlocProvider<AreaQueryBloc>(create: (_) => AreaQueryBloc()),
+
+          BlocProvider<PoiSearchBloc>(
+            create: (ctx) => PoiSearchBloc(
+              repo: ctx.read<PoiSearchRepository>(),
+            ),
+          ),
+        ],
+        child: const _HomeMapView(),
+      ),
     );
   }
 }
@@ -41,7 +51,6 @@ class _HomeMapView extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocListener(
       listeners: [
-        // ✅ Area değişince otomatik search
         BlocListener<AreaQueryBloc, AreaQueryState>(
           listenWhen: (prev, next) => prev.context != next.context,
           listener: (context, state) {
@@ -49,13 +58,9 @@ class _HomeMapView extends StatelessWidget {
 
             context.read<PoiSearchBloc>().fetchForArea(
               area: state.context.area,
-              // şimdilik boş bırakıyoruz (task: opsiyonel)
-              // categories: selectedCategories,
-              // sort: PoiSort.distanceToCenter,
-              // limit: 200,
-               categories: const ["museum", "restaurant"], // ✅ mock
-                sort: PoiSort.distanceToCenter,            // opsiyonel ama test için iyi
-                limit: 200,
+              categories: const ["museum", "restaurant"], // mock
+              sort: PoiSort.distanceToCenter,
+              limit: 200,
             );
           },
         ),
@@ -65,9 +70,12 @@ class _HomeMapView extends StatelessWidget {
           return HomeMapScaffold(
             mode: state.viewMode,
             isDrawing: state.isDrawing,
-            onToggleMode: () => context.read<MapBloc>().add(const ToggleViewModePressed()),
-            onRecenter: () => context.read<MapBloc>().add(const RecenterPressed()),
-            onToggleDrawing: () => context.read<MapBloc>().add(ToggleDrawingPressed()),
+            onToggleMode: () =>
+                context.read<MapBloc>().add(const ToggleViewModePressed()),
+            onRecenter: () =>
+                context.read<MapBloc>().add(const RecenterPressed()),
+            onToggleDrawing: () =>
+                context.read<MapBloc>().add(ToggleDrawingPressed()),
           );
         },
       ),
