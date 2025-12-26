@@ -72,25 +72,44 @@ public class PoiSearchService implements PoiSearchImpl {
 
         // 6) Fetch ALL matching POIs (before pagination)
         List<PointOfInterest> all = fetchByBbox(bbox, normalizedCategories);
+        System.out.println("FETCH RESULT SIZE = " + all.size());
 
-        // 7) If DB is empty for this area: ingest from Foursquare once, persist, then re-query DB
-        // NOTE: ingest may return 0 on 429/401/etc. (PoiIngestService handles it and won't 500)
-        // 7) If DB is empty for this area: ingest from OSM once, persist, then re-query DB
+
+        // ---------------------------------------------------------------------
+        // 7) If DB is empty for this area → INGEST ONCE → re-query DB
+        // ---------------------------------------------------------------------
 
         if (all.isEmpty()) {
             guardIngestBboxSize(bbox);
 
-            System.out.println("DB EMPTY -> INGEST (OSM) bbox=" + bbox);
-
+            // -----------------------------
+            // OLD (OSM / Overpass) — DISABLED
+            // -----------------------------
+            /*
             int saved = poiIngestService.ingestFromOverpassBbox(
                     bbox.getMinLat(), bbox.getMinLng(),
                     bbox.getMaxLat(), bbox.getMaxLng(),
                     normalizedCategories,
-                    500 // ingest limit (istersen 200 de yap)
+                    500
+            );
+            */
+
+            // -----------------------------
+            // NEW (Geoapify)
+            // -----------------------------
+            String filter = buildGeoapifyFilter(request, bbox);
+
+            System.out.println("DB EMPTY -> INGEST (GEOAPIFY) filter=" + filter);
+
+            int saved = poiIngestService.ingestFromGeoapifyArea(
+                    filter,
+                    normalizedCategories,
+                    500
             );
 
             System.out.println("INGEST saved=" + saved);
 
+            // Re-fetch from DB after ingest
             all = fetchByBbox(bbox, normalizedCategories);
         }
 
@@ -117,7 +136,7 @@ public class PoiSearchService implements PoiSearchImpl {
             ).reversed());
         }
 
-        // 10) countsByCategory should be calculated from TOTAL results (before pagination)
+        // 10) countsByCategory calculated from TOTAL results (before pagination)
         Map<String, Integer> countsByCategory = all.stream()
                 .collect(Collectors.groupingBy(
                         p -> normalizeCategory(p.getCategory()),
@@ -143,7 +162,9 @@ public class PoiSearchService implements PoiSearchImpl {
                 .build();
     }
 
-    // ===== Helpers =====
+    // ======================================================================
+    // ============================ HELPERS ==================================
+    // ======================================================================
 
     private PoiSearchInAreaRequestDTO.Bbox resolveBbox(PoiSearchInAreaRequestDTO request) {
         if (request.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
@@ -173,20 +194,25 @@ public class PoiSearchService implements PoiSearchImpl {
     }
 
     private void guardBboxSize(PoiSearchInAreaRequestDTO.Bbox bbox) {
-        double area = (bbox.getMaxLat() - bbox.getMinLat()) * (bbox.getMaxLng() - bbox.getMinLng());
+        double area = (bbox.getMaxLat() - bbox.getMinLat())
+                * (bbox.getMaxLng() - bbox.getMinLng());
         if (area > MAX_BBOX_AREA) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "BBOX_TOO_LARGE");
         }
     }
 
     private void guardIngestBboxSize(PoiSearchInAreaRequestDTO.Bbox bbox) {
-        double area = (bbox.getMaxLat() - bbox.getMinLat()) * (bbox.getMaxLng() - bbox.getMinLng());
+        double area = (bbox.getMaxLat() - bbox.getMinLat())
+                * (bbox.getMaxLng() - bbox.getMinLng());
         if (area > MAX_INGEST_BBOX_AREA) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "INGEST_BBOX_TOO_LARGE");
         }
     }
 
-    private List<PointOfInterest> fetchByBbox(PoiSearchInAreaRequestDTO.Bbox bbox, List<String> categories) {
+    private List<PointOfInterest> fetchByBbox(
+            PoiSearchInAreaRequestDTO.Bbox bbox,
+            List<String> categories
+    ) {
         if (categories == null || categories.isEmpty()) {
             return poiRepository.findByLatitudeBetweenAndLongitudeBetween(
                     bbox.getMinLat(), bbox.getMaxLat(),
@@ -201,16 +227,25 @@ public class PoiSearchService implements PoiSearchImpl {
         );
     }
 
-    private void sortByDistanceToBboxCenter(List<PointOfInterest> pois, PoiSearchInAreaRequestDTO.Bbox bbox) {
+    private void sortByDistanceToBboxCenter(
+            List<PointOfInterest> pois,
+            PoiSearchInAreaRequestDTO.Bbox bbox
+    ) {
         double centerLat = (bbox.getMinLat() + bbox.getMaxLat()) / 2.0;
         double centerLng = (bbox.getMinLng() + bbox.getMaxLng()) / 2.0;
 
         pois.sort(Comparator.comparingDouble(
-                poi -> squaredDistance(centerLat, centerLng, poi.getLatitude(), poi.getLongitude())
+                poi -> squaredDistance(
+                        centerLat, centerLng,
+                        poi.getLatitude(), poi.getLongitude()
+                )
         ));
     }
 
-    private double squaredDistance(double lat1, double lng1, double lat2, double lng2) {
+    private double squaredDistance(
+            double lat1, double lng1,
+            double lat2, double lng2
+    ) {
         double dLat = lat1 - lat2;
         double dLng = lng1 - lng2;
         return dLat * dLat + dLng * dLng;
@@ -227,5 +262,26 @@ public class PoiSearchService implements PoiSearchImpl {
                 .priceLevel(poi.getPriceLevel())
                 .externalId(poi.getExternalId())
                 .build();
+    }
+
+    /**
+     * Builds Geoapify filter string from request.
+     *
+     * BBOX    -> rect:minLon,minLat,maxLon,maxLat
+     * POLYGON -> polygon:lng lat,lng lat,lng lat
+     */
+    private String buildGeoapifyFilter(
+            PoiSearchInAreaRequestDTO request,
+            PoiSearchInAreaRequestDTO.Bbox bbox
+    ) {
+        if (request.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
+            return "rect:"
+                    + bbox.getMinLng() + "," + bbox.getMinLat() + ","
+                    + bbox.getMaxLng() + "," + bbox.getMaxLat();
+        }
+
+        return "polygon:" + request.getPolygon().stream()
+                .map(p -> p.getLng() + " " + p.getLat())
+                .collect(Collectors.joining(","));
     }
 }

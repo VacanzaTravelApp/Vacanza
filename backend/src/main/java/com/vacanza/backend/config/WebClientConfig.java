@@ -91,6 +91,7 @@ public class WebClientConfig {
      * Automatically appends ?apiKey=... to every request
      */
     private ExchangeFilterFunction addApiKey(GeoapifyProperties props) {
+        System.out.println("GEOAPIFY KEY=" + props.getApiKey());
         return (request, next) -> {
             var newUrl = UriComponentsBuilder
                     .fromUri(request.url())
