@@ -8,8 +8,8 @@ import '../bloc/map_state.dart';
 import '../widgets/home_map/home_map_scaffold.dart';
 
 /// Login sonrası kullanıcıyı karşılayan ana harita ekranı.
-/// - MapBloc: 2D/3D + recenter
-/// - AreaQueryBloc: viewport bbox üretme (VACANZA-200)
+/// - MapBloc: 2D/3D + recenter + drawing toggle
+/// - AreaQueryBloc: viewport bbox + user selection (polygon) state
 class HomeMapScreen extends StatelessWidget {
   const HomeMapScreen({super.key});
 
@@ -29,7 +29,6 @@ class HomeMapScreen extends StatelessWidget {
   }
 }
 
-/// Provider'lardan gelen state'leri dinleyen gerçek UI.
 class _HomeMapView extends StatelessWidget {
   const _HomeMapView();
 
@@ -39,12 +38,10 @@ class _HomeMapView extends StatelessWidget {
       builder: (context, state) {
         return HomeMapScaffold(
           mode: state.viewMode,
-          onToggleMode: () {
-            context.read<MapBloc>().add(ToggleViewModePressed());
-          },
-          onRecenter: () {
-            context.read<MapBloc>().add(RecenterPressed());
-          },
+          isDrawing: state.isDrawing,
+          onToggleMode: () => context.read<MapBloc>().add(const ToggleViewModePressed()),
+          onRecenter: () => context.read<MapBloc>().add(const RecenterPressed()),
+          onToggleDrawing: () => context.read<MapBloc>().add(ToggleDrawingPressed()),
         );
       },
     );
