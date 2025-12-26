@@ -57,8 +57,6 @@ public class PoiAreaRequestValidator {
             validateLatLng(p.getLat(), p.getLng());
         }
 
-        // İstersen burada “polygon closed mu?” kontrolü de eklenebilir (FE kapatmayabilir, biz kapatmak zorunda değiliz)
-        // self-intersect kontrolü şu an yok (MVP)
     }
 
     private void validateLatLng(Double lat, Double lng) {
@@ -69,7 +67,6 @@ public class PoiAreaRequestValidator {
 
     private void require(boolean condition, HttpStatus status, String code, String message) {
         if (!condition) {
-            // FE için “hata kodu” gibi okunabilir bir prefix ekliyoruz
             throw new ResponseStatusException(status, code + ": " + message);
         }
     }

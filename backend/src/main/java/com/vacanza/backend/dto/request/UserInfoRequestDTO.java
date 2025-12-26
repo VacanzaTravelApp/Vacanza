@@ -13,7 +13,7 @@ import java.time.LocalDate;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-//hemprofil olusturma hem update için ayni DTO kullanılabilsin diye optional
+//hem profil olusturma hem update için ayni DTO kullanılabilsin diye optional
 public class UserInfoRequestDTO {
 
     private String firstName;

@@ -1,8 +1,6 @@
 package com.vacanza.backend.service;
 
 import com.vacanza.backend.entity.PointOfInterest;
-
-
 import com.vacanza.backend.integration.GeoapifyClient;
 import com.vacanza.backend.integration.GeoapifyResponse;
 import com.vacanza.backend.repo.PointOfInterestRepository;
@@ -14,7 +12,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class PoiIngestService {
-    
+
     private final GeoapifyClient geoapifyClient;
     private final PointOfInterestRepository poiRepository;
 

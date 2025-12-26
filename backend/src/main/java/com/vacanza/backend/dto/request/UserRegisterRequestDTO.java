@@ -1,4 +1,4 @@
-package com.vacanza.backend.dto.request;
+/*package com.vacanza.backend.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -23,4 +23,5 @@ public class UserRegisterRequestDTO {
 
     private String preferredName;  // optional
 }
+ */
 

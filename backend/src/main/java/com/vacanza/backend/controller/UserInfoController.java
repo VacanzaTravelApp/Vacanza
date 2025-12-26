@@ -18,8 +18,8 @@ public class UserInfoController {
     private final UserInfoService userInfoService;
 
     /**
-        register sonrası çağrılır (Firebase register + token alındıktan sonra)
-        profil bilgilerini DB'ye upsert eder (create if missing, else update).
+     * register sonrası çağrılır (Firebase register + token alındıktan sonra)
+     * profil bilgilerini DB'ye upsert eder (create if missing, else update).
      */
     @PostMapping("/auth/register")
     public ResponseEntity<UserRegisterResponseDTO> register(
@@ -37,7 +37,7 @@ public class UserInfoController {
     }
 
     /**
-        profil ekranında data çekmek için
+     * profil ekranında data çekmek için
      */
     @GetMapping("/user/profile")
     public ResponseEntity<UserInfoResponseDTO> getProfile() {
@@ -45,7 +45,7 @@ public class UserInfoController {
     }
 
     /**
-        profil güncellemek için (standart HTTP method: PUT)
+     * profil güncellemek için (standart HTTP method: PUT)
      */
     @PutMapping("/user/profile")
     public ResponseEntity<UserInfoResponseDTO> updateProfile(@RequestBody UserInfoRequestDTO request) {
@@ -53,7 +53,6 @@ public class UserInfoController {
     }
 
     //eski endpointler
-
     @RestController
     @RequestMapping(path = "/user-info")
     @AllArgsConstructor

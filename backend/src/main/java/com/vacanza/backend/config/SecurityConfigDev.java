@@ -12,8 +12,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * DEV environment:
  * - All endpoints are reachable without auth (permitAll)
  * - BUT if a Bearer token is provided, we still validate it and set SecurityContext
- *   so /auth/me and profile endpoints work with curl tests.
+ * so /auth/me and profile endpoints work with curl tests.
  */
+
 @Configuration
 @Profile("dev")
 public class SecurityConfigDev {

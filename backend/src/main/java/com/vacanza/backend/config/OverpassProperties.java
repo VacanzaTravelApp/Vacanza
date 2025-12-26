@@ -1,4 +1,4 @@
-package com.vacanza.backend.config;
+/*package com.vacanza.backend.config;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -10,3 +10,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class OverpassProperties {
     private String baseUrl = "https://overpass-api.de/api";
 }
+
+ */

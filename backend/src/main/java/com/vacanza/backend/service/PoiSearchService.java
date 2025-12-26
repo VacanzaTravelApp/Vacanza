@@ -45,6 +45,14 @@ public class PoiSearchService implements PoiSearchImpl {
     private final PoiAreaRequestValidator validator;
     private final PoiIngestService poiIngestService;
 
+    private static String normalizeCategory(String s) {
+        return (s == null) ? null : s.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    // ======================================================================
+    // ============================ HELPERS ==================================
+    // ======================================================================
+
     @Override
     public PoiSearchInAreaResponseDTO searchInArea(PoiSearchInAreaRequestDTO request) {
 
@@ -162,19 +170,11 @@ public class PoiSearchService implements PoiSearchImpl {
                 .build();
     }
 
-    // ======================================================================
-    // ============================ HELPERS ==================================
-    // ======================================================================
-
     private PoiSearchInAreaRequestDTO.Bbox resolveBbox(PoiSearchInAreaRequestDTO request) {
         if (request.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
             return request.getBbox();
         }
         return bboxFromPolygon(request.getPolygon());
-    }
-
-    private static String normalizeCategory(String s) {
-        return (s == null) ? null : s.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private PoiSearchInAreaRequestDTO.Bbox bboxFromPolygon(List<PoiSearchInAreaRequestDTO.LatLng> polygon) {
@@ -266,7 +266,7 @@ public class PoiSearchService implements PoiSearchImpl {
 
     /**
      * Builds Geoapify filter string from request.
-     *
+     * <p>
      * BBOX    -> rect:minLon,minLat,maxLon,maxLat
      * POLYGON -> polygon:lng lat,lng lat,lng lat
      */

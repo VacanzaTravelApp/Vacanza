@@ -23,16 +23,16 @@ import java.util.List;
 /**
  * Validates Firebase ID Token sent by frontend:
  * Authorization: Bearer <firebase_id_token>
- *
+ * <p>
  * Behavior:
  * - OPTIONS (preflight) requests are always allowed.
  * - If Authorization header is missing or not Bearer => do nothing, continue filter chain.
- *   (SecurityConfig decides if endpoint is public or requires authentication.)
+ * (SecurityConfig decides if endpoint is public or requires authentication.)
  * - If Bearer token is present:
- *   - verify token using Firebase Admin SDK
- *   - ensure user exists in DB (users table)
- *   - set SecurityContext principal=firebaseUid, authority=ROLE_*
- *   - attach request attributes: firebaseEmail, firebaseEmailVerified
+ * - verify token using Firebase Admin SDK
+ * - ensure user exists in DB (users table)
+ * - set SecurityContext principal=firebaseUid, authority=ROLE_*
+ * - attach request attributes: firebaseEmail, firebaseEmailVerified
  * - If Bearer token is present but invalid/expired => 401
  */
 @Component

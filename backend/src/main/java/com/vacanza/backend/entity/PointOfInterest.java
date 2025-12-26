@@ -41,7 +41,7 @@ public class PointOfInterest {
     private Double longitude;
 
     // Useful if Foursquare gives opening hours, otherwise nullable
-    @Column(name = "start_time",  nullable = true)
+    @Column(name = "start_time", nullable = true)
     private LocalTime startTime;
 
     @Column(name = "end_time", nullable = true)

@@ -1,4 +1,4 @@
-package com.vacanza.backend.integration;
+/*package com.vacanza.backend.integration;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -19,9 +19,9 @@ public class OverpassClient {
      * Overpass API:
      * POST /interpreter
      * body: data=<overpass query>
-     *
+     * <p>
      * bbox order: (south,west,north,east) = (minLat,minLng,maxLat,maxLng)
-     */
+
     public OverpassResponse searchByBbox(
             double minLat,
             double minLng,
@@ -46,13 +46,13 @@ public class OverpassClient {
 
     /**
      * Small helper to build Overpass QL.
-     */
+
     static class OverpassQueryBuilder {
 
         /**
          * Very simple category -> OSM tag mapping.
          * You can expand later.
-         */
+
         static String build(double minLat, double minLng, double maxLat, double maxLng, List<String> cats, int limit) {
             String bbox = "(" + minLat + "," + minLng + "," + maxLat + "," + maxLng + ")";
 
@@ -111,3 +111,6 @@ public class OverpassClient {
         }
     }
 }
+
+ */
+
