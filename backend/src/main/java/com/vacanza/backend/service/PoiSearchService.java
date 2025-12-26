@@ -1,6 +1,5 @@
 package com.vacanza.backend.service;
 
-
 import com.vacanza.backend.dto.request.PoiSearchInAreaRequestDTO;
 import com.vacanza.backend.dto.response.PoiSearchInAreaResponseDTO;
 import com.vacanza.backend.entity.PointOfInterest;
@@ -33,79 +32,98 @@ public class PoiSearchService implements PoiSearchImpl {
     @Override
     public PoiSearchInAreaResponseDTO searchInArea(PoiSearchInAreaRequestDTO request) {
 
-        /* Validate request (structure + limits) */
+        // 1) Validate request (structure + limits)
         validator.validate(request);
 
-        /* Apply defaults */
+        // 2) Apply defaults
         int page = request.getPage() != null ? request.getPage() : DEFAULT_PAGE;
         int limit = request.getLimit() != null ? request.getLimit() : DEFAULT_LIMIT;
 
-        /* Normalize geometry → BBOX */
+        // 3) Normalize categories (case-insensitive filter)
+        List<String> normalizedCategories =
+                (request.getCategories() == null) ? List.of()
+                        : request.getCategories().stream()
+                        .map(PoiSearchService::normalizeCategory)
+                        .filter(c -> c != null && !c.isBlank())
+                        .distinct()
+                        .toList();
+
+        // 4) Resolve bbox (BBOX directly, POLYGON -> bboxFromPolygon)
         PoiSearchInAreaRequestDTO.Bbox bbox = resolveBbox(request);
 
-        /* Abuse guard: bbox size */
+        // 5) Abuse guard: bbox size
         guardBboxSize(bbox);
 
-        /* Fetch ALL matching POIs (before pagination) */
-        List<PointOfInterest> all =
-                fetchByBbox(bbox, request.getCategories());
+        // 6) Fetch candidates by bbox (DB-side)
+        List<PointOfInterest> candidates = fetchByBbox(bbox, normalizedCategories);
 
-        /* Abuse guard: result count */
-        if (all.size() > MAX_RESULT_COUNT) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY,
-                    "TOO_MANY_RESULTS"
+        // 7) If POLYGON, filter bbox-candidates with point-in-polygon (service-level)
+        if (request.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.POLYGON) {
+            List<PoiSearchInAreaRequestDTO.LatLng> polygon = request.getPolygon();
+            candidates = candidates.stream()
+                    .filter(p -> pointInPolygon(p.getLatitude(), p.getLongitude(), polygon))
+                    .toList();
+        }
+
+        // 8) Abuse guard: result count
+        if (candidates.size() > MAX_RESULT_COUNT) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "TOO_MANY_RESULTS");
+        }
+
+        // 9) Sorting
+        PoiSearchInAreaRequestDTO.SortType sortType =
+                request.getSort() != null ? request.getSort() : PoiSearchInAreaRequestDTO.SortType.RATING_DESC;
+
+        if (sortType == PoiSearchInAreaRequestDTO.SortType.DISTANCE_TO_CENTER) {
+            sortByDistanceToBboxCenter(candidates, bbox);
+        } else {
+            // null-safe rating sort desc (in-place)
+            candidates.sort(
+                    Comparator.comparing(
+                            PointOfInterest::getRating,
+                            Comparator.nullsLast(Double::compareTo)
+                    ).reversed()
             );
         }
 
-        /* Sorting */
-        PoiSearchInAreaRequestDTO.SortType sortType =
-                request.getSort() != null
-                        ? request.getSort()
-                        : PoiSearchInAreaRequestDTO.SortType.RATING_DESC;
+        // 10) countsByCategory should be calculated from TOTAL results (before pagination)
+        Map<String, Integer> countsByCategory = candidates.stream()
+                .collect(Collectors.groupingBy(
+                        p -> normalizeCategory(p.getCategory()),
+                        Collectors.summingInt(x -> 1)
+                ));
 
-        if (sortType == PoiSearchInAreaRequestDTO.SortType.DISTANCE_TO_CENTER) {
-            sortByDistanceToBboxCenter(all, bbox);
-        } else {
-            all.sort(Comparator.comparingDouble(
-                    PointOfInterest::getRating
-            ).reversed());
-        }
+        // 11) Pagination
+        int from = Math.min(page * limit, candidates.size());
+        int to = Math.min(from + limit, candidates.size());
+        List<PointOfInterest> pageItems = candidates.subList(from, to);
 
-        /*Pagination */
-        int from = Math.min(page * limit, all.size());
-        int to = Math.min(from + limit, all.size());
-        List<PointOfInterest> pageItems = all.subList(from, to);
-
-        /*Map entity → summary DTO */
+        // 12) Map entity → summary DTO
         List<PoiSearchInAreaResponseDTO.PoiSummaryDTO> summaries =
-                pageItems.stream()
-                        .map(this::toSummary)
-                        .toList();
+                pageItems.stream().map(this::toSummary).toList();
 
-        Map<String, Integer> counts = all.stream()
-                .collect(Collectors.groupingBy(PointOfInterest::getCategory, Collectors.summingInt(x -> 1)));
-        /*Build response */
+        // 13) Build response
         return PoiSearchInAreaResponseDTO.builder()
-                .count(all.size())
+                .count(candidates.size())
                 .pois(summaries)
-                .countsByCategory(counts) // MVP: optional
+                .countsByCategory(countsByCategory)
                 .build();
     }
 
+    // ===== Helpers =====
 
-    // Helpers
     private PoiSearchInAreaRequestDTO.Bbox resolveBbox(PoiSearchInAreaRequestDTO request) {
-        if (request.getSelectionType() ==
-                PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
+        if (request.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
             return request.getBbox();
         }
         return bboxFromPolygon(request.getPolygon());
     }
 
-    private PoiSearchInAreaRequestDTO.Bbox bboxFromPolygon(
-            List<PoiSearchInAreaRequestDTO.LatLng> polygon
-    ) {
+    private static String normalizeCategory(String s) {
+        return (s == null) ? null : s.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private PoiSearchInAreaRequestDTO.Bbox bboxFromPolygon(List<PoiSearchInAreaRequestDTO.LatLng> polygon) {
         double minLat = Double.POSITIVE_INFINITY;
         double minLng = Double.POSITIVE_INFINITY;
         double maxLat = Double.NEGATIVE_INFINITY;
@@ -118,28 +136,17 @@ public class PoiSearchService implements PoiSearchImpl {
             maxLng = Math.max(maxLng, p.getLng());
         }
 
-        return new PoiSearchInAreaRequestDTO.Bbox(
-                minLat, minLng, maxLat, maxLng
-        );
+        return new PoiSearchInAreaRequestDTO.Bbox(minLat, minLng, maxLat, maxLng);
     }
 
     private void guardBboxSize(PoiSearchInAreaRequestDTO.Bbox bbox) {
-        double area =
-                (bbox.getMaxLat() - bbox.getMinLat()) *
-                        (bbox.getMaxLng() - bbox.getMinLng());
-
+        double area = (bbox.getMaxLat() - bbox.getMinLat()) * (bbox.getMaxLng() - bbox.getMinLng());
         if (area > MAX_BBOX_AREA) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY,
-                    "BBOX_TOO_LARGE"
-            );
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "BBOX_TOO_LARGE");
         }
     }
 
-    private List<PointOfInterest> fetchByBbox(
-            PoiSearchInAreaRequestDTO.Bbox bbox,
-            List<String> categories
-    ) {
+    private List<PointOfInterest> fetchByBbox(PoiSearchInAreaRequestDTO.Bbox bbox, List<String> categories) {
         if (categories == null || categories.isEmpty()) {
             return poiRepository.findByLatitudeBetweenAndLongitudeBetween(
                     bbox.getMinLat(), bbox.getMaxLat(),
@@ -154,33 +161,22 @@ public class PoiSearchService implements PoiSearchImpl {
         );
     }
 
-    private void sortByDistanceToBboxCenter(
-            List<PointOfInterest> pois,
-            PoiSearchInAreaRequestDTO.Bbox bbox
-    ) {
+    private void sortByDistanceToBboxCenter(List<PointOfInterest> pois, PoiSearchInAreaRequestDTO.Bbox bbox) {
         double centerLat = (bbox.getMinLat() + bbox.getMaxLat()) / 2.0;
         double centerLng = (bbox.getMinLng() + bbox.getMaxLng()) / 2.0;
 
         pois.sort(Comparator.comparingDouble(
-                poi -> squaredDistance(
-                        centerLat, centerLng,
-                        poi.getLatitude(), poi.getLongitude()
-                )
+                poi -> squaredDistance(centerLat, centerLng, poi.getLatitude(), poi.getLongitude())
         ));
     }
 
-    private double squaredDistance(
-            double lat1, double lng1,
-            double lat2, double lng2
-    ) {
+    private double squaredDistance(double lat1, double lng1, double lat2, double lng2) {
         double dLat = lat1 - lat2;
         double dLng = lng1 - lng2;
         return dLat * dLat + dLng * dLng;
     }
 
-    private PoiSearchInAreaResponseDTO.PoiSummaryDTO toSummary(
-            PointOfInterest poi
-    ) {
+    private PoiSearchInAreaResponseDTO.PoiSummaryDTO toSummary(PointOfInterest poi) {
         return PoiSearchInAreaResponseDTO.PoiSummaryDTO.builder()
                 .poiId(poi.getPoiId())
                 .name(poi.getName())
@@ -191,5 +187,22 @@ public class PoiSearchService implements PoiSearchImpl {
                 .priceLevel(poi.getPriceLevel())
                 .externalId(poi.getExternalId())
                 .build();
+    }
+
+    // Ray-casting algorithm (lat=x, lng=y)
+    private static boolean pointInPolygon(double lat, double lng, List<PoiSearchInAreaRequestDTO.LatLng> polygon) {
+        boolean inside = false;
+        for (int i = 0, j = polygon.size() - 1; i < polygon.size(); j = i++) {
+            double xi = polygon.get(i).getLat();
+            double yi = polygon.get(i).getLng();
+            double xj = polygon.get(j).getLat();
+            double yj = polygon.get(j).getLng();
+
+            boolean intersect = ((yi > lng) != (yj > lng)) &&
+                    (lat < (xj - xi) * (lng - yi) / ((yj - yi) + 0.0) + xi);
+
+            if (intersect) inside = !inside;
+        }
+        return inside;
     }
 }

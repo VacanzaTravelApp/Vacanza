@@ -57,8 +57,17 @@ public class PoiAreaRequestValidator {
             validateLatLng(p.getLat(), p.getLng());
         }
 
-        // İstersen burada “polygon closed mu?” kontrolü de eklenebilir (FE kapatmayabilir, biz kapatmak zorunda değiliz)
-        // self-intersect kontrolü şu an yok (MVP)
+        // “polygon closed mu?” kontrolü de eklenebilir (FE kapatmayabilir, biz kapatmak zorunda değiliz)
+        // self-intersect kontrolü
+        long distinctPoints = polygon.stream()
+                .map(p -> p.getLat() + "," + p.getLng())
+                .distinct()
+                .count();
+
+        require(distinctPoints >= 3,
+                HttpStatus.BAD_REQUEST,
+                "POLYGON_INVALID",
+                "polygon must contain at least 3 distinct points");
     }
 
     private void validateLatLng(Double lat, Double lng) {
