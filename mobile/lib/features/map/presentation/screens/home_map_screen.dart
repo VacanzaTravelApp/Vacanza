@@ -11,6 +11,7 @@ import '../../../poi_search/presentation/bloc/area_query_state.dart';
 import '../../../poi_search/presentation/bloc/poi_search_bloc.dart';
 import '../../../poi_search/presentation/bloc/poi_search_event.dart' as poi;
 
+import '../../../poi_search/presentation/widgets/poi_filter_panel.dart';
 import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
@@ -23,7 +24,6 @@ class HomeMapScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
-        /// ✅ VACANZA-186: UI/Bloc Dio görmesin diye repository katmanı
         RepositoryProvider<PoiSearchRepository>(
           create: (ctx) => PoiSearchRepositoryImpl(
             ctx.read<PoiSearchApiClient>(),
@@ -34,8 +34,6 @@ class HomeMapScreen extends StatelessWidget {
         providers: [
           BlocProvider<MapBloc>(create: (_) => MapBloc()),
           BlocProvider<AreaQueryBloc>(create: (_) => AreaQueryBloc()),
-
-          /// ✅ VACANZA-187: POI search state management
           BlocProvider<PoiSearchBloc>(
             create: (ctx) => PoiSearchBloc(
               repo: ctx.read<PoiSearchRepository>(),
@@ -48,36 +46,56 @@ class HomeMapScreen extends StatelessWidget {
   }
 }
 
-class _HomeMapView extends StatelessWidget {
+class _HomeMapView extends StatefulWidget {
   const _HomeMapView();
+
+  @override
+  State<_HomeMapView> createState() => _HomeMapViewState();
+}
+
+class _HomeMapViewState extends State<_HomeMapView> {
+  bool _filtersOpen = false;
+
+  void _openFilters() {
+    if (_filtersOpen) return;
+    if (!mounted) return;
+    setState(() => _filtersOpen = true);
+  }
+
+  void _closeFilters() {
+    if (!_filtersOpen) return;
+    if (!mounted) return;
+    setState(() => _filtersOpen = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocListener(
       listeners: [
-        /// AreaQueryContext değişince POI search akışını tetikle
         BlocListener<AreaQueryBloc, AreaQueryState>(
           listenWhen: (prev, next) => prev.context != next.context,
           listener: (context, state) {
             final ctx = state.context;
 
-            // 1) Viewport akışı (bbox)
+            // 1) Viewport -> PoiSearch viewport event
             if (ctx.areaSource == AreaSource.viewport && ctx.area is BboxArea) {
-              context
-                  .read<PoiSearchBloc>()
-                  .add(poi.ViewportChanged(ctx.area as BboxArea));
+              context.read<PoiSearchBloc>().add(
+                poi.ViewportChanged(ctx.area as BboxArea),
+              );
               return;
             }
 
-            // 2) User selection akışı (bbox veya polygon olabilir)
+            // 2) User selection -> PoiSearch area event + filtre panelini aç
             if (ctx.areaSource == AreaSource.userSelection) {
               context.read<PoiSearchBloc>().add(poi.AreaChanged(ctx.area));
+              _openFilters();
               return;
             }
 
-            // 3) Kullanılabilir area yoksa (NoArea vs) temizle
+            // 3) No usable area -> clear (+ istersek paneli kapat)
             if (!ctx.hasUsableArea) {
               context.read<PoiSearchBloc>().add(const poi.AreaCleared());
+              _closeFilters();
             }
           },
         ),
@@ -93,6 +111,14 @@ class _HomeMapView extends StatelessWidget {
                 context.read<MapBloc>().add(const RecenterPressed()),
             onToggleDrawing: () =>
                 context.read<MapBloc>().add(ToggleDrawingPressed()),
+            onOpenFilters: _openFilters,
+
+            // ✅ Overlay kontrolü burada
+            isFiltersOpen: _filtersOpen,
+            onCloseFilters: _closeFilters,
+            filtersPanel: PoiFilterPanel(
+              onClose: _closeFilters,
+            ),
           );
         },
       ),
