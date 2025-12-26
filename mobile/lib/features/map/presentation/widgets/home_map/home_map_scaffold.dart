@@ -12,9 +12,18 @@ import '../../../data/models/map_view_mode.dart';
 class HomeMapScaffold extends StatelessWidget {
   final MapViewMode mode;
   final bool isDrawing;
+
   final VoidCallback onToggleMode;
   final VoidCallback onRecenter;
   final VoidCallback onToggleDrawing;
+
+  /// VACANZA-188: filter panel open
+  final VoidCallback onOpenFilters;
+
+  /// Panel overlay kontrolü (HomeMapScreen yönetir)
+  final bool isFiltersOpen;
+  final Widget? filtersPanel;
+  final VoidCallback? onCloseFilters;
 
   const HomeMapScaffold({
     super.key,
@@ -23,6 +32,10 @@ class HomeMapScaffold extends StatelessWidget {
     required this.onToggleMode,
     required this.onRecenter,
     required this.onToggleDrawing,
+    required this.onOpenFilters,
+    this.isFiltersOpen = false,
+    this.filtersPanel,
+    this.onCloseFilters,
   });
 
   /// VACANZA-163 Logout
@@ -36,6 +49,8 @@ class HomeMapScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showFilters = isFiltersOpen && filtersPanel != null;
+
     return Scaffold(
       body: SafeArea(
         child: Stack(
@@ -77,8 +92,33 @@ class HomeMapScaffold extends StatelessWidget {
                 onToggleMode: onToggleMode,
                 onRecenter: onRecenter,
                 onToggleDrawing: onToggleDrawing,
+                onOpenFilters: onOpenFilters,
               ),
             ),
+
+            // ================= FILTER OVERLAY (SAĞDAN PANEL) =================
+            if (showFilters) ...[
+              // backdrop (dışına tıklayınca kapat)
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: onCloseFilters,
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.10),
+                  ),
+                ),
+              ),
+
+              // panel
+              Positioned(
+                top: 110, // ActionBar hizası + biraz boşluk
+                right: 16,
+                child: Material(
+                  color: Colors.transparent,
+                  child: filtersPanel!,
+                ),
+              ),
+            ],
           ],
         ),
       ),

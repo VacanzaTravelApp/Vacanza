@@ -3,7 +3,11 @@ import 'package:equatable/equatable.dart';
 import '../../data/api/poi_search_in_area_request_dto.dart';
 import '../../data/models/area_source.dart';
 import '../../data/models/poi.dart';
+import '../../data/models/poi_categories.dart';
 import '../../data/models/selected_area.dart';
+
+// ✅ bunu senin koyduğun dosya yoluna göre import et
+// örn: import '../../domain/poi_categories.dart';
 
 enum PoiSearchStatus { idle, loading, success, error }
 
@@ -41,10 +45,12 @@ class PoiSearchState extends Equatable {
     required this.countsByCategory,
   });
 
-  factory PoiSearchState.initial() => const PoiSearchState(
+  /// ✅ default seçili kategoriler PM'e göre:
+  /// restaurants, cafe, museum, monuments, parks
+  factory PoiSearchState.initial() => PoiSearchState(
     areaSource: AreaSource.viewport,
     selectedArea: NoArea(),
-    selectedCategories: [],
+    selectedCategories: PoiCategories.defaults,
     sort: PoiSort.distanceToCenter,
     page: 0,
     limit: 200,
@@ -52,8 +58,8 @@ class PoiSearchState extends Equatable {
     errorCode: null,
     errorMessage: null,
     count: 0,
-    pois: [],
-    countsByCategory: {},
+    pois: const [],
+    countsByCategory: const {},
   );
 
   bool get isLoading => status == PoiSearchStatus.loading;

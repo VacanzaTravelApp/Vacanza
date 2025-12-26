@@ -11,6 +11,9 @@ class ActionBar extends StatelessWidget {
   final VoidCallback onRecenter;
   final VoidCallback onToggleDrawing;
 
+  // ✅ NEW
+  final VoidCallback onOpenFilters;
+
   const ActionBar({
     super.key,
     required this.mode,
@@ -18,6 +21,7 @@ class ActionBar extends StatelessWidget {
     required this.onToggleMode,
     required this.onRecenter,
     required this.onToggleDrawing,
+    required this.onOpenFilters, // ✅ NEW
   });
 
   @override
@@ -26,7 +30,6 @@ class ActionBar extends StatelessWidget {
 
     return Column(
       children: [
-        // ✅ Drawing toggle (yuvarlak action button)
         ActionIconButton(
           tooltip: isDrawing ? 'Drawing: ON' : 'Drawing: OFF',
           icon: Icons.edit_rounded,
@@ -35,7 +38,14 @@ class ActionBar extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // Mode butonu + altında küçük badge
+        // ✅ NEW: Filter button
+        ActionIconButton(
+          tooltip: 'Filter POIs',
+          icon: Icons.layers_sharp,
+          onPressed: onOpenFilters,
+        ),
+        const SizedBox(height: 16),
+
         Stack(
           clipBehavior: Clip.none,
           children: [
