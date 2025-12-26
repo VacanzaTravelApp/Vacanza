@@ -9,7 +9,9 @@ class AreaQueryState extends Equatable {
   factory AreaQueryState.initial() => AreaQueryState(
     context: AreaQueryContext.initial(),
   );
-
+  AreaQueryState copyWith({AreaQueryContext? context}) {
+    return AreaQueryState(context: context ?? this.context);
+  }
   @override
   List<Object?> get props => [context];
 }
