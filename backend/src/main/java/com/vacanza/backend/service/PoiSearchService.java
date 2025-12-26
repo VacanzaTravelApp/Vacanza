@@ -1,6 +1,5 @@
 package com.vacanza.backend.service;
 
-
 import com.vacanza.backend.dto.request.PoiSearchInAreaRequestDTO;
 import com.vacanza.backend.dto.response.PoiSearchInAreaResponseDTO;
 import com.vacanza.backend.entity.PointOfInterest;
@@ -24,33 +23,72 @@ public class PoiSearchService implements PoiSearchImpl {
     // ===== Defaults & Guards =====
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_LIMIT = 200;
+
+    /**
+     * Hard guard to avoid huge result sets / abuse.
+     * If you expect more, raise carefully or add better paging.
+     */
     private static final int MAX_RESULT_COUNT = 5000;
-    private static final double MAX_BBOX_AREA = 25.0; // MVP abuse guard
+
+    /**
+     * DB query guard (viewport / user-selection should be small).
+     * area = (maxLat-minLat) * (maxLng-minLng)
+     */
+    private static final double MAX_BBOX_AREA = 25.0;
+
+    /**
+     * Ingest guard can be larger than DB guard for debugging / initial seed,
+     * but still capped to avoid accidentally pulling the entire world.
+     * Tune this after MVP.
+     */
+    private static final double MAX_INGEST_BBOX_AREA = 400.0;
 
     private final PointOfInterestRepository poiRepository;
     private final PoiAreaRequestValidator validator;
+    private final PoiIngestService poiIngestService;
 
     @Override
     public PoiSearchInAreaResponseDTO searchInArea(PoiSearchInAreaRequestDTO request) {
 
-        /* Validate request (structure + limits) */
+        // 1) Validate request (structure + limits)
         validator.validate(request);
 
-        /* Apply defaults */
+        // 2) Apply defaults
         int page = request.getPage() != null ? request.getPage() : DEFAULT_PAGE;
         int limit = request.getLimit() != null ? request.getLimit() : DEFAULT_LIMIT;
 
-        /* Normalize geometry → BBOX */
+        // 3) Resolve selection -> bbox
         PoiSearchInAreaRequestDTO.Bbox bbox = resolveBbox(request);
 
-        /* Abuse guard: bbox size */
+        // 4) DB abuse guard (small viewport expected)
         guardBboxSize(bbox);
 
-        /* Fetch ALL matching POIs (before pagination) */
-        List<PointOfInterest> all =
-                fetchByBbox(bbox, request.getCategories());
+        // 5) Normalize categories for case-insensitive filter
+        List<String> normalizedCategories =
+                (request.getCategories() == null) ? List.of()
+                        : request.getCategories().stream()
+                        .map(PoiSearchService::normalizeCategory)
+                        .filter(c -> c != null && !c.isBlank())
+                        .distinct()
+                        .toList();
 
-        /* Abuse guard: result count */
+        // 6) Fetch ALL matching POIs (before pagination)
+        List<PointOfInterest> all = fetchByBbox(bbox, normalizedCategories);
+
+        // 7) If DB is empty for this area: ingest from Foursquare once, persist, then re-query DB
+        // NOTE: Ingest uses a separate guard to allow slightly bigger areas during seeding/debug.
+        if (all.isEmpty()) {
+            guardIngestBboxSize(bbox);
+
+            poiIngestService.ingestFromFoursquareBbox(
+                    bbox.getMinLat(), bbox.getMinLng(),
+                    bbox.getMaxLat(), bbox.getMaxLng()
+            );
+
+            all = fetchByBbox(bbox, normalizedCategories);
+        }
+
+        // 8) Guard: too many results even after DB filtering
         if (all.size() > MAX_RESULT_COUNT) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
@@ -58,7 +96,7 @@ public class PoiSearchService implements PoiSearchImpl {
             );
         }
 
-        /* Sorting */
+        // 9) Sorting (null-safe)
         PoiSearchInAreaRequestDTO.SortType sortType =
                 request.getSort() != null
                         ? request.getSort()
@@ -67,45 +105,53 @@ public class PoiSearchService implements PoiSearchImpl {
         if (sortType == PoiSearchInAreaRequestDTO.SortType.DISTANCE_TO_CENTER) {
             sortByDistanceToBboxCenter(all, bbox);
         } else {
-            all.sort(Comparator.comparingDouble(
-                    PointOfInterest::getRating
+            all.sort(Comparator.comparing(
+                    PointOfInterest::getRating,
+                    Comparator.nullsLast(Double::compareTo)
             ).reversed());
         }
 
-        /*Pagination */
+        // 10) countsByCategory should be calculated from TOTAL results (before pagination)
+        // (UI filter panel typically needs full counts)
+        Map<String, Integer> countsByCategory = all.stream()
+                .collect(Collectors.groupingBy(
+                        p -> normalizeCategory(p.getCategory()),
+                        Collectors.summingInt(x -> 1)
+                ));
+
+        // 11) Pagination
         int from = Math.min(page * limit, all.size());
         int to = Math.min(from + limit, all.size());
         List<PointOfInterest> pageItems = all.subList(from, to);
 
-        /*Map entity → summary DTO */
+        // 12) Map entity -> summary DTO
         List<PoiSearchInAreaResponseDTO.PoiSummaryDTO> summaries =
                 pageItems.stream()
                         .map(this::toSummary)
                         .toList();
 
-        Map<String, Integer> counts = all.stream()
-                .collect(Collectors.groupingBy(PointOfInterest::getCategory, Collectors.summingInt(x -> 1)));
-        /*Build response */
+        // 13) Build response
         return PoiSearchInAreaResponseDTO.builder()
                 .count(all.size())
                 .pois(summaries)
-                .countsByCategory(counts) // MVP: optional
+                .countsByCategory(countsByCategory)
                 .build();
     }
 
+    // ===== Helpers =====
 
-    // Helpers
     private PoiSearchInAreaRequestDTO.Bbox resolveBbox(PoiSearchInAreaRequestDTO request) {
-        if (request.getSelectionType() ==
-                PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
+        if (request.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
             return request.getBbox();
         }
         return bboxFromPolygon(request.getPolygon());
     }
 
-    private PoiSearchInAreaRequestDTO.Bbox bboxFromPolygon(
-            List<PoiSearchInAreaRequestDTO.LatLng> polygon
-    ) {
+    private static String normalizeCategory(String s) {
+        return (s == null) ? null : s.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private PoiSearchInAreaRequestDTO.Bbox bboxFromPolygon(List<PoiSearchInAreaRequestDTO.LatLng> polygon) {
         double minLat = Double.POSITIVE_INFINITY;
         double minLng = Double.POSITIVE_INFINITY;
         double maxLat = Double.NEGATIVE_INFINITY;
@@ -118,28 +164,24 @@ public class PoiSearchService implements PoiSearchImpl {
             maxLng = Math.max(maxLng, p.getLng());
         }
 
-        return new PoiSearchInAreaRequestDTO.Bbox(
-                minLat, minLng, maxLat, maxLng
-        );
+        return new PoiSearchInAreaRequestDTO.Bbox(minLat, minLng, maxLat, maxLng);
     }
 
     private void guardBboxSize(PoiSearchInAreaRequestDTO.Bbox bbox) {
-        double area =
-                (bbox.getMaxLat() - bbox.getMinLat()) *
-                        (bbox.getMaxLng() - bbox.getMinLng());
-
+        double area = (bbox.getMaxLat() - bbox.getMinLat()) * (bbox.getMaxLng() - bbox.getMinLng());
         if (area > MAX_BBOX_AREA) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_ENTITY,
-                    "BBOX_TOO_LARGE"
-            );
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "BBOX_TOO_LARGE");
         }
     }
 
-    private List<PointOfInterest> fetchByBbox(
-            PoiSearchInAreaRequestDTO.Bbox bbox,
-            List<String> categories
-    ) {
+    private void guardIngestBboxSize(PoiSearchInAreaRequestDTO.Bbox bbox) {
+        double area = (bbox.getMaxLat() - bbox.getMinLat()) * (bbox.getMaxLng() - bbox.getMinLng());
+        if (area > MAX_INGEST_BBOX_AREA) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "INGEST_BBOX_TOO_LARGE");
+        }
+    }
+
+    private List<PointOfInterest> fetchByBbox(PoiSearchInAreaRequestDTO.Bbox bbox, List<String> categories) {
         if (categories == null || categories.isEmpty()) {
             return poiRepository.findByLatitudeBetweenAndLongitudeBetween(
                     bbox.getMinLat(), bbox.getMaxLat(),
@@ -154,33 +196,22 @@ public class PoiSearchService implements PoiSearchImpl {
         );
     }
 
-    private void sortByDistanceToBboxCenter(
-            List<PointOfInterest> pois,
-            PoiSearchInAreaRequestDTO.Bbox bbox
-    ) {
+    private void sortByDistanceToBboxCenter(List<PointOfInterest> pois, PoiSearchInAreaRequestDTO.Bbox bbox) {
         double centerLat = (bbox.getMinLat() + bbox.getMaxLat()) / 2.0;
         double centerLng = (bbox.getMinLng() + bbox.getMaxLng()) / 2.0;
 
         pois.sort(Comparator.comparingDouble(
-                poi -> squaredDistance(
-                        centerLat, centerLng,
-                        poi.getLatitude(), poi.getLongitude()
-                )
+                poi -> squaredDistance(centerLat, centerLng, poi.getLatitude(), poi.getLongitude())
         ));
     }
 
-    private double squaredDistance(
-            double lat1, double lng1,
-            double lat2, double lng2
-    ) {
+    private double squaredDistance(double lat1, double lng1, double lat2, double lng2) {
         double dLat = lat1 - lat2;
         double dLng = lng1 - lng2;
         return dLat * dLat + dLng * dLng;
     }
 
-    private PoiSearchInAreaResponseDTO.PoiSummaryDTO toSummary(
-            PointOfInterest poi
-    ) {
+    private PoiSearchInAreaResponseDTO.PoiSummaryDTO toSummary(PointOfInterest poi) {
         return PoiSearchInAreaResponseDTO.PoiSummaryDTO.builder()
                 .poiId(poi.getPoiId())
                 .name(poi.getName())

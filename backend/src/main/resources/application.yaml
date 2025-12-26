@@ -18,3 +18,7 @@ spring:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
     show-sql: true
+
+foursquare:
+  base-url: https://api.foursquare.com/v3
+  api-key: ${FOURSQUARE_API_KEY}
