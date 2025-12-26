@@ -62,7 +62,7 @@ public class PointOfInterest {
     @Column(name = "price_level", length = 10, nullable = true)
     private String priceLevel;
 
-    @Column(name = "external_id", unique = true, nullable = true, length = 100)
+    @Column(name = "external_id", unique = true, nullable = true, length = 255)
     private String externalId; // Foursquare ID (Optional for user-created places)
 
 }
