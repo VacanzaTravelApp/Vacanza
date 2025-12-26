@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 
-import 'package:mobile/core/network/jwt_interceptor.dart';
 import 'package:mobile/features/auth/data/api/auth_api_client.dart';
 import 'package:mobile/features/auth/data/firebase/firebase_auth_service.dart';
 import 'package:mobile/features/auth/data/models/user_authentication_dto.dart';
@@ -18,49 +17,33 @@ class AuthFailure implements Exception {
 }
 
 /// AuthRepository:
-///
-/// Sorumluluk:
 /// - Firebase register/login
 /// - Firebase ID Token alma
-/// - Token'ı SecureStorage'a yazma (interceptor ve session restore için)
+/// - Token'ı SecureStorage'a yazma
 /// - Backend'e sync çağrıları:
 ///   - POST /auth/register
 ///   - GET  /auth/login
-///
-/// NOT:
-/// - Backend "login/register" aslında auth değil, SYNC endpoint.
-/// - Email+password backend'e ASLA gitmiyor.
 class AuthRepository {
   final FirebaseAuthService _firebaseService;
   final SecureStorageService _storage;
 
+  /// Dio DI (tek ortak dio)
   final Dio _dio;
+
   late final AuthApiClient _apiClient;
 
   AuthRepository({
     FirebaseAuthService? firebaseService,
-    SecureStorageService? storage,
-    Dio? dio,
+    required SecureStorageService storage,
+    required Dio dio,
   })  : _firebaseService = firebaseService ?? FirebaseAuthService(),
-        _storage = storage ?? SecureStorageService(),
-        _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: 'http://165.232.69.83:9002', // Android emulator -> localhost
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 10),
-              ),
-            ) {
-    // ✅ Interceptor: her request'e SecureStorage'tan token basar.
-    // Not: Auth endpointlerinde biz ayrıca header geçiyoruz, sorun değil.
-    _dio.interceptors.add(JwtInterceptor(storage: _storage));
-
+        _storage = storage,
+        _dio = dio {
+    // IMPORTANT:
+    // JwtInterceptor ve baseUrl app_dio.dart içinde zaten eklendi.
     _apiClient = AuthApiClient(dio: _dio);
   }
 
-  // ==========================================================
-  // LOGOUT
-  // ==========================================================
   /// Logout:
   /// - storage tokenlarını siler
   /// - firebase signOut yapar
@@ -69,14 +52,11 @@ class AuthRepository {
     await _firebaseService.signOut();
   }
 
-  // ==========================================================
-  // REGISTER FLOW (Firebase + backend register sync)
-  // ==========================================================
-  /// Akış:
+  /// Register akışı:
   /// 1) Firebase createUserWithEmailAndPassword
-  /// 2) Firebase ID Token al (FIREBASE_ID_TOKEN)
-  /// 3) SecureStorage'a yaz (session restore + interceptor için)
-  /// 4) POST /auth/register ile backend'e isimleri sync et
+  /// 2) Firebase ID Token al
+  /// 3) SecureStorage'a yaz
+  /// 4) POST /auth/register (sync)
   Future<UserRegisterResponse> registerWithEmailAndPassword({
     required String email,
     required String password,
@@ -86,16 +66,12 @@ class AuthRepository {
     String? preferredName,
   }) async {
     try {
-      // 1) Firebase register (otomatik login)
       await _firebaseService.register(email, password);
 
-      // 2) Token al
       final firebaseIdToken = await _firebaseService.getIdToken();
 
-      // 3) Token'ı cihazda sakla (session restore için)
       await _storage.writeAccessToken(firebaseIdToken);
 
-      // 4) Backend register sync
       final res = await _apiClient.registerSync(
         firebaseIdToken: firebaseIdToken,
         body: {
@@ -106,16 +82,14 @@ class AuthRepository {
         },
       );
 
-      // Backend "success=false" döndürebilir → bunu failure sayalım.
       if (!res.success) {
-        throw AuthFailure(res.message.isNotEmpty
-            ? res.message
-            : 'Register sync başarısız.');
+        throw AuthFailure(
+          res.message.isNotEmpty ? res.message : 'Register sync başarısız.',
+        );
       }
 
       return res;
     } on fb.FirebaseAuthException catch (e) {
-      // Firebase tarafı hatalar
       switch (e.code) {
         case 'email-already-in-use':
           throw const AuthFailure('Bu email adresi zaten kayıtlı.');
@@ -127,11 +101,9 @@ class AuthRepository {
           throw AuthFailure('Firebase register hatası: ${e.code}');
       }
     } on DioException catch (e) {
-      // Backend tarafı hatalar (400/401/500 vs)
       final status = e.response?.statusCode;
       final data = e.response?.data;
 
-      // Backend message alanı döndürüyorsa yakala
       if (data is Map && data['message'] is String) {
         throw AuthFailure(data['message'] as String);
       }
@@ -148,37 +120,27 @@ class AuthRepository {
     }
   }
 
-  // ==========================================================
-  // LOGIN FLOW (Firebase + backend login sync)
-  // ==========================================================
-  /// Akış:
+  /// Login akışı:
   /// 1) Firebase signInWithEmailAndPassword
   /// 2) Token al
   /// 3) SecureStorage'a yaz
-  /// 4) GET /auth/login ile backend'den "me" benzeri data al
-  ///
-  /// Return:
-  /// - UserAuthenticationDTO (backend user bilgisi)
+  /// 4) GET /auth/login (sync)
   Future<UserAuthenticationDTO> loginWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
     try {
-      // 1) Firebase login
       await _firebaseService.login(email, password);
 
-      // 2) Token al
       final firebaseIdToken = await _firebaseService.getIdToken();
-
-      // 3) Storage'a yaz
       await _storage.writeAccessToken(firebaseIdToken);
 
-      // 4) Backend login sync
       final auth = await _apiClient.loginSync(firebaseIdToken: firebaseIdToken);
 
       if (auth.userId.isEmpty) {
         throw const AuthFailure('Backend authentication başarısız.');
       }
+
       return auth;
     } on fb.FirebaseAuthException catch (e) {
       final code = e.code.toLowerCase();
@@ -201,7 +163,6 @@ class AuthRepository {
         throw AuthFailure(data['message'] as String);
       }
 
-      // Rehbere göre 401 token invalid => logout
       if (status == 401) {
         throw const AuthFailure('Session expired. Please login again.');
       }
@@ -218,14 +179,9 @@ class AuthRepository {
     }
   }
 
-  // ==========================================================
-  // SESSION RESTORE (app açılış)
-  // ==========================================================
-  /// App açılışında:
+  /// Session restore:
   /// - Firebase currentUser varsa token alır
   /// - Backend GET /auth/login atar
-  /// - 200 ise "authenticated"
-  /// - 401 ise session yok
   Future<UserAuthenticationDTO> restoreSession() async {
     try {
       final currentUser = _firebaseService.getCurrentUser();
@@ -233,13 +189,9 @@ class AuthRepository {
         throw const AuthFailure('No Firebase session.');
       }
 
-      // Token al (gerekirse yenileyebilirsin: getIdToken(true) istersen service'e eklenir)
       final firebaseIdToken = await _firebaseService.getIdToken();
-
-      // Storage güncelle (interceptor için)
       await _storage.writeAccessToken(firebaseIdToken);
 
-      // Backend check
       final auth = await _apiClient.loginSync(firebaseIdToken: firebaseIdToken);
       if (!auth.authenticated) {
         throw const AuthFailure('Session invalid.');
