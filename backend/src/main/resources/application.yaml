@@ -19,3 +19,6 @@ spring:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
     show-sql: true
 
+geoapify:
+  base-url: https://api.geoapify.com/v2
+  api-key: ${GEOAPIFY_API_KEY}
