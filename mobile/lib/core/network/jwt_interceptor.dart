@@ -1,71 +1,85 @@
+import 'dart:developer';
+
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 
 import 'package:mobile/core/navigation/navigation_service.dart';
 import 'package:mobile/features/auth/data/storage/secure_storage_service.dart';
 
-/// JWT access token'i her outbound request'e otomatik olarak ekleyen interceptor.
-///
-/// Amaç:
-///  - Her istekte elle "Authorization: Bearer ..." header'ı eklemek zorunda kalmamak
-///  - 401 gelirse global yakalayıp kullanıcıyı session expired gibi logout etmek
-///
-/// NOT:
-///  - Refresh mekanizması (token yenileme) bu sprintte yok.
-///  - 401 -> direkt logout + Login'e yönlendirme yapıyoruz.
 class JwtInterceptor extends Interceptor {
   final SecureStorageService _storage;
+  final Dio _dio;
 
-  /// 401'lerde aynı anda birden fazla istek patlarsa
-  /// (örn. 3 request aynı anda 401 dönerse) user'ı 3 kere redirect etmeyelim.
   static bool _handlingUnauthorized = false;
 
   JwtInterceptor({
     required SecureStorageService storage,
-  }) : _storage = storage;
+    required Dio dio,
+  })  : _storage = storage,
+        _dio = dio;
 
   @override
-  void onRequest(
-      RequestOptions options,
-      RequestInterceptorHandler handler,
-      ) async {
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     try {
-      // SecureStorage içinden access_token'ı oku.
       final accessToken = await _storage.readAccessToken();
 
-      // Token null değil ve boş değilse Authorization header'ına ekle.
-      if (accessToken != null && accessToken.isNotEmpty) {
-        options.headers['Authorization'] = 'Bearer $accessToken';
-      }
-    } catch (_) {
-      // Storage okurken hata olursa request'i kırmıyoruz.
-    }
+      final tokenOk = accessToken != null &&
+          accessToken.trim().isNotEmpty &&
+          accessToken.trim().toLowerCase() != 'null';
 
+      if (tokenOk) {
+        options.headers['Authorization'] = 'Bearer ${accessToken!.trim()}';
+      }
+    } catch (_) {}
+
+    log('[JwtInterceptor] REQ path=${options.path} hasAuth=${options.headers['Authorization'] != null}');
     handler.next(options);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     final status = err.response?.statusCode;
+    final path = err.requestOptions.path;
 
-    // 401 dışı hataları olduğu gibi devam ettir.
+    log('[JwtInterceptor] ERROR status=$status path=$path');
+
     if (status != 401) {
       handler.next(err);
       return;
     }
 
-    // Auth endpointleri (login/register) 401 dönerse
-    // kullanıcıyı logout/redirect etmek istemeyebiliriz.
-    // Çünkü login zaten hata döndürüp UI'da gösterilecek.
-    final path = err.requestOptions.path;
-    final isAuthCall = path.startsWith('/auth');
+    // Bu request "beni logout etme" diyorsa -> sadece hatayı geçir
+    final noAutoLogout = err.requestOptions.extra['noAutoLogout'] == true;
+    if (noAutoLogout) {
+      handler.next(err);
+      return;
+    }
 
+    // Auth endpointleri 401 dönerse burada refresh/logout yapma
+    final isAuthCall = path.startsWith('/auth');
     if (isAuthCall) {
       handler.next(err);
       return;
     }
 
-    // Aynı anda birden fazla 401 gelirse tek sefer handle et.
+    // Authorization header yoksa -> session expired sanma
+    final authHeader = err.requestOptions.headers['Authorization'];
+    final hasAuthHeader =
+        authHeader != null && authHeader.toString().trim().isNotEmpty;
+    if (!hasAuthHeader) {
+      handler.next(err);
+      return;
+    }
+
+    // Aynı request ikinci kez 401 yediyse (retry sonrası) -> artık logout
+    final alreadyRetried = err.requestOptions.extra['__retried'] == true;
+    if (alreadyRetried) {
+      await _forceLogout();
+      handler.next(err);
+      return;
+    }
+
+    // Aynı anda birden fazla 401 gelirse tek thread handle etsin
     if (_handlingUnauthorized) {
       handler.next(err);
       return;
@@ -74,25 +88,79 @@ class JwtInterceptor extends Interceptor {
     _handlingUnauthorized = true;
 
     try {
-      // 1) Local tokenları temizle (access/refresh)
-      await _storage.clearSession();
+      // 1) Firebase token'ı FORCE refresh et
+      final user = fb.FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        await _forceLogout();
+        handler.next(err);
+        return;
+      }
 
-      // 2) Firebase oturumunu kapat
-      await fb.FirebaseAuth.instance.signOut();
+      final newToken = await user.getIdToken(true); // String? olabilir
+      final token = newToken?.trim();
 
-      // 3) Kullanıcıya sakin bir "session expired" hissi ver
-      NavigationService.showSnackBar('Session expired. Please login again.');
+      if (token == null || token.isEmpty) {
+        await _forceLogout();
+        handler.next(err);
+        return;
+      }
 
-      // 4) Stack temizleyerek Login'e yönlendir
-      NavigationService.resetToLogin();
-    } catch (_) {
-      // Herhangi bir yerde hata çıksa bile crash istemiyoruz.
-      // Yine de yönlendirmeyi dene.
-      NavigationService.resetToLogin();
+      await _storage.writeAccessToken(token);
+
+      final retriedOptions = _cloneOptions(err.requestOptions);
+      retriedOptions.extra['__retried'] = true;
+      retriedOptions.headers['Authorization'] = 'Bearer $token';
+
+      final response = await _dio.fetch(retriedOptions);
+      handler.resolve(response);
+      return;
+      return;
+    } catch (e) {
+      // Refresh/Retry patladı -> logout
+      await _forceLogout();
+      handler.next(err);
+      return;
     } finally {
       _handlingUnauthorized = false;
     }
+  }
 
-    handler.next(err);
+  RequestOptions _cloneOptions(RequestOptions requestOptions) {
+    return RequestOptions(
+      path: requestOptions.path,
+      method: requestOptions.method,
+      baseUrl: requestOptions.baseUrl,
+      data: requestOptions.data,
+      queryParameters: Map<String, dynamic>.from(requestOptions.queryParameters),
+      headers: Map<String, dynamic>.from(requestOptions.headers),
+      extra: Map<String, dynamic>.from(requestOptions.extra),
+      responseType: requestOptions.responseType,
+      contentType: requestOptions.contentType,
+      followRedirects: requestOptions.followRedirects,
+      listFormat: requestOptions.listFormat,
+      maxRedirects: requestOptions.maxRedirects,
+      persistentConnection: requestOptions.persistentConnection,
+      receiveDataWhenStatusError: requestOptions.receiveDataWhenStatusError,
+      receiveTimeout: requestOptions.receiveTimeout,
+      requestEncoder: requestOptions.requestEncoder,
+      responseDecoder: requestOptions.responseDecoder,
+      sendTimeout: requestOptions.sendTimeout,
+      validateStatus: requestOptions.validateStatus,
+    );
+  }
+
+  Future<void> _forceLogout() async {
+    try {
+      await _storage.clearSession();
+      await fb.FirebaseAuth.instance.signOut();
+    } catch (_) {}
+
+    try {
+      NavigationService.showSnackBar('Session expired. Please login again.');
+    } catch (_) {}
+
+    try {
+      NavigationService.resetToLogin();
+    } catch (_) {}
   }
 }

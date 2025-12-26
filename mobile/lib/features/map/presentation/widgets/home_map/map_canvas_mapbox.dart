@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
 import 'package:mobile/core/config/mapbox_config.dart';
-
+import 'package:mobile/features/poi_search/data/api/poi_search_dto_debug.dart';
 import '../../../../poi_search/data/models/geo_point.dart';
 import '../../../../poi_search/data/models/selected_area.dart';
 import '../../../../poi_search/presentation/bloc/area_query_bloc.dart';
@@ -94,8 +94,9 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
               cameraOptions: MapboxConfig.initialCamera,
               styleUri: MapboxConfig.styleStandard,
               onMapCreated: (mapboxMap) async {
-                _map = mapboxMap;
 
+                _map = mapboxMap;
+                debugPoiSearchDto();
                 // İlk açılışta: 2D varsay
                 await _applyViewMode(MapViewMode.mode2D);
 
