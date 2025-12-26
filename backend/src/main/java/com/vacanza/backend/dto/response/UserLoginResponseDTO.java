@@ -25,6 +25,7 @@ public class UserLoginResponseDTO {
         private UUID userId;
         private String email;
         private String displayName;
+        private String preferredName;
         //private String profilePicture;
     }
 }
