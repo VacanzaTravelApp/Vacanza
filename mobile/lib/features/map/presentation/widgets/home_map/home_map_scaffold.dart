@@ -11,21 +11,21 @@ import '../../../data/models/map_view_mode.dart';
 
 class HomeMapScaffold extends StatelessWidget {
   final MapViewMode mode;
+  final bool isDrawing;
   final VoidCallback onToggleMode;
   final VoidCallback onRecenter;
+  final VoidCallback onToggleDrawing;
 
   const HomeMapScaffold({
     super.key,
     required this.mode,
+    required this.isDrawing,
     required this.onToggleMode,
     required this.onRecenter,
+    required this.onToggleDrawing,
   });
 
-  /// VACANZA-163
-  /// Logout:
-  /// - SecureStorage temizlenir
-  /// - Firebase signOut
-  /// - Navigation stack reset → Login
+  /// VACANZA-163 Logout
   Future<void> _handleLogout(BuildContext context) async {
     try {
       await context.read<AuthRepository>().logout();
@@ -73,8 +73,10 @@ class HomeMapScaffold extends StatelessWidget {
               right: 12,
               child: ActionBar(
                 mode: mode,
+                isDrawing: isDrawing,
                 onToggleMode: onToggleMode,
                 onRecenter: onRecenter,
+                onToggleDrawing: onToggleDrawing,
               ),
             ),
           ],

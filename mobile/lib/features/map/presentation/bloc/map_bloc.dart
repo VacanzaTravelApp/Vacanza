@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
@@ -16,6 +18,8 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<MapInitialized>(_onInitialized);
     on<ToggleViewModePressed>(_onToggleMode);
     on<RecenterPressed>(_onRecenter);
+    on<ToggleDrawingPressed>(_onToggleDrawingPressed);
+    on<SetDrawingEnabled>(_onSetDrawingEnabled);
   }
 
   void _onInitialized(MapInitialized event, Emitter<MapState> emit) {
@@ -43,7 +47,25 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     // ignore: avoid_print
     print('[MapBloc] RecenterPressed -> recenterTick=${state.recenterTick + 1}');
   }
+  void _onToggleDrawingPressed(
+      ToggleDrawingPressed event,
+      Emitter<MapState> emit,
+      ) {
+    emit(state.copyWith(isDrawing: !state.isDrawing));
 
+      log('[MapBloc] ToggleDrawingPressed -> isDrawing=${!state.isDrawing}');
+
+  }
+
+  void _onSetDrawingEnabled(
+      SetDrawingEnabled event,
+      Emitter<MapState> emit,
+      ) {
+    if (state.isDrawing == event.enabled) return;
+    emit(state.copyWith(isDrawing: event.enabled));
+
+      log('[MapBloc] SetDrawingEnabled -> isDrawing=${event.enabled}');
+  }
   /// İstersen ileride UI'da "controller var mı" kontrolü için okunabilir.
   bool get hasController => _controller != null;
 }
