@@ -31,7 +31,7 @@ public class PointOfInterest {
     @Column(nullable = false, length = 500)
     private String name;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String category;
 
     @Column(nullable = false)
@@ -64,5 +64,13 @@ public class PointOfInterest {
 
     @Column(name = "external_id", unique = true, nullable = true, length = 100)
     private String externalId; // Foursquare ID (Optional for user-created places)
+
+    @PrePersist
+    @PreUpdate
+    private void normalizeFields() {
+        if (this.category != null) {
+            this.category = this.category.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+    }
 
 }
