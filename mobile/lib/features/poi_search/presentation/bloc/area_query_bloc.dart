@@ -1,4 +1,5 @@
 import 'dart:developer';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -10,6 +11,8 @@ import 'area_query_state.dart';
 class AreaQueryBloc extends Bloc<AreaQueryEvent, AreaQueryState> {
   AreaQueryBloc() : super(AreaQueryState.initial()) {
     on<ViewportChanged>(_onViewportChanged);
+    on<UserSelectionChanged>(_onUserSelectionChanged);
+    on<ClearUserSelection>(_onClearUserSelection);
   }
 
   void _onViewportChanged(
@@ -43,6 +46,47 @@ class AreaQueryBloc extends Bloc<AreaQueryEvent, AreaQueryState> {
         context: current.copyWith(
           areaSource: AreaSource.viewport,
           area: event.bbox,
+        ),
+      ),
+    );
+  }
+
+  void _onUserSelectionChanged(
+      UserSelectionChanged event,
+      Emitter<AreaQueryState> emit,
+      ) {
+    final current = state.context;
+
+    if (kDebugMode) {
+      log('[AreaQueryBloc] USER_SELECTION -> ${event.area}');
+    }
+
+    emit(
+      state.copyWith(
+        context: current.copyWith(
+          areaSource: AreaSource.userSelection,
+          area: event.area,
+        ),
+      ),
+    );
+  }
+
+  void _onClearUserSelection(
+      ClearUserSelection event,
+      Emitter<AreaQueryState> emit,
+      ) {
+    final current = state.context;
+
+    if (kDebugMode) {
+      log('[AreaQueryBloc] CLEAR USER_SELECTION -> back to viewport');
+    }
+
+    // Alanı NoArea yapıyoruz; viewport bbox zaten MapCanvas'tan gelmeye devam edecek.
+    emit(
+      state.copyWith(
+        context: current.copyWith(
+          areaSource: AreaSource.viewport,
+          area: const NoArea(),
         ),
       ),
     );
