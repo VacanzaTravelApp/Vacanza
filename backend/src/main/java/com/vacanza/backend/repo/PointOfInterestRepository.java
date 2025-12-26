@@ -11,8 +11,16 @@ public interface PointOfInterestRepository extends JpaRepository<PointOfInterest
 
     Optional<PointOfInterest> findByExternalId(String externalId);
 
+    // BBOX: kategori filtresi yoksa kullanılır
     List<PointOfInterest> findByLatitudeBetweenAndLongitudeBetween(
             Double minLat, Double maxLat,
             Double minLon, Double maxLon
+    );
+
+    // BBOX + categories: kategori filtresi varsa kullanılır
+    List<PointOfInterest> findByLatitudeBetweenAndLongitudeBetweenAndCategoryIn(
+            Double minLat, Double maxLat,
+            Double minLon, Double maxLon,
+            List<String> categories
     );
 }
