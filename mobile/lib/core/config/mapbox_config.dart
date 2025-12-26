@@ -12,7 +12,7 @@ class MapboxConfig {
 
   /// Başlangıç kamera
   static final CameraOptions initialCamera = CameraOptions(
-    center: Point(coordinates: Position(29.0, 41.0)),
+    center: Point(coordinates: Position(32.8597, 39.9334)),
     zoom: 13.5,
     pitch: 0,
     bearing: 0,
