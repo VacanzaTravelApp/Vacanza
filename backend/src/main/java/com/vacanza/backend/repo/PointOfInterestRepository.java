@@ -11,7 +11,7 @@ import java.util.UUID;
 public interface PointOfInterestRepository extends JpaRepository<PointOfInterest, UUID> {
 
     Optional<PointOfInterest> findByExternalId(String externalId);
-
+    boolean existsByExternalId(String externalId);
     // BBOX: kategori filtresi yoksa kullanılır
     List<PointOfInterest> findByLatitudeBetweenAndLongitudeBetween(
             Double minLat, Double maxLat,
