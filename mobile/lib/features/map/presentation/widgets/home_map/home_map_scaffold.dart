@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:mobile/core/navigation/navigation_service.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
-import 'package:mobile/features/map/presentation/widgets/home_map/map_canvas_mapbox.dart';
+import 'package:mobile/features/map/presentation/widgets/home_map/mapbox/map_canvas_mapbox.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/action_bar.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/profile_badge.dart';
 
