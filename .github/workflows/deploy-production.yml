@@ -10,75 +10,96 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      ##############################################################
+      # CHECKOUT
+      ##############################################################
       - name: 📦 Checkout Repository
         uses: actions/checkout@v3
 
-      # Get timestamp
+      ##############################################################
+      # TIME
+      ##############################################################
       - name: ⏱ Get current time
         id: time
-        run: echo "now=$(date)" >> $GITHUB_OUTPUT
+        run: echo "now=$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
 
+      ##############################################################
+      # DEPLOY
+      ##############################################################
       - name: 🚀 Deploy to Production Server Over SSH
-        id: deploy_prod
-        continue-on-error: true
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
+            set -e
+
             echo "===== 🚀 STARTING PRODUCTION DEPLOYMENT ====="
 
             ##############################################################
             # BACKEND DEPLOY (Production)
             ##############################################################
             echo "🔥 Updating Backend (Production)..."
+
+            cd /root/vacanza-backend/prod/Vacanza
+            git fetch origin
+            git reset --hard origin/Production
+
             cd /root/vacanza-backend/prod
-            git pull origin Production
-            docker compose down --remove-orphans
-            docker compose up --build -d
+            docker compose -p vacanza-prod-backend down --remove-orphans
+            docker compose -p vacanza-prod-backend up --build -d
+
+            docker ps | grep vacanza-prod-backend
+
             echo "✔ Backend Production Deploy Finished!"
 
             ##############################################################
             # WEB DEPLOY (Production)
             ##############################################################
             echo "🌍 Updating Web (Production)..."
-            cd /root/vacanza-web/prod
-            git pull origin Production
-            docker compose down --remove-orphans
-            docker compose up --build -d
-            echo "✔ Web Production Deploy Finished!"
 
+            cd /root/vacanza-web/prod/Vacanza
+            git fetch origin
+            git reset --hard origin/Production
+
+            cd /root/vacanza-web/prod
+            docker compose -p vacanza-prod-web down --remove-orphans
+            docker compose -p vacanza-prod-web up --build -d
+
+            docker ps | grep vacanza-web-prod
+
+            echo "✔ Web Production Deploy Finished!"
             echo "===== 🎉 ALL PRODUCTION SERVICES UPDATED SUCCESSFULLY ====="
 
-      ###########################################################################
+      ##############################################################
       # SUCCESS NOTIFICATION
-      ###########################################################################
+      ##############################################################
       - name: 📢 Mattermost Success Notification (Production)
         if: success()
         uses: fjogeleit/http-request-action@v1
         with:
           url: ${{ secrets.MM_WEBHOOK_URL }}
-          method: 'POST'
+          method: POST
           data: >
             {
               "username": "CI/CD Bot",
               "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": "🚀 **Production Deploy Successful!**\n\n🌍 Environment: **Production**\n🛠 Services Updated: **Backend + Web**\n✨ Status: **Success**\n🔔 Time: **${{ steps.time.outputs.now }}**"
+              "text": "🚀 **Production Deploy Successful!**\n\n🌍 Environment: **Production**\n🛠 Services Updated: **Backend + Web**\n✨ Status: **Success**\n🕒 Time: **${{ steps.time.outputs.now }}**"
             }
 
-      ###########################################################################
+      ##############################################################
       # FAILURE NOTIFICATION
-      ###########################################################################
+      ##############################################################
       - name: ❌ Mattermost Failure Notification (Production)
         if: failure()
         uses: fjogeleit/http-request-action@v1
         with:
           url: ${{ secrets.MM_WEBHOOK_URL }}
-          method: 'POST'
+          method: POST
           data: >
             {
               "username": "CI/CD Bot",
               "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
-              "text": "❌ **Production Deploy FAILED!**\n\n🚨 Environment: **Production**\n📛 Please check GitHub Actions logs.\n🕒 Time: **${{ steps.time.outputs.now }}**"
+              "text": "❌ **Production Deploy FAILED!**\n\n🚨 Environment: **Production**\n📛 One or more services did not start correctly.\n🕒 Time: **${{ steps.time.outputs.now }}**"
             }

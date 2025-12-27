@@ -9,53 +9,60 @@ html, body, #root {
 }
 
 /*
-** 1. ANA KAPSAYICI (AUTH-CONTAINER): Havadar Mavi Degrade
+** 1. ANA KAPSAYICI (AUTH-CONTAINER): TAM EKRAN GÖRSEL
 */
 .auth-container {
     min-height: 100vh;
     width: 100%;
     
-    /* GÜNCEL: Görseldeki en açık, havadar mavi tonları */
-    background: linear-gradient(
-        135deg, 
-        #bfe9ff, /* Çok açık, havadar gökyüzü mavisi (Başlangıç) */
-        #d0eaff, /* Çok açık, soğuk mavi (Orta) */
-        #ffffff  /* Saf Beyaz (Bitiş) */
-    );
-    
-    display: flex;
-}
-
-/* ---------------------------------------------------- */
-/* --- SOL SÜTUN (GÖRSEL) --- (Aynı) */
-
-.auth-visual-column {
-    flex: 1;
-    background-image: url('https://picsum.photos/1000/1000?random=1');
-    background-size: cover;
+    /* Tüm sayfanın arka plan görseli */
+    background-image: url('https://picsum.photos/1000/1000?random=1'); 
+    background-size: cover; 
     background-position: center;
-    position: relative;
-    color: white; 
-    padding: 60px 40px; 
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between; 
-    overflow: hidden;
+    background-attachment: fixed; 
+    
+    display: flex; 
+    position: relative; 
 }
 
-.auth-visual-column::before {
+/* ** Saydam Koyu Katman (Görselin Okunabilirliğini Artırır) */
+.auth-container::before {
     content: '';
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.4); 
+    background: rgba(0, 0, 0, 0.4); /* Koyu opaklık katmanı */
     z-index: 1;
 }
 
-.auth-visual-column > * {
+/* Tüm içerik sütunlarının katmanın önünde görünmesini sağlar */
+.auth-container > * {
     z-index: 2; 
+}
+
+
+/* ---------------------------------------------------- */
+/* --- SOL SÜTUN (İÇERİK SÜTUNU) --- */
+
+.auth-visual-column {
+    flex: 1;
+    background-image: none;
+    background-color: transparent; 
+    
+    color: white; 
+    padding: 60px 40px; 
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; 
+    overflow: hidden;
+    z-index: 2; /* Arka plan katmanının üstünde */
+}
+
+.auth-visual-column::before {
+
+    content: none;
 }
 
 
@@ -171,7 +178,7 @@ html, body, #root {
 }
 
 .stat-text {
-    font-size: 14px;
+    font-size: 14px; 
     font-weight: 500;
     opacity: 0.8;
     text-transform: uppercase; 
@@ -188,16 +195,23 @@ html, body, #root {
     display: flex;
     justify-content: center;
     align-items: center;
-    /* Degrade görünmesi için şeffaf */
+    /* Arka planı şeffaf */
     background-color: transparent; 
+    z-index: 2;
 }
 
 /* ** 3. FORM KARTI GÖLGESİ VE ARKA PLAN 
-** Saf beyazlığı kırar, degradeyi hafifçe yansıtır.
+** Opaklık %75'e düşürülmüştür.
 */
-.auth-form-column > div { 
-    /* GÜNCEL: %95 Opak beyaz + Hafif Bulanıklık */
-    background-color: rgba(255, 255, 255, 0.95); 
+.auth-form-column > * { 
+    /* GÜNCEL: Opaklığı %75'e düşürdük (Beyazlığı önemli ölçüde kırar) */
+    background-color: rgba(255, 255, 255, 0.75); 
+    
+    /* Küçültülmüş boyut ve iç boşluk ayarları */
+    max-width: 360px; 
+    width: 100%; 
+    padding: 30px;
+    
     backdrop-filter: blur(8px); 
     
     /* Gölge ve köşe yuvarlaklığı */

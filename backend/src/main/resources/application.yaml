@@ -5,6 +5,9 @@ spring:
   application:
     name: vacanza-backend
 
+  profiles:
+    active: dev # security kapatmak için dev ortamına ayarladım
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -15,3 +18,7 @@ spring:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
     show-sql: true
+
+geoapify:
+  base-url: https://api.geoapify.com/v2
+  api-key: ${GEOAPIFY_API_KEY}

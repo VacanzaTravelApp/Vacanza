@@ -1,111 +1,112 @@
 // src/pages/auth/LoginCard.jsx
 
-import React from 'react';
-import { Form, Input, Button, Space } from 'antd'; // Checkbox kaldırıldı
-import { 
-    LockOutlined, 
-    MailOutlined, 
-    SendOutlined, // Logo ikonu eklendi 
-    // Alt navigasyon ikonları (GlobalOutlined, TeamOutlined, SettingOutlined) kaldırıldı
-} from '@ant-design/icons';
-import './RegisterCard.css'; 
+import React, { useState } from "react";
+import { Form, Input, Button, message } from "antd";
+import { LockOutlined, MailOutlined, SendOutlined } from "@ant-design/icons";
+import "./RegisterCard.css";
+import { useNavigate } from "react-router-dom";
 
-import { useNavigate } from 'react-router-dom';
+//Firebase
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "../../firebase";
+
+// API
+import { authApi } from "../../api/authApi";
 
 const LoginCard = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const onFinish = (values) => {
-    console.log('Login Successful:', values);
-    alert('Login successful! Redirecting to homepage.');
-    // navigate('/dashboard'); 
+  const onFinish = async ({ email, password }) => {
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+  console.log("Firebase login successful.");
+      try {
+        await authApi.login();
+        console.log("Backend sync successful.");
+      // eslint-disable-next-line no-unused-vars
+      } catch (syncError) {
+        console.warn("Backend sync skipped: Server returned HTML, but we are logged in via Firebase.");
+      }
+   message.success("Logged in successfully!");
+      navigate("/map");
+    } catch (error) {
+      console.error("Firebase login error:", error);
+
+      let msg = "Login failed. Please try again.";
+      if (error?.code === "auth/invalid-email") msg = "Please enter a valid email address.";
+      if (error?.code === "auth/user-not-found") msg = "No user found with this email.";
+      if (error?.code === "auth/invalid-credential" || error?.code === "auth/wrong-password")
+        msg = "Incorrect email or password.";
+
+      message.error(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRegisterRedirect = () => {
-    // '/register' yoluna yönlendirir
-    navigate('/register'); 
-  };
-  
-  const handleForgotPassword = () => {
-      alert('Forgot Password link clicked!');
-      // navigate('/forgot-password');
-  };
+  const handleForgotPassword = async () => {
+    const userEmail = window.prompt("Enter your email to reset your password:");
+    if (!userEmail) return;
 
+    try {
+      await sendPasswordResetEmail(auth, userEmail);
+      message.success("Password reset email sent. Please check your inbox.");
+    } catch (error) {
+      console.error("Reset password error:", error);
+      message.error("Could not send reset email. Please check the email address.");
+    }
+  };
 
   return (
-    <div className="register-card"> {/* Stil için RegisterCard CSS kullanılıyor */}
+    <div className="register-card">
       <div className="card-header">
         <span className="vacanza-logo">
-            <SendOutlined className="logo-icon" /> {/* Logo ikonu eklendi */}
-            Vacanza
+          <SendOutlined className="logo-icon" />
+          Vacanza
         </span>
-        <h3>Welcome Back to Vacanza</h3>
-        <p className="header-subtext">
-          Sign in to continue your journey
-        </p>
+        <h3>Welcome Back</h3>
+        <p className="header-subtext">Sign in to continue</p>
       </div>
 
-      <Form
-        name="login"
-        initialValues={{ remember: true }}
-        onFinish={onFinish} 
-        layout="vertical"
-        className="auth-form"
-      >
-        {/* E-posta */}
+      <Form name="login" onFinish={onFinish} layout="vertical" className="auth-form">
         <Form.Item
           name="email"
           rules={[
-            { type: 'email', message: 'The input is not a valid E-mail!' },
-            { required: true, message: 'Please input your E-mail!' },
+            { type: "email", message: "Please enter a valid email address!" },
+            { required: true, message: "Please enter your email!" },
           ]}
         >
-          <Input 
-            prefix={<MailOutlined />} 
-            placeholder="Enter your email" 
-            size="large" 
-            autoComplete="email"
-          />
+          <Input prefix={<MailOutlined />} placeholder="Email address" size="large" autoComplete="email" />
         </Form.Item>
 
-        {/* Şifre */}
-        <Form.Item
-          name="password"
-          rules={[{ required: true, message: 'Please input your Password!' }]}
-        >
-          <Input.Password 
-            prefix={<LockOutlined />} 
-            placeholder="Enter your password" 
-            size="large" 
+        <Form.Item name="password" rules={[{ required: true, message: "Please enter your password!" }]}>
+          <Input.Password
+            prefix={<LockOutlined />}
+            placeholder="Password"
+            size="large"
             autoComplete="current-password"
           />
         </Form.Item>
 
-        {/* Şifremi Unuttum? Linki */}
         <div className="login-options-row">
-            {/* Boşluk bırakmak için yer tutucu kullanıyoruz (CSS'teki flex-end için) */}
-            <span className="remember-me-placeholder"></span> 
-            
-            <span onClick={handleForgotPassword} className="forgot-password-link">
-                Forgot Password?
-            </span>
+          <span className="remember-me-placeholder" />
+          <span onClick={handleForgotPassword} className="forgot-password-link">
+            Forgot Password?
+          </span>
         </div>
 
-        {/* Giriş Butonu */}
-        <Form.Item style={{ marginTop: '20px' }}> {/* Butonun üstüne boşluk ekledik */}
-          <Button type="primary" htmlType="submit" className="cta-button" size="large">
+        <Form.Item style={{ marginTop: 20 }}>
+          <Button type="primary" htmlType="submit" className="cta-button" size="large" loading={loading}>
             Log In
           </Button>
         </Form.Item>
-        
-        {/* Alt Navigasyon (Özellik Butonları) bu tasarımda olmadığı için kaldırıldı. */}
       </Form>
 
-
-      {/* Kayıt Ol Yönlendirmesi */}
       <div className="login-redirect">
-        Don't have an Vacanza account? 
-        <span onClick={handleRegisterRedirect} className="login-link">
+        Don&apos;t have an account?{" "}
+        <span onClick={() => navigate("/register")} className="login-link">
           Sign Up
         </span>
       </div>

@@ -1,5 +1,3 @@
-// firebase.js
-
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
@@ -12,10 +10,6 @@ const firebaseConfig = {
   appId: "1:424211182688:web:7e4c7ddeb6c7ed04e3bf05",
   measurementId: "G-CRPL3K2FG9"
 };
-
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-// Export Firebase services
-export const auth = getAuth(app);
-export default app;
+export const auth = getAuth(app); 
+export default auth; 
