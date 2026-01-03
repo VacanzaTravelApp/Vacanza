@@ -43,7 +43,7 @@ public class WebClientConfig {
                     .queryParam("apiKey", props.getApiKey())
                     .build(false)
                     .toUri();
-            System.out.println("🔥 FINAL GEOAPIFY URL = " + newUrl);
+            System.out.println("FINAL GEOAPIFY URL = " + newUrl);
             var newRequest = ClientRequest
                     .from(request)
                     .url(newUrl)

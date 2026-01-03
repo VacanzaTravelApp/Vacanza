@@ -17,7 +17,6 @@ public class PoiIngestService {
     private final GeoapifyClient geoapifyClient;
     private final PointOfInterestRepository poiRepository;
 
-    // 🔥 MULTI CATEGORY INGEST
     @Transactional
     public int ingestMultipleCategories(
             String filter,
@@ -45,7 +44,6 @@ public class PoiIngestService {
         return totalSaved;
     }
 
-    // 🔥 TEK CATEGORY INGEST
     private int ingestSingleCategory(
             String filter,
             String geoapifyCategory,
