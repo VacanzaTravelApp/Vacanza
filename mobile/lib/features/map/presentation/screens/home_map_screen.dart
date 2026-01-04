@@ -7,6 +7,7 @@ import '../../../poi_search/data/models/selected_area.dart';
 import '../../../poi_search/data/repositories/poi_search_repository.dart';
 import '../../../poi_search/data/repositories/poi_search_repository_impl.dart';
 import '../../../poi_search/presentation/bloc/area_query_bloc.dart';
+import '../../../poi_search/presentation/bloc/area_query_event.dart' as aq;
 import '../../../poi_search/presentation/bloc/area_query_state.dart';
 import '../../../poi_search/presentation/bloc/poi_search_bloc.dart';
 import '../../../poi_search/presentation/bloc/poi_search_event.dart' as poi;
@@ -65,7 +66,12 @@ class _HomeMapViewState extends State<_HomeMapView> {
   void _closeFilters() {
     if (!_filtersOpen) return;
     if (!mounted) return;
+
     setState(() => _filtersOpen = false);
+
+    // ✅ panel kapanınca user selection biter -> viewport'a dön
+    context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
+    context.read<PoiSearchBloc>().add(const poi.AreaCleared());
   }
 
   @override
@@ -86,7 +92,7 @@ class _HomeMapViewState extends State<_HomeMapView> {
             }
 
             // 2) User selection -> PoiSearch area event + filtre panelini aç
-            if (ctx.areaSource == AreaSource.userSelection) {
+            if (ctx.areaSource == AreaSource.userSelection && ctx.area is PolygonArea) {
               context.read<PoiSearchBloc>().add(poi.AreaChanged(ctx.area));
               _openFilters();
               return;
@@ -105,15 +111,26 @@ class _HomeMapViewState extends State<_HomeMapView> {
           return HomeMapScaffold(
             mode: state.viewMode,
             isDrawing: state.isDrawing,
-            onToggleMode: () =>
-                context.read<MapBloc>().add(const ToggleViewModePressed()),
-            onRecenter: () =>
-                context.read<MapBloc>().add(const RecenterPressed()),
-            onToggleDrawing: () =>
-                context.read<MapBloc>().add(ToggleDrawingPressed()),
+            onToggleMode: () => context.read<MapBloc>().add(const ToggleViewModePressed()),
+            onRecenter: () => context.read<MapBloc>().add(const RecenterPressed()),
+            onToggleDrawing: () {
+              final isDrawingNow = context.read<MapBloc>().state.isDrawing;
+
+              if (isDrawingNow) {
+                // ✅ Butondan kapatma:
+                // - Drawing kapanır
+                // - Selection temizlenir (viewport’a dönersin)
+                context.read<MapBloc>().add(SetDrawingEnabled(false));
+                context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
+                context.read<PoiSearchBloc>().add(const poi.AreaCleared());
+
+                _closeFilters();
+              } else {
+                context.read<MapBloc>().add(SetDrawingEnabled(true));
+              }
+            },
             onOpenFilters: _openFilters,
 
-            // ✅ Overlay kontrolü burada
             isFiltersOpen: _filtersOpen,
             onCloseFilters: _closeFilters,
             filtersPanel: PoiFilterPanel(
