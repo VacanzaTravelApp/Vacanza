@@ -26,14 +26,27 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
     on<LoadNextPage>(_onLoadNextPage); // opsiyonel
   }
 
+  /// Son gelen viewport bbox’u burada cache’liyoruz.
+  /// (USER_SELECTION aktifken bile güncellenir)
+  BboxArea? _lastViewportBbox;
+
   void _onViewportChanged(ViewportChanged event, Emitter<PoiSearchState> emit) {
+    // ✅ Çok zoom-out olunca request atma
+    if (_bboxTooLargeForSearch(event.bbox)) {
+      log('[PoiSearchBloc] IGNORE viewport (bbox too large) -> zoom in');
+      return;
+    }
+
+    // ✅ Her zaman cache’le (AreaCleared fallback için)
+    _lastViewportBbox = event.bbox;
+
     // ✅ User selection aktifse viewport update’leri ignore
     if (state.areaSource == AreaSource.userSelection) {
       log('[PoiSearchBloc] IGNORE viewport (USER_SELECTION active)');
       return;
     }
 
-    // Aynı bbox geldiyse spam request atma
+    // ✅ Aynı bbox geldiyse spam request atma
     if (state.selectedArea is BboxArea && state.selectedArea == event.bbox) {
       return;
     }
@@ -63,11 +76,13 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
   }
 
   void _onAreaCleared(AreaCleared event, Emitter<PoiSearchState> emit) {
-    // Viewport moduna dön; bbox zaten MapCanvas’tan tekrar gelecek
+    // ✅ Viewport moduna dön; map hareket etmese bile son bbox varsa direkt ona döneriz.
+    final fallback = _lastViewportBbox ?? const NoArea();
+
     emit(
       state.copyWith(
         areaSource: AreaSource.viewport,
-        selectedArea: const NoArea(),
+        selectedArea: fallback,
         page: 0,
         status: PoiSearchStatus.idle,
         errorCode: null,
@@ -77,13 +92,29 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
         countsByCategory: const {},
       ),
     );
+
+    // ✅ Eğer fallback usable ise hemen tekrar search et
+    if (fallback.isUsable) {
+      add(const SearchRequested());
+    }
+  }
+
+  bool _bboxTooLargeForSearch(BboxArea b) {
+    final latSpan = (b.maxLat - b.minLat).abs();
+    final lngSpan = (b.maxLng - b.minLng).abs();
+
+    // ✅ agresif threshold (senin istediğin): 0.15
+    return latSpan > 0.15 || lngSpan > 0.15;
   }
 
   void _onCategoryChanged(CategoryChanged event, Emitter<PoiSearchState> emit) {
-    // Repository normalize ediyor (lowercase + uniq), burada sadece state’i tutuyoruz.
-    emit(state.copyWith(selectedCategories: List.unmodifiable(event.categories), page: 0));
+    emit(
+      state.copyWith(
+        selectedCategories: List.unmodifiable(event.categories),
+        page: 0,
+      ),
+    );
 
-    // ✅ Category değişince aynı aktif area ile yeniden request
     if (state.hasUsableArea) {
       add(const SearchRequested());
     }
@@ -94,10 +125,12 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
     if (state.hasUsableArea) add(const SearchRequested());
   }
 
-  Future<void> _onSearchRequested(SearchRequested event, Emitter<PoiSearchState> emit) async {
+  Future<void> _onSearchRequested(
+      SearchRequested event,
+      Emitter<PoiSearchState> emit,
+      ) async {
     if (!state.hasUsableArea) return;
 
-    // MVP: pagination yoksa page=0
     final page = 0;
     final limit = state.limit.clamp(1, 500);
 
@@ -151,6 +184,6 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
   }
 
   Future<void> _onLoadNextPage(LoadNextPage event, Emitter<PoiSearchState> emit) async {
-    // ops: şimdilik MVP dışı. İstersen sonra açarız.
+    // ops: şimdilik MVP dışı.
   }
 }

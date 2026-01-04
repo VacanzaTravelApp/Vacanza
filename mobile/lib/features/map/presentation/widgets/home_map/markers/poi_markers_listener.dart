@@ -2,29 +2,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../../poi_search/data/models/poi.dart';
 import '../../../../../poi_search/presentation/bloc/poi_search_bloc.dart';
 import '../../../../../poi_search/presentation/bloc/poi_search_state.dart';
-
 import 'poi_markers_controller.dart';
 
 /// PoiSearchBloc -> Map markers binder.
 /// UI çizmez; sadece marker state sync yapar.
+///
+/// Kurallar:
+/// - loading: clear
+/// - idle veya usable area yok: clear
+/// - success: backend'in döndürdüğü state.pois aynen basılır
+///   (kategori filtresi backend tarafında uygulanır, burada tekrar filtreleme yapılmaz)
 class PoiMarkersListener extends StatelessWidget {
   final PoiMarkersController? poiMarkers;
-
-  /// Backend boş dönerse mock gösterelim mi?
-  /// Backend gelince false yapıp sadece gerçek data kullanabilirsin.
-  final bool useMockWhenBackendEmpty;
-
-  /// Mock data üretici (backend boşken dev/test için).
-  final List<Poi> Function()? mockPois;
 
   const PoiMarkersListener({
     super.key,
     required this.poiMarkers,
-    required this.useMockWhenBackendEmpty,
-    this.mockPois,
   });
 
   @override
@@ -33,12 +28,13 @@ class PoiMarkersListener extends StatelessWidget {
       listenWhen: (prev, next) =>
       prev.status != next.status ||
           prev.pois != next.pois ||
-          prev.selectedCategories != next.selectedCategories,
+          prev.selectedArea != next.selectedArea ||
+          prev.areaSource != next.areaSource,
       listener: (context, state) async {
         final markers = poiMarkers;
         if (markers == null) {
           if (kDebugMode) {
-            debugPrint('[PoiMarkersListener] markers=null (init sonrası setState gerekli)');
+            debugPrint('[PoiMarkersListener] markers=null (MapCanvas setState ile rebuild etmeli)');
           }
           return;
         }
@@ -55,36 +51,17 @@ class PoiMarkersListener extends StatelessWidget {
           return;
         }
 
-        // Success -> marker bas
+        // Success -> backend pois'i aynen bas
         if (state.status == PoiSearchStatus.success) {
-          // 1) Data kaynağı seçimi
-          List<Poi> pois = state.pois;
-
-          if (pois.isEmpty && useMockWhenBackendEmpty && mockPois != null) {
-            pois = mockPois!();
-          }
-
-          // 2) Kategori filtresi (mock + backend fark etmez)
-          final selected = state.selectedCategories
-              .map((e) => e.trim().toLowerCase())
-              .where((e) => e.isNotEmpty)
-              .toSet();
-
-          if (selected.isNotEmpty) {
-            pois = pois
-                .where((p) => selected.contains(p.category.trim().toLowerCase()))
-                .toList();
-          }
-
           if (kDebugMode) {
-            debugPrint(
-              '[PoiMarkersListener] status=success backendPois=${state.pois.length} '
-                  'selected=${selected.length} renderPois=${pois.length}',
-            );
+            debugPrint('[PoiMarkersListener] success -> render pois=${state.pois.length}');
           }
-
-          await markers.setPois(pois);
+          await markers.setPois(state.pois);
         }
+
+        // Error'da mevcut marker'ı olduğu gibi bırakmak istersen clear yapma.
+        // İstersen aşağıdaki satırı açabilirsin:
+        // if (state.status == PoiSearchStatus.error) await markers.clear();
       },
       child: const SizedBox.shrink(),
     );

@@ -149,8 +149,8 @@ class PoiFilterPanel extends StatelessWidget {
                 final count = counts[key] ?? 0;
 
                 // counts geldiyse count=0 olanlar disabled görünsün
-                final enabled = !hasCounts || count > 0;
-
+                final hasKey = counts.containsKey(key);
+                final enabled = !hasCounts || !hasKey || count > 0;
                 final isOn = selected.contains(key);
                 final color = _colorFor(key);
 
