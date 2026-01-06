@@ -1,3 +1,7 @@
+// ======================= home_map_scaffold.dart =======================
+// lib/features/map/presentation/widgets/home_map/home_map_scaffold.dart
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -25,6 +29,14 @@ class HomeMapScaffold extends StatelessWidget {
   final Widget? filtersPanel;
   final VoidCallback? onCloseFilters;
 
+  /// ✅ Results bottom sheet kontrolü (HomeMapScreen yönetir)
+  final bool isResultsOpen;
+  final Widget? resultsSheet;
+
+  /// ✅ Filter açıkken resultsSheet'i arkada blur preview göstermek için
+  /// (sadece polygon sonrası filter açılınca true göndereceksin)
+  final bool showResultsBlurUnderFilters;
+
   const HomeMapScaffold({
     super.key,
     required this.mode,
@@ -36,6 +48,9 @@ class HomeMapScaffold extends StatelessWidget {
     this.isFiltersOpen = false,
     this.filtersPanel,
     this.onCloseFilters,
+    this.isResultsOpen = false,
+    this.resultsSheet,
+    this.showResultsBlurUnderFilters = false,
   });
 
   /// VACANZA-163 Logout
@@ -51,6 +66,13 @@ class HomeMapScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final showFilters = isFiltersOpen && filtersPanel != null;
 
+    // normal sheet: filter kapalıyken
+    final showResults = isResultsOpen && resultsSheet != null && !showFilters;
+
+    // blur preview: filter açıkken, sadece belirli senaryoda
+    final showBlurPreview =
+        showFilters && showResultsBlurUnderFilters && resultsSheet != null;
+
     return Scaffold(
       body: SafeArea(
         child: Stack(
@@ -62,17 +84,18 @@ class HomeMapScaffold extends StatelessWidget {
 
             // ================= PROFILE (SOL ÜST) =================
             const Positioned(
-              top: 20,
+              top: 30,
               left: 16,
               child: ProfileBadge(
-                name: 'Alex', // VACANZA-164
+                name: 'Serhat', // VACANZA-164
                 subtitle: 'Traveler',
+                  imagePath: 'assets/core/theme/profile/serhat.jpg'
               ),
             ),
 
             // ================= LOGOUT (SAĞ ÜST) =================
             Positioned(
-              top: 20,
+              top: 30,
               right: 16,
               child: IconButton(
                 tooltip: 'Logout',
@@ -96,6 +119,28 @@ class HomeMapScaffold extends StatelessWidget {
               ),
             ),
 
+            // ================= RESULTS SHEET (BLUR PREVIEW UNDER FILTER) =================
+            // ================= RESULTS SHEET (BLUR PREVIEW UNDER FILTER) =================
+            if (showBlurPreview)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: IgnorePointer(
+                  ignoring: true,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24), // sheet ile aynı
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 2.2, sigmaY: 2.2), // hafif blur
+                      child: Opacity(
+                        opacity: 0.55, // hafif soluk
+                        child: resultsSheet!,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
             // ================= FILTER OVERLAY (SAĞDAN PANEL) =================
             if (showFilters) ...[
               // backdrop (dışına tıklayınca kapat)
@@ -111,7 +156,7 @@ class HomeMapScaffold extends StatelessWidget {
 
               // panel
               Positioned(
-                top: 110, // ActionBar hizası + biraz boşluk
+                top: 110,
                 right: 16,
                 child: Material(
                   color: Colors.transparent,
@@ -119,6 +164,9 @@ class HomeMapScaffold extends StatelessWidget {
                 ),
               ),
             ],
+
+            // ================= RESULTS SHEET (BOTTOM) =================
+            if (showResults) resultsSheet!,
           ],
         ),
       ),

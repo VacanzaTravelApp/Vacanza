@@ -1,92 +1,102 @@
-import 'package:flutter/foundation.dart';
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../../poi_search/data/models/poi.dart';
 import '../../../../../poi_search/presentation/bloc/poi_search_bloc.dart';
 import '../../../../../poi_search/presentation/bloc/poi_search_state.dart';
-
 import 'poi_markers_controller.dart';
 
-/// PoiSearchBloc -> Map markers binder.
-/// UI çizmez; sadece marker state sync yapar.
-class PoiMarkersListener extends StatelessWidget {
+class PoiMarkersListener extends StatefulWidget {
   final PoiMarkersController? poiMarkers;
-
-  /// Backend boş dönerse mock gösterelim mi?
-  /// Backend gelince false yapıp sadece gerçek data kullanabilirsin.
-  final bool useMockWhenBackendEmpty;
-
-  /// Mock data üretici (backend boşken dev/test için).
-  final List<Poi> Function()? mockPois;
 
   const PoiMarkersListener({
     super.key,
     required this.poiMarkers,
-    required this.useMockWhenBackendEmpty,
-    this.mockPois,
   });
+
+  @override
+  State<PoiMarkersListener> createState() => _PoiMarkersListenerState();
+}
+
+class _PoiMarkersListenerState extends State<PoiMarkersListener> {
+  PoiSearchState? _lastProcessedState;
+
+  @override
+  void didUpdateWidget(covariant PoiMarkersListener oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.poiMarkers != widget.poiMarkers) {
+      log('[PoiMarkersListener] controller changed -> reset last state');
+      _lastProcessedState = null;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final currentState = context.read<PoiSearchBloc>().state;
+        _processPoisState(currentState, force: true);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<PoiSearchBloc, PoiSearchState>(
-      listenWhen: (prev, next) =>
-      prev.status != next.status ||
-          prev.pois != next.pois ||
-          prev.selectedCategories != next.selectedCategories,
-      listener: (context, state) async {
-        final markers = poiMarkers;
-        if (markers == null) {
-          if (kDebugMode) {
-            debugPrint('[PoiMarkersListener] markers=null (init sonrası setState gerekli)');
-          }
-          return;
-        }
-
-        // Yeni request başlarken eski marker'ları temizle
-        if (state.status == PoiSearchStatus.loading) {
-          await markers.clear();
-          return;
-        }
-
-        // Alan yoksa veya idle ise temiz tut
-        if (!state.hasUsableArea || state.status == PoiSearchStatus.idle) {
-          await markers.clear();
-          return;
-        }
-
-        // Success -> marker bas
-        if (state.status == PoiSearchStatus.success) {
-          // 1) Data kaynağı seçimi
-          List<Poi> pois = state.pois;
-
-          if (pois.isEmpty && useMockWhenBackendEmpty && mockPois != null) {
-            pois = mockPois!();
-          }
-
-          // 2) Kategori filtresi (mock + backend fark etmez)
-          final selected = state.selectedCategories
-              .map((e) => e.trim().toLowerCase())
-              .where((e) => e.isNotEmpty)
-              .toSet();
-
-          if (selected.isNotEmpty) {
-            pois = pois
-                .where((p) => selected.contains(p.category.trim().toLowerCase()))
-                .toList();
-          }
-
-          if (kDebugMode) {
-            debugPrint(
-              '[PoiMarkersListener] status=success backendPois=${state.pois.length} '
-                  'selected=${selected.length} renderPois=${pois.length}',
-            );
-          }
-
-          await markers.setPois(pois);
-        }
+      listenWhen: (prev, next) {
+        return prev.status != next.status ||
+            prev.pois != next.pois ||
+            prev.selectedArea != next.selectedArea ||
+            prev.areaSource != next.areaSource;
+      },
+      listener: (context, state) {
+        _processPoisState(state);
       },
       child: const SizedBox.shrink(),
     );
+  }
+
+  void _processPoisState(PoiSearchState state, {bool force = false}) async {
+    final markers = widget.poiMarkers;
+
+    if (markers == null || !markers.isReady) {
+      log('[PoiMarkersListener] markers not ready -> skipping');
+      return;
+    }
+
+    if (!force && _isSameState(state, _lastProcessedState)) {
+      log('[PoiMarkersListener] same state -> skip');
+      return;
+    }
+
+    _lastProcessedState = state;
+
+    if (state.status == PoiSearchStatus.loading) {
+      log('[PoiMarkersListener] loading -> clear markers');
+      await markers.clear();
+      return;
+    }
+
+    if (!state.hasUsableArea || state.status == PoiSearchStatus.idle) {
+      log('[PoiMarkersListener] idle/no area -> clear markers');
+      await markers.clear();
+      return;
+    }
+
+    if (state.status == PoiSearchStatus.success) {
+      log('[PoiMarkersListener] success -> render ${state.pois.length} POIs');
+      await markers.setPois(state.pois);
+      return;
+    }
+
+    if (state.status == PoiSearchStatus.error) {
+      log('[PoiMarkersListener] error -> keeping current markers');
+    }
+  }
+
+  bool _isSameState(PoiSearchState? a, PoiSearchState? b) {
+    if (a == null || b == null) return false;
+    return a.status == b.status &&
+        a.pois == b.pois &&
+        a.selectedArea == b.selectedArea &&
+        a.areaSource == b.areaSource;
   }
 }

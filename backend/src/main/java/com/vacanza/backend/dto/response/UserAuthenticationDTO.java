@@ -19,6 +19,7 @@ public class UserAuthenticationDTO {
 
     private String email;
     private String role;
+    private String preferredName;
 
     private boolean verified;
 

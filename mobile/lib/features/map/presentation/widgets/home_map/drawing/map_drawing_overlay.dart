@@ -1,3 +1,4 @@
+// map_drawing_overlay.dart
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -11,20 +12,26 @@ import 'freehand_painter.dart';
 /// Freehand polygon drawing overlay.
 /// - isDrawing true iken GestureDetector aktif olur.
 /// - Polygon tamamlanınca onPolygonFinished çağrılır.
-/// - Drawing kapatmayı parent kontrol eder (onDisableDrawing).
+/// - Ekranda kalıcı polygon çizimi, activeSelectionPolygon ile yapılır (single source of truth).
 class MapDrawingOverlay extends StatefulWidget {
   final bool isDrawing;
   final mb.MapboxMap? map;
 
+  /// ✅ AreaQueryBloc’dan gelen aktif selection (varsa ekranda çizilir)
+  final PolygonArea? activeSelectionPolygon;
+
+  /// ✅ Map hareket edince (idle) selection polygon’un screen path’i yeniden hesaplanabilsin diye
+  final int rebuildTick;
+
   final void Function(PolygonArea polygon) onPolygonFinished;
-  final VoidCallback onDisableDrawing;
 
   const MapDrawingOverlay({
     super.key,
     required this.isDrawing,
     required this.map,
+    required this.activeSelectionPolygon,
+    required this.rebuildTick,
     required this.onPolygonFinished,
-    required this.onDisableDrawing,
   });
 
   @override
@@ -34,11 +41,12 @@ class MapDrawingOverlay extends StatefulWidget {
 class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
   bool _limitWarned = false;
 
-  final List<Offset> _screenPath = [];
-  final List<GeoPoint> _geoPoints = [];
+  // Drawing esnasında (screen space)
+  final List<Offset> _drawingScreenPath = [];
+  final List<GeoPoint> _drawingGeoPoints = [];
 
-  /// Finish sonrası path 1 an görünüp kaybolmasın.
-  bool _keepPathOnDisableOnce = false;
+  // Selection polygon (screen space) -> AreaQuery’den gelen polygonun ekranda çizilecek hali
+  List<Offset> _selectionScreenPath = const [];
 
   DateTime _lastSampleAt = DateTime.fromMillisecondsSinceEpoch(0);
   static const Duration _sampleEvery = Duration(milliseconds: 35);
@@ -47,23 +55,47 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
   void didUpdateWidget(covariant MapDrawingOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Drawing mod değişimini yakala
-    if (oldWidget.isDrawing != widget.isDrawing) {
-      _onDrawingModeChanged(widget.isDrawing);
+    // Drawing mod açıldıysa temiz başla
+    if (!oldWidget.isDrawing && widget.isDrawing) {
+      setState(() {
+        _limitWarned = false;
+        _drawingScreenPath.clear();
+        _drawingGeoPoints.clear();
+      });
+    }
+
+    // Active selection / map değiştiyse screen path’i yeniden hesapla
+    final bool selectionChanged =
+        oldWidget.activeSelectionPolygon != widget.activeSelectionPolygon ||
+            oldWidget.map != widget.map;
+
+    // ✅ Map idle tick geldiyse selection redraw
+    final bool tickChanged = oldWidget.rebuildTick != widget.rebuildTick;
+
+    if (selectionChanged || tickChanged) {
+      unawaited(_rebuildSelectionScreenPath());
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final showDrawingPath = widget.isDrawing && _drawingScreenPath.isNotEmpty;
+    final showSelectionPath = !widget.isDrawing && _selectionScreenPath.isNotEmpty;
+
+    // Öncelik: çizim açıkken çizim path’i görünür. Çizim kapalıysa selection polygon görünür.
+    final pathToDraw = showDrawingPath
+        ? _drawingScreenPath
+        : (showSelectionPath ? _selectionScreenPath : const <Offset>[]);
+
     return Positioned.fill(
       child: Stack(
         children: [
-          // çizim
+          // çizim/polygon painter
           Positioned.fill(
             child: IgnorePointer(
               ignoring: true,
               child: CustomPaint(
-                painter: FreehandPainter(List<Offset>.of(_screenPath)),
+                painter: FreehandPainter(List<Offset>.of(pathToDraw)),
               ),
             ),
           ),
@@ -86,58 +118,33 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
     );
   }
 
-  void _onDrawingModeChanged(bool enabled) {
-    if (enabled) {
-      setState(() {
-        _limitWarned = false;
-        _screenPath.clear();
-        _geoPoints.clear();
-        _keepPathOnDisableOnce = false;
-      });
-      return;
-    }
-
-    if (_keepPathOnDisableOnce) {
-      _keepPathOnDisableOnce = false;
-      _limitWarned = false;
-      return;
-    }
-
-    setState(() {
-      _limitWarned = false;
-      _screenPath.clear();
-      _geoPoints.clear();
-    });
-  }
-
   void _onDrawEnd() {
-    if (_geoPoints.length >= 3) {
-      final polygon = PolygonArea(List<GeoPoint>.of(_geoPoints));
+    if (_drawingGeoPoints.length >= 3) {
+      final polygon = PolygonArea(List<GeoPoint>.of(_drawingGeoPoints));
 
-      // parent'a polygonu yolla
+      // ✅ parent'a polygonu yolla (AreaQuery + PoiSearch burada triggerlanacak)
       widget.onPolygonFinished(polygon);
 
-      // drawing kapanırken path kaybolmasın
-      _keepPathOnDisableOnce = true;
-
-      // drawing OFF
-      widget.onDisableDrawing();
-
-      _geoPoints.clear();
-      _limitWarned = false;
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Polygon için en az 3 nokta gerekli.')),
-      );
-
+      // ✅ drawing path temizle (kalıcı çizim activeSelection’dan gelecek)
       setState(() {
-        _screenPath.clear();
-        _geoPoints.clear();
+        _drawingScreenPath.clear();
+        _drawingGeoPoints.clear();
         _limitWarned = false;
       });
 
-      widget.onDisableDrawing();
+      return;
     }
+
+    // yetersiz nokta -> temizle
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(content: Text('Polygon için en az 3 nokta gerekli.')),
+    );
+
+    setState(() {
+      _drawingScreenPath.clear();
+      _drawingGeoPoints.clear();
+      _limitWarned = false;
+    });
   }
 
   Future<void> _onDrawPoint(Offset localPos) async {
@@ -147,10 +154,10 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
     if (now.difference(_lastSampleAt) < _sampleEvery) return;
     _lastSampleAt = now;
 
-    if (_geoPoints.length >= 200) {
+    if (_drawingGeoPoints.length >= 200) {
       if (!_limitWarned && mounted) {
         _limitWarned = true;
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
           const SnackBar(content: Text('Maksimum 200 nokta ekleyebilirsin.')),
         );
       }
@@ -160,8 +167,8 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
     final geo = await _screenToGeo(localPos);
     if (geo == null) return;
 
-    if (_geoPoints.isNotEmpty) {
-      final last = _geoPoints.last;
+    if (_drawingGeoPoints.isNotEmpty) {
+      final last = _drawingGeoPoints.last;
       final dLat = (last.lat - geo.lat).abs();
       final dLng = (last.lng - geo.lng).abs();
       if (dLat < 0.00001 && dLng < 0.00001) return;
@@ -170,8 +177,8 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
     if (!mounted) return;
 
     setState(() {
-      _screenPath.add(localPos);
-      _geoPoints.add(geo);
+      _drawingScreenPath.add(localPos);
+      _drawingGeoPoints.add(geo);
     });
   }
 
@@ -192,6 +199,50 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
       final lat = (coords[1] as num).toDouble();
 
       return GeoPoint(lat: lat, lng: lng);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _rebuildSelectionScreenPath() async {
+    final map = widget.map;
+    final polygon = widget.activeSelectionPolygon;
+
+    if (map == null || polygon == null || polygon.points.isEmpty) {
+      if (!mounted) return;
+      setState(() => _selectionScreenPath = const []);
+      return;
+    }
+
+    final List<Offset> newPath = [];
+
+    // Polygon points -> screen points
+    for (final p in polygon.points) {
+      final screen = await _geoToScreen(p);
+      if (screen != null) newPath.add(screen);
+    }
+
+    // kapatmak için ilk noktayı sona ekle (görsel olarak)
+    if (newPath.length >= 2) {
+      newPath.add(newPath.first);
+    }
+
+    if (!mounted) return;
+    setState(() => _selectionScreenPath = List.unmodifiable(newPath));
+  }
+
+  Future<Offset?> _geoToScreen(GeoPoint geo) async {
+    try {
+      final map = widget.map;
+      if (map == null) return null;
+
+      final mb.ScreenCoordinate sc = await map.pixelForCoordinate(
+        mb.Point(
+          coordinates: mb.Position(geo.lng, geo.lat), // ✅ lng, lat
+        ),
+      );
+
+      return Offset(sc.x.toDouble(), sc.y.toDouble());
     } catch (_) {
       return null;
     }

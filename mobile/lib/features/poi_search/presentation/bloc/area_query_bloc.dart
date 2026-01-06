@@ -15,11 +15,18 @@ class AreaQueryBloc extends Bloc<AreaQueryEvent, AreaQueryState> {
     on<ClearUserSelection>(_onClearUserSelection);
   }
 
+  /// Son gelen viewport bbox’u cache’leriz ki user selection temizlenince
+  /// map hareket etmese bile hemen viewport alanına dönebilelim.
+  BboxArea? _lastViewportBbox;
+
   void _onViewportChanged(
       ViewportChanged event,
       Emitter<AreaQueryState> emit,
       ) {
     final current = state.context;
+
+    // ✅ Her zaman cache’le (USER_SELECTION aktif olsa bile).
+    _lastViewportBbox = event.bbox;
 
     // ✅ USER_SELECTION aktifken viewport event'leri state'i bozmasın.
     if (current.areaSource == AreaSource.userSelection) {
@@ -81,12 +88,14 @@ class AreaQueryBloc extends Bloc<AreaQueryEvent, AreaQueryState> {
       log('[AreaQueryBloc] CLEAR USER_SELECTION -> back to viewport');
     }
 
-    // Alanı NoArea yapıyoruz; viewport bbox zaten MapCanvas'tan gelmeye devam edecek.
+    // ✅ Eğer son viewport bbox varsa direkt ona dön, yoksa NoArea.
+    final fallback = _lastViewportBbox ?? const NoArea();
+
     emit(
       state.copyWith(
         context: current.copyWith(
           areaSource: AreaSource.viewport,
-          area: const NoArea(),
+          area: fallback,
         ),
       ),
     );

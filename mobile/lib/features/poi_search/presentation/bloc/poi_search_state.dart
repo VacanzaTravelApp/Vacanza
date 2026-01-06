@@ -6,9 +6,6 @@ import '../../data/models/poi.dart';
 import '../../data/models/poi_categories.dart';
 import '../../data/models/selected_area.dart';
 
-// ✅ bunu senin koyduğun dosya yoluna göre import et
-// örn: import '../../domain/poi_categories.dart';
-
 enum PoiSearchStatus { idle, loading, success, error }
 
 /// POI search state (VACANZA-187)
@@ -45,11 +42,9 @@ class PoiSearchState extends Equatable {
     required this.countsByCategory,
   });
 
-  /// ✅ default seçili kategoriler PM'e göre:
-  /// restaurants, cafe, museum, monuments, parks
   factory PoiSearchState.initial() => PoiSearchState(
     areaSource: AreaSource.viewport,
-    selectedArea: NoArea(),
+    selectedArea: const NoArea(),
     selectedCategories: PoiCategories.defaults,
     sort: PoiSort.distanceToCenter,
     page: 0,
@@ -65,16 +60,18 @@ class PoiSearchState extends Equatable {
   bool get isLoading => status == PoiSearchStatus.loading;
   bool get hasUsableArea => selectedArea.isUsable;
 
+  static const Object _noChange = Object();
+
   PoiSearchState copyWith({
     AreaSource? areaSource,
     SelectedArea? selectedArea,
     List<String>? selectedCategories,
-    PoiSort? sort,
+    Object? sort = _noChange,
     int? page,
     int? limit,
     PoiSearchStatus? status,
-    String? errorCode,
-    String? errorMessage,
+    Object? errorCode = _noChange,
+    Object? errorMessage = _noChange,
     int? count,
     List<Poi>? pois,
     Map<String, int>? countsByCategory,
@@ -83,12 +80,12 @@ class PoiSearchState extends Equatable {
       areaSource: areaSource ?? this.areaSource,
       selectedArea: selectedArea ?? this.selectedArea,
       selectedCategories: selectedCategories ?? this.selectedCategories,
-      sort: sort ?? this.sort,
+      sort: identical(sort, _noChange) ? this.sort : sort as PoiSort?,
       page: page ?? this.page,
       limit: limit ?? this.limit,
       status: status ?? this.status,
-      errorCode: errorCode ?? this.errorCode,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorCode: identical(errorCode, _noChange) ? this.errorCode : errorCode as String?,
+      errorMessage: identical(errorMessage, _noChange) ? this.errorMessage : errorMessage as String?,
       count: count ?? this.count,
       pois: pois ?? this.pois,
       countsByCategory: countsByCategory ?? this.countsByCategory,

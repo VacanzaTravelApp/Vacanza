@@ -1,3 +1,4 @@
+// mapbox_view.dart
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -10,6 +11,7 @@ import '../../../../../poi_search/data/models/selected_area.dart';
 /// Map widget + viewport bbox emitter (debounced).
 /// - Gesture ignore: drawing modunda map interaction kapatmak için.
 /// - İlk idle’da da bbox gönderir.
+/// - ✅ Parent isterse her idle eventini dinleyebilir (selection redraw için).
 class MapboxView extends StatefulWidget {
   final bool ignoreGestures;
 
@@ -19,11 +21,15 @@ class MapboxView extends StatefulWidget {
   /// Viewport bbox üretildiğinde parent’a gönderir.
   final void Function(BboxArea bbox) onViewportBbox;
 
+  /// ✅ Map idle olduğunda parent bilgilensin (bbox dışında işler için)
+  final VoidCallback? onMapIdle;
+
   const MapboxView({
     super.key,
     required this.ignoreGestures,
     required this.onMapCreated,
     required this.onViewportBbox,
+    this.onMapIdle,
   });
 
   @override
@@ -58,6 +64,9 @@ class _MapboxViewState extends State<MapboxView> {
         },
         onMapIdleListener: (_) {
           if (_map == null) return;
+
+          // ✅ Parent'a idle sinyali (selection polygon redraw vb.)
+          widget.onMapIdle?.call();
 
           if (!_initialViewportSent) {
             _initialViewportSent = true;

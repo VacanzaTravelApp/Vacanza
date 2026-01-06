@@ -7,14 +7,20 @@ class ProfileBadge extends StatelessWidget {
   final String name;
   final String subtitle;
 
+  /// ✅ opsiyonel: asset path (örn: assets/core/theme/profile/serhat.jpg)
+  final String? imagePath;
+
   const ProfileBadge({
     super.key,
     required this.name,
     required this.subtitle,
+    this.imagePath,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bool hasImage = (imagePath != null && imagePath!.isNotEmpty);
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -32,13 +38,15 @@ class ProfileBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Avatar (mock)
+          // Avatar
           Container(
             width: 38,
             height: 38,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
+              gradient: hasImage
+                  ? null
+                  : const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
@@ -46,10 +54,20 @@ class ProfileBadge extends StatelessWidget {
                   Color(0xFF2ECC71),
                 ],
               ),
+              image: hasImage
+                  ? DecorationImage(
+                image: AssetImage(imagePath!),
+                fit: BoxFit.cover,
+              )
+                  : null,
             ),
-            child: const Icon(Icons.person, color: Colors.white, size: 20),
+            child: hasImage
+                ? null
+                : const Icon(Icons.person, color: Colors.white, size: 20),
           ),
+
           const SizedBox(width: 10),
+
           // Texts
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
