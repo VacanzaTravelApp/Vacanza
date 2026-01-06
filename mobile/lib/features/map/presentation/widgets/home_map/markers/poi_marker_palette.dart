@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+/*import 'package:flutter/material.dart';
 
 /// VACANZA-197: Marker renk/ölçü mapping'i
 /// Filter panel ile aynı kategori->renk mantığını paylaşsın diye ayrı dosyada.
@@ -23,4 +23,4 @@ class PoiMarkerPalette {
   static const double radius = 7.0;
   static const double strokeWidth = 1.6;
   static const Color strokeColor = Colors.white;
-}
+}*/
