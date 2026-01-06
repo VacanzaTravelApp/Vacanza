@@ -20,6 +20,9 @@ class MapDrawingOverlay extends StatefulWidget {
   /// ✅ AreaQueryBloc’dan gelen aktif selection (varsa ekranda çizilir)
   final PolygonArea? activeSelectionPolygon;
 
+  /// ✅ Map hareket edince (idle) selection polygon’un screen path’i yeniden hesaplanabilsin diye
+  final int rebuildTick;
+
   final void Function(PolygonArea polygon) onPolygonFinished;
 
   const MapDrawingOverlay({
@@ -27,6 +30,7 @@ class MapDrawingOverlay extends StatefulWidget {
     required this.isDrawing,
     required this.map,
     required this.activeSelectionPolygon,
+    required this.rebuildTick,
     required this.onPolygonFinished,
   });
 
@@ -60,9 +64,15 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
       });
     }
 
-    // Active selection değiştiyse screen path’i yeniden hesapla
-    if (oldWidget.activeSelectionPolygon != widget.activeSelectionPolygon ||
-        oldWidget.map != widget.map) {
+    // Active selection / map değiştiyse screen path’i yeniden hesapla
+    final bool selectionChanged =
+        oldWidget.activeSelectionPolygon != widget.activeSelectionPolygon ||
+            oldWidget.map != widget.map;
+
+    // ✅ Map idle tick geldiyse selection redraw
+    final bool tickChanged = oldWidget.rebuildTick != widget.rebuildTick;
+
+    if (selectionChanged || tickChanged) {
       unawaited(_rebuildSelectionScreenPath());
     }
   }
@@ -126,7 +136,7 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
     }
 
     // yetersiz nokta -> temizle
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       const SnackBar(content: Text('Polygon için en az 3 nokta gerekli.')),
     );
 
@@ -147,7 +157,7 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
     if (_drawingGeoPoints.length >= 200) {
       if (!_limitWarned && mounted) {
         _limitWarned = true;
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
           const SnackBar(content: Text('Maksimum 200 nokta ekleyebilirsin.')),
         );
       }

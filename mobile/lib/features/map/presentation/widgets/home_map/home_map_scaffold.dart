@@ -84,17 +84,18 @@ class HomeMapScaffold extends StatelessWidget {
 
             // ================= PROFILE (SOL ÜST) =================
             const Positioned(
-              top: 20,
+              top: 30,
               left: 16,
               child: ProfileBadge(
-                name: 'Alex', // VACANZA-164
+                name: 'Serhat', // VACANZA-164
                 subtitle: 'Traveler',
+                  imagePath: 'assets/core/theme/profile/serhat.jpg'
               ),
             ),
 
             // ================= LOGOUT (SAĞ ÜST) =================
             Positioned(
-              top: 20,
+              top: 30,
               right: 16,
               child: IconButton(
                 tooltip: 'Logout',
