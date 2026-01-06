@@ -57,7 +57,7 @@ class LoadNextPage extends PoiSearchEvent {
   const LoadNextPage();
 }
 
-/// Opsiyonel: sort değişimi (şimdilik gerekmez ama hazır dursun).
+/// Opsiyonel: sort değişimi (null gelirse sort temizlenebilir).
 class SortChanged extends PoiSearchEvent {
   final PoiSort? sort;
 
