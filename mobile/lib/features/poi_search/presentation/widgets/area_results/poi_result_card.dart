@@ -89,7 +89,7 @@ class _CategoryDot extends StatelessWidget {
   Color _colorFor(String key) {
     final k = key.trim().toLowerCase();
     switch (k) {
-      case 'restaurants':
+      case 'restaurant':
         return const Color(0xFFFFD166);
       case 'cafe':
         return const Color(0xFFB37AFF);
@@ -107,7 +107,7 @@ class _CategoryDot extends StatelessWidget {
   IconData _iconFor(String key) {
     final k = key.trim().toLowerCase();
     switch (k) {
-      case 'restaurants':
+      case 'restaurant':
         return Icons.restaurant_rounded;
       case 'cafe':
         return Icons.local_cafe_rounded;
