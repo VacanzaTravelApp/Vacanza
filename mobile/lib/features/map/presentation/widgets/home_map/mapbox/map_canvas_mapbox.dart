@@ -35,24 +35,24 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   mb.MapboxMap? _map;
   PoiMarkersController? _poiMarkers;
 
-  /// ✅ en son yüklenen style
+  /// en son yüklenen style
   String? _lastStyleUri;
 
-  /// ✅ mode switch / recenter sırasında viewport bbox event'lerini dondur
+  /// mode switch / recenter sırasında viewport bbox event'lerini dondur
   bool _suspendViewportUpdates = false;
 
   Timer? _resumeTimer;
 
-  /// ✅ Map idle oldukça (user selection varsa) polygon screen path'i rebuild etmek için tick
+  /// Map idle oldukça (user selection varsa) polygon screen path'i rebuild etmek için tick
   int _selectionRebuildTick = 0;
 
-  /// ✅ FIX: Annotation manager yeniden oluşturulunca widget tree'yi rebuild etmek için key
+  /// Annotation manager yeniden oluşturulunca widget tree'yi rebuild etmek için key
   int _markerControllerKey = 0;
 
   @override
   void dispose() {
     _resumeTimer?.cancel();
-    _poiMarkers?.dispose(); // unawaited - dispose içinde async call problem yaratmaz
+    unawaited(_poiMarkers?.dispose()); // unawaited
     super.dispose();
   }
 
@@ -80,7 +80,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
     return MultiBlocListener(
       listeners: [
-        // ✅ ViewMode değişimi
+        // ViewMode değişimi
         BlocListener<MapBloc, MapState>(
           listenWhen: (prev, next) => prev.viewMode != next.viewMode,
           listener: (context, state) async {
@@ -89,51 +89,55 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
             log('[MapCanvas] ViewMode changing to ${state.viewMode.label}');
 
-            // ✅ Viewport updates dondur
             _suspendViewportFor(ms: 900);
 
             final bool styleChanged = await _applyViewMode(state.viewMode);
 
-            // ✅ CRITICAL FIX: Style değiştiyse annotation manager'ı tamamen yeniden oluştur
+            // Style değiştiyse annotation manager'ı tamamen yeniden oluştur
             if (styleChanged) {
-              log('[MapCanvas] Style changed, recreating annotation manager');
+              log('[MapCanvas] Style changed -> recreating PoiMarkersController');
 
-              // 1️⃣ Eski controller'ı temizle
               final oldController = _poiMarkers;
               if (oldController != null) {
                 await oldController.dispose();
               }
 
-              // 2️⃣ Yeni controller oluştur
               final newController = PoiMarkersController(map);
               await newController.init();
 
-              // 3️⃣ State'i güncelle (key değişimi ile PoiMarkersListener yeniden oluşturulacak)
+              // ✅ init fail olduysa state'e basma
+              if (!newController.isReady) {
+                log('[MapCanvas] PoiMarkersController init failed after style change');
+                if (!mounted) return;
+                setState(() {
+                  _poiMarkers = null;
+                  _markerControllerKey++;
+                });
+                return;
+              }
+
               if (!mounted) return;
               setState(() {
                 _poiMarkers = newController;
                 _markerControllerKey++;
               });
 
-              log('[MapCanvas] New controller created with key=$_markerControllerKey');
+              log('[MapCanvas] New controller created key=$_markerControllerKey');
 
-              // 4️⃣ Mevcut POI state'ini yeni controller'a uygula
-              // (PoiMarkersListener didUpdateWidget içinde otomatik yapacak ama
-              // güvenlik için burada da tetikleyebiliriz)
+              // mevcut POI state'ini yeniden uygula (opsiyonel ama faydalı)
               final poiState = context.read<PoiSearchBloc>().state;
 
               if (poiState.status == PoiSearchStatus.success && poiState.pois.isNotEmpty) {
                 log('[MapCanvas] Reapplying ${poiState.pois.length} POIs to new controller');
                 await newController.setPois(poiState.pois);
               } else {
-                log('[MapCanvas] No POIs to reapply');
                 await newController.clear();
               }
             }
           },
         ),
 
-        // ✅ Recenter
+        // Recenter
         BlocListener<MapBloc, MapState>(
           listenWhen: (prev, next) => prev.recenterTick != next.recenterTick,
           listener: (context, state) async {
@@ -141,9 +145,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
             if (map == null) return;
 
             log('[MapCanvas] Recenter triggered');
-
             _suspendViewportFor(ms: 700);
-
             await _recenter(state.viewMode);
           },
         ),
@@ -153,10 +155,8 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
           MapboxView(
             ignoreGestures: isDrawing,
             onMapCreated: _onMapCreated,
-
             onMapIdle: () {
               if (_map == null) return;
-
               if (isDrawing) return;
 
               final ctx = context.read<AreaQueryBloc>().state.context;
@@ -166,19 +166,17 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
               if (!mounted) return;
               setState(() => _selectionRebuildTick++);
             },
-
             onViewportBbox: (bbox) {
               if (_suspendViewportUpdates) return;
 
               final ctx = context.read<AreaQueryBloc>().state.context;
-
               if (ctx.areaSource == AreaSource.userSelection) return;
 
               context.read<AreaQueryBloc>().add(aq.ViewportChanged(bbox));
             },
           ),
 
-          // ✅ CRITICAL: Key ile listener'ı yeniden oluştur
+          // Key ile listener'ı yeniden oluştur
           PoiMarkersListener(
             key: ValueKey(_markerControllerKey),
             poiMarkers: _poiMarkers,
@@ -210,6 +208,12 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
     final controller = PoiMarkersController(mapboxMap);
     await controller.init();
+
+    // ✅ init fail olduysa _poiMarkers null kalsın
+    if (!controller.isReady) {
+      log('[MapCanvas] PoiMarkersController init failed on map created');
+      return;
+    }
 
     if (mounted) {
       setState(() => _poiMarkers = controller);
@@ -264,8 +268,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     final map = _map;
     if (map == null) return;
 
-    final mb.CameraOptions camera =
-    (mode == MapViewMode.mode3D) ? MapboxConfig.camera3D : MapboxConfig.camera2D;
+    final mb.CameraOptions camera = (mode == MapViewMode.mode3D) ? MapboxConfig.camera3D : MapboxConfig.camera2D;
 
     await map.easeTo(
       camera,
