@@ -32,7 +32,7 @@ class PoiSearchApiClient {
     );
 
     final body = req.toJson();
-    log('[PoiSearchApiClient] POST /pois/search-in-area body=$body');
+   // log('[PoiSearchApiClient] POST /pois/search-in-area body=$body');
 
     final res = await _dio.post(
       '/pois/search-in-area',
@@ -40,7 +40,7 @@ class PoiSearchApiClient {
       // ✅ endpoint auth istiyor (skipAuth yok)
     );
 
-    log('[PoiSearchApiClient] status=${res.statusCode} data=${res.data}');
+   // log('[PoiSearchApiClient] status=${res.statusCode} data=${res.data}');
 
     final data = res.data;
 

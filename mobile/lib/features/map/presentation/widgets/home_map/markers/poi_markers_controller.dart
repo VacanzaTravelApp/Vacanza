@@ -15,7 +15,7 @@ import 'poi_marker_icon_factory.dart';
 ///
 /// Önemli not:
 /// - loadStyleURI/viewMode değişimi sonrası annotation manager geçersiz olabiliyor.
-///   Bu yüzden reinitAfterStyleChange() çağrılmalı.
+///   Bu yüzden dispose() -> init() sequence ile temiz restart gerekir.
 class PoiMarkersController {
   final mb.MapboxMap _map;
 
@@ -32,29 +32,40 @@ class PoiMarkersController {
   PoiMarkersController(this._map);
 
   Future<void> init() async {
-    _pointManager ??= await _map.annotations.createPointAnnotationManager();
+    // ✅ Eğer zaten varsa önce dispose et (güvenli restart)
+    if (_pointManager != null) {
+      await dispose();
+    }
+
+    _pointManager = await _map.annotations.createPointAnnotationManager();
+    log('[PoiMarkersController] init completed');
   }
 
-  /// Style değişince Mapbox annotation manager resetlenebiliyor.
-  /// Bu metot, manager'ı yeniden kurar ve local mapping state'i temizler.
+  /// ✅ DEPRECATED: Artık kullanma, yerine dispose() -> init() kullan
+  @Deprecated('Use dispose() followed by init() instead')
   Future<void> reinitAfterStyleChange() async {
-    _pointManager = await _map.annotations.createPointAnnotationManager();
-    _byPoiId.clear();
-    // icon cache'i tutmak istersen silme. PNG üretimi pahalı olabilir.
-    // _iconCache.clear();
+    await dispose();
+    await init();
   }
 
   Future<void> clear() async {
     final mgr = _pointManager;
-    if (mgr == null) return;
+    if (mgr == null) {
+      log('[PoiMarkersController] clear: manager is null');
+      return;
+    }
 
     try {
+      // ✅ Önce mapping'i temizle
+      _byPoiId.clear();
+
+      // ✅ Sonra Mapbox'taki annotation'ları sil
       await mgr.deleteAll();
+
+      log('[PoiMarkersController] cleared all markers');
     } catch (e) {
       log('[PoiMarkersController] deleteAll failed: $e');
     }
-
-    _byPoiId.clear();
   }
 
   String _normCategory(String raw) => raw.trim().toLowerCase();
@@ -116,12 +127,18 @@ class PoiMarkersController {
 
   Future<void> setPois(List<Poi> pois) async {
     final mgr = _pointManager;
-    if (mgr == null) return;
+    if (mgr == null) {
+      log('[PoiMarkersController] setPois: manager is null, skipping');
+      return;
+    }
 
-    // Yeni sonuç gelince eskileri temizle
+    // ✅ Yeni sonuç gelince eskileri temizle
     await clear();
 
-    if (pois.isEmpty) return;
+    if (pois.isEmpty) {
+      log('[PoiMarkersController] setPois: empty list');
+      return;
+    }
 
     final options = <mb.PointAnnotationOptions>[];
     final createdPoiIds = <String>[];
@@ -139,7 +156,7 @@ class PoiMarkersController {
           ),
           image: png,
 
-          // ✅ Collision yüzünden bazı markerlar zoom’da çıkıyor gibi görünüyordu.
+          // ✅ Collision yüzünden bazı markerlar zoom'da çıkıyor gibi görünüyordu.
           // iconSize küçültünce aynı zoom seviyesinde daha çok marker görünür.
           iconSize: 0.9,
         ),
@@ -147,20 +164,37 @@ class PoiMarkersController {
       createdPoiIds.add(poi.poiId);
     }
 
-    if (options.isEmpty) return;
+    if (options.isEmpty) {
+      log('[PoiMarkersController] setPois: no valid coordinates');
+      return;
+    }
 
-    final created = await mgr.createMulti(options);
+    try {
+      final created = await mgr.createMulti(options);
 
-    // created listesi options ile aynı sırada döner.
-    for (int i = 0; i < created.length; i++) {
-      _byPoiId[createdPoiIds[i]] = created[i];
+      // created listesi options ile aynı sırada döner.
+      for (int i = 0; i < created.length; i++) {
+        _byPoiId[createdPoiIds[i]] = created[i];
+      }
+
+      log('[PoiMarkersController] created ${created.length} markers');
+    } catch (e) {
+      log('[PoiMarkersController] createMulti failed: $e');
     }
   }
 
   /// ✅ Widget dispose içinde çağırabilmek için ekledik.
-  /// (async ama çağıran tarafta unawaited kullanacağız)
+  /// Manager'ı tamamen temizler (style change için de kullanılır)
   Future<void> dispose() async {
+    log('[PoiMarkersController] disposing...');
+
+    // ✅ Önce marker'ları temizle
     await clear();
+
+    // ✅ Manager referansını null'la
     _pointManager = null;
+
+    // Icon cache'i korumak istersen bunu kaldır
+    // _iconCache.clear();
   }
 }
