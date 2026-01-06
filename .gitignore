@@ -5,6 +5,6 @@ DB_Config/vacanza-DB_Config
 
 .DS_Store
 
-TestREADME.md
+./TestREADME.md
 
-Dockerfile
+./Dockerfile
