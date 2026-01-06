@@ -63,7 +63,7 @@ class PoiMarkersController {
 
   String _assetPathFor(String key) {
     switch (key) {
-      case 'restaurants':
+      case 'restaurant':
         return 'assets/core/theme/poi/poi_restaurant.png';
       case 'cafe':
         return 'assets/core/theme/poi/poi_cafe.png';

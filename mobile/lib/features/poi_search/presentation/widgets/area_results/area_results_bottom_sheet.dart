@@ -45,8 +45,8 @@ class AreaResultsSheet extends StatelessWidget {
 
   String _labelFor(String key) {
     switch (key) {
-      case 'restaurants':
-        return 'Restaurants';
+      case 'restaurant':
+        return 'Restaurant';
       case 'cafe':
         return 'Cafes';
       case 'museum':
@@ -63,7 +63,7 @@ class AreaResultsSheet extends StatelessWidget {
 
   IconData _iconFor(String key) {
     switch (key) {
-      case 'restaurants':
+      case 'restaurant':
         return Icons.restaurant_rounded;
       case 'cafe':
         return Icons.local_cafe_rounded;
@@ -82,7 +82,7 @@ class AreaResultsSheet extends StatelessWidget {
     switch (key) {
       case 'museum':
         return const Color(0xFF0096FF);
-      case 'restaurants':
+      case 'restaurant':
         return const Color(0xFFFFD166);
       case 'cafe':
         return const Color(0xFFB37AFF);
@@ -110,7 +110,7 @@ class AreaResultsSheet extends StatelessWidget {
 
     // Stabil order (figma uyumlu)
     const baseOrder = <String>[
-      'restaurants',
+      'restaurant',
       'cafe',
       'museum',
       'monuments',
