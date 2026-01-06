@@ -20,14 +20,48 @@ class Poi {
   });
 
   factory Poi.fromJson(Map<String, dynamic> json) {
-    // ✅ Null / tip sapması olursa patlamasın diye güvenli parse
     final lat = (json["latitude"] as num?)?.toDouble() ?? 0.0;
     final lng = (json["longitude"] as num?)?.toDouble() ?? 0.0;
 
+    String _fallbackNameFromCategory(String rawCategory) {
+      final c = rawCategory.trim().toLowerCase();
+
+      switch (c) {
+        case 'parks':
+        case 'park':
+          return 'Park';
+        case 'museums':
+        case 'museum':
+          return 'Museum';
+        case 'monuments':
+        case 'monument':
+          return 'Monument';
+        case 'restaurants':
+        case 'restaurant':
+          return 'Restaurant';
+        case 'cafe':
+        case 'cafes':
+          return 'Cafe';
+        default:
+          if (c.isEmpty) return 'Place';
+          return c[0].toUpperCase() + c.substring(1); // son çare
+      }
+    }
+
+    bool _isUnnamed(String s) {
+      final n = s.trim().toLowerCase();
+      return n.isEmpty || n == 'unnamed' || n == 'unamed';
+    }
+
+    final category = (json["category"] ?? "").toString();
+    final rawName = (json["name"] ?? "").toString();
+
+    final name = _isUnnamed(rawName) ? _fallbackNameFromCategory(category) : rawName;
+
     return Poi(
       poiId: (json["poiId"] ?? "").toString(),
-      name: (json["name"] ?? "").toString(),
-      category: (json["category"] ?? "").toString(),
+      name: name,
+      category: category,
       latitude: lat,
       longitude: lng,
       rating: (json["rating"] as num?)?.toDouble(),
