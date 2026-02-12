@@ -16,8 +16,8 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-        login sonrası ve app açılışında session restore için çağrılır.
-        firebase ID token Bearer olarak gönderilir.
+     * login sonrası ve app açılışında session restore için çağrılır.
+     * firebase ID token Bearer olarak gönderilir.
      */
     @GetMapping("/login")
     public ResponseEntity<UserAuthenticationDTO> login(HttpServletRequest request) {
