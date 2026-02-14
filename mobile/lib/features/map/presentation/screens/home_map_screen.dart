@@ -1,11 +1,16 @@
 // ======================= home_map_screen.dart =======================
 // lib/features/map/presentation/screens/home_map_screen.dart
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../../checkin/data/api/checkin_api_client.dart';
+import '../../../checkin/data/repositories/checkin_repository.dart';
 import '../../../checkin/data/services/location_service.dart';
 import '../../../checkin/presentation/bloc/candidate_poi_cubit.dart';
+import '../../../checkin/presentation/bloc/checkin_bloc.dart';
+import '../../../checkin/presentation/bloc/checkin_event.dart';
 import '../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../checkin/presentation/bloc/location_event.dart';
 import '../../../checkin/presentation/bloc/location_state.dart';
@@ -45,6 +50,12 @@ class HomeMapScreen extends StatelessWidget {
         RepositoryProvider<LocationService>(
           create: (_) => LocationService(),
         ),
+        RepositoryProvider<CheckinApiClient>(
+          create: (ctx) => CheckinApiClient(ctx.read<Dio>()),
+        ),
+        RepositoryProvider<CheckinRepository>(
+          create: (ctx) => CheckinRepository(ctx.read<CheckinApiClient>()),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -62,6 +73,11 @@ class HomeMapScreen extends StatelessWidget {
           ),
           BlocProvider<CandidatePoiCubit>(
             create: (_) => CandidatePoiCubit(),
+          ),
+          BlocProvider<CheckinBloc>(
+            create: (ctx) => CheckinBloc(
+              repository: ctx.read<CheckinRepository>(),
+            ),
           ),
         ],
         child: const _HomeMapView(),
@@ -231,6 +247,24 @@ class _HomeMapViewState extends State<_HomeMapView>
             }
           },
         ),
+
+        // ================= Auto check-in trigger (MOB-3) =================
+        BlocListener<LocationBloc, LocationState>(
+          listenWhen: (prev, next) =>
+              next.status == LocationStatus.tracking &&
+              (prev.latitude != next.latitude ||
+                  prev.longitude != next.longitude),
+          listener: (context, state) {
+            final candidates =
+                context.read<CandidatePoiCubit>().state.candidatePoiIds;
+            context.read<CheckinBloc>().add(TriggerAutoCheckin(
+                  latitude: state.latitude!,
+                  longitude: state.longitude!,
+                  candidatePoiIds: candidates,
+                ));
+          },
+        ),
+
         BlocListener<AreaQueryBloc, AreaQueryState>(
           listenWhen: (prev, next) => prev.context != next.context,
           listener: (context, state) {

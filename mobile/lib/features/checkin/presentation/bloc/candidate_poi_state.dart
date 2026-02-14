@@ -8,15 +8,9 @@ class CandidatePoiState {
   final BboxArea? viewport;
   final List<String> candidatePoiIds;
 
-  const CandidatePoiState({
-    this.viewport,
-    this.candidatePoiIds = const [],
-  });
+  const CandidatePoiState({this.viewport, this.candidatePoiIds = const []});
 
-  CandidatePoiState copyWith({
-    BboxArea? viewport,
-    List<String>? candidatePoiIds,
-  }) {
+  CandidatePoiState copyWith({BboxArea? viewport, List<String>? candidatePoiIds}) {
     return CandidatePoiState(
       viewport: viewport ?? this.viewport,
       candidatePoiIds: candidatePoiIds ?? this.candidatePoiIds,
