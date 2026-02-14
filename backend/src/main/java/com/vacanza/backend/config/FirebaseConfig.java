@@ -13,15 +13,24 @@ import java.io.IOException;
 public class FirebaseConfig {
 
     @PostConstruct
-    public void init() throws IOException {
-        ClassPathResource resource = new ClassPathResource("vacanza-firebase.json");
+    public void init() {
+        try {
+            ClassPathResource resource = new ClassPathResource("vacanza-firebase.json");
+            if (!resource.exists()) {
+                System.out.println(
+                        "Firebase configuration file 'vacanza-firebase.json' not found. Firebase initialization skipped.");
+                return;
+            }
 
-        FirebaseOptions options = FirebaseOptions.builder()
-                .setCredentials(GoogleCredentials.fromStream(resource.getInputStream()))
-                .build();
+            FirebaseOptions options = FirebaseOptions.builder()
+                    .setCredentials(GoogleCredentials.fromStream(resource.getInputStream()))
+                    .build();
 
-        if (FirebaseApp.getApps().isEmpty()) {
-            FirebaseApp.initializeApp(options);
+            if (FirebaseApp.getApps().isEmpty()) {
+                FirebaseApp.initializeApp(options);
+            }
+        } catch (IOException e) {
+            System.err.println("Database configuration error: " + e.getMessage());
         }
     }
 }
