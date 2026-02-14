@@ -1,1 +1,0 @@
-Bu kısmda sistemi tabloya bağlamak için kullanılır
