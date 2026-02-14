@@ -4,6 +4,11 @@ Python microservice for AI-powered features (FastAPI + LangChain + OpenAI).
 
 ## Setup
 
+1. Copy the environment template and add your OpenAI API key:
+   - **macOS / Linux:** `cp .env.example .env`
+   - **Windows:** `copy .env.example .env`
+   - Edit `.env` and set `OPENAI_API_KEY`
+
 ### macOS / Linux
 
 ```bash
