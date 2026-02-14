@@ -57,6 +57,16 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `GET /health` — Health check (returns 200)
 - `GET /ai/test` — OpenAI connection test (requires `OPENAI_API_KEY`)
 
+## Docker
+
+```bash
+# Build and run
+docker compose up --build
+
+# Or build only
+docker compose build
+```
+
 ## Tests
 
 ```bash
