@@ -5,7 +5,7 @@ from fastapi import APIRouter
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", status_code=200)
 def health_check() -> dict[str, str]:
     """Returns service health status.
 

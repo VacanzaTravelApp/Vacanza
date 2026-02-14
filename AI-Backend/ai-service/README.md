@@ -55,3 +55,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ## Endpoints
 
 - `GET /health` — Health check (returns 200)
+
+## Tests
+
+```bash
+pytest tests/ -v
+```
