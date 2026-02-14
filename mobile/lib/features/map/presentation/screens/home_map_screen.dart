@@ -11,6 +11,7 @@ import '../../../checkin/data/services/location_service.dart';
 import '../../../checkin/presentation/bloc/candidate_poi_cubit.dart';
 import '../../../checkin/presentation/bloc/checkin_bloc.dart';
 import '../../../checkin/presentation/bloc/checkin_event.dart';
+import '../../../checkin/presentation/bloc/checkin_state.dart';
 import '../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../checkin/presentation/bloc/location_event.dart';
 import '../../../checkin/presentation/bloc/location_state.dart';
@@ -98,6 +99,9 @@ class _HomeMapViewState extends State<_HomeMapView>
   bool _filtersOpen = false;
   bool _resultsOpen = false;
 
+  /// Cached reference to avoid context.read in dispose/lifecycle callbacks.
+  late final LocationBloc _locationBloc;
+
   /// GPS tracking was active before app went to background
   bool _wasTracking = false;
 
@@ -165,38 +169,38 @@ class _HomeMapViewState extends State<_HomeMapView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _locationBloc = context.read<LocationBloc>();
 
     // Start foreground GPS tracking (MOB-1)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LocationBloc>().add(const StartTracking());
+      _locationBloc.add(const StartTracking());
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // Stop GPS tracking before disposal
-    context.read<LocationBloc>().add(const StopTracking());
+    // Stop GPS tracking before disposal (use cached ref — context is unsafe here)
+    _locationBloc.add(const StopTracking());
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    final bloc = context.read<LocationBloc>();
 
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       // App going to background — stop GPS to save battery
-      if (bloc.state.status == LocationStatus.tracking) {
+      if (_locationBloc.state.status == LocationStatus.tracking) {
         _wasTracking = true;
-        bloc.add(const StopTracking());
+        _locationBloc.add(const StopTracking());
       }
     } else if (state == AppLifecycleState.resumed) {
       // App coming to foreground — restart GPS if it was active before
       if (_wasTracking) {
         _wasTracking = false;
-        bloc.add(const StartTracking());
+        _locationBloc.add(const StartTracking());
       }
     }
   }
@@ -262,6 +266,25 @@ class _HomeMapViewState extends State<_HomeMapView>
                   longitude: state.longitude!,
                   candidatePoiIds: candidates,
                 ));
+          },
+        ),
+
+        // ================= New check-in feedback (MOB-5) =================
+        BlocListener<CheckinBloc, CheckinState>(
+          listenWhen: (prev, next) =>
+              prev.status != next.status &&
+              next.status == CheckinStatus.newCreated,
+          listener: (context, state) {
+            final poiName = state.response?.poiName;
+            final message =
+                poiName != null ? 'Checked in at $poiName' : 'Checked in!';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
           },
         ),
 
