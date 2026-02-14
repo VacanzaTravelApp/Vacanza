@@ -6,7 +6,7 @@ import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.UserInfo;
 import com.vacanza.backend.repo.UserInfoRepository;
 import com.vacanza.backend.security.CurrentUserProvider;
-import com.vacanza.backend.service.impl.UserInfoImpl;
+
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,16 +16,16 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * Profile upsert:
  * - if user_info doesn't exist: requires firstName + lastName, then create
- * - if exists: updates only non-null fields (doesn't overwrite required with null)
+ * - if exists: updates only non-null fields (doesn't overwrite required with
+ * null)
  */
 @Service
 @AllArgsConstructor
-public class UserInfoService implements UserInfoImpl {
+public class UserInfoService {
 
     private final CurrentUserProvider currentUserProvider;
     private final UserInfoRepository userInfoRepository;
 
-    @Override
     @Transactional(readOnly = true)
     public UserInfoResponseDTO getUserInfo() {
         User user = currentUserProvider.getCurrentUserEntity();
@@ -35,7 +35,6 @@ public class UserInfoService implements UserInfoImpl {
         return toDto(info);
     }
 
-    @Override
     @Transactional
     public UserInfoResponseDTO updateUserInfo(UserInfoRequestDTO req) {
         User user = currentUserProvider.getCurrentUserEntity();
@@ -47,8 +46,7 @@ public class UserInfoService implements UserInfoImpl {
             if (isBlank(req.getFirstName()) || isBlank(req.getLastName())) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "firstName and lastName are required to create profile"
-                );
+                        "firstName and lastName are required to create profile");
             }
 
             info = UserInfo.builder()
@@ -68,16 +66,25 @@ public class UserInfoService implements UserInfoImpl {
         }
 
         // Update: only apply non-null values (do not overwrite with null)
-        if (req.getFirstName() != null) info.setFirstName(req.getFirstName().trim());
-        if (req.getLastName() != null) info.setLastName(req.getLastName().trim());
-        if (req.getMiddleName() != null) info.setMiddleName(req.getMiddleName());
-        if (req.getPreferredName() != null) info.setPreferredName(req.getPreferredName());
+        if (req.getFirstName() != null)
+            info.setFirstName(req.getFirstName().trim());
+        if (req.getLastName() != null)
+            info.setLastName(req.getLastName().trim());
+        if (req.getMiddleName() != null)
+            info.setMiddleName(req.getMiddleName());
+        if (req.getPreferredName() != null)
+            info.setPreferredName(req.getPreferredName());
 
-        if (req.getCountry() != null) info.setCountry(req.getCountry());
-        if (req.getBirthDate() != null) info.setBirthDate(req.getBirthDate());
-        if (req.getGender() != null) info.setGender(req.getGender());
-        if (req.getBudget() != null) info.setBudget(req.getBudget());
-        if (req.getProfileImageUrl() != null) info.setProfileImageUrl(req.getProfileImageUrl());
+        if (req.getCountry() != null)
+            info.setCountry(req.getCountry());
+        if (req.getBirthDate() != null)
+            info.setBirthDate(req.getBirthDate());
+        if (req.getGender() != null)
+            info.setGender(req.getGender());
+        if (req.getBudget() != null)
+            info.setBudget(req.getBudget());
+        if (req.getProfileImageUrl() != null)
+            info.setProfileImageUrl(req.getProfileImageUrl());
 
         return toDto(userInfoRepository.save(info));
     }
