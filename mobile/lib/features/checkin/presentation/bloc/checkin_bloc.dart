@@ -8,8 +8,12 @@ import 'checkin_state.dart';
 
 /// Handles auto check-in API calls with throttling and empty-candidates guard.
 ///
-/// Listens for [TriggerAutoCheckin] events dispatched from the
-/// LocationBloc listener in HomeMapScreen.
+/// After the API responds (HTTP 200), branches into three outcomes:
+/// - [CheckinStatus.newCreated] — checkInId != null → new check-in
+/// - [CheckinStatus.duplicate]  — success && checkInId == null
+/// - [CheckinStatus.noMatch]    — !success (no POI within range)
+///
+/// Only [newCreated] should trigger local state updates.
 class CheckinBloc extends Bloc<CheckinEvent, CheckinState> {
   final CheckinRepository _repository;
 
@@ -62,12 +66,42 @@ class CheckinBloc extends Bloc<CheckinEvent, CheckinState> {
         candidatePoiIds: event.candidatePoiIds,
       );
 
-      log('[CheckinBloc] success checkInId=${response.checkInId} '
-          'poiName=${response.poiName} '
-          'gamificationTriggered=${response.gamificationTriggered}');
+      // ── MOB-4: Branch into 3 response outcomes ──
+
+      // 1) New check-in created (primary signal: checkInId != null)
+      if (response.checkInId != null) {
+        log('[CheckinBloc] newCreated '
+            'checkInId=${response.checkInId} '
+            'poiName=${response.poiName} '
+            'gamificationTriggered=${response.gamificationTriggered}');
+
+        emit(state.copyWith(
+          status: CheckinStatus.newCreated,
+          response: response,
+          gamificationTriggered: response.gamificationTriggered,
+        ));
+        return;
+      }
+
+      // 2) Duplicate — already checked in (success==true, no checkInId)
+      if (response.success) {
+        log('[CheckinBloc] duplicate '
+            'poiId=${response.poiId} '
+            'poiName=${response.poiName} '
+            'message=${response.message}');
+
+        emit(state.copyWith(
+          status: CheckinStatus.duplicate,
+          response: response,
+        ));
+        return;
+      }
+
+      // 3) No matching POI in range (success==false)
+      log('[CheckinBloc] noMatch message=${response.message}');
 
       emit(state.copyWith(
-        status: CheckinStatus.success,
+        status: CheckinStatus.noMatch,
         response: response,
       ));
     } on CheckinException catch (e) {
