@@ -1,11 +1,11 @@
-package com.vacanza.backend.exceptions.enums;
+package com.vacanza.backend.exceptions;
 
 import lombok.Getter;
 
 @Getter
 public enum UserLoginHistoryExceptionEnum {
 
-    //NULL Info
+    // NULL Info
     NullUserId("There is no user with this ID"),
     NullIP("IP address not found");
 
