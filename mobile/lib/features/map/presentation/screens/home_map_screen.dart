@@ -2,6 +2,12 @@
 // lib/features/map/presentation/screens/home_map_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
+
+import '../../../checkin/data/services/location_service.dart';
+import '../../../checkin/presentation/bloc/location_bloc.dart';
+import '../../../checkin/presentation/bloc/location_event.dart';
+import '../../../checkin/presentation/bloc/location_state.dart';
 
 import '../../../poi_search/data/api/poi_search_api_client.dart';
 import '../../../poi_search/data/models/area_source.dart';
@@ -35,6 +41,9 @@ class HomeMapScreen extends StatelessWidget {
             ctx.read<PoiSearchApiClient>(),
           ),
         ),
+        RepositoryProvider<LocationService>(
+          create: (_) => LocationService(),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -43,6 +52,11 @@ class HomeMapScreen extends StatelessWidget {
           BlocProvider<PoiSearchBloc>(
             create: (ctx) => PoiSearchBloc(
               repo: ctx.read<PoiSearchRepository>(),
+            ),
+          ),
+          BlocProvider<LocationBloc>(
+            create: (ctx) => LocationBloc(
+              locationService: ctx.read<LocationService>(),
             ),
           ),
         ],
@@ -59,9 +73,13 @@ class _HomeMapView extends StatefulWidget {
   State<_HomeMapView> createState() => _HomeMapViewState();
 }
 
-class _HomeMapViewState extends State<_HomeMapView> {
+class _HomeMapViewState extends State<_HomeMapView>
+    with WidgetsBindingObserver {
   bool _filtersOpen = false;
   bool _resultsOpen = false;
+
+  /// GPS tracking was active before app went to background
+  bool _wasTracking = false;
 
   /// ✅ Filter açılışı polygon çiziminden mi geldi?
   /// Sadece bu durumda results sheet altta blur preview olarak görünsün.
@@ -124,10 +142,91 @@ class _HomeMapViewState extends State<_HomeMapView> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Start foreground GPS tracking (MOB-1)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<LocationBloc>().add(const StartTracking());
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Stop GPS tracking before disposal
+    context.read<LocationBloc>().add(const StopTracking());
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    final bloc = context.read<LocationBloc>();
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      // App going to background — stop GPS to save battery
+      if (bloc.state.status == LocationStatus.tracking) {
+        _wasTracking = true;
+        bloc.add(const StopTracking());
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      // App coming to foreground — restart GPS if it was active before
+      if (_wasTracking) {
+        _wasTracking = false;
+        bloc.add(const StartTracking());
+      }
+    }
+  }
+
+  void _showPermissionDeniedDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Location Permission Required'),
+        content: const Text(
+          'Location permission is permanently denied. '
+          'Please enable it from app settings to use check-in.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Geolocator.openAppSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MultiBlocListener(
       listeners: [
-        // ================= AreaQuery -> PoiSearch wiring =================
+        // ================= Location permission handling (MOB-1) =================
+        BlocListener<LocationBloc, LocationState>(
+          listenWhen: (prev, next) => prev.status != next.status,
+          listener: (context, state) {
+            if (state.status == LocationStatus.permissionDenied) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Location permission is required for check-in.'),
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            } else if (state.status == LocationStatus.permissionDeniedForever) {
+              _showPermissionDeniedDialog(context);
+            }
+          },
+        ),
         BlocListener<AreaQueryBloc, AreaQueryState>(
           listenWhen: (prev, next) => prev.context != next.context,
           listener: (context, state) {
