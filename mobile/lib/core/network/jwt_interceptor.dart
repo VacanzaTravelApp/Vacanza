@@ -32,7 +32,11 @@ class JwtInterceptor extends Interceptor {
       }
     } catch (_) {}
 
-    log('[JwtInterceptor] REQ path=${options.path} hasAuth=${options.headers['Authorization'] != null}');
+    final authHeader = options.headers['Authorization']?.toString();
+    final maskedAuth = authHeader != null && authHeader.startsWith('Bearer ')
+        ? 'Bearer ${authHeader.substring(7, authHeader.length.clamp(0, 13))}...'
+        : authHeader ?? 'MISSING';
+    log('[JwtInterceptor] REQ path=${options.path} auth=$maskedAuth');
     handler.next(options);
   }
 
@@ -42,6 +46,11 @@ class JwtInterceptor extends Interceptor {
     final path = err.requestOptions.path;
 
     log('[JwtInterceptor] ERROR status=$status path=$path');
+
+    if (status == 401) {
+      final body = err.response?.data;
+      log('[JwtInterceptor] 401 body=$body');
+    }
 
     if (status != 401) {
       handler.next(err);

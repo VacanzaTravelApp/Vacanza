@@ -73,6 +73,16 @@ class CandidatePoiCubit extends Cubit<CandidatePoiState> {
         'candidates=${candidates.length} '
         'sample=$sample');
 
+    // Log first 3 candidates with full details for manual emulator testing
+    final samplePois = _allPois
+        .where((p) => candidates.contains(p.poiId))
+        .take(3);
+    for (final p in samplePois) {
+      log('[CandidatePoiCubit] samplePoi '
+          'id=${p.poiId} name=${p.name} '
+          'lat=${p.latitude} lng=${p.longitude}');
+    }
+
     emit(state.copyWith(candidatePoiIds: candidates));
   }
 }
