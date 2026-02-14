@@ -6,7 +6,7 @@ import com.vacanza.backend.entity.User;
 import com.vacanza.backend.repo.UserInfoRepository;
 import com.vacanza.backend.repo.UserLoginHistoryRepository;
 import com.vacanza.backend.security.CurrentUserProvider;
-import com.vacanza.backend.service.impl.AuthImpl;
+
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,13 +22,12 @@ import java.time.Instant;
  */
 @Service
 @AllArgsConstructor
-public class AuthService implements AuthImpl {
+public class AuthService {
 
     private final CurrentUserProvider currentUserProvider;
     private final UserInfoRepository userInfoRepository;
     private final UserLoginHistoryRepository loginHistoryRepository;
 
-    @Override
     @Transactional
     public UserAuthenticationDTO getMe(HttpServletRequest request) {
         User user = currentUserProvider.getCurrentUserEntity();
@@ -45,8 +44,7 @@ public class AuthService implements AuthImpl {
                         .loginProvider("firebase")
                         .loginTime(Instant.now())
                         .ipAddress(resolveClientIp(request))
-                        .build()
-        );
+                        .build());
 
         return UserAuthenticationDTO.builder()
                 .userId(user.getUserId())
