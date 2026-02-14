@@ -1,4 +1,4 @@
-package com.vacanza.backend.dto;
+package com.vacanza.backend.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
