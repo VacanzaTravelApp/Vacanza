@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../checkin/data/services/location_service.dart';
+import '../../../checkin/presentation/bloc/candidate_poi_cubit.dart';
 import '../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../checkin/presentation/bloc/location_event.dart';
 import '../../../checkin/presentation/bloc/location_state.dart';
@@ -58,6 +59,9 @@ class HomeMapScreen extends StatelessWidget {
             create: (ctx) => LocationBloc(
               locationService: ctx.read<LocationService>(),
             ),
+          ),
+          BlocProvider<CandidatePoiCubit>(
+            create: (_) => CandidatePoiCubit(),
           ),
         ],
         child: const _HomeMapView(),
@@ -232,11 +236,14 @@ class _HomeMapViewState extends State<_HomeMapView>
           listener: (context, state) {
             final ctx = state.context;
 
-            // 1) Viewport -> PoiSearch viewport event
+            // 1) Viewport -> PoiSearch viewport event + CandidatePoiCubit
             if (ctx.areaSource == AreaSource.viewport && ctx.area is BboxArea) {
+              final bbox = ctx.area as BboxArea;
               context.read<PoiSearchBloc>().add(
-                poi.ViewportChanged(ctx.area as BboxArea),
+                poi.ViewportChanged(bbox),
               );
+              // MOB-2: forward viewport bbox to candidate cubit
+              context.read<CandidatePoiCubit>().updateViewport(bbox);
               return;
             }
 
@@ -277,6 +284,8 @@ class _HomeMapViewState extends State<_HomeMapView>
               prev.pois != next.pois ||
               prev.selectedCategories != next.selectedCategories,
           listener: (context, state) {
+            // MOB-2: forward POI list to candidate cubit on any POI change
+            context.read<CandidatePoiCubit>().updatePois(state.pois);
             // Filter açıkken normal results gösterme (blur preview scaffold'da)
             if (_filtersOpen) {
               return;
