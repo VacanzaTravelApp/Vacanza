@@ -55,6 +55,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ## Endpoints
 
 - `GET /health` — Health check (returns 200)
+- `GET /ai/test` — OpenAI connection test (requires `OPENAI_API_KEY`)
 
 ## Tests
 
