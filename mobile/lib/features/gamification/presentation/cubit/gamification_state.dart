@@ -16,9 +16,13 @@ class GamificationLoading extends GamificationState {
 }
 
 /// Profile loaded successfully.
+///
+/// [isMock] is `true` when data comes from the local mock fallback
+/// (backend returned 404). UI can show a subtle "Preview data" indicator.
 class GamificationLoaded extends GamificationState {
   final GamificationProfileDto profile;
-  const GamificationLoaded(this.profile);
+  final bool isMock;
+  const GamificationLoaded(this.profile, {this.isMock = false});
 }
 
 /// Fetch failed.

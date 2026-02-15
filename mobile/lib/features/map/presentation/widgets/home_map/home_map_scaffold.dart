@@ -10,6 +10,7 @@ import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/mapbox/map_canvas_mapbox.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/action_bar.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/profile_badge.dart';
+import 'package:mobile/features/profile/presentation/screens/profile_screen.dart';
 
 import '../../../data/models/map_view_mode.dart';
 
@@ -83,13 +84,21 @@ class HomeMapScaffold extends StatelessWidget {
             ),
 
             // ================= PROFILE (SOL ÜST) =================
-            const Positioned(
+            Positioned(
               top: 30,
               left: 16,
               child: ProfileBadge(
                 name: 'Serhat', // VACANZA-164
                 subtitle: 'Traveler',
-                  imagePath: 'assets/core/theme/profile/serhat.jpg'
+                imagePath: 'assets/core/theme/profile/serhat.jpg',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProfileScreen(),
+                    ),
+                  );
+                },
               ),
             ),
 

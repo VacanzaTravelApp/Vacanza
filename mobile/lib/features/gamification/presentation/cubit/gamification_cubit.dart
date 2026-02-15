@@ -18,6 +18,8 @@ class GamificationCubit extends Cubit<GamificationState> {
 
   /// Fetches the gamification profile from the backend.
   /// Skips if already loading to prevent concurrent fetches.
+  ///
+  /// On 404, receives mock data from repository with `isMock: true`.
   Future<void> fetchProfile() async {
     if (state is GamificationLoading) return;
 
@@ -25,11 +27,18 @@ class GamificationCubit extends Cubit<GamificationState> {
     emit(const GamificationLoading());
 
     try {
-      final profile = await _repository.getProfile();
-      log('[GamificationCubit] loaded — '
-          'role=${profile.roleText} level=${profile.levelText} '
-          'xp=${profile.totalXp}');
-      emit(GamificationLoaded(profile));
+      final result = await _repository.getProfile();
+
+      if (result.isMock) {
+        log('[GamificationCubit] loaded MOCK — '
+            'role=${result.profile.roleText}');
+      } else {
+        log('[GamificationCubit] loaded — '
+            'role=${result.profile.roleText} level=${result.profile.levelText} '
+            'xp=${result.profile.totalXp}');
+      }
+
+      emit(GamificationLoaded(result.profile, isMock: result.isMock));
     } on GamificationException catch (e) {
       log('[GamificationCubit] error: ${e.message}');
       emit(GamificationError(e.message));
