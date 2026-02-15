@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 
 import '../api/gamification_api_client.dart';
 import '../models/gamification_profile_dto.dart';
-import '../models/mock_profile.dart';
 
 /// Domain-level exception for gamification operations.
 class GamificationException implements Exception {
@@ -15,43 +14,24 @@ class GamificationException implements Exception {
   String toString() => 'GamificationException: $message';
 }
 
-/// Result wrapper that indicates whether data is real or mock.
-class GamificationResult {
-  final GamificationProfileDto profile;
-  final bool isMock;
-  const GamificationResult({required this.profile, this.isMock = false});
-}
-
 /// Wraps [GamificationApiClient] and maps [DioException] to
 /// [GamificationException] for clean domain-level error handling.
 ///
-/// Returns mock data on 404 (backend not deployed yet).
+/// Logs diagnostics with [GAM_REPO] tag.
 class GamificationRepository {
   final GamificationApiClient _apiClient;
 
   GamificationRepository({required GamificationApiClient apiClient})
       : _apiClient = apiClient;
 
-  /// Fetches the gamification profile.
-  ///
-  /// On 404, returns [GamificationResult] with `isMock: true` and mock data.
-  /// On other errors, throws [GamificationException].
-  Future<GamificationResult> getProfile() async {
+  /// Fetches the gamification profile; throws [GamificationException] on error.
+  Future<GamificationProfileDto> getProfile() async {
     try {
-      final profile = await _apiClient.fetchProfile();
-      return GamificationResult(profile: profile);
+      return await _apiClient.fetchProfile();
     } on DioException catch (e) {
-      log('[GamificationRepo] DioException: ${e.type} ${e.message}');
-
-      // 404 → backend not ready, use mock fallback
       final status = e.response?.statusCode;
-      if (status == 404) {
-        log('[GamificationRepo] 404 → returning mock profile');
-        return GamificationResult(
-          profile: mockGamificationProfile(),
-          isMock: true,
-        );
-      }
+      log('[GAM_REPO] DioException type=${e.type} '
+          'status=$status message=${e.message}');
 
       // Network / timeout errors
       if (e.type == DioExceptionType.connectionError ||
@@ -71,7 +51,7 @@ class GamificationRepository {
 
       throw const GamificationException('Request failed');
     } on FormatException catch (e) {
-      log('[GamificationRepo] FormatException: $e');
+      log('[GAM_REPO] FormatException: $e');
       throw const GamificationException('Invalid response');
     }
   }

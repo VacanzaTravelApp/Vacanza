@@ -1,5 +1,6 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/gamification_profile_dto.dart';
@@ -12,27 +13,15 @@ import '../widgets/xp_card.dart';
 /// MOB-9: Gamification summary screen.
 ///
 /// Thin orchestrator only — delegates rendering to widget files.
-/// Calls [GamificationCubit.fetchProfile] once on first open.
-class GamificationProfileScreen extends StatefulWidget {
+/// Does NOT auto-fetch; relies on [GamificationCubit] already having
+/// data from [ProfileScreen]. User can retry on error.
+class GamificationProfileScreen extends StatelessWidget {
   const GamificationProfileScreen({super.key});
 
   @override
-  State<GamificationProfileScreen> createState() =>
-      _GamificationProfileScreenState();
-}
-
-class _GamificationProfileScreenState extends State<GamificationProfileScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Single fetch via postFrameCallback to avoid calling during build.
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      context.read<GamificationCubit>().fetchProfile();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    log('[GAM_UI] GamificationProfileScreen opened');
+
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       body: SafeArea(
@@ -41,9 +30,10 @@ class _GamificationProfileScreenState extends State<GamificationProfileScreen> {
             return switch (state) {
               GamificationInitial() => _buildLoading(),
               GamificationLoading() => _buildLoading(),
-              GamificationError(:final message) => _buildError(context, message),
-              GamificationLoaded(:final profile, :final isMock) =>
-                _GamificationLoadedBody(profile: profile, isMock: isMock),
+              GamificationError(:final message) =>
+                _buildError(context, message),
+              GamificationLoaded(:final profile) =>
+                _GamificationLoadedBody(profile: profile),
             };
           },
         ),
@@ -66,17 +56,21 @@ class _GamificationProfileScreenState extends State<GamificationProfileScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Color(0xFFFF6B6B)),
+            const Icon(Icons.error_outline,
+                size: 48, color: Color(0xFFFF6B6B)),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15, color: Color(0xFF5F7A8F)),
+              style:
+                  const TextStyle(fontSize: 15, color: Color(0xFF5F7A8F)),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: () =>
-                  context.read<GamificationCubit>().fetchProfile(),
+              onPressed: () {
+                log('[GAM_UI] GamificationProfileScreen retry tapped');
+                context.read<GamificationCubit>().fetchProfile();
+              },
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Retry'),
               style: FilledButton.styleFrom(
@@ -94,11 +88,9 @@ class _GamificationProfileScreenState extends State<GamificationProfileScreen> {
 
 class _GamificationLoadedBody extends StatelessWidget {
   final GamificationProfileDto profile;
-  final bool isMock;
 
   const _GamificationLoadedBody({
     required this.profile,
-    required this.isMock,
   });
 
   @override
@@ -111,19 +103,16 @@ class _GamificationLoadedBody extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
             child: Column(
               children: [
-                // Back button + mock chip
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.chevron_left, size: 28),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white.withValues(alpha: 0.8),
-                      ),
+                // Back button
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.chevron_left, size: 28),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.8),
                     ),
-                    const Spacer(),
-                    if (isMock) _buildMockChip(),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -197,32 +186,6 @@ class _GamificationLoadedBody extends StatelessWidget {
         // Bottom padding
         const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
-    );
-  }
-
-  /// Subtle "Preview data" chip shown when data is mock fallback.
-  Widget _buildMockChip() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF3CD),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.5)),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.science_outlined, size: 14, color: Color(0xFFB8860B)),
-          SizedBox(width: 4),
-          Text(
-            'Preview data',
-            style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFFB8860B)),
-          ),
-        ],
-      ),
     );
   }
 }
