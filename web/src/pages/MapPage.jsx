@@ -732,9 +732,21 @@ export default function MapPage() {
           <span style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700 }}>Vacanza Map</span>
         </div>
 
-        <Button size={isMobile ? "small" : "middle"} icon={<LogoutOutlined />} onClick={handleLogout}>
-          {isMobile ? "" : "Log Out"}
-        </Button>
+<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+  <Button
+    size={isMobile ? "small" : "middle"}
+    icon={<UserOutlined />}
+    onClick={() => navigate("/gamification")}
+  >
+    {isMobile ? "" : "Gamification"}
+  </Button>
+
+  <Button size={isMobile ? "small" : "middle"} icon={<LogoutOutlined />} onClick={handleLogout}>
+    {isMobile ? "" : "Log Out"}
+  </Button>
+</div>
+
+
       </Header>
 
       <Content style={{ marginTop: headerHeight, padding: contentPadding, position: "relative" }}>

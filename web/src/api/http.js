@@ -4,6 +4,7 @@ import { auth } from "../firebase";
 const http = axios.create({
   // baseURL yok -> istekler /... şeklinde gider, Vite proxy yakalar
   headers: { "Content-Type": "application/json" },
+  timeout: 15000, // ✅ timeout => TIMEOUT normalize edilecek
 });
 
 http.interceptors.request.use(
