@@ -18,6 +18,11 @@ spring:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
     show-sql: true
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
 
 geoapify:
   base-url: https://api.geoapify.com/v2

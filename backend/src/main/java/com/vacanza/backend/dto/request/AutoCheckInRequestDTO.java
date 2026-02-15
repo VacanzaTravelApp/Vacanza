@@ -1,4 +1,4 @@
-package com.vacanza.backend.dto;
+package com.vacanza.backend.dto.request;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;

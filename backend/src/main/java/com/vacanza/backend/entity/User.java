@@ -12,13 +12,10 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(
-        name = "users",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_users_email", columnNames = "email"),
-                @UniqueConstraint(name = "uk_users_firebase_uid", columnNames = "firebase_uid")
-        }
-)
+@Table(name = "users", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_users_email", columnNames = "email"),
+        @UniqueConstraint(name = "uk_users_firebase_uid", columnNames = "firebase_uid")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -46,11 +43,12 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    //relationship alani (kullanici birden fazla historye sahip olabilir
-    //json serialization loopu engelliyor
-    //kullanici silinirse ona bagli historyler de silinecek (cascase ile)
+    // relationship alani (kullanici birden fazla historye sahip olabilir
+    // json serialization loopu engelliyor
+    // kullanici silinirse ona bagli historyler de silinecek (cascase ile)
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JsonIgnore
+    @Builder.Default
     private List<LoginHistory> loginHistoryList = new ArrayList<>();
 
     @PrePersist

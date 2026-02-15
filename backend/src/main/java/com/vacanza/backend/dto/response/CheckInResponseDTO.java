@@ -1,4 +1,4 @@
-package com.vacanza.backend.dto;
+package com.vacanza.backend.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,4 +19,5 @@ public class CheckInResponseDTO {
     private Instant checkedInAt;
     private String message;
     private boolean success;
+    private boolean gamificationTriggered;
 }
