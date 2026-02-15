@@ -1,5 +1,12 @@
 import http from "../api/http";
 
+/**
+ * Fetches the current user's gamification profile.
+ * Requires Firebase ID token (handled by http interceptor).
+ * 
+ * @returns {Promise<Object>} Gamification profile data
+ */
+export const fetchMyGamification = async () => {
 const USE_MOCK = import.meta.env.VITE_USE_GAMIFICATION_MOCK === "true";
 
 /**
@@ -51,3 +58,4 @@ export const fetchMyGamification = async () => {
 
     return data;
 };
+
