@@ -23,7 +23,6 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class CheckInService {
 
         private final CheckInRepository checkInRepository;
