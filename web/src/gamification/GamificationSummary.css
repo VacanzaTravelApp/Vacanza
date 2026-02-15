@@ -1,0 +1,264 @@
+.gamification-page {
+    min-height: 100vh;
+    padding: 28px 16px;
+    background: #f5f6f8;
+}
+
+.gamification-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Common Card Style */
+.gamification-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    height: 100%;
+    /* Fill column height */
+}
+
+/* Loading */
+.gamification-loading {
+    display: flex;
+    background: #fff;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
+}
+
+/* Header (Left Column) */
+.gamification-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.role-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.level-text {
+    margin-top: 4px;
+    font-size: 24px;
+    font-weight: 800;
+    color: #111827;
+}
+
+/* Progress Ring (Left Column) */
+.gamification-ring-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.gamification-ring {
+    position: relative;
+    width: 180px;
+    height: 180px;
+}
+
+.gamification-ring svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.ring-bg {
+    fill: none;
+    stroke: #e9edf2;
+    stroke-width: 10;
+}
+
+.ring-progress {
+    fill: none;
+    stroke-width: 10;
+    stroke-linecap: round;
+    stroke: url(#grad);
+    /* ID from JSX */
+    transition: stroke-dashoffset 0.6s ease;
+}
+
+.gamification-ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.percent {
+    font-size: 36px;
+    font-weight: 900;
+    color: #111827;
+    line-height: 1;
+}
+
+.to-level {
+    font-size: 13px;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+.xp {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+    margin-top: 6px;
+    background: #f3f4f6;
+    padding: 2px 10px;
+    border-radius: 12px;
+}
+
+/* Stats (Left Column) */
+.gamification-stats {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.stat-item {
+    text-align: center;
+    flex: 1;
+    border-right: 1px solid #f0f0f0;
+}
+
+.stat-item:last-child {
+    border-right: none;
+}
+
+.stat-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: #111827;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+/* Badges (Right Column) */
+.badges-title {
+    margin-bottom: 20px !important;
+    font-size: 18px !important;
+}
+
+.gamification-badges {
+    display: grid;
+    /* Responsive Grid: 2 cols on mobile, 3 on tablet, 4 on desktop */
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+}
+
+.badge-item {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 20px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.badge-item:hover {
+    background: #fff;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    border-color: transparent;
+    transform: translateY(-2px);
+}
+
+.badge-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    margin-bottom: 12px;
+    /* Placeholder fallback */
+    background: #e5e7eb;
+}
+
+/* Color variants */
+.badge-icon.orange {
+    background: #fff1db;
+}
+
+.badge-icon.coral {
+    background: #ffe3e6;
+}
+
+.badge-icon.blue {
+    background: #e6f4ff;
+}
+
+.badge-icon.green {
+    background: #e7fff3;
+}
+
+.badge-icon.pink {
+    background: #ffe9f3;
+}
+
+.badge-icon.purple {
+    background: #f1e9ff;
+}
+
+.badge-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2937;
+    line-height: 1.4;
+    margin-bottom: 6px;
+}
+
+.badge-check {
+    font-size: 14px;
+    color: #22c55e;
+    font-weight: 900;
+    margin-top: auto;
+    /* Push to bottom */
+}
+
+/* Locked Badge */
+.badge-item.locked {
+    opacity: 0.6;
+    filter: grayscale(1);
+    background: #f3f4f6;
+}
+
+.badge-item.locked .badge-check {
+    display: none;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    .gamification-card {
+        padding: 20px;
+    }
+
+    .gamification-stats {
+        justify-content: space-around;
+    }
+
+    .gamification-badges {
+        grid-template-columns: repeat(3, 1fr);
+        /* 3 cols on tablet */
+    }
+}
+
+@media (max-width: 520px) {
+    .gamification-badges {
+        grid-template-columns: repeat(2, 1fr);
+        /* 2 cols on mobile */
+    }
+}
