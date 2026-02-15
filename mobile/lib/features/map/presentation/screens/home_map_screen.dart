@@ -1,5 +1,7 @@
 // ======================= home_map_screen.dart =======================
 // lib/features/map/presentation/screens/home_map_screen.dart
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,6 +17,8 @@ import '../../../checkin/presentation/bloc/checkin_state.dart';
 import '../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../checkin/presentation/bloc/location_event.dart';
 import '../../../checkin/presentation/bloc/location_state.dart';
+
+import '../../../gamification/presentation/cubit/gamification_cubit.dart';
 
 import '../../../poi_search/data/api/poi_search_api_client.dart';
 import '../../../poi_search/data/models/area_source.dart';
@@ -285,6 +289,20 @@ class _HomeMapViewState extends State<_HomeMapView>
                 behavior: SnackBarBehavior.floating,
               ),
             );
+          },
+        ),
+
+        // ================= Gamification refresh (MOB-12) =================
+        BlocListener<CheckinBloc, CheckinState>(
+          listenWhen: (prev, next) =>
+              prev.status != next.status &&
+              next.status == CheckinStatus.newCreated &&
+              next.gamificationTriggered &&
+              prev.response?.checkInId != next.response?.checkInId,
+          listener: (context, state) {
+            log('[GAM_UI] MOB-12 refresh triggered — '
+                'checkInId=${state.response?.checkInId}');
+            context.read<GamificationCubit>().refresh();
           },
         ),
 
