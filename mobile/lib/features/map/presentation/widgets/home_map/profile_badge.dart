@@ -10,26 +10,30 @@ class ProfileBadge extends StatelessWidget {
   /// ✅ opsiyonel: asset path (örn: assets/core/theme/profile/serhat.jpg)
   final String? imagePath;
 
+  /// ✅ opsiyonel: tap handler for navigation (MOB-9)
+  final VoidCallback? onTap;
+
   const ProfileBadge({
     super.key,
     required this.name,
     required this.subtitle,
     this.imagePath,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool hasImage = (imagePath != null && imagePath!.isNotEmpty);
 
-    return Container(
+    final child = Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.90),
+        color: Colors.white.withValues(alpha: 0.90),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.6)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
+            color: Colors.black.withValues(alpha: 0.10),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -87,5 +91,10 @@ class ProfileBadge extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap != null) {
+      return GestureDetector(onTap: onTap, child: child);
+    }
+    return child;
   }
 }
