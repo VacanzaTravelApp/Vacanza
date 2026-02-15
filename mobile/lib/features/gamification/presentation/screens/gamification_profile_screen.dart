@@ -6,7 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/models/gamification_profile_dto.dart';
 import '../cubit/gamification_cubit.dart';
 import '../cubit/gamification_state.dart';
-import '../widgets/badge_tile.dart';
+import '../widgets/badge_grid_section.dart';
 import '../widgets/challenges_placeholder.dart';
 import '../widgets/xp_card.dart';
 
@@ -145,35 +145,14 @@ class _GamificationLoadedBody extends StatelessWidget {
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
         // ─── Badge Grid ───
-        if (profile.badges.isNotEmpty) ...[
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                profile.badgesSectionTitle.isNotEmpty
-                    ? profile.badgesSectionTitle
-                    : 'Achievement Badges',
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF2C3E50)),
-              ),
-            ),
+        SliverToBoxAdapter(
+          child: BadgeGridSection(
+            sectionTitle: profile.badgesSectionTitle,
+            badges: profile.badges,
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 12)),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            sliver: SliverGrid.count(
-              crossAxisCount: 3,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.85,
-              children:
-                  profile.badges.map((b) => BadgeTile(badge: b)).toList(),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-        ],
+        ),
+
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
         // ─── Challenges Placeholder ───
         const SliverToBoxAdapter(
