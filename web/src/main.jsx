@@ -8,6 +8,7 @@ import AuthProvider from "./context/AuthProvider";
 
 const queryClient = new QueryClient();
 
+console.log("MAIN JSX RUNNING");
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
