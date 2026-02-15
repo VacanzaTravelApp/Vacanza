@@ -28,11 +28,11 @@
 | 4     | MOB-4  | Response handling & local state  | MOB-3             |
 | 5     | MOB-5  | Minimal user feedback (toast)    | MOB-4             |
 
-### Phase 2 — UX & Field Testing (MOB-6)
+### Phase 2 — Live GPS & Field Testing (MOB-6)
 
-| Order | Task   | Summary                             | Depends On      |
-|-------|--------|-------------------------------------|-----------------|
-| 6     | MOB-6  | Field test GPS edge cases           | MOB-1 → MOB-5   |
+| Order | Task   | Summary                                          | Depends On      |
+|-------|--------|--------------------------------------------------|-----------------|
+| 6     | MOB-6  | Live GPS integration + field & edge validation   | MOB-1 → MOB-5   |
 
 ### Phase 3 — Gamification (MOB-7 → MOB-13)
 
@@ -55,7 +55,7 @@ graph LR
     MOB4 --> MOB5[MOB-5 Feedback]
   end
   subgraph "Phase 2 – Field Test"
-    MOB5 --> MOB6[MOB-6 Field Test]
+    MOB5 --> MOB6[MOB-6 Live GPS + Field Test]
   end
   subgraph "Phase 3 – Gamification"
     MOB7[MOB-7 DTOs] --> MOB8[MOB-8 BLoC]
@@ -421,10 +421,10 @@ feat(MOB-5): non-blocking check-in feedback toast
 
 ---
 
-### MOB-6 — Field Testing & GPS Edge Case Validation (UC1.7)
+### MOB-6 — Live GPS Integration + Field & Edge Validation (UC1.7)
 
 #### 1) Overview
-Validate auto check-in behavior under real GPS field conditions. This is a testing/validation task, not a code-heavy task. Focus on documenting observed behavior and tuning parameters.
+Replace hardcoded coordinates with emulator/device GPS location stream, center the map on the user's location on the first valid GPS fix (one-time), keep auto check-in using the live stream, and document GPS drift/50m boundary behavior for UC1.7.
 
 #### 2) Dependencies
 - MOB-1 through MOB-5 fully integrated and working
@@ -436,12 +436,26 @@ None.
 
 | Action   | Path |
 |----------|------|
-| NEW      | `docs/field_test_results.md` — test observations log |
+| MODIFY   | `lib/features/checkin/presentation/bloc/location_bloc.dart` — expose first-fix flag |
+| MODIFY   | `lib/features/checkin/presentation/bloc/location_state.dart` — add `isFirstFix` field |
+| MODIFY   | `lib/features/map/presentation/screens/home_map_screen.dart` — listen for first fix → center camera once |
+| MODIFY   | `lib/features/map/presentation/widgets/home_map/mapbox/mapbox_view.dart` or `map_canvas_mapbox.dart` — remove/fallback hardcoded start coordinate |
 | MODIFY   | `lib/features/checkin/data/services/location_service.dart` — tune `distanceFilter`, polling interval if needed |
 | MODIFY   | `lib/features/checkin/presentation/bloc/checkin_bloc.dart` — tune throttle duration based on field results |
+| NEW      | `docs/field_test_results.md` — test observations log |
 
 #### 5) Step-by-Step Implementation Plan
 
+**Live GPS Integration:**
+- [ ] Use emulator/device location source as default (hardcoded coordinate as fallback only)
+- [ ] On first valid location fix:
+  - Persist current location in `LocationState`
+  - If map is ready, center camera once
+  - Set `isFirstFix = true` to prevent repeated camera recenter on subsequent updates
+- [ ] Keep continuous location updates for auto check-in evaluation
+- [ ] Safe fallback if location permission/service is unavailable (no crash; show error state)
+
+**Field & Edge Validation:**
 - [ ] Prepare test plan: identify 3+ real POIs with known coordinates
 - [ ] Test scenario 1: Walk toward POI, observe check-in trigger at ≤50m
 - [ ] Test scenario 2: Stand at boundary (~45–55m), observe detection consistency
@@ -456,6 +470,8 @@ None.
 
 | Scenario | Handling |
 |----------|----------|
+| GPS permission denied | LocationBloc emits permissionDenied state; map uses fallback coordinate; no crash |
+| Location service disabled | LocationBloc emits serviceDisabled state; map shows fallback; graceful degradation |
 | GPS drift causes false check-in | Accept as prototype limitation; document threshold |
 | ~50m boundary oscillation | Backend decides proximity; client just sends candidates |
 | High latency (>10s) | Reduce throttle interval; increase polling frequency |
@@ -463,17 +479,20 @@ None.
 
 #### 7) Acceptance Criteria
 
-- [ ] Check-in confirmation observed shortly after entering radius (best-effort)
-- [ ] Detection accuracy reaches ~80% in field conditions (prototype target)
-- [ ] No critical crashes/blockers during demo scenario
-- [ ] Tuning parameters documented
+- [ ] App uses live location from emulator/device; hardcoded coordinate is only a fallback, not default
+- [ ] Map centers exactly once on the first valid location fix; subsequent updates do not keep moving the camera
+- [ ] Auto check-in triggers based on live location updates and continues working reliably
+- [ ] Boundary (≈50m) behavior is tested and outcomes are documented
+- [ ] Observed latency and detection outcomes are documented (best-effort; no strict "2 seconds" requirement)
+- [ ] No critical crashes if permission denied / location disabled / GPS unavailable
 
 #### 8) Commit Message Suggestion
 ```
-test(MOB-6): field test results and GPS parameter tuning
+feat(MOB-6): live GPS integration + field test results
 
-- Document field test observations
-- Tune distanceFilter and throttle based on results
+- Replace hardcoded coordinates with live GPS stream
+- Center map once on first valid location fix
+- Document field test observations and GPS parameter tuning
 ```
 
 ---

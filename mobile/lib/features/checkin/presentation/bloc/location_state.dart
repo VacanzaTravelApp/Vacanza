@@ -23,11 +23,16 @@ class LocationState {
   final double? longitude;
   final String? errorMessage;
 
+  /// True after the first valid GPS position has been received.
+  /// Used by HomeMapScreen to center the camera exactly once.
+  final bool isFirstFix;
+
   const LocationState({
     required this.status,
     this.latitude,
     this.longitude,
     this.errorMessage,
+    this.isFirstFix = false,
   });
 
   factory LocationState.initial() => const LocationState(
@@ -39,16 +44,19 @@ class LocationState {
     double? latitude,
     double? longitude,
     String? errorMessage,
+    bool? isFirstFix,
   }) {
     return LocationState(
       status: status ?? this.status,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       errorMessage: errorMessage ?? this.errorMessage,
+      isFirstFix: isFirstFix ?? this.isFirstFix,
     );
   }
 
   @override
   String toString() =>
-      'LocationState(status: $status, lat: $latitude, lng: $longitude)';
+      'LocationState(status: $status, lat: $latitude, lng: $longitude, '
+      'isFirstFix: $isFirstFix)';
 }
