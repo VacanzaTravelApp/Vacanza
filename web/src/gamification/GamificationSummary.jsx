@@ -1,18 +1,21 @@
 import React from "react";
 import { Spin, Alert, Typography, Row, Col, Button } from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 import { useGamificationProfile } from "./useGamificationProfile";
 import "./GamificationSummary.css";
 
 const { Title, Text } = Typography;
 
 const GamificationSummary = () => {
+    const navigate = useNavigate();
     const { data, isLoading, isError, error, refetch } = useGamificationProfile();
 
     if (isLoading) {
         return (
             <div className="gamification-page">
                 <div className="gamification-loading">
-                    <Spin size="large" />
+                    <Spin size="large" tip="Loading profile..." />
                 </div>
             </div>
         );
@@ -23,8 +26,8 @@ const GamificationSummary = () => {
             <div className="gamification-page">
                 <Alert
                     type="error"
-                    message={error?.message ?? error?.code ?? "—"}
-                    description={error?.code ?? "—"}
+                    message="Data Loading Error"
+                    description={error?.message || "Something went wrong while fetching data."}
                     showIcon
                     action={
                         <Button size="small" onClick={() => refetch()}>
@@ -36,31 +39,44 @@ const GamificationSummary = () => {
         );
     }
 
+    // Circular Progress Calculation (r=75 circumference ≈ 471)
+    const strokeDasharray = 471;
+    const progressPercent = data?.xpProgressPercent ?? 0;
+    const offset = strokeDasharray - (strokeDasharray * progressPercent) / 100;
+
     return (
         <div className="gamification-page">
             <div className="gamification-container">
+                {/* Back to Map Button */}
+                <Button 
+                    type="text" 
+                    icon={<ArrowLeftOutlined />} 
+                    onClick={() => navigate("/map")} 
+                    style={{ marginBottom: 20, fontWeight: 600 }}
+                >
+                    Back to Map
+                </Button>
+
                 <Row gutter={[24, 24]}>
-                    {/* LEFT COLUMN: Profile & Stats */}
+                    {/* LEFT COLUMN: Profile Summary */}
                     <Col xs={24} md={8} lg={7}>
                         <div className="gamification-card profile-card">
-                            {/* Header */}
                             <div className="gamification-header">
                                 <Text className="role-text">
-                                    {data?.roleText ?? "—"}
+                                    {data?.roleText ?? "TRAVELER"}
                                 </Text>
                                 <div className="level-text">
-                                    {data?.levelText ?? "—"}
+                                    {data?.levelText ?? "Level 1"}
                                 </div>
                             </div>
 
-                            {/* Circular Progress */}
                             <div className="gamification-ring-wrap">
                                 <div className="gamification-ring">
                                     <svg>
                                         <defs>
                                             <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                <stop offset="0%" style={{ stopColor: "#4caf50", stopOpacity: 1 }} />
-                                                <stop offset="100%" style={{ stopColor: "#8bc34a", stopOpacity: 1 }} />
+                                                <stop offset="0%" style={{ stopColor: "#1890ff", stopOpacity: 1 }} />
+                                                <stop offset="100%" style={{ stopColor: "#69c0ff", stopOpacity: 1 }} />
                                             </linearGradient>
                                         </defs>
                                         <circle className="ring-bg" cx="85" cy="85" r="75" />
@@ -69,24 +85,24 @@ const GamificationSummary = () => {
                                             cx="85"
                                             cy="85"
                                             r="75"
-                                            strokeDasharray="471"
-                                            strokeDashoffset={471 - (471 * (data?.progressPercent ?? 0)) / 100}
+                                            strokeDasharray={strokeDasharray}
+                                            strokeDashoffset={offset}
                                         />
                                     </svg>
                                     <div className="gamification-ring-center">
-                                        <div className="percent">{data?.progressPercent ?? 0}%</div>
-                                        <div className="to-level">{data?.nextLevelText ?? "to next level"}</div>
-                                        <div className="xp">{data?.currentXp ?? "0 XP"}</div>
+                                        <div className="percent">{progressPercent}%</div>
+                                        <div className="to-level">next level</div>
+                                        <div className="xp">{data?.totalXp ?? 0} XP</div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Stats */}
-                            {Array.isArray(data?.stats) && data.stats.length > 0 && (
+                            {/* Stats Section */}
+                            {Array.isArray(data?.stats) && (
                                 <div className="gamification-stats">
                                     {data.stats.map((stat, index) => (
                                         <div key={index} className="stat-item">
-                                            <div className="stat-value">{stat?.value ?? "—"}</div>
+                                            <div className="stat-value">{stat?.value ?? 0}</div>
                                             <div className="stat-label">{stat?.label ?? "—"}</div>
                                         </div>
                                     ))}
@@ -97,37 +113,35 @@ const GamificationSummary = () => {
 
                     {/* RIGHT COLUMN: Badges */}
                     <Col xs={24} md={16} lg={17}>
-                        {data?.badgesSectionTitle &&
-                            Array.isArray(data?.badges) &&
-                            data.badges.length > 0 && (
-                                <div className="gamification-card badges-card">
-                                    <Title level={4} className="badges-title">
-                                        {data.badgesSectionTitle}
-                                    </Title>
-                                    <div className="gamification-badges">
-                                        {data.badges.map((badge) => {
-                                            if (!badge?.title) return null;
-                                            const isLocked = badge.unlocked === false;
+                        <div className="gamification-card badges-card">
+                            <Title level={4} className="badges-title">
+                                {data?.badgesSectionTitle ?? "Achievement Badges"}
+                            </Title>
+                            <div className="gamification-badges">
+                                {data?.badges?.map((badge) => {
+                                    const isLocked = badge.earned === false;
 
-                                            return (
-                                                <div
-                                                    key={badge.id}
-                                                    className={`badge-item ${isLocked ? "locked" : ""}`}
-                                                >
-                                                    <div
-                                                        className={`badge-icon ${badge.color || "blue"}`}
-                                                    >
-                                                        {/* Icon placeholder or real icon based on key */}
-                                                        {/* For now using empty div as requested */}
-                                                    </div>
-                                                    <div className="badge-title">{badge.title}</div>
-                                                    <div className="badge-check">✓</div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
+                                    return (
+                                        <div
+                                            key={badge.id}
+                                            className={`badge-item ${isLocked ? "locked" : ""}`}
+                                        >
+                                            <div className={`badge-icon ${badge.color || "blue"}`}>
+                                                <span style={{ fontSize: '28px' }}>
+                                                    {badge.key === 'speed' ? '⚡' : 
+                                                     badge.key === 'foodie' ? '🍴' : 
+                                                     badge.key === 'culture' ? '🏛️' : 
+                                                     badge.key === 'nature' ? '🌲' : 
+                                                     badge.key === 'explorer' ? '🧭' : '📍'}
+                                                </span>
+                                            </div>
+                                            <div className="badge-title">{badge.title}</div>
+                                            {!isLocked && <div className="badge-check">✓ Earned</div>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </Col>
                 </Row>
             </div>
