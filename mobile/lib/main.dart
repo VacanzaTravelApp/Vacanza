@@ -16,6 +16,10 @@ import 'features/auth/data/storage/secure_storage_service.dart';
 
 import 'features/poi_search/data/api/poi_search_api_client.dart';
 
+import 'features/gamification/data/api/gamification_api_client.dart';
+import 'features/gamification/data/repositories/gamification_repository.dart';
+import 'features/gamification/presentation/cubit/gamification_cubit.dart';
+
 import 'features/auth/presentation/bloc/register_bloc.dart';
 import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'features/auth/presentation/screens/auth_gate.dart';
@@ -65,6 +69,18 @@ class VacanzaApp extends StatelessWidget {
         RepositoryProvider<PoiSearchApiClient>(
           create: (ctx) => PoiSearchApiClient(ctx.read<Dio>()),
         ),
+
+        /// Gamification API client (MOB-8)
+        RepositoryProvider<GamificationApiClient>(
+          create: (ctx) => GamificationApiClient(ctx.read<Dio>()),
+        ),
+
+        /// Gamification repository (MOB-8)
+        RepositoryProvider<GamificationRepository>(
+          create: (ctx) => GamificationRepository(
+            apiClient: ctx.read<GamificationApiClient>(),
+          ),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -76,6 +92,13 @@ class VacanzaApp extends StatelessWidget {
           BlocProvider<LoginBloc>(
             create: (context) => LoginBloc(
               authRepository: context.read<AuthRepository>(),
+            ),
+          ),
+
+          /// Gamification cubit (MOB-8) — app-wide for Profile + MOB-12
+          BlocProvider<GamificationCubit>(
+            create: (context) => GamificationCubit(
+              repository: context.read<GamificationRepository>(),
             ),
           ),
         ],
