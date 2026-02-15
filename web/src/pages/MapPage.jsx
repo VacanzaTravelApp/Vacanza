@@ -15,6 +15,7 @@ import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from 
 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import { useGamificationProfile } from "../gamification/useGamification";
 
 const { Header, Content, Footer } = Layout;
 
@@ -194,7 +195,7 @@ function ensureMapbox3D(map, enabled) {
   if (!enabled) {
     try {
       map.setTerrain(null);
-    // eslint-disable-next-line no-unused-vars
+      // eslint-disable-next-line no-unused-vars
     } catch (e) {
       // ignore
     }
@@ -215,7 +216,7 @@ function ensureMapbox3D(map, enabled) {
 
   try {
     map.setTerrain({ source: DEM_SOURCE_ID, exaggeration: 1.2 });
-  // eslint-disable-next-line no-unused-vars
+    // eslint-disable-next-line no-unused-vars
   } catch (e) {
     // ignore
   }
@@ -231,7 +232,7 @@ function ensureMapbox3D(map, enabled) {
           "sky-atmosphere-sun-intensity": 8,
         },
       });
-    // eslint-disable-next-line no-unused-vars
+      // eslint-disable-next-line no-unused-vars
     } catch (e) {
       // ignore
     }
@@ -260,7 +261,7 @@ function ensureMapbox3D(map, enabled) {
         },
         beforeId
       );
-    // eslint-disable-next-line no-unused-vars
+      // eslint-disable-next-line no-unused-vars
     } catch (e) {
       // ignore
     }
@@ -272,7 +273,7 @@ function ensureMapbox3D(map, enabled) {
       "space-color": "#000000",
       "star-intensity": 0.0,
     });
-  // eslint-disable-next-line no-unused-vars
+    // eslint-disable-next-line no-unused-vars
   } catch (e) {
     // ignore
   }
@@ -282,6 +283,8 @@ export default function MapPage() {
   const navigate = useNavigate();
   const mapRef = useRef(null);
   const isMobile = useIsMobile(768);
+  const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
+    useGamificationProfile();
 
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -1114,6 +1117,23 @@ export default function MapPage() {
                 </div>
               </div>
             </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "#555" }}>
+              {gamificationLoading ? (
+                <span>Loading profile...</span>
+              ) : gamificationError ? (
+                <span style={{ color: "#d4380d" }}>Gamification load failed</span>
+              ) : gamification ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontWeight: 700 }}>
+                    {gamification.levelText} • {gamification.roleText}
+                  </span>
+                  <span style={{ color: "#777" }}>
+                    XP: {gamification.totalXp} • Next: {gamification.xpToNextLevel} • {gamification.xpProgressPercent}%
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
           </Card>
         </div>
       </Content>
