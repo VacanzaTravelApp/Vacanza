@@ -85,11 +85,19 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     LocationUpdated event,
     Emitter<LocationState> emit,
   ) {
-    log('[LocationBloc] LocationUpdated event lat=${event.latitude} lng=${event.longitude}');
+    // First valid GPS fix — notify listeners (camera center, etc.)
+    final firstFix = state.latitude == null && state.longitude == null;
+    if (firstFix) {
+      log('[LocationBloc] ★ first GPS fix lat=${event.latitude} lng=${event.longitude}');
+    } else {
+      log('[LocationBloc] LocationUpdated lat=${event.latitude} lng=${event.longitude}');
+    }
+
     emit(state.copyWith(
       status: LocationStatus.tracking,
       latitude: event.latitude,
       longitude: event.longitude,
+      isFirstFix: firstFix,
     ));
   }
 
