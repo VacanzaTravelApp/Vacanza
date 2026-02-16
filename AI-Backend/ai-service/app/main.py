@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import ai, health
+from app.api.routes import ai, conversations, health
 from app.core.config import get_settings
 from app.db.migrate import run_migrations
 
@@ -36,3 +36,4 @@ app = FastAPI(
 
 app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(ai.router, prefix="/ai", tags=["ai"])
+app.include_router(conversations.router, prefix="/conversations", tags=["conversations"])

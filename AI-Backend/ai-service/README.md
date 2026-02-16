@@ -28,6 +28,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 - `GET /health` — Health check
 - `GET /ai/test` — OpenAI connection test
+- `POST /conversations` — Create conversation
+- `GET /conversations` — List conversations
+- `GET /conversations/{id}` — Get conversation
+- `DELETE /conversations/{id}` — Delete conversation
+- `POST /conversations/{id}/messages` — Add message
+- `GET /conversations/{id}/messages` — List messages
 
 ---
 
