@@ -1,20 +1,23 @@
 package com.vacanza.backend.config;
 
+import io.netty.channel.ChannelOption;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
 import reactor.util.retry.Retry;
 
 import java.time.Duration;
-import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Configuration
@@ -31,6 +34,23 @@ public class WebClientConfig {
                 .filter(addApiKey(props))
                 .filter(log4xx5xx("[GEOAPIFY]"))
                 .filter(retryOn429And5xx())
+                .build();
+    }
+
+    @Bean
+    @Qualifier("aiWebClient")
+    public WebClient aiWebClient(AiServiceProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        return WebClient.builder()
+                .baseUrl(props.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(log4xx5xx("[AI-SERVICE]"))
                 .build();
     }
 
