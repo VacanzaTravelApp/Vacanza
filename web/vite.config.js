@@ -12,16 +12,15 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      "/pois": {
-        target: "http://165.232.69.83:9002",
-        changeOrigin: true,
-        secure: false,
-      },
       "/gamification": {
         target: "http://165.232.69.83:9002",
         changeOrigin: true,
         secure: false,
       },
+
+      // (opsiyonel) backend'te kullandığınız diğer prefixler varsa ekle:
+      // "/poi": { target: "http://165.232.69.83:9002", changeOrigin: true, secure: false },
+      // "/users": { target: "http://165.232.69.83:9002", changeOrigin: true, secure: false },
     },
   },
   optimizeDeps: {

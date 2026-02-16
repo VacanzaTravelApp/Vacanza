@@ -15,9 +15,7 @@ import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from 
 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { useGamificationProfile } from "../gamification/useGamificationProfile";
-
-//import http from "../api/http";
+import { useGamificationProfile } from "../gamification/useGamification";
 
 const { Header, Content, Footer } = Layout;
 
@@ -285,7 +283,9 @@ export default function MapPage() {
   const navigate = useNavigate();
   const mapRef = useRef(null);
   const isMobile = useIsMobile(768);
-const { data: gamification, isLoading, isError } = useGamificationProfile();
+  const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
+    useGamificationProfile();
+
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
@@ -1172,20 +1172,22 @@ const res = await fetch("/pois/search-in-area", {
                 </div>
               </div>
             </div>
-            <div>
-  <div>{user?.displayName}</div>
-
-  {isLoading && <div>Loading gamification...</div>}
-  {isError && <div>Gamification yüklenemedi</div>}
-
-  {!isLoading && !isError && gamification && (
-    <>
-      <div>{gamification.levelText}</div>
-      <div>{gamification.roleText}</div>
-      <div>XP: {gamification.xp}</div>
-    </>
-  )}
-</div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "#555" }}>
+              {gamificationLoading ? (
+                <span>Loading profile...</span>
+              ) : gamificationError ? (
+                <span style={{ color: "#d4380d" }}>Gamification load failed</span>
+              ) : gamification ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontWeight: 700 }}>
+                    {gamification.levelText} • {gamification.roleText}
+                  </span>
+                  <span style={{ color: "#777" }}>
+                    XP: {gamification.totalXp} • Next: {gamification.xpToNextLevel} • {gamification.xpProgressPercent}%
+                  </span>
+                </div>
+              ) : null}
+            </div>
 
           </Card>
         </div>
