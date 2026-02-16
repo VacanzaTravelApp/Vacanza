@@ -1,6 +1,5 @@
 package com.vacanza.backend.integration;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -9,11 +8,13 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
 public class GeoapifyClient {
 
-        @Qualifier("geoapifyWebClient")
-        private final WebClient webClient;
+    private final WebClient webClient;
+
+    public GeoapifyClient(@Qualifier("geoapifyWebClient") WebClient webClient) {
+        this.webClient = webClient;
+    }
 
         public Mono<GeoapifyResponse> search(
                         String filter,
