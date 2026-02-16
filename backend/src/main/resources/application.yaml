@@ -27,3 +27,8 @@ spring:
 geoapify:
   base-url: https://api.geoapify.com/v2
   api-key: ${GEOAPIFY_API_KEY}
+
+ai-service:
+  base-url: ${AI_SERVICE_BASE_URL}
+  connect-timeout: 10s
+  read-timeout: 30s
