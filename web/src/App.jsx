@@ -8,6 +8,7 @@ import RegisterCard from "./pages/auth/RegisterCardtempclass";
 import LoginCard from "./pages/auth/LoginCard";
 import MapPage from "./pages/MapPage";
 
+// Gamification sayfan doğru yoldan import edilmiş
 import GamificationSummary from "./gamification/GamificationSummary";
 
 const queryClient = new QueryClient();
@@ -17,7 +18,10 @@ const App = () => {
         <QueryClientProvider client={queryClient}>
             <Router>
                 <Routes>
+                    {/* Ana sayfaya gelenleri register'a yönlendirir */}
                     <Route path="/" element={<Navigate to="/register" replace />} />
+                    
+                    {/* Kayıt ve Giriş Sayfaları */}
                     <Route
                         path="/register"
                         element={
@@ -34,7 +38,12 @@ const App = () => {
                             </AuthLayout>
                         }
                     />
+                    
+                    {/* Harita Sayfası */}
                     <Route path="/map" element={<MapPage />} />
+                    
+                    {/* Detaylı Gamification Sayfası */}
+                    {/* MapPage'deki karta tıklandığında burası açılacak */}
                     <Route path="/gamification" element={<GamificationSummary />} />
                 </Routes>
             </Router>

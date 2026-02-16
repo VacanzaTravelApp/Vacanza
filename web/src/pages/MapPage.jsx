@@ -35,7 +35,7 @@ const STYLES = [
   "mapbox://styles/mapbox/monochrome",
 ];
 
-const BACKEND_BASE_URL = "http://165.232.69.83:9002";
+//const BACKEND_BASE_URL = "http://165.232.69.83:9002";
 
 // Results panel haritayı kapatmasın diye padding hesabında kullanıyoruz
 const RESULTS_PANEL_APPROX_HEIGHT_DESKTOP = 320;
@@ -453,12 +453,14 @@ export default function MapPage() {
           limit: 200,
           sort: "RATING_DESC",
         };
+const res = await fetch("/pois/search-in-area", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(body),
+});
 
-        const res = await fetch(`${BACKEND_BASE_URL}/pois/search-in-area`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
 
         if (!res.ok) {
           setPoisRaw([]);
@@ -732,21 +734,9 @@ export default function MapPage() {
           <span style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700 }}>Vacanza Map</span>
         </div>
 
-<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-  <Button
-    size={isMobile ? "small" : "middle"}
-    icon={<UserOutlined />}
-    onClick={() => navigate("/gamification")}
-  >
-    {isMobile ? "" : "Gamification"}
-  </Button>
-
-  <Button size={isMobile ? "small" : "middle"} icon={<LogoutOutlined />} onClick={handleLogout}>
-    {isMobile ? "" : "Log Out"}
-  </Button>
-</div>
-
-
+        <Button size={isMobile ? "small" : "middle"} icon={<LogoutOutlined />} onClick={handleLogout}>
+          {isMobile ? "" : "Log Out"}
+        </Button>
       </Header>
 
       <Content style={{ marginTop: headerHeight, padding: contentPadding, position: "relative" }}>
@@ -832,7 +822,59 @@ export default function MapPage() {
               );
             })}
           </Map>
+<Card
+            onClick={() => navigate("/gamification")} 
+            style={{
+              position: "absolute",
+              top: isMobile ? 10 : 20,
+              left: isMobile ? 10 : 20,
+              zIndex: 100,
+              width: isMobile ? 240 : 280,
+              borderRadius: 20,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+              cursor: "pointer",
+              background: "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(8px)",
+              transition: "transform 0.2s ease",
+              border: "none"
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
+            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <Avatar 
+                size={48} 
+                src={user?.photoURL} 
+                icon={<UserOutlined />} 
+                style={{ border: "2px solid #e6f7ff" }}
+              />
+              <div>
+                <b style={{ fontSize: 16, display: "block" }}>{user?.displayName || "Gezgin"}</b>
+                <span style={{ fontSize: 13, color: "#8c8c8c" }}>{gamification?.roleText || "Newbie"}</span>
+              </div>
+            </div>
 
+            <div style={{ background: "#f5f5f5", padding: "12px", borderRadius: "14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: "600", color: "#1890ff" }}>
+                  {gamification?.levelText || "Level 1"}
+                </span>
+              </div>
+
+              <div style={{ width: "100%", height: 6, background: "#e8e8e8", borderRadius: 10, overflow: "hidden", marginBottom: 6 }}>
+                <div style={{ 
+                  width: `${gamification?.xpProgressPercent || 0}%`, 
+                  height: "100%", 
+                  background: "linear-gradient(90deg, #1890ff, #69c0ff)",
+                  transition: "width 0.5s ease-in-out"
+                }} />
+              </div>
+
+              <div style={{ fontSize: 11, color: "#595959", textAlign: "center" }}>
+                {gamification?.totalXp || 0} XP - {gamification?.xpProgressPercent || 0}% to next level
+              </div>
+            </div>
+          </Card>
           {/* sağdaki butonlar */}
           <div
             style={{
@@ -1094,6 +1136,7 @@ export default function MapPage() {
                     })
                   )}
                 </div>
+                
               </Card>
             </div>
           )}
