@@ -1,6 +1,6 @@
 import React from "react";
 import { Spin, Alert, Typography, Row, Col, Button } from "antd";
-import { useGamificationProfile } from "./useGamificationProfile";
+import { useGamificationProfile } from "./useGamification";
 import "./GamificationSummary.css";
 
 const { Title, Text } = Typography;
