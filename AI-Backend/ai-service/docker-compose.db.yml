@@ -1,17 +1,10 @@
-services:
-  ai-service:
-    build: .
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
+# Local PostgreSQL with pgvector — for AI development
+# Run: docker compose -f docker-compose.db.yml up -d
 
+services:
   postgres:
     image: pgvector/pgvector:pg16
+    container_name: vacanza-ai-postgres
     environment:
       POSTGRES_USER: vacanza
       POSTGRES_PASSWORD: vacanza
@@ -19,7 +12,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ai_postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vacanza -d vacanza_ai"]
@@ -28,4 +21,4 @@ services:
       retries: 5
 
 volumes:
-  postgres_data:
+  ai_postgres_data:
