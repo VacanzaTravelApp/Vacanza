@@ -41,6 +41,7 @@ public class SecurityConfigNonDev {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/health", "/error").permitAll()
                         .requestMatchers("/pois/**").permitAll()   // POI endpoints public
+                        .requestMatchers("/chat/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class);
