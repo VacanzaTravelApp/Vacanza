@@ -21,25 +21,45 @@ router = APIRouter()
 X_USER_ID = "X-User-Id"
 
 
+def _parse_x_user_id(x_user_id: str | None = Header(None, alias=X_USER_ID)) -> uuid.UUID | None:
+    """Parse X-User-Id header. Returns None if missing, raises 400 if invalid UUID."""
+    if not x_user_id or not x_user_id.strip():
+        return None
+    try:
+        return uuid.UUID(x_user_id.strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="X-User-Id must be a valid UUID")
+
+
+def _require_x_user_id(x_user_id: str | None = Header(None, alias=X_USER_ID)) -> uuid.UUID:
+    """Require X-User-Id header. 400 if missing or invalid UUID."""
+    if not x_user_id or not x_user_id.strip():
+        raise HTTPException(status_code=400, detail="X-User-Id header required")
+    try:
+        return uuid.UUID(x_user_id.strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="X-User-Id must be a valid UUID")
+
+
 @router.post("/conversations", response_model=ConversationCreateResponse)
 def create_conversation(
-    x_user_id: uuid.UUID | None = Header(None, alias=X_USER_ID),
+    user_id: uuid.UUID = Depends(_require_x_user_id),
     repo: ConversationRepository = Depends(get_conversation_repo),
 ) -> ConversationCreateResponse:
-    """Create a new conversation. user_id from X-User-Id header (proxy)."""
-    conversation = repo.create(user_id=x_user_id)
+    """Create a new conversation. user_id required from X-User-Id header."""
+    conversation = repo.create(user_id=user_id)
     return ConversationCreateResponse(id=conversation.id)
 
 
 @router.get("/conversations", response_model=list[ConversationListItem])
 def list_conversations(
-    x_user_id: uuid.UUID | None = Header(None, alias=X_USER_ID),
+    user_id: uuid.UUID | None = Depends(_parse_x_user_id),
     limit: int = 100,
     offset: int = 0,
     repo: ConversationRepository = Depends(get_conversation_repo),
 ) -> list[ConversationListItem]:
-    """List user's conversations. user_id from X-User-Id header (proxy)."""
-    conversations = repo.list(user_id=x_user_id, limit=limit, offset=offset)
+    """List user's conversations. user_id from X-User-Id header only (no query param)."""
+    conversations = repo.list(user_id=user_id, limit=limit, offset=offset)
     return [ConversationListItem.model_validate(c) for c in conversations]
 
 
