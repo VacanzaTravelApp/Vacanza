@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.api.deps import get_conversation_repo, get_message_repo, get_settings
 from app.core.config import Settings
@@ -18,26 +18,28 @@ from app.services.chat_service import get_ai_response
 
 router = APIRouter()
 
+X_USER_ID = "X-User-Id"
+
 
 @router.post("/conversations", response_model=ConversationCreateResponse)
 def create_conversation(
-    user_id: uuid.UUID | None = None,
+    x_user_id: uuid.UUID | None = Header(None, alias=X_USER_ID),
     repo: ConversationRepository = Depends(get_conversation_repo),
 ) -> ConversationCreateResponse:
-    """Create a new conversation."""
-    conversation = repo.create(user_id=user_id)
+    """Create a new conversation. user_id from X-User-Id header (proxy)."""
+    conversation = repo.create(user_id=x_user_id)
     return ConversationCreateResponse(id=conversation.id)
 
 
 @router.get("/conversations", response_model=list[ConversationListItem])
 def list_conversations(
-    user_id: uuid.UUID | None = None,
+    x_user_id: uuid.UUID | None = Header(None, alias=X_USER_ID),
     limit: int = 100,
     offset: int = 0,
     repo: ConversationRepository = Depends(get_conversation_repo),
 ) -> list[ConversationListItem]:
-    """List user's conversations."""
-    conversations = repo.list(user_id=user_id, limit=limit, offset=offset)
+    """List user's conversations. user_id from X-User-Id header (proxy)."""
+    conversations = repo.list(user_id=x_user_id, limit=limit, offset=offset)
     return [ConversationListItem.model_validate(c) for c in conversations]
 
 
