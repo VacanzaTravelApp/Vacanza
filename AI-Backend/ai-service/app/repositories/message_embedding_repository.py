@@ -19,12 +19,14 @@ class MessageEmbeddingRepository:
         message_id: uuid.UUID,
         embedding: list[float],
         model: str,
+        user_id: uuid.UUID | None = None,
     ) -> MessageEmbedding:
         """Create a new message embedding."""
         msg_embedding = MessageEmbedding(
             message_id=message_id,
             embedding=embedding,
             model=model,
+            user_id=user_id,
         )
         self.db.add(msg_embedding)
         self.db.commit()

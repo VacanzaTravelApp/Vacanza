@@ -30,6 +30,10 @@ class MessageEmbedding(Base):
         ForeignKey("messages.id", ondelete="CASCADE"),
         nullable=False,
     )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
     embedding: Mapped[list[float]] = mapped_column(
         Vector(EMBEDDING_DIM),
         nullable=False,
