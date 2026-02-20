@@ -3,9 +3,9 @@
 import uuid
 from typing import Sequence
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from app.db.models import MessageEmbedding
+from app.db.models import Message, MessageEmbedding
 
 
 class MessageEmbeddingRepository:
@@ -59,3 +59,51 @@ class MessageEmbeddingRepository:
         self.db.delete(msg_embedding)
         self.db.commit()
         return True
+
+    def search_similar(
+        self,
+        query_embedding: list[float],
+        user_id: uuid.UUID | None,
+        exclude_conversation_id: uuid.UUID | None = None,
+        limit: int = 10,
+        max_distance: float | None = None,
+    ) -> Sequence[MessageEmbedding]:
+        """Find most similar message embeddings by cosine distance.
+
+        Args:
+            query_embedding: Query vector (1536 dims).
+            user_id: Filter by user (None = returns empty).
+            exclude_conversation_id: Exclude messages from this conversation (for "old" context).
+            limit: Max results (default 10).
+            max_distance: Optional cosine distance threshold; results with distance > this are excluded.
+
+        Returns:
+            MessageEmbedding objects ordered by similarity (closest first), with message loaded.
+        """
+        if user_id is None:
+            return []
+
+        distance_col = MessageEmbedding.embedding.cosine_distance(query_embedding)
+        fetch_limit = limit * 2 if max_distance is not None else limit
+
+        query = (
+            self.db.query(MessageEmbedding, distance_col)
+            .options(joinedload(MessageEmbedding.message))
+            .filter(MessageEmbedding.user_id == user_id)
+        )
+
+        if exclude_conversation_id is not None:
+            query = query.join(Message).filter(
+                Message.conversation_id != exclude_conversation_id
+            )
+
+        rows = query.order_by(distance_col).limit(fetch_limit).all()
+
+        if max_distance is None:
+            return [me for me, _ in rows]
+
+        return [
+            me
+            for me, d in rows
+            if d is not None and float(d) <= max_distance
+        ][:limit]
