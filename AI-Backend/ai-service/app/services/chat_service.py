@@ -4,7 +4,7 @@ import asyncio
 import logging
 import uuid
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.core.config import Settings
 from app.db.models import Message
@@ -15,6 +15,7 @@ from app.services.openai_service import create_chat_model
 logger = logging.getLogger(__name__)
 
 MEMORY_WINDOW = 10  # Last N user+assistant pairs for context
+RAG_TOP_K = 8  # Max similar old messages to add as context
 
 
 async def _save_embedding_for_message(
@@ -42,6 +43,17 @@ async def _save_embedding_for_message(
         logger.warning("Embedding failed for message %s: %s", message.id, e)
     except Exception as e:
         logger.warning("Embedding failed for message %s: %s", message.id, e)
+
+
+def _build_rag_context_prompt(similar_messages: list[tuple[str, str]]) -> str:
+    """Build 'Önceki konuşma notları' section for system/context."""
+    if not similar_messages:
+        return ""
+    lines = ["Önceki konuşmalardan ilgili notlar:"]
+    for role, content in similar_messages:
+        prefix = "Kullanıcı" if role == "user" else "Asistan"
+        lines.append(f"- {prefix}: {content[:200]}{'...' if len(content) > 200 else ''}")
+    return "\n".join(lines)
 
 
 def _build_context_messages(messages: list[Message]) -> list[HumanMessage | AIMessage]:
@@ -90,6 +102,26 @@ async def get_ai_response(
     conversation = conversation_repo.get_by_id(conversation_id)
     user_id = conversation.user_id if conversation else None
 
+    # RAG: find similar old messages for long-term context
+    rag_messages: list[tuple[str, str]] = []
+    embedding_service = create_embedding_service(settings)
+    if embedding_service and user_id:
+        try:
+            query_embedding = await asyncio.to_thread(
+                embedding_service.embed, user_content.strip()
+            )
+            similar = message_embedding_repo.search_similar(
+                query_embedding=query_embedding,
+                user_id=user_id,
+                exclude_conversation_id=conversation_id,
+                limit=RAG_TOP_K,
+            )
+            for me in similar:
+                if me.message:
+                    rag_messages.append((me.message.role, me.message.content))
+        except (EmbeddingServiceError, Exception) as e:
+            logger.debug("RAG search skipped: %s", e)
+
     # Load conversation history from DB
     messages = message_repo.list_by_conversation(
         conversation_id=conversation_id,
@@ -100,7 +132,16 @@ async def get_ai_response(
     history = _build_context_messages(list(messages))
 
     # Build full message list for LLM
-    llm_messages: list[HumanMessage | AIMessage] = history + [HumanMessage(content=user_content)]
+    llm_messages: list[SystemMessage | HumanMessage | AIMessage] = []
+    rag_prompt = _build_rag_context_prompt(rag_messages)
+    if rag_prompt:
+        llm_messages.append(
+            SystemMessage(
+                content=f"Sen Vacanza seyahat asistanısın. {rag_prompt}\n\nMevcut sohbete yanıt ver."
+            )
+        )
+    llm_messages.extend(history)
+    llm_messages.append(HumanMessage(content=user_content))
 
     # Invoke LLM
     llm = create_chat_model(settings)
