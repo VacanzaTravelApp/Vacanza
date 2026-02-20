@@ -15,7 +15,8 @@ from app.services.openai_service import create_chat_model
 logger = logging.getLogger(__name__)
 
 MEMORY_WINDOW = 10  # Last N user+assistant pairs for context
-RAG_TOP_K = 8  # Max similar old messages to add as context
+RAG_TOP_K = 8  # Max similar old messages (5-10 range for token limit)
+RAG_MAX_CHARS_PER_MSG = 250  # Truncate to avoid token overflow (~80 tokens/msg)
 
 
 async def _save_embedding_for_message(
@@ -46,13 +47,23 @@ async def _save_embedding_for_message(
 
 
 def _build_rag_context_prompt(similar_messages: list[tuple[str, str]]) -> str:
-    """Build 'Önceki konuşma notları' section for system/context."""
+    """Build 'Önceki konuşma notları' section for system/context.
+
+    Token limit: max RAG_TOP_K messages, each truncated to RAG_MAX_CHARS_PER_MSG.
+    """
     if not similar_messages:
         return ""
-    lines = ["Önceki konuşmalardan ilgili notlar:"]
-    for role, content in similar_messages:
+    lines = [
+        "Önceki konuşmalardan ilgili notlar (bu bilgileri yanıtında kullan):"
+    ]
+    for role, content in similar_messages[:RAG_TOP_K]:
+        truncated = (
+            content[:RAG_MAX_CHARS_PER_MSG] + "..."
+            if len(content) > RAG_MAX_CHARS_PER_MSG
+            else content
+        )
         prefix = "Kullanıcı" if role == "user" else "Asistan"
-        lines.append(f"- {prefix}: {content[:200]}{'...' if len(content) > 200 else ''}")
+        lines.append(f"- {prefix}: {truncated}")
     return "\n".join(lines)
 
 
@@ -137,7 +148,11 @@ async def get_ai_response(
     if rag_prompt:
         llm_messages.append(
             SystemMessage(
-                content=f"Sen Vacanza seyahat asistanısın. {rag_prompt}\n\nMevcut sohbete yanıt ver."
+                content=(
+                    "Sen Vacanza seyahat asistanısın. "
+                    f"{rag_prompt}\n\n"
+                    "Bu önceki konuşma notlarını dikkate alarak mevcut sohbete yanıt ver."
+                )
             )
         )
     llm_messages.extend(history)
