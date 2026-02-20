@@ -1,15 +1,47 @@
 """Chat service with LangChain and context memory (sliding window)."""
 
+import asyncio
+import logging
 import uuid
 
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.config import Settings
 from app.db.models import Message
-from app.repositories import MessageRepository
+from app.repositories import ConversationRepository, MessageEmbeddingRepository, MessageRepository
+from app.services.embedding_service import EMBEDDING_MODEL, EmbeddingServiceError, create_embedding_service
 from app.services.openai_service import create_chat_model
 
+logger = logging.getLogger(__name__)
+
 MEMORY_WINDOW = 10  # Last N user+assistant pairs for context
+
+
+async def _save_embedding_for_message(
+    settings: Settings,
+    message_embedding_repo: MessageEmbeddingRepository,
+    message: Message,
+    content: str,
+    user_id: uuid.UUID | None,
+) -> None:
+    """Create and save embedding for a message. Logs on failure, does not raise."""
+    if not content or not content.strip():
+        return
+    embedding_service = create_embedding_service(settings)
+    if not embedding_service:
+        return
+    try:
+        embedding = await asyncio.to_thread(embedding_service.embed, content.strip())
+        message_embedding_repo.create(
+            message_id=message.id,
+            embedding=embedding,
+            model=EMBEDDING_MODEL,
+            user_id=user_id,
+        )
+    except EmbeddingServiceError as e:
+        logger.warning("Embedding failed for message %s: %s", message.id, e)
+    except Exception as e:
+        logger.warning("Embedding failed for message %s: %s", message.id, e)
 
 
 def _build_context_messages(messages: list[Message]) -> list[HumanMessage | AIMessage]:
@@ -37,6 +69,8 @@ def _build_context_messages(messages: list[Message]) -> list[HumanMessage | AIMe
 async def get_ai_response(
     settings: Settings,
     message_repo: MessageRepository,
+    message_embedding_repo: MessageEmbeddingRepository,
+    conversation_repo: ConversationRepository,
     conversation_id: uuid.UUID,
     user_content: str,
 ) -> str:
@@ -45,12 +79,17 @@ async def get_ai_response(
     Args:
         settings: App settings.
         message_repo: Message repository.
+        message_embedding_repo: Message embedding repository.
+        conversation_repo: Conversation repository (for user_id).
         conversation_id: Conversation ID.
         user_content: User message text.
 
     Returns:
         AI response content.
     """
+    conversation = conversation_repo.get_by_id(conversation_id)
+    user_id = conversation.user_id if conversation else None
+
     # Load conversation history from DB
     messages = message_repo.list_by_conversation(
         conversation_id=conversation_id,
@@ -68,16 +107,24 @@ async def get_ai_response(
     response = await llm.ainvoke(llm_messages)
     ai_content = str(response.content)
 
-    # Save to DB
-    message_repo.create(
+    # Save user message to DB
+    user_msg = message_repo.create(
         conversation_id=conversation_id,
         role="user",
         content=user_content,
     )
-    message_repo.create(
+    await _save_embedding_for_message(
+        settings, message_embedding_repo, user_msg, user_content, user_id
+    )
+
+    # Save assistant message to DB
+    assistant_msg = message_repo.create(
         conversation_id=conversation_id,
         role="assistant",
         content=ai_content,
+    )
+    await _save_embedding_for_message(
+        settings, message_embedding_repo, assistant_msg, ai_content, user_id
     )
 
     return ai_content

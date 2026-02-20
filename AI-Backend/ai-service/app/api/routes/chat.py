@@ -4,9 +4,18 @@ import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 
-from app.api.deps import get_conversation_repo, get_message_repo, get_settings
+from app.api.deps import (
+    get_conversation_repo,
+    get_message_embedding_repo,
+    get_message_repo,
+    get_settings,
+)
 from app.core.config import Settings
-from app.repositories import ConversationRepository, MessageRepository
+from app.repositories import (
+    ConversationRepository,
+    MessageEmbeddingRepository,
+    MessageRepository,
+)
 from app.schemas.chat import (
     ConversationCreateResponse,
     ConversationListItem,
@@ -70,6 +79,7 @@ async def send_message(
     settings: Settings = Depends(get_settings),
     conversation_repo: ConversationRepository = Depends(get_conversation_repo),
     message_repo: MessageRepository = Depends(get_message_repo),
+    message_embedding_repo: MessageEmbeddingRepository = Depends(get_message_embedding_repo),
 ) -> MessageSendResponse:
     """Send a message and get AI response. Context is preserved within conversation."""
     if conversation_repo.get_by_id(conversation_id) is None:
@@ -84,6 +94,8 @@ async def send_message(
     content = await get_ai_response(
         settings=settings,
         message_repo=message_repo,
+        message_embedding_repo=message_embedding_repo,
+        conversation_repo=conversation_repo,
         conversation_id=conversation_id,
         user_content=body.content,
     )
