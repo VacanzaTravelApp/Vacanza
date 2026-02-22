@@ -6,6 +6,22 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 
+class UserProfileForAi(BaseModel):
+    """User profile for AI personalization (from X-User-Profile header)."""
+
+    displayName: str | None = None
+    firstName: str | None = None
+    middleName: str | None = None
+    lastName: str | None = None
+    preferredName: str | None = None
+    country: str | None = None
+    birthDate: str | None = None
+    gender: str | None = None
+    budget: str | None = None
+    profileImageUrl: str | None = None
+    joinDate: str | None = None
+
+
 class ConversationCreateResponse(BaseModel):
     """Response when creating a new conversation."""
 

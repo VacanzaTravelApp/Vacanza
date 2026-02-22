@@ -7,6 +7,7 @@ import uuid
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.core.config import Settings
+from app.schemas.chat import UserProfileForAi
 from app.db.models import Message
 from app.repositories import ConversationRepository, MessageEmbeddingRepository, MessageRepository
 from app.services.embedding_service import EMBEDDING_MODEL, EmbeddingServiceError, create_embedding_service
@@ -44,6 +45,36 @@ async def _save_embedding_for_message(
         logger.warning("Embedding failed for message %s: %s", message.id, e)
     except Exception as e:
         logger.warning("Embedding failed for message %s: %s", message.id, e)
+
+
+def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
+    """Build user profile section for system prompt. Empty if no profile."""
+    if not profile:
+        return ""
+    parts: list[str] = []
+    if profile.displayName:
+        parts.append(f"İsim: {profile.displayName}")
+    if profile.firstName and not profile.displayName:
+        parts.append(f"Ad: {profile.firstName}")
+    if profile.middleName:
+        parts.append(f"İkinci ad: {profile.middleName}")
+    if profile.lastName:
+        parts.append(f"Soyad: {profile.lastName}")
+    if profile.preferredName:
+        parts.append(f"Tercih edilen isim: {profile.preferredName}")
+    if profile.country:
+        parts.append(f"Ülke: {profile.country}")
+    if profile.birthDate:
+        parts.append(f"Doğum tarihi: {profile.birthDate}")
+    if profile.gender:
+        parts.append(f"Cinsiyet: {profile.gender}")
+    if profile.budget:
+        parts.append(f"Bütçe: {profile.budget}")
+    if profile.joinDate:
+        parts.append(f"Üyelik tarihi: {profile.joinDate}")
+    if not parts:
+        return ""
+    return "Kullanıcı profili: " + ", ".join(parts) + ".\n"
 
 
 def _build_rag_context_prompt(similar_messages: list[tuple[str, str]]) -> str:
@@ -96,6 +127,7 @@ async def get_ai_response(
     conversation_repo: ConversationRepository,
     conversation_id: uuid.UUID,
     user_content: str,
+    user_profile: UserProfileForAi | None = None,
 ) -> str:
     """Send user message, get AI response with context, save both to DB.
 
@@ -144,17 +176,15 @@ async def get_ai_response(
 
     # Build full message list for LLM
     llm_messages: list[SystemMessage | HumanMessage | AIMessage] = []
+    profile_prompt = _build_profile_prompt(user_profile)
     rag_prompt = _build_rag_context_prompt(rag_messages)
+    system_parts = ["Sen Vacanza seyahat asistanısın."]
+    if profile_prompt:
+        system_parts.append(profile_prompt.strip())
     if rag_prompt:
-        llm_messages.append(
-            SystemMessage(
-                content=(
-                    "Sen Vacanza seyahat asistanısın. "
-                    f"{rag_prompt}\n\n"
-                    "Bu önceki konuşma notlarını dikkate alarak mevcut sohbete yanıt ver."
-                )
-            )
-        )
+        system_parts.append(rag_prompt)
+        system_parts.append("Bu önceki konuşma notlarını dikkate alarak mevcut sohbete yanıt ver.")
+    llm_messages.append(SystemMessage(content="\n\n".join(filter(None, system_parts))))
     llm_messages.extend(history)
     llm_messages.append(HumanMessage(content=user_content))
 

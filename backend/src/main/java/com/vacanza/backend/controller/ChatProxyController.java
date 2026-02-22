@@ -3,7 +3,9 @@ package com.vacanza.backend.controller;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.integration.ai.AiChatDto;
 import com.vacanza.backend.integration.ai.AiServiceClient;
+import com.vacanza.backend.integration.ai.UserProfileForAi;
 import com.vacanza.backend.security.CurrentUserProvider;
+import com.vacanza.backend.service.UserInfoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +20,7 @@ public class ChatProxyController {
 
     private final AiServiceClient aiServiceClient;
     private final CurrentUserProvider currentUserProvider;
+    private final UserInfoService userInfoService;
 
     @PostMapping("/conversations")
     public ResponseEntity<AiChatDto.ConversationCreateResponse> createConversation() {
@@ -43,8 +46,11 @@ public class ChatProxyController {
             @PathVariable UUID conversationId,
             @RequestBody AiChatDto.MessageSendRequest body) {
         User user = currentUserProvider.getCurrentUserEntity();
+        UserProfileForAi profile = userInfoService.getUserInfoByUser(user)
+                .map(UserProfileForAi::from)
+                .orElse(null);
         return ResponseEntity.ok(
-                aiServiceClient.sendMessage(user.getUserId(), conversationId, body).block()
+                aiServiceClient.sendMessage(user.getUserId(), conversationId, body, profile).block()
         );
     }
 
