@@ -30,6 +30,7 @@ public class SecurityConfigDev {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/chat/**").authenticated()
+                        .requestMatchers("/api/behavior/**").authenticated()
                         .anyRequest().permitAll())
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable())
