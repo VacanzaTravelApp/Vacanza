@@ -1,5 +1,7 @@
 package com.vacanza.backend.integration.ai;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
@@ -11,17 +13,22 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Client for AI chat service. Proxies requests with X-User-Id header.
+ * Client for AI chat service. Proxies requests with X-User-Id and X-User-Profile headers.
  */
 @Component
 public class AiServiceClient {
 
     private static final String X_USER_ID = "X-User-Id";
+    private static final String X_USER_PROFILE = "X-User-Profile";
 
     private final WebClient webClient;
+    private final ObjectMapper objectMapper;
 
-    public AiServiceClient(@Qualifier("aiWebClient") WebClient webClient) {
+    public AiServiceClient(
+            @Qualifier("aiWebClient") WebClient webClient,
+            ObjectMapper objectMapper) {
         this.webClient = webClient;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -57,17 +64,29 @@ public class AiServiceClient {
 
     /**
      * POST /chat/conversations/{id}/messages — Send message, get AI response.
+     *
+     * @param profile Optional user profile for AI personalization (sent as X-User-Profile header).
      */
     public Mono<AiChatDto.MessageSendResponse> sendMessage(
             UUID userId,
             UUID conversationId,
-            AiChatDto.MessageSendRequest body) {
-        return webClient.post()
+            AiChatDto.MessageSendRequest body,
+            UserProfileForAi profile) {
+        var spec = webClient.post()
                 .uri("/chat/conversations/{id}/messages", conversationId)
                 .header(X_USER_ID, userId.toString())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .retrieve()
+                .bodyValue(body);
+
+        if (profile != null) {
+            try {
+                spec = spec.header(X_USER_PROFILE, objectMapper.writeValueAsString(profile));
+            } catch (JsonProcessingException e) {
+                // Skip profile on serialization error
+            }
+        }
+
+        return spec.retrieve()
                 .bodyToMono(AiChatDto.MessageSendResponse.class);
     }
 

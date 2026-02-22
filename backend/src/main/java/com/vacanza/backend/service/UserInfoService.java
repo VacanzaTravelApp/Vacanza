@@ -35,6 +35,15 @@ public class UserInfoService {
         return toDto(info);
     }
 
+    /**
+     * Get user profile by User entity (for internal use, e.g. chat proxy).
+     * Returns empty if profile not found.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Optional<UserInfoResponseDTO> getUserInfoByUser(User user) {
+        return userInfoRepository.findByUser(user).map(this::toDto);
+    }
+
     @Transactional
     public UserInfoResponseDTO updateUserInfo(UserInfoRequestDTO req) {
         User user = currentUserProvider.getCurrentUserEntity();
