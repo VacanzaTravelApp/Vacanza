@@ -48,44 +48,57 @@ async def _save_embedding_for_message(
 
 
 def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
-    """Build user profile section for system prompt. Empty if no profile."""
+    """Build user profile section for system prompt. Includes name, country, budget and behavioral instructions."""
     if not profile:
         return ""
     parts: list[str] = []
     if profile.displayName:
-        parts.append(f"İsim: {profile.displayName}")
+        parts.append(f"Name: {profile.displayName}")
     if profile.firstName and not profile.displayName:
-        parts.append(f"Ad: {profile.firstName}")
+        parts.append(f"First name: {profile.firstName}")
     if profile.middleName:
-        parts.append(f"İkinci ad: {profile.middleName}")
+        parts.append(f"Middle name: {profile.middleName}")
     if profile.lastName:
-        parts.append(f"Soyad: {profile.lastName}")
+        parts.append(f"Last name: {profile.lastName}")
     if profile.preferredName:
-        parts.append(f"Tercih edilen isim: {profile.preferredName}")
+        parts.append(f"Preferred name: {profile.preferredName}")
     if profile.country:
-        parts.append(f"Ülke: {profile.country}")
+        parts.append(f"Country: {profile.country}")
     if profile.birthDate:
-        parts.append(f"Doğum tarihi: {profile.birthDate}")
+        parts.append(f"Birth date: {profile.birthDate}")
     if profile.gender:
-        parts.append(f"Cinsiyet: {profile.gender}")
+        parts.append(f"Gender: {profile.gender}")
     if profile.budget:
-        parts.append(f"Bütçe: {profile.budget}")
+        parts.append(f"Budget: {profile.budget}")
     if profile.joinDate:
-        parts.append(f"Üyelik tarihi: {profile.joinDate}")
+        parts.append(f"Join date: {profile.joinDate}")
     if not parts:
         return ""
-    return "Kullanıcı profili: " + ", ".join(parts) + ".\n"
+
+    instructions: list[str] = []
+    if profile.displayName or profile.preferredName or profile.firstName:
+        name = profile.displayName or profile.preferredName or profile.firstName
+        instructions.append(f"Greet the user by name ({name}).")
+    if profile.budget:
+        instructions.append("Consider budget (Budget: " + profile.budget + ") in your recommendations.")
+    if profile.country:
+        instructions.append("Use country (Country: " + profile.country + ") in your recommendations.")
+
+    result = "User profile: " + ", ".join(parts) + ".\n"
+    if instructions:
+        result += "Rules: " + " ".join(instructions)
+    return result
 
 
 def _build_rag_context_prompt(similar_messages: list[tuple[str, str]]) -> str:
-    """Build 'Önceki konuşma notları' section for system/context.
+    """Build 'Previous conversation notes' section for system/context.
 
     Token limit: max RAG_TOP_K messages, each truncated to RAG_MAX_CHARS_PER_MSG.
     """
     if not similar_messages:
         return ""
     lines = [
-        "Önceki konuşmalardan ilgili notlar (bu bilgileri yanıtında kullan):"
+        "Relevant notes from previous conversations (use these in your response):"
     ]
     for role, content in similar_messages[:RAG_TOP_K]:
         truncated = (
@@ -93,7 +106,7 @@ def _build_rag_context_prompt(similar_messages: list[tuple[str, str]]) -> str:
             if len(content) > RAG_MAX_CHARS_PER_MSG
             else content
         )
-        prefix = "Kullanıcı" if role == "user" else "Asistan"
+        prefix = "User" if role == "user" else "Assistant"
         lines.append(f"- {prefix}: {truncated}")
     return "\n".join(lines)
 
@@ -178,12 +191,18 @@ async def get_ai_response(
     llm_messages: list[SystemMessage | HumanMessage | AIMessage] = []
     profile_prompt = _build_profile_prompt(user_profile)
     rag_prompt = _build_rag_context_prompt(rag_messages)
-    system_parts = ["Sen Vacanza seyahat asistanısın."]
+    # Dynamic system prompt: Vacanza definition + role + profile (name, country, budget) + RAG
+    base_prompt = """You are the travel assistant for Vacanza, a personal app for vacation and travel planning.
+
+Use a warm, friendly tone. Talk as if you know the user—like a trusted friend. Avoid formal or corporate language; be simple, clear, and personable. When giving destination suggestions, budget-friendly options, or travel tips, consider the user's preferences.
+
+Always respond in the same language the user writes in."""
+    system_parts = [base_prompt]
     if profile_prompt:
         system_parts.append(profile_prompt.strip())
     if rag_prompt:
         system_parts.append(rag_prompt)
-        system_parts.append("Bu önceki konuşma notlarını dikkate alarak mevcut sohbete yanıt ver.")
+        system_parts.append("Use these previous conversation notes when responding to the current chat.")
     llm_messages.append(SystemMessage(content="\n\n".join(filter(None, system_parts))))
     llm_messages.extend(history)
     llm_messages.append(HumanMessage(content=user_content))
