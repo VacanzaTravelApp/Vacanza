@@ -21,7 +21,7 @@ import java.time.Duration;
 
 @Slf4j
 @Configuration
-@EnableConfigurationProperties({GeoapifyProperties.class, AiServiceProperties.class})
+@EnableConfigurationProperties({ GeoapifyProperties.class, AiServiceProperties.class, AmadeusProperties.class })
 public class WebClientConfig {
 
     @Bean
@@ -51,6 +51,22 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .filter(log4xx5xx("[AI-SERVICE]"))
+                .build();
+    }
+
+    @Bean
+    @Qualifier("amadeusWebClient")
+    public WebClient amadeusWebClient(AmadeusProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        return WebClient.builder()
+                .baseUrl(props.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(log4xx5xx("[AMADEUS]"))
                 .build();
     }
 
