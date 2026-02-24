@@ -32,3 +32,10 @@ ai-service:
   base-url: ${AI_SERVICE_BASE_URL}
   connect-timeout: 10s
   read-timeout: 30s
+
+amadeus:
+  base-url: https://test.api.amadeus.com
+  client-id: ${AMADEUS_CLIENT_ID}
+  client-secret: ${AMADEUS_CLIENT_SECRET}
+  connect-timeout: 10s
+  read-timeout: 30s
