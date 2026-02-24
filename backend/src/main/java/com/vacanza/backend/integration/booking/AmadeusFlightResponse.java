@@ -72,6 +72,8 @@ public class AmadeusFlightResponse {
 
         return response.getData().stream()
                 .filter(fo -> fo.getItineraries() != null && !fo.getItineraries().isEmpty())
+                .filter(fo -> fo.getItineraries().get(0).getSegments() != null
+                        && !fo.getItineraries().get(0).getSegments().isEmpty())
                 .map(fo -> {
                     Itinerary firstItinerary = fo.getItineraries().get(0);
                     List<Segment> segments = firstItinerary.getSegments();

@@ -71,7 +71,8 @@ public class AmadeusTokenService {
                 .block();
 
         if (response == null || response.getAccessToken() == null) {
-            throw new RuntimeException("Failed to retrieve Amadeus OAuth2 token");
+            log.error("[AMADEUS] Failed to retrieve OAuth2 token — response was null or missing access_token");
+            throw new IllegalStateException("Failed to retrieve Amadeus OAuth2 token");
         }
 
         this.cachedToken = response.getAccessToken();
