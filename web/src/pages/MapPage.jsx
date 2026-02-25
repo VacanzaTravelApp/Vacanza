@@ -16,6 +16,7 @@ import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
+import BookingSheet from "../features/booking/components/BookingSheet";
 
 const { Header, Content, Footer } = Layout;
 
@@ -314,6 +315,7 @@ export default function MapPage() {
 
   const [resultsOpen, setResultsOpen] = useState(false);
   const [resultsTab, setResultsTab] = useState("all");
+const [bookingOpen, setBookingOpen] = useState(false);
 
   // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
   useEffect(() => {
@@ -453,13 +455,13 @@ export default function MapPage() {
           limit: 200,
           sort: "RATING_DESC",
         };
-const res = await fetch("/pois/search-in-area", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify(body),
-});
+        const res = await fetch("/pois/search-in-area", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
 
 
         if (!res.ok) {
@@ -822,8 +824,8 @@ const res = await fetch("/pois/search-in-area", {
               );
             })}
           </Map>
-<Card
-            onClick={() => navigate("/gamification")} 
+          <Card
+            onClick={() => navigate("/gamification")}
             style={{
               position: "absolute",
               top: isMobile ? 10 : 20,
@@ -842,10 +844,10 @@ const res = await fetch("/pois/search-in-area", {
             onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <Avatar 
-                size={48} 
-                src={user?.photoURL} 
-                icon={<UserOutlined />} 
+              <Avatar
+                size={48}
+                src={user?.photoURL}
+                icon={<UserOutlined />}
                 style={{ border: "2px solid #e6f7ff" }}
               />
               <div>
@@ -862,9 +864,9 @@ const res = await fetch("/pois/search-in-area", {
               </div>
 
               <div style={{ width: "100%", height: 6, background: "#e8e8e8", borderRadius: 10, overflow: "hidden", marginBottom: 6 }}>
-                <div style={{ 
-                  width: `${gamification?.xpProgressPercent || 0}%`, 
-                  height: "100%", 
+                <div style={{
+                  width: `${gamification?.xpProgressPercent || 0}%`,
+                  height: "100%",
                   background: "linear-gradient(90deg, #1890ff, #69c0ff)",
                   transition: "width 0.5s ease-in-out"
                 }} />
@@ -925,6 +927,16 @@ const res = await fetch("/pois/search-in-area", {
               onClick={handleStyleChange}
               style={{ width: fabSize, height: fabSize }}
             />
+
+            <Button
+  shape="circle"
+  onClick={() => setBookingOpen(true)}
+  style={{ width: fabSize, height: fabSize }}
+  aria-label="Open booking"
+  title="Booking"
+>
+  🧳
+</Button>
           </div>
 
           {/* Filter panel */}
@@ -1136,7 +1148,7 @@ const res = await fetch("/pois/search-in-area", {
                     })
                   )}
                 </div>
-                
+
               </Card>
             </div>
           )}
@@ -1190,6 +1202,7 @@ const res = await fetch("/pois/search-in-area", {
             </div>
 
           </Card>
+          <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
         </div>
       </Content>
 
