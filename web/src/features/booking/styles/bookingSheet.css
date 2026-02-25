@@ -1,118 +1,212 @@
+/* 1. Arka Plan ve Animasyon */
 .booking-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(2px);
-  z-index: 9999;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(15px); /* Haritayı şık bir şekilde bulandırır */
+  z-index: 10000;
   display: flex;
   justify-content: center;
-  align-items: flex-end;
+  align-items: flex-end; /* Mobilde alttan, webde ortada istersen center yap */
 }
 
 .booking-sheet {
-  width: min(520px, 100%);
-  height: 72vh;
-  max-height: 72vh;
+  width: 100%;
+  max-width: 440px; /* Webde çok yayılmaması için sabit genişlik */
   background: #ffffff;
-  border-top-left-radius: 22px;
-  border-top-right-radius: 22px;
-  box-shadow: 0 -14px 30px rgba(0, 0, 0, 0.18);
-  padding: 10px 14px 16px;
+  border-top-left-radius: 32px;
+  border-top-right-radius: 32px;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+  animation: slideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   overflow: hidden;
 }
 
-.booking-handle {
-  width: 44px;
-  height: 5px;
-  background: #d8d8d8;
-  border-radius: 999px;
-  margin: 6px auto 10px;
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 
-.booking-header {
+/* 2. Header ve Kapatma Butonu */
+.sheet-header-ios {
+  padding: 12px 20px;
+}
+
+.drag-handle {
+  width: 36px;
+  height: 5px;
+  background: #d1d1d6;
+  border-radius: 10px;
+  margin: 0 auto 15px;
+}
+
+.header-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-main h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+
+.close-circle-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f2f2f7;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 3. Modern Sekmeler (Hotels / Flights) */
+.booking-tabs-modern {
+  display: flex;
+  background: #f2f2f7;
+  margin: 10px 20px 24px;
+  padding: 4px;
+  border-radius: 14px;
+}
+
+.tab-modern {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  color: #8e8e93;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tab-modern.active {
+  background: #ffffff;
+  color: #007aff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* 4. Form Giriş Alanları */
+.form-scroll-area {
+  padding: 0 20px;
+  overflow-y: auto;
+}
+
+.ios-input-group {
+  margin-bottom: 20px;
+}
+
+.ios-input-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8e8e93;
+  margin-bottom: 8px;
+  margin-left: 2px;
+}
+
+.ios-input-wrapper {
+  background: #f2f2f7;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1.5px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.ios-input-wrapper:focus-within {
+  background: #fff;
+  border-color: #007aff;
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+}
+
+.ios-input-wrapper input {
+  background: transparent;
+  border: none;
+  flex: 1;
+  font-size: 16px;
+  font-weight: 500;
+  outline: none;
+  color: #000;
+}
+
+/* 5. Yan Yana Alanlar (Dates & Adults) */
+.ios-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ios-stepper {
+  background: #f2f2f7;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 2px 10px;
+  padding: 6px 8px;
+  width: 100%;
 }
 
-.booking-title {
+.ios-stepper button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #d1d1d6;
+  background: #fff;
   font-size: 18px;
-  font-weight: 800;
-  color: #111;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.booking-close {
+/* 6. Arama Butonu (CTA) */
+.ios-main-search-btn {
+  background: #007aff;
+  color: white;
+  border: none;
+  width: 100%;
+  padding: 18px;
+  border-radius: 18px;
+  font-size: 17px;
+  font-weight: 700;
+  margin-top: 10px;
+  cursor: pointer;
+  transition: transform 0.1s active;
+}
+
+.ios-main-search-btn:active {
+  transform: scale(0.98);
+}
+
+.modern-date-input {
   border: none;
   background: transparent;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 10px;
-  line-height: 1;
-}
-
-.booking-close:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.booking-content {
-  height: calc(72vh - 70px);
-  overflow: auto;
-  padding-bottom: 10px;
-}
-
-.booking-tabs {
-  display: flex;
-  gap: 10px;
-  padding: 6px 0 14px;
-}
-
-.booking-tab {
-  flex: 1;
-  border: 1px solid #e6e6e6;
-  background: #f6f6f6;
-  padding: 10px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-weight: 700;
-  color: #111;
-}
-
-.booking-tab-active {
-  background: #0b66ff;
-  color: #fff;
-  border-color: #0b66ff;
-}
-
-.booking-placeholder {
-  margin-top: 6px;
-  padding: 14px;
-  border: 1px solid #eeeeee;
-  border-radius: 16px;
-  background: #fafafa;
-}
-
-.booking-placeholder-title {
-  font-weight: 800;
-  margin-bottom: 6px;
-}
-
-.booking-placeholder-text {
-  color: #555;
-  font-size: 14px;
-  line-height: 1.4;
-  margin-bottom: 12px;
-}
-
-.booking-primary-btn {
   width: 100%;
-  padding: 12px 14px;
-  border: none;
-  border-radius: 14px;
-  font-weight: 800;
+  font-family: inherit;
+  font-size: 16px;
+  outline: none;
+  color: #000;
   cursor: pointer;
-  background: #0b66ff;
-  color: #fff;
+}
+
+/* Takvim ikonunu webkit tarayıcılarda özelleştirme */
+.modern-date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
   opacity: 0.6;
 }
