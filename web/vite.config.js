@@ -36,6 +36,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        "/bookings": {
+          target: backendUrl,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
     optimizeDeps: {
