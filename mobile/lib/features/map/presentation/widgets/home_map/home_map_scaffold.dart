@@ -22,6 +22,9 @@ class HomeMapScaffold extends StatelessWidget {
   final VoidCallback onRecenter;
   final VoidCallback onToggleDrawing;
 
+  /// UC1.8-MOB1: booking entry point
+  final VoidCallback onOpenBooking;
+
   /// VACANZA-188: filter panel open
   final VoidCallback onOpenFilters;
 
@@ -45,6 +48,7 @@ class HomeMapScaffold extends StatelessWidget {
     required this.onToggleMode,
     required this.onRecenter,
     required this.onToggleDrawing,
+    required this.onOpenBooking,
     required this.onOpenFilters,
     this.isFiltersOpen = false,
     this.filtersPanel,
@@ -124,6 +128,7 @@ class HomeMapScaffold extends StatelessWidget {
                 onToggleMode: onToggleMode,
                 onRecenter: onRecenter,
                 onToggleDrawing: onToggleDrawing,
+                onOpenBooking: onOpenBooking,
                 onOpenFilters: onOpenFilters,
               ),
             ),

@@ -35,6 +35,8 @@ import '../../../poi_search/presentation/bloc/poi_search_state.dart';
 import '../../../poi_search/presentation/widgets/area_results/area_results_bottom_sheet.dart';
 import '../../../poi_search/presentation/widgets/poi_filter_panel.dart';
 
+import '../../../../features/booking/presentation/widgets/booking_bottom_sheet.dart';
+
 import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
@@ -433,6 +435,18 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ✅ manual filter tuşu -> blur preview OFF
             onOpenFilters: () => _openFilters(fromUserSelection: false),
+
+            // ✅ UC1.8-MOB1: booking entry point
+            onOpenBooking: () {
+              showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                isDismissible: true,
+                enableDrag: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const BookingBottomSheet(),
+              );
+            },
 
             // ===== Filters overlay =====
             isFiltersOpen: _filtersOpen,

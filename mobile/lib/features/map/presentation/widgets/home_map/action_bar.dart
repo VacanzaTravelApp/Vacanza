@@ -11,6 +11,9 @@ class ActionBar extends StatelessWidget {
   final VoidCallback onRecenter;
   final VoidCallback onToggleDrawing;
 
+  // ✅ UC1.8-MOB1: Booking entry point
+  final VoidCallback onOpenBooking;
+
   // ✅ NEW
   final VoidCallback onOpenFilters;
 
@@ -21,6 +24,7 @@ class ActionBar extends StatelessWidget {
     required this.onToggleMode,
     required this.onRecenter,
     required this.onToggleDrawing,
+    required this.onOpenBooking, // ✅ UC1.8-MOB1
     required this.onOpenFilters, // ✅ NEW
   });
 
@@ -43,6 +47,14 @@ class ActionBar extends StatelessWidget {
           tooltip: 'Filter POIs',
           icon: Icons.layers_sharp,
           onPressed: onOpenFilters,
+        ),
+        const SizedBox(height: 16),
+
+        // ✅ UC1.8-MOB1: Booking entry point
+        ActionIconButton(
+          tooltip: 'Booking',
+          icon: Icons.luggage_rounded,
+          onPressed: onOpenBooking,
         ),
         const SizedBox(height: 16),
 
