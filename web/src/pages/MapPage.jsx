@@ -17,6 +17,7 @@ import { auth } from "../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
 import BookingSheet from "../features/booking/components/BookingSheet";
+import { CalendarOutlined } from "@ant-design/icons";
 
 const { Header, Content, Footer } = Layout;
 
@@ -928,15 +929,20 @@ const [bookingOpen, setBookingOpen] = useState(false);
               style={{ width: fabSize, height: fabSize }}
             />
 
-            <Button
+      <Button
   shape="circle"
+  icon={<CalendarOutlined />}
   onClick={() => setBookingOpen(true)}
-  style={{ width: fabSize, height: fabSize }}
-  aria-label="Open booking"
-  title="Booking"
->
-  🧳
-</Button>
+  style={{
+    width: fabSize,
+    height: fabSize,
+    border: "none",
+    background: bookingOpen ? "#1890ff" : "rgba(255,255,255,0.95)",
+    color: bookingOpen ? "#fff" : "#333",
+    backdropFilter: "blur(8px)",
+    boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+  }}
+/>
           </div>
 
           {/* Filter panel */}
