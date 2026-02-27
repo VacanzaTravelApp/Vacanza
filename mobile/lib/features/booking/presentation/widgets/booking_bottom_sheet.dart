@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../data/repositories/booking_repository.dart';
 import '../cubit/booking_cubit.dart';
 import '../cubit/booking_state.dart';
 
@@ -19,7 +20,9 @@ class BookingBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => BookingCubit(),
+      create: (ctx) => BookingCubit(
+        repository: ctx.read<BookingRepository>(),
+      ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.65,
         minChildSize: 0.35,
