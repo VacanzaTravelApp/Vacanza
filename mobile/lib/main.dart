@@ -20,6 +20,9 @@ import 'features/gamification/data/api/gamification_api_client.dart';
 import 'features/gamification/data/repositories/gamification_repository.dart';
 import 'features/gamification/presentation/cubit/gamification_cubit.dart';
 
+import 'features/booking/data/api/booking_api_client.dart';
+import 'features/booking/data/repositories/booking_repository.dart';
+
 import 'features/auth/presentation/bloc/register_bloc.dart';
 import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'features/auth/presentation/screens/auth_gate.dart';
@@ -79,6 +82,18 @@ class VacanzaApp extends StatelessWidget {
         RepositoryProvider<GamificationRepository>(
           create: (ctx) => GamificationRepository(
             apiClient: ctx.read<GamificationApiClient>(),
+          ),
+        ),
+
+        /// Booking API client (UC1.8-MOB4)
+        RepositoryProvider<BookingApiClient>(
+          create: (ctx) => BookingApiClient(ctx.read<Dio>()),
+        ),
+
+        /// Booking repository (UC1.8-MOB5)
+        RepositoryProvider<BookingRepository>(
+          create: (ctx) => BookingRepository(
+            apiClient: ctx.read<BookingApiClient>(),
           ),
         ),
       ],

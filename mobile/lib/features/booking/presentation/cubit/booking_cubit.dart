@@ -5,18 +5,22 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/models/accommodation_search_request.dart';
 import '../../data/models/sort_criteria.dart';
 import '../../data/models/transport_search_request.dart';
+import '../../data/repositories/booking_repository.dart';
 import 'booking_state.dart';
 
-/// UC1.8-MOB2 — Booking flow controller.
+/// UC1.8-MOB2/MOB5 — Booking flow controller.
 ///
 /// Manages the bottom-sheet state machine:
 ///   Search → Loading → Results / Empty / Error
 ///   Results → Filters → (Apply / Reset) → Loading → Results
 ///
-/// Repository integration is wired in MOB5.
 /// Logs every decision with [BOOKING_CUBIT] tag.
 class BookingCubit extends Cubit<BookingState> {
-  BookingCubit() : super(const BookingSearch());
+  final BookingRepository _repository;
+
+  BookingCubit({required BookingRepository repository})
+      : _repository = repository,
+        super(const BookingSearch());
 
   // ── Internal state for retry / filter re-run ──────────────────
   AccommodationSearchRequest? _lastHotelRequest;
@@ -38,8 +42,6 @@ class BookingCubit extends Cubit<BookingState> {
   }
 
   /// Searches hotels via repository.
-  ///
-  /// MOB5 wires the actual repo call — the cubit just manages states.
   Future<void> searchHotels(AccommodationSearchRequest request) async {
     // Guard: ignore if already loading
     if (state is BookingLoading) {
@@ -49,24 +51,37 @@ class BookingCubit extends Cubit<BookingState> {
 
     _lastHotelRequest = request;
     _currentType = BookingType.hotels;
+    final summary = _buildSummary(
+      city: request.cityCode,
+      dateRange: '${request.checkInDate}–${request.checkOutDate}',
+      adults: request.adults,
+    );
     log('[BOOKING_CUBIT] searchHotels $request');
     emit(const BookingLoading(type: BookingType.hotels));
 
     try {
-      // TODO(MOB5): Replace with BookingRepository.searchHotels(request)
-      // final results = await _repository.searchHotels(request);
-      //
-      // For now, emit error indicating repo is not wired yet.
-      emit(const BookingError(
-        type: BookingType.hotels,
-        message: 'Repository not wired yet (MOB5)',
-      ));
+      final results = await _repository.searchHotels(request);
+      if (isClosed) return;
+
+      if (results.isEmpty) {
+        emit(BookingEmpty(type: BookingType.hotels, summary: summary));
+      } else {
+        emit(BookingHotelResults(
+          results: results,
+          summary: summary,
+          lastRequest: request,
+          budget: request.budget,
+          sortBy: request.sortBy,
+        ));
+      }
+    } on BookingException catch (e) {
+      if (isClosed) return;
+      log('[BOOKING_CUBIT] searchHotels ERROR: ${e.message}');
+      emit(BookingError(type: BookingType.hotels, message: e.message));
     } catch (e) {
-      log('[BOOKING_CUBIT] searchHotels ERROR: $e');
-      emit(BookingError(
-        type: BookingType.hotels,
-        message: e.toString(),
-      ));
+      if (isClosed) return;
+      log('[BOOKING_CUBIT] searchHotels UNEXPECTED: $e');
+      emit(BookingError(type: BookingType.hotels, message: e.toString()));
     }
   }
 
@@ -79,21 +94,39 @@ class BookingCubit extends Cubit<BookingState> {
 
     _lastFlightRequest = request;
     _currentType = BookingType.flights;
+    final summary = _buildSummary(
+      city: '${request.origin}→${request.destination}',
+      dateRange: request.returnDate != null
+          ? '${request.departureDate}–${request.returnDate}'
+          : request.departureDate,
+      adults: request.adults,
+    );
     log('[BOOKING_CUBIT] searchFlights $request');
     emit(const BookingLoading(type: BookingType.flights));
 
     try {
-      // TODO(MOB5): Replace with BookingRepository.searchFlights(request)
-      emit(const BookingError(
-        type: BookingType.flights,
-        message: 'Repository not wired yet (MOB5)',
-      ));
+      final results = await _repository.searchFlights(request);
+      if (isClosed) return;
+
+      if (results.isEmpty) {
+        emit(BookingEmpty(type: BookingType.flights, summary: summary));
+      } else {
+        emit(BookingFlightResults(
+          results: results,
+          summary: summary,
+          lastRequest: request,
+          budget: request.budget,
+          sortBy: request.sortBy,
+        ));
+      }
+    } on BookingException catch (e) {
+      if (isClosed) return;
+      log('[BOOKING_CUBIT] searchFlights ERROR: ${e.message}');
+      emit(BookingError(type: BookingType.flights, message: e.message));
     } catch (e) {
-      log('[BOOKING_CUBIT] searchFlights ERROR: $e');
-      emit(BookingError(
-        type: BookingType.flights,
-        message: e.toString(),
-      ));
+      if (isClosed) return;
+      log('[BOOKING_CUBIT] searchFlights UNEXPECTED: $e');
+      emit(BookingError(type: BookingType.flights, message: e.toString()));
     }
   }
 
@@ -180,6 +213,7 @@ class BookingCubit extends Cubit<BookingState> {
       return searchFlights(_lastFlightRequest!);
     }
     // No previous request — go back to search
+    if (isClosed) return;
     emit(BookingSearch(type: _currentType));
   }
 
@@ -199,4 +233,13 @@ class BookingCubit extends Cubit<BookingState> {
     log('[BOOKING_CUBIT] backToSearch');
     emit(BookingSearch(type: _currentType));
   }
+
+  // ── Private helpers ───────────────────────────────────────────
+
+  String _buildSummary({
+    required String city,
+    required String dateRange,
+    required int adults,
+  }) =>
+      '$city · $dateRange · $adults adult${adults > 1 ? 's' : ''}';
 }
