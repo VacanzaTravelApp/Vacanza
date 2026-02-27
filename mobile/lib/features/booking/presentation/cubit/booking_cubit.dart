@@ -27,6 +27,12 @@ class BookingCubit extends Cubit<BookingState> {
   TransportSearchRequest? _lastFlightRequest;
   BookingType _currentType = BookingType.hotels;
 
+  /// Exposes last hotel request for form state restore (MOB6).
+  AccommodationSearchRequest? get lastHotelRequest => _lastHotelRequest;
+
+  /// Exposes last flight request for form state restore (MOB6).
+  TransportSearchRequest? get lastFlightRequest => _lastFlightRequest;
+
   // ── Kept for back-navigation from filters ─────────────────────
   BookingState? _previousResultsState;
 
