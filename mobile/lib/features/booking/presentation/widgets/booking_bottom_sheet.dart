@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/repositories/booking_repository.dart';
 import '../cubit/booking_cubit.dart';
 import '../cubit/booking_state.dart';
+import 'search/booking_search_form.dart';
 
 /// UC1.8-MOB1/MOB2 — Booking bottom-sheet shell.
 ///
@@ -97,12 +98,7 @@ class BookingBottomSheet extends StatelessWidget {
   /// MOB6/7/8 will replace these placeholders with real widgets.
   Widget _buildBody(BuildContext context, BookingState state) {
     return switch (state) {
-      BookingSearch() => _PlaceholderView(
-          icon: Icons.search_rounded,
-          title: 'Search ${state.type == BookingType.hotels ? 'Hotels' : 'Flights'}',
-          subtitle: 'Search form will be wired in MOB6.',
-          state: state,
-        ),
+      BookingSearch() => BookingSearchForm(initialType: state.type),
       BookingLoading() => const _LoadingView(),
       BookingHotelResults() => _PlaceholderView(
           icon: Icons.hotel_rounded,
