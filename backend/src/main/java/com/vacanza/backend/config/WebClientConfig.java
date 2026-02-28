@@ -64,6 +64,7 @@ public class WebClientConfig {
         return WebClient.builder()
                 .baseUrl(props.getBaseUrl())
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024)) // 2 MB
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .filter(log4xx5xx("[AMADEUS]"))
