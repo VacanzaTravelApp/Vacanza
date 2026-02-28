@@ -11,9 +11,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,26 +24,32 @@ public class BookingServiceImpl implements BookingService {
 
         @Override
         public List<AccommodationOptionDTO> searchAccommodations(AccommodationSearchRequestDTO request) {
-                log.info("Searching accommodations: city={}, budget={}, sort={}",
-                                request.getCityCode(), request.getBudget(), request.getSortBy());
+                log.info("Searching accommodations: city={}, budget={}, currency={}, sort={}",
+                                request.getCityCode(), request.getBudget(),
+                                request.getCurrency(), request.getSortBy());
 
                 List<AccommodationOptionDTO> results = amadeusClient.searchHotels(request);
 
-                // Apply budget filter (budget is per-night; Amadeus returns total-stay price)
+                // Apply budget filter (compares total-stay price, only when currencies match)
                 if (request.getBudget() != null) {
-                        long nights = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
-                        if (nights <= 0)
-                                nights = 1;
-                        final long stayNights = nights;
+                        final String requestCurrency = request.getCurrency() != null
+                                        ? request.getCurrency()
+                                        : "USD";
 
                         results = results.stream()
                                         .filter(opt -> {
                                                 if (opt.getPrice() == null)
                                                         return false;
-                                                BigDecimal perNight = opt.getPrice().divide(
-                                                                BigDecimal.valueOf(stayNights), 2,
-                                                                RoundingMode.HALF_UP);
-                                                return perNight.compareTo(request.getBudget()) <= 0;
+                                                // Skip filter if currencies don't match (can't compare cross-currency)
+                                                if (opt.getCurrency() != null
+                                                                && !opt.getCurrency()
+                                                                                .equalsIgnoreCase(requestCurrency)) {
+                                                        log.debug("Skipping budget filter for {} — currency mismatch: {} vs {}",
+                                                                        opt.getHotelName(), opt.getCurrency(),
+                                                                        requestCurrency);
+                                                        return true;
+                                                }
+                                                return opt.getPrice().compareTo(request.getBudget()) <= 0;
                                         })
                                         .collect(Collectors.toList());
                 }
