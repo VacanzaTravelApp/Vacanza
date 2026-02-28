@@ -92,7 +92,8 @@ public class AmadeusClient {
                             .bodyToMono(AmadeusHotelResponse.class)
                             .block();
 
-                    allResults.addAll(AmadeusHotelResponse.toAccommodationOptions(offersResponse));
+                    allResults.addAll(AmadeusHotelResponse.toAccommodationOptions(
+                            offersResponse, request.getCheckInDate(), request.getCheckOutDate()));
                 } catch (WebClientResponseException e) {
                     log.warn("[AMADEUS] Hotel offers batch failed ({}): {}", hotelIds, e.getStatusCode());
                     // Continue with next batch
