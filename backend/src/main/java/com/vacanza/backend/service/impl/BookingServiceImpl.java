@@ -11,6 +11,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,89 +23,103 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
 
-    private final AmadeusClient amadeusClient;
+        private final AmadeusClient amadeusClient;
 
-    @Override
-    public List<AccommodationOptionDTO> searchAccommodations(AccommodationSearchRequestDTO request) {
-        log.info("Searching accommodations: city={}, budget={}, sort={}",
-                request.getCityCode(), request.getBudget(), request.getSortBy());
+        @Override
+        public List<AccommodationOptionDTO> searchAccommodations(AccommodationSearchRequestDTO request) {
+                log.info("Searching accommodations: city={}, budget={}, sort={}",
+                                request.getCityCode(), request.getBudget(), request.getSortBy());
 
-        List<AccommodationOptionDTO> results = amadeusClient.searchHotels(request);
+                List<AccommodationOptionDTO> results = amadeusClient.searchHotels(request);
 
-        // Apply budget filter
-        if (request.getBudget() != null) {
-            results = results.stream()
-                    .filter(opt -> opt.getPrice() != null
-                            && opt.getPrice().compareTo(request.getBudget()) <= 0)
-                    .collect(Collectors.toList());
+                // Apply budget filter (budget is per-night; Amadeus returns total-stay price)
+                if (request.getBudget() != null) {
+                        long nights = ChronoUnit.DAYS.between(request.getCheckInDate(), request.getCheckOutDate());
+                        if (nights <= 0)
+                                nights = 1;
+                        final long stayNights = nights;
+
+                        results = results.stream()
+                                        .filter(opt -> {
+                                                if (opt.getPrice() == null)
+                                                        return false;
+                                                BigDecimal perNight = opt.getPrice().divide(
+                                                                BigDecimal.valueOf(stayNights), 2,
+                                                                RoundingMode.HALF_UP);
+                                                return perNight.compareTo(request.getBudget()) <= 0;
+                                        })
+                                        .collect(Collectors.toList());
+                }
+
+                // Apply sorting
+                results = sortAccommodations(results, request.getSortBy());
+
+                log.info("Returning {} accommodation results after filtering", results.size());
+                return results;
         }
 
-        // Apply sorting
-        results = sortAccommodations(results, request.getSortBy());
+        @Override
+        public List<TransportOptionDTO> searchTransportation(TransportSearchRequestDTO request) {
+                log.info("Searching transportation: {} -> {}, budget={}, sort={}",
+                                request.getOrigin(), request.getDestination(),
+                                request.getBudget(), request.getSortBy());
 
-        log.info("Returning {} accommodation results after filtering", results.size());
-        return results;
-    }
+                List<TransportOptionDTO> results = amadeusClient.searchFlights(request);
 
-    @Override
-    public List<TransportOptionDTO> searchTransportation(TransportSearchRequestDTO request) {
-        log.info("Searching transportation: {} -> {}, budget={}, sort={}",
-                request.getOrigin(), request.getDestination(),
-                request.getBudget(), request.getSortBy());
+                // Apply budget filter
+                if (request.getBudget() != null) {
+                        results = results.stream()
+                                        .filter(opt -> opt.getPrice() != null
+                                                        && opt.getPrice().compareTo(request.getBudget()) <= 0)
+                                        .collect(Collectors.toList());
+                }
 
-        List<TransportOptionDTO> results = amadeusClient.searchFlights(request);
+                // Apply sorting
+                results = sortTransportation(results, request.getSortBy());
 
-        // Apply budget filter
-        if (request.getBudget() != null) {
-            results = results.stream()
-                    .filter(opt -> opt.getPrice() != null
-                            && opt.getPrice().compareTo(request.getBudget()) <= 0)
-                    .collect(Collectors.toList());
+                log.info("Returning {} transportation results after filtering", results.size());
+                return results;
         }
 
-        // Apply sorting
-        results = sortTransportation(results, request.getSortBy());
+        private List<AccommodationOptionDTO> sortAccommodations(
+                        List<AccommodationOptionDTO> results, SortCriteria sortBy) {
 
-        log.info("Returning {} transportation results after filtering", results.size());
-        return results;
-    }
+                if (sortBy == null) {
+                        return results;
+                }
 
-    private List<AccommodationOptionDTO> sortAccommodations(
-            List<AccommodationOptionDTO> results, SortCriteria sortBy) {
+                Comparator<AccommodationOptionDTO> comparator = switch (sortBy) {
+                        case PRICE_ASC -> Comparator.comparing(
+                                        AccommodationOptionDTO::getPrice,
+                                        Comparator.nullsLast(Comparator.naturalOrder()));
+                        case PRICE_DESC -> Comparator.comparing(
+                                        AccommodationOptionDTO::getPrice,
+                                        Comparator.nullsLast(Comparator.reverseOrder()));
+                        case RATING_DESC -> Comparator.comparing(
+                                        AccommodationOptionDTO::getRating,
+                                        Comparator.nullsLast(Comparator.reverseOrder()));
+                };
 
-        if (sortBy == null) {
-            return results;
+                return results.stream().sorted(comparator).collect(Collectors.toList());
         }
 
-        Comparator<AccommodationOptionDTO> comparator = switch (sortBy) {
-            case PRICE_ASC -> Comparator.comparing(
-                    AccommodationOptionDTO::getPrice, Comparator.nullsLast(Comparator.naturalOrder()));
-            case PRICE_DESC -> Comparator.comparing(
-                    AccommodationOptionDTO::getPrice, Comparator.nullsLast(Comparator.reverseOrder()));
-            case RATING_DESC -> Comparator.comparing(
-                    AccommodationOptionDTO::getRating, Comparator.nullsLast(Comparator.reverseOrder()));
-        };
+        private List<TransportOptionDTO> sortTransportation(
+                        List<TransportOptionDTO> results, SortCriteria sortBy) {
 
-        return results.stream().sorted(comparator).collect(Collectors.toList());
-    }
+                if (sortBy == null) {
+                        return results;
+                }
 
-    private List<TransportOptionDTO> sortTransportation(
-            List<TransportOptionDTO> results, SortCriteria sortBy) {
+                Comparator<TransportOptionDTO> comparator = switch (sortBy) {
+                        case PRICE_ASC -> Comparator.comparing(
+                                        TransportOptionDTO::getPrice, Comparator.nullsLast(Comparator.naturalOrder()));
+                        case PRICE_DESC -> Comparator.comparing(
+                                        TransportOptionDTO::getPrice, Comparator.nullsLast(Comparator.reverseOrder()));
+                        case RATING_DESC -> Comparator.comparing(
+                                        TransportOptionDTO::getPrice, Comparator.nullsLast(Comparator.naturalOrder()));
+                        // Flights don't have rating, fallback to price asc
+                };
 
-        if (sortBy == null) {
-            return results;
+                return results.stream().sorted(comparator).collect(Collectors.toList());
         }
-
-        Comparator<TransportOptionDTO> comparator = switch (sortBy) {
-            case PRICE_ASC -> Comparator.comparing(
-                    TransportOptionDTO::getPrice, Comparator.nullsLast(Comparator.naturalOrder()));
-            case PRICE_DESC -> Comparator.comparing(
-                    TransportOptionDTO::getPrice, Comparator.nullsLast(Comparator.reverseOrder()));
-            case RATING_DESC -> Comparator.comparing(
-                    TransportOptionDTO::getPrice, Comparator.nullsLast(Comparator.naturalOrder()));
-            // Flights don't have rating, fallback to price asc
-        };
-
-        return results.stream().sorted(comparator).collect(Collectors.toList());
-    }
 }
