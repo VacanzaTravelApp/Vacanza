@@ -66,6 +66,19 @@ public class AmadeusHotelResponse {
     public static class Price {
         private String currency;
         private String total;
+        private Variations variations;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Variations {
+        private Average average;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Average {
+        private String base;
     }
 
     @Data
@@ -119,10 +132,16 @@ public class AmadeusHotelResponse {
                     }
 
                     BigDecimal price = BigDecimal.ZERO;
+                    BigDecimal perNight = null;
                     String currency = "USD";
                     if (offer.getPrice() != null) {
                         price = new BigDecimal(offer.getPrice().getTotal());
                         currency = offer.getPrice().getCurrency();
+                        if (offer.getPrice().getVariations() != null
+                                && offer.getPrice().getVariations().getAverage() != null
+                                && offer.getPrice().getVariations().getAverage().getBase() != null) {
+                            perNight = new BigDecimal(offer.getPrice().getVariations().getAverage().getBase());
+                        }
                     }
 
                     String bookingUrl = String.format(
@@ -134,6 +153,7 @@ public class AmadeusHotelResponse {
                             .hotelId(hotel.getHotelId())
                             .address(addressStr)
                             .price(price)
+                            .pricePerNight(perNight)
                             .currency(currency)
                             .rating(hotel.getRating())
                             .externalBookingUrl(bookingUrl)

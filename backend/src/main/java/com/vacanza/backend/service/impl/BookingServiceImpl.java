@@ -40,16 +40,17 @@ public class BookingServiceImpl implements BookingService {
                                         .filter(opt -> {
                                                 if (opt.getPrice() == null)
                                                         return false;
-                                                // Skip filter if currencies don't match (can't compare cross-currency)
+                                                // Skip filter if currencies don't match
                                                 if (opt.getCurrency() != null
                                                                 && !opt.getCurrency()
                                                                                 .equalsIgnoreCase(requestCurrency)) {
-                                                        log.debug("Skipping budget filter for {} — currency mismatch: {} vs {}",
-                                                                        opt.getHotelName(), opt.getCurrency(),
-                                                                        requestCurrency);
                                                         return true;
                                                 }
-                                                return opt.getPrice().compareTo(request.getBudget()) <= 0;
+                                                // Compare per-night price; fallback to total if unavailable
+                                                java.math.BigDecimal comparePrice = opt.getPricePerNight() != null
+                                                                ? opt.getPricePerNight()
+                                                                : opt.getPrice();
+                                                return comparePrice.compareTo(request.getBudget()) <= 0;
                                         })
                                         .collect(Collectors.toList());
                 }
