@@ -6,6 +6,9 @@ import com.vacanza.backend.dto.response.AccommodationOptionDTO;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 
@@ -115,10 +118,16 @@ public class AmadeusHotelResponse {
 
     // --- Mapping ---
 
-    public static List<AccommodationOptionDTO> toAccommodationOptions(AmadeusHotelResponse response) {
+    public static List<AccommodationOptionDTO> toAccommodationOptions(
+            AmadeusHotelResponse response, LocalDate checkIn, LocalDate checkOut) {
         if (response == null || response.getData() == null) {
             return Collections.emptyList();
         }
+
+        long nights = ChronoUnit.DAYS.between(checkIn, checkOut);
+        if (nights <= 0)
+            nights = 1;
+        final long stayNights = nights;
 
         return response.getData().stream()
                 .filter(ho -> ho.isAvailable() && ho.getOffers() != null && !ho.getOffers().isEmpty())
@@ -142,6 +151,11 @@ public class AmadeusHotelResponse {
                                 && offer.getPrice().getVariations().getAverage().getBase() != null) {
                             perNight = new BigDecimal(offer.getPrice().getVariations().getAverage().getBase());
                         }
+                    }
+
+                    // Fallback: calculate per-night from total / nights
+                    if (perNight == null && price.compareTo(BigDecimal.ZERO) > 0) {
+                        perNight = price.divide(BigDecimal.valueOf(stayNights), 2, RoundingMode.HALF_UP);
                     }
 
                     String bookingUrl = String.format(
