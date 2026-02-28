@@ -4,6 +4,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/repositories/booking_repository.dart';
 import '../cubit/booking_cubit.dart';
 import '../cubit/booking_state.dart';
+import 'results/booking_empty_state.dart';
+import 'results/booking_loading_skeleton.dart';
+import 'results/booking_results_view.dart';
 import 'search/booking_search_form.dart';
 
 /// UC1.8-MOB1/MOB2 — Booking bottom-sheet shell.
@@ -94,29 +97,22 @@ class BookingBottomSheet extends StatelessWidget {
   }
 
   /// Routes to the correct view based on cubit state.
-  ///
-  /// MOB6/7/8 will replace these placeholders with real widgets.
   Widget _buildBody(BuildContext context, BookingState state) {
     return switch (state) {
       BookingSearch() => BookingSearchForm(initialType: state.type),
-      BookingLoading() => const _LoadingView(),
-      BookingHotelResults() => _PlaceholderView(
-          icon: Icons.hotel_rounded,
-          title: '${state.results.length} Hotels Found',
-          subtitle: 'Results list will be wired in MOB7.',
-          state: state,
+      BookingLoading() => const BookingLoadingSkeleton(),
+      BookingHotelResults() => BookingResultsView(
+          results: state.results,
+          type: BookingType.hotels,
+          summary: state.summary,
         ),
-      BookingFlightResults() => _PlaceholderView(
-          icon: Icons.flight_rounded,
-          title: '${state.results.length} Flights Found',
-          subtitle: 'Results list will be wired in MOB7.',
-          state: state,
+      BookingFlightResults() => BookingResultsView(
+          results: state.results,
+          type: BookingType.flights,
+          summary: state.summary,
         ),
-      BookingEmpty() => _PlaceholderView(
-          icon: Icons.search_off_rounded,
-          title: 'No Results',
-          subtitle: state.summary,
-          state: state,
+      BookingEmpty() => BookingEmptyState(
+          onModifySearch: () => context.read<BookingCubit>().backToSearch(),
         ),
       BookingError() => _ErrorView(
           message: state.message,
@@ -279,31 +275,6 @@ class _PlaceholderView extends StatelessWidget {
   }
 }
 
-/// Loading placeholder.
-class _LoadingView extends StatelessWidget {
-  const _LoadingView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 60),
-        const CircularProgressIndicator(
-          color: Color(0xFF0096FF),
-          strokeWidth: 3,
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Searching…',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade500,
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 /// Error view with retry button.
 class _ErrorView extends StatelessWidget {
