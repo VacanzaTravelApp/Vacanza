@@ -15,7 +15,8 @@ public class AccommodationOptionDTO {
     private String hotelName;
     private String hotelId;
     private String address;
-    private BigDecimal price;
+    private BigDecimal price; // total stay price
+    private BigDecimal pricePerNight; // average nightly rate
     private String currency;
     private Double rating;
     private String externalBookingUrl;
