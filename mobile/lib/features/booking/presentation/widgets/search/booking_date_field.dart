@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 /// Reusable read-only date field that opens a date picker on tap.
-class BookingDateField extends StatelessWidget {
+///
+/// Exposes [openPicker] so the parent can programmatically trigger it
+/// (e.g., auto-open check-out after check-in selection).
+class BookingDateField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final String placeholder;
@@ -19,7 +22,15 @@ class BookingDateField extends StatelessWidget {
     this.onDateChanged,
   });
 
+  @override
+  State<BookingDateField> createState() => BookingDateFieldState();
+}
+
+class BookingDateFieldState extends State<BookingDateField> {
   static const _accent = Color(0xFF0096FF);
+
+  /// Programmatically opens the date picker.
+  Future<void> openPicker() => _pickDate();
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +40,7 @@ class BookingDateField extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 4),
           child: Text(
-            label,
+            widget.label,
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
@@ -38,10 +49,10 @@ class BookingDateField extends StatelessWidget {
           ),
         ),
         GestureDetector(
-          onTap: () => _pickDate(context),
+          onTap: _pickDate,
           child: AbsorbPointer(
             child: TextFormField(
-              controller: controller,
+              controller: widget.controller,
               readOnly: true,
               style: const TextStyle(
                 fontSize: 14,
@@ -49,7 +60,7 @@ class BookingDateField extends StatelessWidget {
                 color: Color(0xFF1A1A1A),
               ),
               decoration: InputDecoration(
-                hintText: placeholder,
+                hintText: widget.placeholder,
                 hintStyle: const TextStyle(
                   color: Color(0xFFBBBBBB),
                   fontWeight: FontWeight.w400,
@@ -86,16 +97,17 @@ class BookingDateField extends StatelessWidget {
     );
   }
 
-  Future<void> _pickDate(BuildContext context) async {
+  Future<void> _pickDate() async {
     final now = DateTime.now();
-    final earliest = firstDate ?? now;
-    final latest = lastDate ?? DateTime(now.year + 2);
+    final earliest = widget.firstDate ?? now;
+    final latest = widget.lastDate ?? DateTime(now.year + 2);
 
-    // Parse current value if available
     DateTime initial = earliest;
-    if (controller.text.isNotEmpty) {
-      final parsed = DateTime.tryParse(controller.text);
-      if (parsed != null && !parsed.isBefore(earliest) && !parsed.isAfter(latest)) {
+    if (widget.controller.text.isNotEmpty) {
+      final parsed = DateTime.tryParse(widget.controller.text);
+      if (parsed != null &&
+          !parsed.isBefore(earliest) &&
+          !parsed.isAfter(latest)) {
         initial = parsed;
       }
     }
@@ -120,12 +132,11 @@ class BookingDateField extends StatelessWidget {
     );
 
     if (picked != null) {
-      controller.text = _format(picked);
-      onDateChanged?.call(picked);
+      widget.controller.text = _format(picked);
+      widget.onDateChanged?.call(picked);
     }
   }
 
-  /// Formats a DateTime as YYYY-MM-DD (zero-padded).
   String _format(DateTime d) {
     final y = d.year.toString().padLeft(4, '0');
     final m = d.month.toString().padLeft(2, '0');

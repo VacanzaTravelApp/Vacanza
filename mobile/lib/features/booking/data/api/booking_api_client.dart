@@ -44,9 +44,32 @@ class BookingApiClient {
       );
     }
 
+    // ── TEMP DEBUG: raw JSON inspection ─────────────────────────
+    final reqJson = request.toJson();
+    log('[BUDGET_DEBUG] REQUEST: city=${reqJson['cityCode']} '
+        'dates=${reqJson['checkInDate']}→${reqJson['checkOutDate']} '
+        'adults=${reqJson['adults']} budget=${reqJson['budget']} '
+        'sort=${reqJson['sortBy']}');
+
+    for (var i = 0; i < data.length && i < 3; i++) {
+      log('[BUDGET_DEBUG] RAW item[$i]: ${data[i]}');
+    }
+
     final results = data
         .map((e) => AccommodationOption.fromJson(e as Map<String, dynamic>))
         .toList();
+
+    if (results.isNotEmpty) {
+      final prices = results.map((r) => r.price).toList();
+      prices.sort();
+      log('[BUDGET_DEBUG] count=${results.length} '
+          'minPrice=${prices.first} maxPrice=${prices.last}');
+      for (final r in results) {
+        log('[BUDGET_DEBUG] ${r.hotelId} "${r.hotelName}" '
+            'price=${r.price} ${r.currency} rating=${r.rating}');
+      }
+    }
+    // ── END TEMP DEBUG ──────────────────────────────────────────
 
     log('[BOOKING_API] accommodations count=${results.length}');
     return results;

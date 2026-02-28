@@ -14,10 +14,6 @@ import 'iata_text_field.dart';
 import 'sort_dropdown.dart';
 
 /// UC1.8-MOB6 — Orchestrator form for hotel/flight search.
-///
-/// Assembles sub-widgets, manages controllers, handles cross-field
-/// date constraints, validates, builds request DTOs, and dispatches
-/// to [BookingCubit].
 class BookingSearchForm extends StatefulWidget {
   final BookingType initialType;
 
@@ -42,6 +38,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   final _destinationCtrl = TextEditingController();
   final _departureCtrl = TextEditingController();
   final _returnCtrl = TextEditingController();
+  bool _isRoundTrip = false;
 
   // Shared
   final _budgetCtrl = TextEditingController();
@@ -52,13 +49,15 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   DateTime? _checkInDate;
   DateTime? _departureDate;
 
+  // Keys to programmatically open pickers
+  final _checkOutKey = GlobalKey<BookingDateFieldState>();
+  final _returnKey = GlobalKey<BookingDateFieldState>();
+
   @override
   void initState() {
     super.initState();
     _type = widget.initialType;
     _restoreFromCubit();
-
-    // Listen for text changes to update button state
     for (final c in _allControllers) {
       c.addListener(_onFieldChanged);
     }
@@ -86,7 +85,6 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     super.dispose();
   }
 
-  /// Restores form fields from the cubit's last request (if any).
   void _restoreFromCubit() {
     final cubit = context.read<BookingCubit>();
 
@@ -108,6 +106,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         _destinationCtrl.text = req.destination;
         _departureCtrl.text = req.departureDate;
         _returnCtrl.text = req.returnDate ?? '';
+        _isRoundTrip = req.returnDate != null;
         _adults = req.adults;
         _budgetCtrl.text = req.budget?.toString() ?? '';
         _sort = req.sortBy ?? SortCriteria.priceAsc;
@@ -138,7 +137,6 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
 
   void _onCheckInChanged(DateTime date) {
     _checkInDate = date;
-    // If check-out is on or before the new check-in, clear it
     if (_checkOutCtrl.text.isNotEmpty) {
       final checkOut = DateTime.tryParse(_checkOutCtrl.text);
       if (checkOut != null && !checkOut.isAfter(date)) {
@@ -146,11 +144,17 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
       }
     }
     setState(() {});
+
+    // Auto-open check-out if empty
+    if (_checkOutCtrl.text.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkOutKey.currentState?.openPicker();
+      });
+    }
   }
 
   void _onDepartureChanged(DateTime date) {
     _departureDate = date;
-    // If return is before the new departure, clear it
     if (_returnCtrl.text.isNotEmpty) {
       final ret = DateTime.tryParse(_returnCtrl.text);
       if (ret != null && ret.isBefore(date)) {
@@ -158,6 +162,13 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
       }
     }
     setState(() {});
+
+    // Auto-open return if round-trip and empty
+    if (_isRoundTrip && _returnCtrl.text.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _returnKey.currentState?.openPicker();
+      });
+    }
   }
 
   void _onSearch() {
@@ -183,8 +194,9 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
           origin: _originCtrl.text,
           destination: _destinationCtrl.text,
           departureDate: _departureCtrl.text,
-          returnDate:
-              _returnCtrl.text.isEmpty ? null : _returnCtrl.text,
+          returnDate: _isRoundTrip && _returnCtrl.text.isNotEmpty
+              ? _returnCtrl.text
+              : null,
           adults: _adults,
           budget: budget,
           sortBy: _sort,
@@ -238,6 +250,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
           const SizedBox(width: 12),
           Expanded(
             child: BookingDateField(
+              key: _checkOutKey,
               controller: _checkOutCtrl,
               label: 'Check-out',
               firstDate: _checkInDate != null
@@ -268,6 +281,12 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         icon: Icons.search_rounded,
       ),
       const SizedBox(height: 12),
+
+      // Round-trip toggle
+      _roundTripToggle(),
+      const SizedBox(height: 12),
+
+      // Date row
       Row(
         children: [
           Expanded(
@@ -278,18 +297,62 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
               onDateChanged: _onDepartureChanged,
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: BookingDateField(
-              controller: _returnCtrl,
-              label: 'Return (optional)',
-              firstDate: _departureDate ?? now,
-              onDateChanged: (_) => setState(() {}),
+          if (_isRoundTrip) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              child: BookingDateField(
+                key: _returnKey,
+                controller: _returnCtrl,
+                label: 'Return',
+                firstDate: _departureDate ?? now,
+                onDateChanged: (_) => setState(() {}),
+              ),
+            ),
+          ],
+        ],
+      ),
+    ];
+  }
+
+  Widget _roundTripToggle() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isRoundTrip = !_isRoundTrip;
+          if (!_isRoundTrip) _returnCtrl.clear();
+        });
+      },
+      child: Row(
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: _isRoundTrip ? _accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: _isRoundTrip ? _accent : const Color(0xFFCCCCCC),
+                width: 1.5,
+              ),
+            ),
+            child: _isRoundTrip
+                ? const Icon(Icons.check_rounded,
+                    size: 14, color: Colors.white)
+                : null,
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            'Round trip',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF555555),
             ),
           ),
         ],
       ),
-    ];
+    );
   }
 
   Widget _sharedFields() {
