@@ -10,9 +10,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Integration client for Amadeus Self-Service API.
@@ -26,6 +26,7 @@ public class AmadeusClient {
     private final AmadeusTokenService tokenService;
 
     private static final int MAX_HOTEL_IDS = 20;
+    private static final int HOTEL_BATCH_SIZE = 5;
 
     public AmadeusClient(
             @Qualifier("amadeusWebClient") WebClient webClient,
@@ -39,6 +40,7 @@ public class AmadeusClient {
      *
      * Step 1: GET /v1/reference-data/locations/hotels/by-city → get hotel IDs
      * Step 2: GET /v3/shopping/hotel-offers?hotelIds=... → get offers with prices
+     * (batched to handle partial availability in Amadeus test tier)
      */
     public List<AccommodationOptionDTO> searchHotels(AccommodationSearchRequestDTO request) {
         try {
@@ -60,33 +62,50 @@ public class AmadeusClient {
                 return Collections.emptyList();
             }
 
-            // Take first N hotel IDs to avoid API limits
-            String hotelIds = hotelList.getData().stream()
+            // Take first N hotel IDs
+            List<String> allHotelIds = hotelList.getData().stream()
                     .limit(MAX_HOTEL_IDS)
                     .map(AmadeusHotelResponse.HotelEntry::getHotelId)
-                    .collect(Collectors.joining(","));
+                    .toList();
 
-            // Step 2: Get offers for those hotels
-            AmadeusHotelResponse offersResponse = webClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/v3/shopping/hotel-offers")
-                            .queryParam("hotelIds", hotelIds)
-                            .queryParam("checkInDate", request.getCheckInDate().toString())
-                            .queryParam("checkOutDate", request.getCheckOutDate().toString())
-                            .queryParam("adults", request.getAdults())
-                            .queryParam("currency", request.getCurrency())
-                            .build())
-                    .header("Authorization", "Bearer " + tokenService.getToken())
-                    .retrieve()
-                    .bodyToMono(AmadeusHotelResponse.class)
-                    .block();
+            // Step 2: Get offers in batches (Amadeus test tier returns 400 if any
+            // hotel in the batch has no availability, so smaller batches
+            // yield partial results instead of total failure)
+            List<AccommodationOptionDTO> allResults = new ArrayList<>();
+            for (int i = 0; i < allHotelIds.size(); i += HOTEL_BATCH_SIZE) {
+                List<String> batch = allHotelIds.subList(i,
+                        Math.min(i + HOTEL_BATCH_SIZE, allHotelIds.size()));
+                String hotelIds = String.join(",", batch);
 
-            List<AccommodationOptionDTO> results = AmadeusHotelResponse.toAccommodationOptions(offersResponse);
-            log.info("[AMADEUS] Found {} hotel offers for city: {}", results.size(), request.getCityCode());
-            return results;
+                try {
+                    AmadeusHotelResponse offersResponse = webClient.get()
+                            .uri(uriBuilder -> uriBuilder
+                                    .path("/v3/shopping/hotel-offers")
+                                    .queryParam("hotelIds", hotelIds)
+                                    .queryParam("checkInDate", request.getCheckInDate().toString())
+                                    .queryParam("checkOutDate", request.getCheckOutDate().toString())
+                                    .queryParam("adults", request.getAdults())
+                                    .queryParam("currency", request.getCurrency())
+                                    .build())
+                            .header("Authorization", "Bearer " + tokenService.getToken())
+                            .retrieve()
+                            .bodyToMono(AmadeusHotelResponse.class)
+                            .block();
+
+                    allResults.addAll(AmadeusHotelResponse.toAccommodationOptions(offersResponse));
+                } catch (WebClientResponseException e) {
+                    log.warn("[AMADEUS] Hotel offers batch failed ({}): {}", hotelIds, e.getStatusCode());
+                    // Continue with next batch
+                } catch (Exception e) {
+                    log.warn("[AMADEUS] Hotel offers batch error ({}): {}", hotelIds, e.getMessage());
+                }
+            }
+
+            log.info("[AMADEUS] Found {} hotel offers for city: {}", allResults.size(), request.getCityCode());
+            return allResults;
 
         } catch (WebClientResponseException e) {
-            log.error("[AMADEUS] Hotel search API error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("[AMADEUS] Hotel list API error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
             return Collections.emptyList();
         } catch (Exception e) {
             log.error("[AMADEUS] Hotel search failed: {}", e.getMessage(), e);
