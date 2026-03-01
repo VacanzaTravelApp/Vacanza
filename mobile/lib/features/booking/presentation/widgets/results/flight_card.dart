@@ -1,22 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/models/transport_option.dart';
+import '../booking_url_launcher.dart';
 
 /// Card displaying a single flight result.
-class FlightCard extends StatelessWidget {
+class FlightCard extends StatefulWidget {
   final TransportOption flight;
 
   const FlightCard({super.key, required this.flight});
+
+  @override
+  State<FlightCard> createState() => _FlightCardState();
+}
+
+class _FlightCardState extends State<FlightCard> {
+  bool _isLaunching = false;
 
   static const _accent = Color(0xFF0096FF);
 
   @override
   Widget build(BuildContext context) {
+    final flight = widget.flight;
     final depTime = _formatTime(flight.departureTime);
     final arrTime = _formatTime(flight.arrivalTime);
     final dur = _formatDuration(flight.duration);
     final stopsLabel = _stopsLabel(flight.stops);
+    final validUrl = isValidBookingUrl(flight.externalBookingUrl);
+    final enabled = validUrl && !_isLaunching;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -34,10 +44,8 @@ class FlightCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Carrier + Time + Price row
           Row(
             children: [
-              // Carrier badge
               Container(
                 width: 40,
                 height: 40,
@@ -58,7 +66,6 @@ class FlightCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // Times
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,7 +88,6 @@ class FlightCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Price
               Text(
                 '\$${flight.price.toStringAsFixed(0)}',
                 style: const TextStyle(
@@ -93,22 +99,17 @@ class FlightCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-
-          // Route bar
           Column(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(flight.origin,
-                      style: _routeLabel),
+                  Text(flight.origin, style: _routeLabel),
                   Text(dur, style: _routeLabel),
-                  Text(flight.destination,
-                      style: _routeLabel),
+                  Text(flight.destination, style: _routeLabel),
                 ],
               ),
               const SizedBox(height: 4),
-              // Progress bar
               Stack(
                 alignment: Alignment.center,
                 children: [
@@ -135,7 +136,6 @@ class FlightCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              // Stops badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -158,32 +158,46 @@ class FlightCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-
-          // CTA button
           GestureDetector(
-            onTap: () => _openBookingUrl(context),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFAFAFA),
-                border: Border.all(color: const Color(0xFFE5E5E5)),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Open in Google Flights',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+            onTap: enabled
+                ? () async {
+                    setState(() => _isLaunching = true);
+                    try {
+                      await openBookingUrl(context, flight.externalBookingUrl);
+                    } finally {
+                      if (mounted) setState(() => _isLaunching = false);
+                    }
+                  }
+                : null,
+            child: Opacity(
+              opacity: enabled ? 1 : 0.5,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAFAFA),
+                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _isLaunching ? 'Opening…' : 'Open in Google Flights',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF555555),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 14,
                       color: Color(0xFF555555),
                     ),
-                  ),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF555555)),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -197,7 +211,6 @@ class FlightCard extends StatelessWidget {
     color: Color(0xFF999999),
   );
 
-  /// Formats ISO 8601 datetime to "HH:mm".
   static String _formatTime(String iso) {
     final dt = DateTime.tryParse(iso);
     if (dt == null) return iso;
@@ -205,7 +218,6 @@ class FlightCard extends StatelessWidget {
         '${dt.minute.toString().padLeft(2, '0')}';
   }
 
-  /// Parses ISO 8601 duration (PT3H15M) to "3h 15m".
   static String _formatDuration(String iso) {
     final match = RegExp(r'PT(?:(\d+)H)?(?:(\d+)M)?').firstMatch(iso);
     if (match == null) return iso;
@@ -221,26 +233,5 @@ class FlightCard extends StatelessWidget {
     if (stops == 0) return 'Non-stop';
     if (stops == 1) return '1 stop';
     return '$stops stops';
-  }
-
-  Future<void> _openBookingUrl(BuildContext context) async {
-    final uri = Uri.tryParse(flight.externalBookingUrl);
-    if (uri == null || !uri.hasScheme) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Booking link unavailable')),
-        );
-      }
-      return;
-    }
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot open booking link')),
-        );
-      }
-    }
   }
 }
