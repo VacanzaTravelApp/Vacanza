@@ -4,19 +4,26 @@ import 'package:flutter/services.dart';
 /// Optional budget input with $ prefix and USD badge.
 class BudgetField extends StatelessWidget {
   final TextEditingController controller;
+  final String label;
+  final String? helperText;
 
-  const BudgetField({super.key, required this.controller});
+  const BudgetField({
+    super.key,
+    required this.controller,
+    this.label = 'Budget (Optional)',
+    this.helperText,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 4),
           child: Text(
-            'Budget (Optional)',
-            style: TextStyle(
+            label,
+            style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: Color(0xFF999999),
@@ -98,6 +105,17 @@ class BudgetField extends StatelessWidget {
             ),
           ),
         ),
+        if (helperText != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 4),
+            child: Text(
+              helperText!,
+              style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFFAAAAAA),
+              ),
+            ),
+          ),
       ],
     );
   }
