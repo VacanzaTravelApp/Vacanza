@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../data/models/accommodation_option.dart';
+import '../../../data/models/booking_utils.dart';
 import '../booking_url_launcher.dart';
 
 /// Card displaying a single hotel result.
@@ -63,7 +64,7 @@ class _HotelCardState extends State<HotelCard> {
             ),
           ),
           const SizedBox(height: 8),
-          if (hotel.rating != null)
+          if (formatRating(hotel.rating) != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
@@ -71,7 +72,7 @@ class _HotelCardState extends State<HotelCard> {
                   const Icon(Icons.star_rounded, size: 15, color: Color(0xFFFFD166)),
                   const SizedBox(width: 3),
                   Text(
-                    hotel.rating!.toStringAsFixed(1),
+                    formatRating(hotel.rating)!,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
