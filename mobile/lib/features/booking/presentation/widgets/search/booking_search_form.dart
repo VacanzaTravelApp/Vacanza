@@ -368,7 +368,17 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(child: BudgetField(controller: _budgetCtrl)),
+            Expanded(
+              child: BudgetField(
+                controller: _budgetCtrl,
+                label: _type == BookingType.hotels
+                    ? 'Budget per night'
+                    : 'Budget (Optional)',
+                helperText: _type == BookingType.hotels
+                    ? 'Max nightly price. Leave empty for no limit.'
+                    : null,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/repositories/booking_repository.dart';
 import '../cubit/booking_cubit.dart';
 import '../cubit/booking_state.dart';
+import 'filters/booking_filters_view.dart';
 import 'results/booking_empty_state.dart';
 import 'results/booking_loading_skeleton.dart';
 import 'results/booking_results_view.dart';
@@ -118,12 +119,7 @@ class BookingBottomSheet extends StatelessWidget {
           message: state.message,
           onRetry: () => context.read<BookingCubit>().retry(),
         ),
-      BookingFilters() => _PlaceholderView(
-          icon: Icons.tune_rounded,
-          title: 'Filters',
-          subtitle: 'Filters view will be wired in MOB8.',
-          state: state,
-        ),
+      BookingFilters() => BookingFiltersView(filters: state),
     };
   }
 }
@@ -218,60 +214,6 @@ class _SheetHeader extends StatelessWidget {
       BookingError() => 'Error',
       BookingFilters() => 'Filters',
     };
-  }
-}
-
-/// Placeholder view for states not yet wired (MOB6/7/8).
-class _PlaceholderView extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final BookingState state;
-
-  const _PlaceholderView({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.state,
-  });
-
-  static const _accent = Color(0xFF0096FF);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 40),
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: _accent.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Icon(icon, size: 32, color: _accent),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey.shade500,
-            height: 1.5,
-          ),
-        ),
-      ],
-    );
   }
 }
 
