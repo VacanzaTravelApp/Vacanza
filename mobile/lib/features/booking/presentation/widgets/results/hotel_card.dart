@@ -1,18 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/models/accommodation_option.dart';
+import '../booking_url_launcher.dart';
 
 /// Card displaying a single hotel result.
-class HotelCard extends StatelessWidget {
+class HotelCard extends StatefulWidget {
   final AccommodationOption hotel;
 
   const HotelCard({super.key, required this.hotel});
+
+  @override
+  State<HotelCard> createState() => _HotelCardState();
+}
+
+class _HotelCardState extends State<HotelCard> {
+  bool _isLaunching = false;
 
   static const _accent = Color(0xFF0096FF);
 
   @override
   Widget build(BuildContext context) {
+    final hotel = widget.hotel;
+    final validUrl = isValidBookingUrl(hotel.externalBookingUrl);
+    final enabled = validUrl && !_isLaunching;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -30,7 +41,6 @@ class HotelCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Hotel name
           Text(
             hotel.hotelName,
             maxLines: 2,
@@ -43,8 +53,6 @@ class HotelCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-
-          // Address
           Text(
             hotel.address.isNotEmpty ? hotel.address : 'Address not available',
             maxLines: 1,
@@ -55,8 +63,6 @@ class HotelCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-
-          // Rating (only if present)
           if (hotel.rating != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -75,8 +81,6 @@ class HotelCard extends StatelessWidget {
                 ],
               ),
             ),
-
-          // Price + CTA row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -89,19 +93,31 @@ class HotelCard extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: () => _openBookingUrl(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text(
-                    'Open booking',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _accent,
+                onTap: enabled
+                    ? () async {
+                        setState(() => _isLaunching = true);
+                        try {
+                          await openBookingUrl(context, hotel.externalBookingUrl);
+                        } finally {
+                          if (mounted) setState(() => _isLaunching = false);
+                        }
+                      }
+                    : null,
+                child: Opacity(
+                  opacity: enabled ? 1 : 0.5,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _isLaunching ? 'Opening…' : 'Open booking',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _accent,
+                      ),
                     ),
                   ),
                 ),
@@ -111,26 +127,5 @@ class HotelCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _openBookingUrl(BuildContext context) async {
-    final uri = Uri.tryParse(hotel.externalBookingUrl);
-    if (uri == null || !uri.hasScheme) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Booking link unavailable')),
-        );
-      }
-      return;
-    }
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot open booking link')),
-        );
-      }
-    }
   }
 }
