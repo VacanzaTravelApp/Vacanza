@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../data/models/booking_utils.dart';
 import '../../../data/models/transport_option.dart';
 import '../booking_url_launcher.dart';
 
@@ -21,10 +22,10 @@ class _FlightCardState extends State<FlightCard> {
   @override
   Widget build(BuildContext context) {
     final flight = widget.flight;
-    final depTime = _formatTime(flight.departureTime);
-    final arrTime = _formatTime(flight.arrivalTime);
-    final dur = _formatDuration(flight.duration);
-    final stopsLabel = _stopsLabel(flight.stops);
+    final depTime = formatTime(flight.departureTime);
+    final arrTime = formatTime(flight.arrivalTime);
+    final dur = formatDuration(flight.duration);
+    final stopsLabel = formatStops(flight.stops);
     final validUrl = isValidBookingUrl(flight.externalBookingUrl);
     final enabled = validUrl && !_isLaunching;
 
@@ -210,28 +211,4 @@ class _FlightCardState extends State<FlightCard> {
     fontSize: 11,
     color: Color(0xFF999999),
   );
-
-  static String _formatTime(String iso) {
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return iso;
-    return '${dt.hour.toString().padLeft(2, '0')}:'
-        '${dt.minute.toString().padLeft(2, '0')}';
-  }
-
-  static String _formatDuration(String iso) {
-    final match = RegExp(r'PT(?:(\d+)H)?(?:(\d+)M)?').firstMatch(iso);
-    if (match == null) return iso;
-    final h = match.group(1);
-    final m = match.group(2);
-    final parts = <String>[];
-    if (h != null) parts.add('${h}h');
-    if (m != null) parts.add('${m}m');
-    return parts.isEmpty ? iso : parts.join(' ');
-  }
-
-  static String _stopsLabel(int stops) {
-    if (stops == 0) return 'Non-stop';
-    if (stops == 1) return '1 stop';
-    return '$stops stops';
-  }
 }
