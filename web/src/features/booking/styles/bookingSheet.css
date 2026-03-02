@@ -1,72 +1,243 @@
+/* --- 1. Temel Katmanlar & Animasyon --- */
 .custom-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(5px);
-  display: flex;
-  align-items: center; /* Screenshot 1 tarzı ortalamak için */
-  justify-content: center;
-  z-index: 10000; /* Harita katmanlarının üstünde olmalı */
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); 
+  backdrop-filter: blur(8px); display: flex; align-items: flex-end; 
+  justify-content: center; z-index: 9999;
 }
 
 .custom-sheet {
-  background: white;
-  width: 90%;
-  max-width: 480px;
-  border-radius: 28px;
-  padding: 24px;
-  box-shadow: 0 15px 50px rgba(0,0,0,0.2);
-  animation: popIn 0.3s ease-out;
+  background: white; width: 100%; max-width: 420px; border-radius: 32px 32px 0 0;
+  padding: 16px 20px 20px; position: relative; display: flex; flex-direction: column;
+  max-height: 85vh !important; z-index: 10000; pointer-events: auto !important;
+  animation: slideUp 0.35s ease-out; overflow: hidden;
 }
 
-@keyframes popIn {
-  from { transform: scale(0.9); opacity: 0; }
+.drag-handle-line { width: 35px; height: 4px; background: #e5e5ea; border-radius: 10px; margin: 0 auto 12px; flex-shrink: 0; }
+
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* --- 2. Kaydırma Alanı --- */
+.sheet-scrollable-content {
+  flex: 1; overflow-y: auto !important; padding-bottom: 40px;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.sheet-scrollable-content::-webkit-scrollbar { display: none; }
+
+/* --- 3. Header & Çarpı Butonu --- */
+.sheet-header-refined {
+  display: flex; justify-content: space-between; align-items: center; 
+  margin-bottom: 15px; flex-shrink: 0; width: 100%;
 }
 
-.drag-handle-line {
-  width: 40px;
-  height: 4px;
-  background: #E5E5EA;
-  border-radius: 2px;
-  margin: -10px auto 20px;
+.close-circle-btn-top {
+  position: absolute; right: 20px; top: 20px; width: 32px; height: 32px;
+  border-radius: 50%; background: #f2f2f7; border: none; font-size: 14px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  z-index: 1001; color: #8e8e93;
 }
+
+.sheet-title-main, .found-count-title { font-size: 19px; font-weight: 800; color: #1c1c1e; margin: 0; }
+.route-sub-detail { font-size: 12px; color: #8e8e93; margin-top: 2px; }
+
+/* --- 4. Arama Ekranı Form Elemanları --- */
+.tab-pill-container { display: flex; background: #f2f2f7; border-radius: 12px; padding: 3px; margin-bottom: 20px; }
+.tab-pill-container button {
+  flex: 1; border: none; padding: 9px; border-radius: 10px;
+  font-weight: 700; font-size: 12px; background: transparent; color: #8e8e93; cursor: pointer;
+}
+.tab-pill-container button.pill-active { background: white !important; color: #007aff !important; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+.input-group-modern { display: flex; flex-direction: column; margin-bottom: 12px; }
+.input-group-modern label { font-size: 9px; font-weight: 700; color: #8e8e93; text-transform: uppercase; margin-bottom: 4px; }
+.input-group-modern input {
+  background: #f9f9fb !important; border: 1px solid #efeff4 !important; border-radius: 14px !important;
+  padding: 10px 14px !important; font-size: 13px !important; font-weight: 600 !important; width: 100% !important; outline: none !important;
+}
+
+/* --- YENİ: iOS Round Trip Toggle Düzenlemesi --- */
+.checkbox-wrapper-ios {
+  display: flex; align-items: center; gap: 12px; margin: 8px 0 15px; cursor: pointer;
+}
+
+.checkbox-wrapper-ios input[type="checkbox"] {
+  appearance: none; width: 44px; height: 24px; background-color: #e9e9ea;
+  border-radius: 20px; position: relative; cursor: pointer; transition: background-color 0.3s;
+}
+
+.checkbox-wrapper-ios input[type="checkbox"]::before {
+  content: ""; position: absolute; width: 20px; height: 20px; border-radius: 50%;
+  top: 2px; left: 2px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: 0.3s;
+}
+
+.checkbox-wrapper-ios input[type="checkbox"]:checked { background-color: #34c759; }
+.checkbox-wrapper-ios input[type="checkbox"]:checked::before { transform: translateX(20px); }
+
+.checkbox-wrapper-ios label { font-size: 13px; font-weight: 600; color: #1c1c1e; cursor: pointer; }
+
+/* --- Diğer Form Elemanları --- */
+.row-compact { display: flex; gap: 10px; width: 100%; }
+.half { flex: 1; }
+
+.counter-box {
+  display: flex; align-items: center; justify-content: space-between; background: #f9f9fb;
+  border: 1px solid #efeff4; border-radius: 14px; padding: 6px 10px; height: 42px;
+}
+.counter-box button { background: white; border: none; width: 26px; height: 26px; border-radius: 50%; color: #007aff; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
 .main-search-btn {
-  background: #007AFF;
-  color: white;
-  border: none;
-  width: 100%;
-  padding: 16px;
-  border-radius: 16px;
-  font-size: 17px;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 20px;
+  width: 100%; padding: 15px; background: #007aff !important; color: white !important;
+  border: none; border-radius: 18px; font-size: 15px; font-weight: 700; margin-top: 15px; cursor: pointer;
 }
 
-.result-item-card {
+/* --- 5. Sonuç Kartları --- */
+.results-container { display: flex; flex-direction: column; width: 100%; padding: 4px 0; }
+
+.flight-detail-card, .hotel-detail-card {
+  width: 100% !important; background: white; border-radius: 22px; padding: 18px; 
+  margin-bottom: 12px; border: 1px solid #f2f2f7; box-shadow: 0 4px 12px rgba(0,0,0,0.04); box-sizing: border-box;
+}
+
+.card-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.price-tag-blue { font-size: 17px; font-weight: 800; color: #007aff !important; }
+.carrier-tag { font-size: 10px; font-weight: 800; color: #8e8e93; text-transform: uppercase; }
+
+/* Uçuş Hattı Çizgisi */
+.path-line-group { flex: 1; display: flex; flex-direction: column; align-items: center; margin: 0 10px; }
+.line-bar { width: 100%; height: 2px; background: #f2f2f7; position: relative; margin-top: 4px; }
+.line-bar .dot { position: absolute; top: -2px; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; background: #d1d1d6; border-radius: 50%; }
+
+.flight-path-row { display: flex; align-items: center; justify-content: space-between; margin: 15px 0; }
+.t-val { font-size: 15px; font-weight: 700; color: #1c1c1e; }
+.c-val { font-size: 10px; color: #8e8e93; }
+
+.google-action-btn { 
+  background: #f4f4f7; border: none; padding: 12px; border-radius: 14px; 
+  font-size: 12px; font-weight: 700; width: 100%; cursor: pointer; color: #3a3a3c; margin-top: 10px;
+}
+
+/* --- 6. Footer & Sort By (En Altta) --- */
+.results-footer-actions { width: 100%; margin-top: 10px; padding-bottom: 20px; border-top: 1px solid #f2f2f7; padding-top: 20px; }
+
+.sort-container-refined {
+  background: #f8f8fa; padding: 12px 16px; border-radius: 18px; margin-bottom: 15px;
+}
+.sort-container-refined label { font-size: 9px; text-transform: uppercase; color: #8e8e93; font-weight: 700; margin-bottom: 4px; display: block; }
+
+.modern-sort-select { 
+  width: 100%; border: none; background: transparent; font-size: 14px; font-weight: 600; 
+  outline: none; color: #1c1c1e; cursor: pointer; appearance: none;
+}
+
+.center-btn-wrapper { width: 100%; display: flex; justify-content: center; }
+.retry-link-btn {
+  background: transparent !important; border: none !important; color: #8e8e93 !important;
+  padding: 12px; font-weight: 600; font-size: 13px; cursor: pointer;
+}
+
+.checkbox-wrapper-ios {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  background: #F2F2F7;
-  border-radius: 18px;
-  margin-bottom: 12px;
-}
-/* Mevcut stillerine ekle */
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  gap: 10px; 
+  margin: 15px 0; 
+  cursor: pointer;
 }
 
-.custom-backdrop {
+.checkbox-wrapper-ios input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px !important;  
+  height: 18px !important;
+  border: 1.5px solid #d1d1d6;
+  border-radius: 4px; 
+  background-color: #fff;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin: 0;
+  /* ÖNEMLİ: Eğer yukarıdaki stillerden beyaz yuvarlak kalıyorsa şunu ekle: */
   display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: flex-end; /* İçeriği en alta yaslar */
 }
 
-.custom-sheet {
-  /* Web'de çok yayılmasın diye max-width verdik */
-  max-width: 500px;
+/* Beyaz yuvarlağı oluşturan eski kodu geçersiz kılmak için: */
+.checkbox-wrapper-ios input[type="checkbox"]::before {
+  display: none !important; /* Bu satır beyaz yuvarlağı öldürür */
+}
+
+.checkbox-wrapper-ios input[type="checkbox"]:checked {
+  background-color: #007aff;
+  border-color: #007aff;
+}
+
+/* İçindeki beyaz TİK işareti */
+.checkbox-wrapper-ios input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px; /* Konumu biraz düzelttim */
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  display: block !important;
+}
+
+.checkbox-wrapper-ios label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1c1c1e;
+  cursor: pointer;
+  user-select: none;
+}
+/* Yanındaki Yazı Stili */
+.checkbox-wrapper-ios label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1c1c1e;
+  cursor: pointer;
+  user-select: none;
+}
+/* bookingSheet.css içinde şunun olduğundan emin ol: */
+.sort-container-refined {
+  display: block !important; /* Görünür olduğundan emin olalım */
+  background: #f8f8fa;
+  padding: 12px 16px;
+  border-radius: 18px;
+  margin-bottom: 15px;
   width: 100%;
+}
+/* Validation Mesajı */
+.validation-error-msg {
+  background: #fff2f2;
+  color: #ff3b30;
+  padding: 10px 15px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 12px;
+  border: 1px solid rgba(255, 59, 48, 0.2);
+  text-align: center;
+  animation: shake 0.4s ease-in-out;
+}
+
+/* Buton Hover Efekti */
+.action-hover-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-hover-btn:hover {
+  background: #0056b3 !important; /* Biraz daha koyu mavi */
+  transform: scale(1.02);
+  box-shadow: 0 8px 20px rgba(0, 122, 255, 0.3);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
 }

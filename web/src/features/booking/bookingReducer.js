@@ -1,50 +1,44 @@
 export const initialState = {
-  bookingType: "hotels", // 'hotels' veya 'flights'
-  view: "search",        // 'search' (form) veya 'results' (liste)
+  bookingType: 'hotels',
+  view: 'search',
   loading: false,
-  error: null,
   items: [],
+  sortBy: 'low', 
   searchParams: {
-    destination: "", 
-    dates: "",       
-    adults: 1,       
-    budget: "",
-    sortBy: "PRICE_ASC"
+    origin: '', 
+    destination: '',
+    dates: '',
+    checkOutDate: '',
+    adults: 1,
+    budget: '',
+    isRoundTrip: false
   }
 };
 
 export function bookingReducer(state, action) {
   switch (action.type) {
-    case "SET_TYPE":
-      // Tip değişince sonuçları temizle ve arama moduna dön
-      return { ...state, bookingType: action.payload, items: [], view: "search" };
-      
     case "UPDATE_PARAM":
-      return { ...state, searchParams: { ...state.searchParams, ...action.payload } };
-      
-    case "SEARCH_START":
-      return { ...state, loading: true, error: null };
-      
-    case "SEARCH_SUCCESS":
-      // Sonuç gelince otomatik olarak 'results' görünümüne geç
+      // Eğer payload doğrudan sortBy içeriyorsa state'in köküne yazar
+      // Diğer her şeyi searchParams içine güvenli bir şekilde merge eder
       return { 
         ...state, 
-        loading: false, 
-        items: action.payload, 
-        view: action.payload.length > 0 ? "results" : "search",
-        error: action.payload.length === 0 ? "Hiç sonuç bulunamadı." : null 
+        sortBy: action.payload.sortBy !== undefined ? action.payload.sortBy : state.sortBy,
+        bookingType: action.payload.bookingType || state.bookingType,
+        searchParams: { 
+          ...state.searchParams, 
+          ...action.payload 
+        }
       };
-      
+    case "SEARCH_START":
+      return { ...state, loading: true };
+    case "SEARCH_SUCCESS":
+      return { ...state, loading: false, items: action.payload, view: 'results' };
     case "SEARCH_ERROR":
-      return { ...state, loading: false, error: action.payload, view: "search" };
-
+      return { ...state, loading: false };
     case "RETRY":
-      // Sonuçlardan tekrar arama formuna dönmek için
-      return { ...state, view: "search", items: [] };
-      // bookingReducer.js içinde switch-case kısmına:
-case "RESET_STATE":
-  return initialState;
-
+      return { ...state, view: 'search', items: [], sortBy: 'low' };
+    case "RESET_STATE":
+      return initialState;
     default:
       return state;
   }
