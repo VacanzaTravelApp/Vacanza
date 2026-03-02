@@ -1,212 +1,72 @@
-/* 1. Arka Plan ve Animasyon */
-.booking-backdrop {
+.custom-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(15px); /* Haritayı şık bir şekilde bulandırır */
-  z-index: 10000;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
   display: flex;
+  align-items: center; /* Screenshot 1 tarzı ortalamak için */
   justify-content: center;
-  align-items: flex-end; /* Mobilde alttan, webde ortada istersen center yap */
+  z-index: 10000; /* Harita katmanlarının üstünde olmalı */
 }
 
-.booking-sheet {
+.custom-sheet {
+  background: white;
+  width: 90%;
+  max-width: 480px;
+  border-radius: 28px;
+  padding: 24px;
+  box-shadow: 0 15px 50px rgba(0,0,0,0.2);
+  animation: popIn 0.3s ease-out;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.9); opacity: 0; }
+}
+
+.drag-handle-line {
+  width: 40px;
+  height: 4px;
+  background: #E5E5EA;
+  border-radius: 2px;
+  margin: -10px auto 20px;
+}
+
+.main-search-btn {
+  background: #007AFF;
+  color: white;
+  border: none;
   width: 100%;
-  max-width: 440px; /* Webde çok yayılmaması için sabit genişlik */
-  background: #ffffff;
-  border-top-left-radius: 32px;
-  border-top-right-radius: 32px;
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  padding-bottom: env(safe-area-inset-bottom, 20px);
-  animation: slideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-  overflow: hidden;
+  padding: 16px;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 20px;
 }
 
+.result-item-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: #F2F2F7;
+  border-radius: 18px;
+  margin-bottom: 12px;
+}
+/* Mevcut stillerine ekle */
 @keyframes slideUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
 
-/* 2. Header ve Kapatma Butonu */
-.sheet-header-ios {
-  padding: 12px 20px;
-}
-
-.drag-handle {
-  width: 36px;
-  height: 5px;
-  background: #d1d1d6;
-  border-radius: 10px;
-  margin: 0 auto 15px;
-}
-
-.header-main {
+.custom-backdrop {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-main h2 {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  margin: 0;
-}
-
-.close-circle-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #f2f2f7;
-  border: none;
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: flex-end; /* İçeriği en alta yaslar */
 }
 
-/* 3. Modern Sekmeler (Hotels / Flights) */
-.booking-tabs-modern {
-  display: flex;
-  background: #f2f2f7;
-  margin: 10px 20px 24px;
-  padding: 4px;
-  border-radius: 14px;
-}
-
-.tab-modern {
-  flex: 1;
-  padding: 12px;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  font-weight: 600;
-  color: #8e8e93;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.tab-modern.active {
-  background: #ffffff;
-  color: #007aff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-
-/* 4. Form Giriş Alanları */
-.form-scroll-area {
-  padding: 0 20px;
-  overflow-y: auto;
-}
-
-.ios-input-group {
-  margin-bottom: 20px;
-}
-
-.ios-input-group label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #8e8e93;
-  margin-bottom: 8px;
-  margin-left: 2px;
-}
-
-.ios-input-wrapper {
-  background: #f2f2f7;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  padding: 14px 16px;
-  border: 1.5px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.ios-input-wrapper:focus-within {
-  background: #fff;
-  border-color: #007aff;
-  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
-}
-
-.ios-input-wrapper input {
-  background: transparent;
-  border: none;
-  flex: 1;
-  font-size: 16px;
-  font-weight: 500;
-  outline: none;
-  color: #000;
-}
-
-/* 5. Yan Yana Alanlar (Dates & Adults) */
-.ios-row {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.ios-stepper {
-  background: #f2f2f7;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
+.custom-sheet {
+  /* Web'de çok yayılmasın diye max-width verdik */
+  max-width: 500px;
   width: 100%;
-}
-
-.ios-stepper button {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid #d1d1d6;
-  background: #fff;
-  font-size: 18px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 6. Arama Butonu (CTA) */
-.ios-main-search-btn {
-  background: #007aff;
-  color: white;
-  border: none;
-  width: 100%;
-  padding: 18px;
-  border-radius: 18px;
-  font-size: 17px;
-  font-weight: 700;
-  margin-top: 10px;
-  cursor: pointer;
-  transition: transform 0.1s active;
-}
-
-.ios-main-search-btn:active {
-  transform: scale(0.98);
-}
-
-.modern-date-input {
-  border: none;
-  background: transparent;
-  width: 100%;
-  font-family: inherit;
-  font-size: 16px;
-  outline: none;
-  color: #000;
-  cursor: pointer;
-}
-
-/* Takvim ikonunu webkit tarayıcılarda özelleştirme */
-.modern-date-input::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  opacity: 0.6;
 }
