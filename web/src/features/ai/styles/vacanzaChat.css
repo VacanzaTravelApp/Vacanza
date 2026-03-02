@@ -1,0 +1,59 @@
+.ai-chat-container {
+  position: absolute;
+  right: 80px; /* Dikey butonların yanında dursun */
+  bottom: 20px;
+  width: 340px;
+  height: 500px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.chat-header-refined {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.ai-sparkle-avatar {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, #60A5FA, #A78BFA);
+  border-radius: 50%;
+  display: grid; place-items: center; color: white;
+}
+
+.chat-content-scroll {
+  flex: 1; padding: 15px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+.message-bubble {
+  padding: 10px 14px; border-radius: 16px; max-width: 80%; font-size: 14px; position: relative;
+}
+
+.ai-bubble { background: white; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.user-bubble { background: #007AFF; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+
+.chat-footer-refined { padding: 12px; background: white; }
+.quick-action-pills { display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 4px; }
+.quick-action-pills button { border: 1px solid #eee; background: none; border-radius: 20px; padding: 4px 12px; font-size: 12px; white-space: nowrap; }
+
+.chat-input-field-group {
+  display: flex; background: #F2F2F7; border-radius: 20px; padding: 5px 12px; align-items: center;
+}
+.chat-input-field-group input { border: none; background: none; flex: 1; outline: none; padding: 8px; font-size: 14px; }
