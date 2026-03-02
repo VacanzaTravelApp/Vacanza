@@ -18,6 +18,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
+import VacanzaChat from "../features/ai/components/VacanzaChat";
 
 const { Header, Content, Footer } = Layout;
 
@@ -36,8 +37,6 @@ const STYLES = [
   "mapbox://styles/mapbox/satellite-streets-v12",
   "mapbox://styles/mapbox/monochrome",
 ];
-
-//const BACKEND_BASE_URL = "http://165.232.69.83:9002";
 
 // Results panel haritayı kapatmasın diye padding hesabında kullanıyoruz
 const RESULTS_PANEL_APPROX_HEIGHT_DESKTOP = 320;
@@ -174,12 +173,6 @@ function polygonToBbox(poly) {
   return { minLat, minLng, maxLat, maxLng };
 }
 
-/**
- * GERÇEK 3D:
- * - DEM terrain
- * - Sky
- * - 3D buildings (fill-extrusion)
- */
 function ensureMapbox3D(map, enabled) {
   if (!map) return;
 
@@ -317,7 +310,7 @@ export default function MapPage() {
   const [resultsOpen, setResultsOpen] = useState(false);
   const [resultsTab, setResultsTab] = useState("all");
 const [bookingOpen, setBookingOpen] = useState(false);
-
+const [isChatOpen, setIsChatOpen] = useState(false);
   // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
   useEffect(() => {
     if (resultsOpen) setFilterOpen(false);
@@ -889,7 +882,29 @@ const [bookingOpen, setBookingOpen] = useState(false);
               flexDirection: "column",
               gap: fabGap,
             }}
+            
           >
+            <Tooltip title="Ask Vacanza AI" placement="left">
+    <Button
+      shape="circle"
+      onClick={() => {
+    setIsChatOpen(true);   
+    setFilterOpen(false);  
+  }}
+      style={{
+        width: fabSize,
+        height: fabSize,
+        fontSize: isMobile ? "18px" : "20px",
+        background: "linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)", // Figma'daki gibi hafif gradyan
+        border: "none",
+        color: "white",
+        boxShadow: "0 4px 12px rgba(96, 165, 250, 0.4)",
+      }}
+    >
+      ✨
+    </Button>
+  </Tooltip>
+
             <Tooltip title="Draw Area" placement="left">
               <Button
                 shape="circle"
@@ -928,6 +943,8 @@ const [bookingOpen, setBookingOpen] = useState(false);
               onClick={handleStyleChange}
               style={{ width: fabSize, height: fabSize }}
             />
+             
+
 
       <Button
   shape="circle"
@@ -1209,6 +1226,7 @@ const [bookingOpen, setBookingOpen] = useState(false);
 
           </Card>
           <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
+            <VacanzaChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
         </div>
       </Content>
 
