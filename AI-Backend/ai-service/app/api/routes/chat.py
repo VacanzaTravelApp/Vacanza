@@ -31,6 +31,7 @@ router = APIRouter()
 
 X_USER_ID = "X-User-Id"
 X_USER_PROFILE = "X-User-Profile"
+X_USER_AI_PREFS = "X-User-Ai-Preferences"
 
 
 def _parse_x_user_id(x_user_id: str | None = Header(None, alias=X_USER_ID)) -> uuid.UUID | None:
@@ -88,11 +89,25 @@ def list_conversations(
     return [ConversationListItem.model_validate(c) for c in conversations]
 
 
+def _parse_x_user_ai_preferences(
+    x_user_ai_prefs: str | None = Header(None, alias=X_USER_AI_PREFS),
+) -> list[dict] | None:
+    """Parse X-User-Ai-Preferences header (JSON list). Returns None if missing or invalid."""
+    if not x_user_ai_prefs or not x_user_ai_prefs.strip():
+        return None
+    try:
+        data = json.loads(x_user_ai_prefs.strip())
+        return data if isinstance(data, list) else None
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 @router.post("/conversations/{conversation_id}/messages", response_model=MessageSendResponse)
 async def send_message(
     conversation_id: uuid.UUID,
     body: MessageSend,
     user_profile: UserProfileForAi | None = Depends(_parse_x_user_profile),
+    existing_ai_prefs: list[dict] | None = Depends(_parse_x_user_ai_preferences),
     settings: Settings = Depends(get_settings),
     conversation_repo: ConversationRepository = Depends(get_conversation_repo),
     message_repo: MessageRepository = Depends(get_message_repo),
@@ -108,7 +123,7 @@ async def send_message(
             detail="OpenAI API key not configured",
         )
 
-    content = await get_ai_response(
+    content, extraction_result = await get_ai_response(
         settings=settings,
         message_repo=message_repo,
         message_embedding_repo=message_embedding_repo,
@@ -116,11 +131,15 @@ async def send_message(
         conversation_id=conversation_id,
         user_content=body.content,
         user_profile=user_profile,
+        existing_preferences=existing_ai_prefs,
     )
 
     conversation_repo.update_updated_at(conversation_id)
 
-    return MessageSendResponse(content=content)
+    return MessageSendResponse(
+        content=content,
+        extracted_preferences=extraction_result.preferences,
+    )
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list[MessageItem])

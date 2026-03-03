@@ -8,10 +8,12 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.core.config import Settings
 from app.schemas.chat import UserProfileForAi
+from app.schemas.preference_extraction import PreferenceExtractionResult
 from app.db.models import Message
 from app.repositories import ConversationRepository, MessageEmbeddingRepository, MessageRepository
 from app.services.embedding_service import EMBEDDING_MODEL, EmbeddingServiceError, create_embedding_service
 from app.services.openai_service import create_chat_model
+from app.services.preference_extraction_service import extract_preferences
 
 logger = logging.getLogger(__name__)
 
@@ -141,19 +143,12 @@ async def get_ai_response(
     conversation_id: uuid.UUID,
     user_content: str,
     user_profile: UserProfileForAi | None = None,
-) -> str:
+    existing_preferences: list[dict] | None = None,
+) -> tuple[str, PreferenceExtractionResult]:
     """Send user message, get AI response with context, save both to DB.
 
-    Args:
-        settings: App settings.
-        message_repo: Message repository.
-        message_embedding_repo: Message embedding repository.
-        conversation_repo: Conversation repository (for user_id).
-        conversation_id: Conversation ID.
-        user_content: User message text.
-
     Returns:
-        AI response content.
+        Tuple of (AI response content, extracted preferences).
     """
     conversation = conversation_repo.get_by_id(conversation_id)
     user_id = conversation.user_id if conversation else None
@@ -212,24 +207,30 @@ Always respond in the same language the user writes in."""
     response = await llm.ainvoke(llm_messages)
     ai_content = str(response.content)
 
-    # Save user message to DB
+    # Save messages + extract preferences concurrently
     user_msg = message_repo.create(
         conversation_id=conversation_id,
         role="user",
         content=user_content,
     )
-    await _save_embedding_for_message(
-        settings, message_embedding_repo, user_msg, user_content, user_id
-    )
-
-    # Save assistant message to DB
     assistant_msg = message_repo.create(
         conversation_id=conversation_id,
         role="assistant",
         content=ai_content,
     )
-    await _save_embedding_for_message(
+
+    embedding_user_task = _save_embedding_for_message(
+        settings, message_embedding_repo, user_msg, user_content, user_id
+    )
+    embedding_assistant_task = _save_embedding_for_message(
         settings, message_embedding_repo, assistant_msg, ai_content, user_id
     )
+    extraction_task = extract_preferences(
+        settings, user_content, ai_content, existing_preferences=existing_preferences
+    )
 
-    return ai_content
+    _, _, extraction_result = await asyncio.gather(
+        embedding_user_task, embedding_assistant_task, extraction_task
+    )
+
+    return ai_content, extraction_result
