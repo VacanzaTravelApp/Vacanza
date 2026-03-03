@@ -20,6 +20,7 @@ public class AiServiceClient {
 
     private static final String X_USER_ID = "X-User-Id";
     private static final String X_USER_PROFILE = "X-User-Profile";
+    private static final String X_USER_AI_PREFS = "X-User-Ai-Preferences";
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
@@ -71,7 +72,8 @@ public class AiServiceClient {
             UUID userId,
             UUID conversationId,
             AiChatDto.MessageSendRequest body,
-            UserProfileForAi profile) {
+            UserProfileForAi profile,
+            List<AiChatDto.ExtractedPreference> existingAiPrefs) {
         var spec = webClient.post()
                 .uri("/chat/conversations/{id}/messages", conversationId)
                 .header(X_USER_ID, userId.toString())
@@ -83,6 +85,14 @@ public class AiServiceClient {
                 spec = spec.header(X_USER_PROFILE, objectMapper.writeValueAsString(profile));
             } catch (JsonProcessingException e) {
                 // Skip profile on serialization error
+            }
+        }
+
+        if (existingAiPrefs != null && !existingAiPrefs.isEmpty()) {
+            try {
+                spec = spec.header(X_USER_AI_PREFS, objectMapper.writeValueAsString(existingAiPrefs));
+            } catch (JsonProcessingException e) {
+                // Skip on serialization error
             }
         }
 
