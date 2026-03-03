@@ -37,6 +37,7 @@ import '../../../poi_search/presentation/widgets/poi_filter_panel.dart';
 
 import '../../../../features/booking/presentation/widgets/booking_bottom_sheet.dart';
 
+import '../../../chat/presentation/screens/chat_screen.dart';
 import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
@@ -445,6 +446,16 @@ class _HomeMapViewState extends State<_HomeMapView>
                 enableDrag: true,
                 backgroundColor: Colors.transparent,
                 builder: (_) => const BookingBottomSheet(),
+              );
+            },
+
+            // ✅ Chatbot
+            onOpenChat: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ChatScreen(),
+                ),
               );
             },
 
