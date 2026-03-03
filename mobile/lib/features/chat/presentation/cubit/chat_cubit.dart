@@ -96,6 +96,22 @@ class ChatCubit extends Cubit<ChatState> {
     }
   }
 
+  /// Load an existing conversation by ID.
+  Future<void> loadConversation(String conversationId) async {
+    emit(const ChatLoading());
+    try {
+      _conversationId = conversationId;
+      final messages = await _apiClient.getMessages(conversationId);
+      emit(ChatLoaded(
+        messages: messages,
+        conversationId: conversationId,
+      ));
+    } catch (e, st) {
+      developer.log('Chat loadConversation error: $e', name: 'ChatCubit', stackTrace: st);
+      emit(ChatError(message: e.toString()));
+    }
+  }
+
   /// Start a new conversation (clears current).
   void newConversation() {
     _conversationId = null;
