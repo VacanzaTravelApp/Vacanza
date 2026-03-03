@@ -38,6 +38,15 @@ class ConversationRepository:
             query = query.filter(Conversation.user_id == user_id)
         return query.order_by(Conversation.created_at.desc()).limit(limit).offset(offset).all()
 
+    def update_title(self, conversation_id: uuid.UUID, title: str) -> Conversation | None:
+        """Set conversation title (e.g. from first user message)."""
+        from sqlalchemy import update
+
+        stmt = update(Conversation).where(Conversation.id == conversation_id).values(title=title)
+        self.db.execute(stmt)
+        self.db.commit()
+        return self.get_by_id(conversation_id)
+
     def update_updated_at(self, conversation_id: uuid.UUID) -> Conversation | None:
         """Update the updated_at timestamp."""
         from datetime import datetime, timezone

@@ -39,6 +39,7 @@ class ConversationListItem(BaseModel):
     created_at: datetime
     updated_at: datetime
     user_id: UUID | None
+    title: str | None = None
 
 
 class MessageSend(BaseModel):

@@ -47,6 +47,7 @@ public final class AiChatDto {
         private Instant updatedAt;
         @JsonProperty("user_id")
         private UUID userId;
+        private String title;
     }
 
     /** Single message in history. */
