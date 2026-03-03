@@ -308,6 +308,12 @@ Vacanza app features (mention when relevant):
         content=ai_content,
     )
 
+    # Set conversation title from first user message (for session list display)
+    if not messages and conversation and not conversation.title:
+        raw = user_content.strip()
+        title = (raw[:50].rstrip() + ("..." if len(raw) > 50 else "")) if raw else "New conversation"
+        conversation_repo.update_title(conversation_id, title)
+
     embedding_user_task = _save_embedding_for_message(
         settings, message_embedding_repo, user_msg, user_content, user_id
     )

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, func
+from sqlalchemy import DateTime, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,6 +36,7 @@ class Conversation(Base):
         UUID(as_uuid=True),
         nullable=True,
     )
+    title: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     messages: Mapped[list["Message"]] = relationship(
         "Message",
