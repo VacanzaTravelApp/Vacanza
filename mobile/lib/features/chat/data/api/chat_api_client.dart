@@ -11,6 +11,23 @@ class ChatApiClient {
 
   ChatApiClient(this._dio);
 
+  /// GET /chat/conversations — List user's conversations.
+  Future<List<ConversationListItem>> listConversations({
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final response = await _dio.get<dynamic>(
+      '/chat/conversations',
+      queryParameters: {'limit': limit, 'offset': offset},
+    );
+    final data = response.data;
+    if (data is! List) return [];
+    return data
+        .map((e) =>
+            ConversationListItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// POST /chat/conversations — Create a new conversation.
   Future<ConversationCreateResponse> createConversation() async {
     final response = await _dio.post<Map<String, dynamic>>(

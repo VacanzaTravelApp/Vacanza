@@ -50,6 +50,21 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
     });
   }
 
+  void _showPastConversations(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _PastConversationsSheet(
+        apiClient: ctx.read<ChatApiClient>(),
+        onSelect: (conversationId) {
+          Navigator.of(ctx).pop();
+          context.read<ChatCubit>().loadConversation(conversationId);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -70,6 +85,12 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
           color: AppColors.textHeading,
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'Past conversations',
+            onPressed: () => _showPastConversations(context),
+            color: AppColors.textHeading,
+          ),
           BlocBuilder<ChatCubit, ChatState>(
             builder: (context, state) {
               if (state is ChatLoaded && state.messages.isNotEmpty) {
@@ -445,6 +466,192 @@ class _ErrorBanner extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PastConversationsSheet extends StatefulWidget {
+  final ChatApiClient apiClient;
+  final void Function(String conversationId) onSelect;
+
+  const _PastConversationsSheet({
+    required this.apiClient,
+    required this.onSelect,
+  });
+
+  @override
+  State<_PastConversationsSheet> createState() =>
+      _PastConversationsSheetState();
+}
+
+class _PastConversationsSheetState extends State<_PastConversationsSheet> {
+  List<ConversationListItem> _conversations = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final list = await widget.apiClient.listConversations();
+      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      if (mounted) {
+        setState(() {
+          _conversations = list;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  String _formatDate(DateTime d) {
+    final now = DateTime.now();
+    final diff = now.difference(d);
+    if (diff.inDays == 0) {
+      return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    }
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    return '${d.day}/${d.month}/${d.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Text(
+                    'Past Conversations',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textHeading,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                    color: AppColors.textMuted,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppColors.primary),
+                    )
+                  : _error != null
+                      ? Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _error!,
+                                style: const TextStyle(color: Colors.red),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              TextButton(
+                                onPressed: _load,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _conversations.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.chat_bubble_outline_rounded,
+                                    size: 48,
+                                    color: AppColors.textMuted.withValues(alpha: 0.5),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'No past conversations',
+                                    style: TextStyle(color: AppColors.textMuted),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: scrollController,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              itemCount: _conversations.length,
+                              itemBuilder: (context, i) {
+                                final c = _conversations[i];
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor:
+                                        AppColors.primary.withValues(alpha: 0.2),
+                                    child: const Icon(
+                                      Icons.chat_rounded,
+                                      color: AppColors.primary,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    'Conversation',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textHeading,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    _formatDate(c.updatedAt),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  onTap: () => widget.onSelect(c.id),
+                                );
+                              },
+                            ),
+            ),
+          ],
+        ),
       ),
     );
   }

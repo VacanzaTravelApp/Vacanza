@@ -41,6 +41,32 @@ class ConversationCreateResponse {
   }
 }
 
+class ConversationListItem {
+  final String id;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const ConversationListItem({
+    required this.id,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory ConversationListItem.fromJson(Map<String, dynamic> json) {
+    final createdAt = json['created_at'];
+    final updatedAt = json['updated_at'];
+    return ConversationListItem(
+      id: (json['id'] ?? '').toString(),
+      createdAt: createdAt is String
+          ? DateTime.tryParse(createdAt) ?? DateTime.now()
+          : DateTime.now(),
+      updatedAt: updatedAt is String
+          ? DateTime.tryParse(updatedAt) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+}
+
 class MessageSendResponse {
   final String content;
   final List<ExtractedPreference> extractedPreferences;
