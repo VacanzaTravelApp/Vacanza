@@ -3,7 +3,9 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.preference_extraction import ExtractedPreference
 
 
 class UserProfileForAi(BaseModel):
@@ -60,3 +62,4 @@ class MessageSendResponse(BaseModel):
     """AI response when sending a message."""
 
     content: str
+    extracted_preferences: list[ExtractedPreference] = Field(default_factory=list)

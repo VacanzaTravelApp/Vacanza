@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -66,5 +67,22 @@ public final class AiChatDto {
     @AllArgsConstructor
     public static class MessageSendResponse {
         private String content;
+
+        @JsonProperty("extracted_preferences")
+        private List<ExtractedPreference> extractedPreferences;
+    }
+
+    /** A single preference extracted by AI from the conversation. */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExtractedPreference {
+        @JsonProperty("preference_key")
+        private String preferenceKey;
+
+        @JsonProperty("preference_value")
+        private String preferenceValue;
+
+        private Double confidence;
     }
 }

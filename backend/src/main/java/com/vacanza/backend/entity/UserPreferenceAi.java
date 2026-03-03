@@ -2,9 +2,12 @@ package com.vacanza.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -49,18 +52,29 @@ public class UserPreferenceAi {
 
     /**
      * Where this preference was learned from.
-     * e.g. "conversation", "ui", "behavior"
+     * CHECK constraint: only 'CHAT' or 'BEHAVIOR' allowed.
      */
     @Column(name = "source", nullable = false, length = 50)
     private String source;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "metadata", columnDefinition = "jsonb")
+    private Map<String, Object> metadata;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
     @PrePersist
     protected void onCreate() {
+        Instant now = Instant.now();
+        if (this.createdAt == null) {
+            this.createdAt = now;
+        }
         if (this.updatedAt == null) {
-            this.updatedAt = Instant.now();
+            this.updatedAt = now;
         }
     }
 
