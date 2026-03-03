@@ -1,6 +1,7 @@
 package com.vacanza.backend.service;
 
 import com.vacanza.backend.dto.request.UserInteractionRequestDTO;
+import com.vacanza.backend.dto.response.InteractionStatsResponseDTO;
 import com.vacanza.backend.dto.response.UserInteractionResponseDTO;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.UserInteraction;
@@ -45,6 +46,24 @@ public class UserInteractionService {
         return UserInteractionResponseDTO.builder()
                 .interactionId(saved.getInteractionId())
                 .success(true)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public InteractionStatsResponseDTO getStats(User user) {
+        long totalCount = userInteractionRepository.countByUser(user);
+        List<Object[]> rows = userInteractionRepository.countInteractionTypesByUser(user.getUserId());
+
+        var byType = rows.stream()
+                .map(row -> InteractionStatsResponseDTO.TypeCount.builder()
+                        .interactionType((String) row[0])
+                        .count(((Number) row[1]).longValue())
+                        .build())
+                .toList();
+
+        return InteractionStatsResponseDTO.builder()
+                .totalCount(totalCount)
+                .byType(byType)
                 .build();
     }
 
