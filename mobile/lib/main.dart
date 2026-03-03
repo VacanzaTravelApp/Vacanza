@@ -23,6 +23,8 @@ import 'features/gamification/presentation/cubit/gamification_cubit.dart';
 import 'features/booking/data/api/booking_api_client.dart';
 import 'features/booking/data/repositories/booking_repository.dart';
 
+import 'features/chat/data/api/chat_api_client.dart';
+
 import 'features/auth/presentation/bloc/register_bloc.dart';
 import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'features/auth/presentation/screens/auth_gate.dart';
@@ -95,6 +97,11 @@ class VacanzaApp extends StatelessWidget {
           create: (ctx) => BookingRepository(
             apiClient: ctx.read<BookingApiClient>(),
           ),
+        ),
+
+        /// Chat API client (AI chatbot)
+        RepositoryProvider<ChatApiClient>(
+          create: (ctx) => ChatApiClient(ctx.read<Dio>()),
         ),
       ],
       child: MultiBlocProvider(
