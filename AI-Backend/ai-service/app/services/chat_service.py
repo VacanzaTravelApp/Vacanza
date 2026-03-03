@@ -49,6 +49,39 @@ async def _save_embedding_for_message(
         logger.warning("Embedding failed for message %s: %s", message.id, e)
 
 
+def _confidence_label(confidence: float) -> str:
+    """Human-readable confidence label (optional display)."""
+    if confidence >= 0.8:
+        return "high"
+    if confidence >= 0.5:
+        return "medium"
+    return "low"
+
+
+def _build_ai_preferences_prompt(
+    existing_preferences: list[dict] | None,
+    include_confidence: bool = True,
+) -> str:
+    """Build AI-inferred preferences section for system prompt (from user_preferences_ai)."""
+    if not existing_preferences:
+        return ""
+    lines = ["User preferences (learned from chat and behavior — use these in your recommendations):"]
+    for p in existing_preferences:
+        key = p.get("preference_key") or ""
+        value = p.get("preference_value") or ""
+        conf = p.get("confidence")
+        if not key or not value:
+            continue
+        if include_confidence and conf is not None:
+            label = _confidence_label(float(conf))
+            lines.append(f"- {key}: {value} (confidence: {label})")
+        else:
+            lines.append(f"- {key}: {value}")
+    if len(lines) <= 1:
+        return ""
+    return "\n".join(lines)
+
+
 def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
     """Build user profile section for system prompt. Includes name, country, budget and behavioral instructions."""
     if not profile:
@@ -185,8 +218,9 @@ async def get_ai_response(
     # Build full message list for LLM
     llm_messages: list[SystemMessage | HumanMessage | AIMessage] = []
     profile_prompt = _build_profile_prompt(user_profile)
+    ai_prefs_prompt = _build_ai_preferences_prompt(existing_preferences, include_confidence=True)
     rag_prompt = _build_rag_context_prompt(rag_messages)
-    # Dynamic system prompt: Vacanza definition + role + profile (name, country, budget) + RAG
+    # Dynamic system prompt: Vacanza definition + role + profile + AI preferences + RAG
     base_prompt = """You are the travel assistant for Vacanza, a personal app for vacation and travel planning.
 
 Use a warm, friendly tone. Talk as if you know the user—like a trusted friend. Avoid formal or corporate language; be simple, clear, and personable. When giving destination suggestions, budget-friendly options, or travel tips, consider the user's preferences.
@@ -195,6 +229,8 @@ Always respond in the same language the user writes in."""
     system_parts = [base_prompt]
     if profile_prompt:
         system_parts.append(profile_prompt.strip())
+    if ai_prefs_prompt:
+        system_parts.append(ai_prefs_prompt)
     if rag_prompt:
         system_parts.append(rag_prompt)
         system_parts.append("Use these previous conversation notes when responding to the current chat.")
