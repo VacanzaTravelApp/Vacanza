@@ -67,7 +67,6 @@ public class UserInfoService {
                     .country(req.getCountry())
                     .birthDate(req.getBirthDate())
                     .gender(req.getGender())
-                    .budget(req.getBudget())
                     .profileImageUrl(req.getProfileImageUrl())
                     .build();
 
@@ -90,8 +89,6 @@ public class UserInfoService {
             info.setBirthDate(req.getBirthDate());
         if (req.getGender() != null)
             info.setGender(req.getGender());
-        if (req.getBudget() != null)
-            info.setBudget(req.getBudget());
         if (req.getProfileImageUrl() != null)
             info.setProfileImageUrl(req.getProfileImageUrl());
 
@@ -111,7 +108,6 @@ public class UserInfoService {
                 .country(info.getCountry())
                 .birthDate(info.getBirthDate())
                 .gender(info.getGender())
-                .budget(info.getBudget())
                 .profileImageUrl(info.getProfileImageUrl())
                 .joinDate(info.getJoinDate())
                 .build();
