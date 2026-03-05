@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/checkins")
+@RequestMapping("/users/me/checkins")
 @RequiredArgsConstructor
 public class CheckInController {
 
@@ -28,7 +28,7 @@ public class CheckInController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/history")
+    @GetMapping
     public ResponseEntity<List<CheckInHistoryDTO>> getCheckInHistory() {
         User currentUser = currentUserProvider.getCurrentUserEntity();
         List<CheckInHistoryDTO> history = checkInService.getCheckInHistory(currentUser);

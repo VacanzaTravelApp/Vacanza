@@ -11,14 +11,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/gamification")
+@RequestMapping("/users/me")
 @RequiredArgsConstructor
 public class GamificationController {
 
     private final GamificationProfileService profileService;
     private final CurrentUserProvider currentUserProvider;
 
-    @GetMapping("/profile")
+    @GetMapping("/gamification")
     public ResponseEntity<GamificationProfileDTO> getProfile() {
         User user = currentUserProvider.getCurrentUserEntity();
         return ResponseEntity.ok(profileService.getProfile(user));
