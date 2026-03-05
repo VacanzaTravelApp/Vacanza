@@ -19,6 +19,7 @@ public class UserInfoResponseDTO {
 
     private UUID infoId;
     private UUID userId;
+    private String email;
 
     private String firstName;
     private String middleName;

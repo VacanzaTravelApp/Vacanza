@@ -102,6 +102,7 @@ public class UserInfoService {
         return UserInfoResponseDTO.builder()
                 .infoId(info.getInfoId())
                 .userId(info.getUser().getUserId())
+                .email(info.getUser().getEmail())
                 .firstName(info.getFirstName())
                 .middleName(info.getMiddleName())
                 .lastName(info.getLastName())
