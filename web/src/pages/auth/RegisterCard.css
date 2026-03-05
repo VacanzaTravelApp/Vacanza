@@ -1,66 +1,97 @@
-
 .register-card {
-    background: linear-gradient(145deg, #f9fcff, #ffffff); 
-    
-    padding: 40px;
+    background: rgba(252, 253, 255, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    padding: 16px 24px;
+    /* Back to more compact padding */
     border-radius: 20px;
-
-    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.03); 
-    
-    max-width: 400px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.02);
+    max-width: 390px;
     width: 100%;
 }
 
 .card-header {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 12px;
+    /* Tightened header again */
 }
 
 .vacanza-logo {
     font-size: 24px;
     font-weight: 700;
-    color: #1e90ff; 
+    color: #1e90ff;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .vacanza-logo .logo-icon {
-    margin-right: 8px;
-    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    /* Smaller logo */
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3da8c8 0%, #2b8fae 100%);
+    color: #fff;
+    font-size: 18px;
+    /* Smaller icon font */
+    box-shadow: 0 4px 12px rgba(61, 168, 200, 0.3);
 }
 
 .card-header h3 {
-    font-size: 22px;
+    font-size: 20px;
     color: #333;
-    margin-top: 10px;
-    margin-bottom: 5px;
+    margin-top: 8px;
+    margin-bottom: 4px;
 }
 
 .header-subtext {
-    font-size: 14px;
+    font-size: 13px;
     color: #666;
 }
 
-/* --- Ant Design Özelleştirmeleri --- */
-
-/* Input'ların varsayılan kenar ve büyüklüğünü ayarla */
-.ant-input-affix-wrapper, .ant-input-password {
-    border-radius: 8px !important;
-    padding: 10px 15px !important; 
-    border: 1px solid #e0e0e0 !important;
-    transition: border-color 0.3s, box-shadow 0.3s; /* Geçiş ekledik */
+.ant-input-affix-wrapper,
+.ant-input-password {
+    border-radius: 24px !important;
+    padding: 8px 18px !important;
+    border: 1.4px solid #e5e9ec !important;
+    background-color: #ffffff !important;
+    transition: all 0.2s ease-in-out;
 }
 
-/* --- HATA DURUMU İÇİN YENİ STİL --- */
+.ant-input-affix-wrapper:hover,
+.ant-input-password:hover,
+.ant-input-affix-wrapper-focused,
+.ant-input-password-focused {
+    border-color: #3da8c8 !important;
+    box-shadow: 0 0 0 3px rgba(61, 168, 200, 0.12) !important;
+    background-color: #ffffff !important;
+}
+
+.auth-form .ant-form-item {
+    margin-bottom: 6px !important;
+    /* Back to tighter spacing */
+}
+
+.auth-form .ant-form-item-label {
+    padding-bottom: 2px !important;
+}
+
+.auth-form .ant-form-item-label>label {
+    font-size: 13px !important;
+    font-weight: 600;
+}
+
+/* --- NEW STYLES FOR ERROR STATES --- */
 
 .ant-form-item-has-error .ant-input-affix-wrapper:not(.ant-input-affix-wrapper-disabled) {
-    border-color: #ff4d4f !important; 
+    border-color: #ff4d4f !important;
     box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2) !important;
 }
 
 .ant-form-item-has-error .ant-input {
-    border-color: #ff4d4f !important; 
+    border-color: #ff4d4f !important;
 }
 
 .ant-form-item-has-error .ant-input-password input {
@@ -72,12 +103,12 @@
     color: #ff4d4f !important;
 }
 
-/* --- Kayıt Butonu (CTA) --- */
-/* Kayıt formu için düz mavi buton */
+/* --- Registration Button (CTA) --- */
+/* Solid blue button for the registration form */
 .cta-button.ant-btn-primary {
     width: 100%;
     padding: 14px;
-    height: auto; 
+    height: auto;
     background-color: #1e90ff;
     border: none;
     border-radius: 8px;
@@ -88,12 +119,12 @@
 
 .cta-button.ant-btn-primary:hover,
 .cta-button.ant-btn-primary:focus {
-    background-color: #0d83e3; 
+    background-color: #0d83e3;
 }
 
-/* Giriş Butonu için Gradient Stil */
+/* Gradient Style for Login Button */
 .cta-button.login-gradient-button {
-    background: linear-gradient(90deg, #1e90ff, #00c6ff); 
+    background: linear-gradient(90deg, #1e90ff, #00c6ff);
     border: none;
     transition: all 0.3s;
 }
@@ -104,7 +135,7 @@
 }
 
 
-/* --- Alt Navigasyon (Özellik Butonları - Alt Kısım) --- */
+/* --- Alternative Navigation (Feature Buttons - Bottom Section) --- */
 
 .alt-nav {
     display: flex;
@@ -122,22 +153,24 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    cursor: default; /* Bunlar butondan çok bilgi göstergesi */
+    cursor: default;
+    /* These are information indicators rather than actual buttons */
     padding: 0 10px;
 }
 
 .alt-nav-icon {
     margin-bottom: 5px;
     color: #1e90ff;
-    font-size: 20px; 
+    font-size: 20px;
 }
 
 
-/* --- Giriş Yap Yönlendirmesi --- */
+/* --- Login Redirect --- */
 
 .login-redirect {
     text-align: center;
-    margin-top: 30px;
+    margin-top: 12px;
+    /* Halved the margin to bring it closer */
     font-size: 14px;
     color: #777;
 }
@@ -154,19 +187,19 @@
 }
 
 
-/* --- Login Kartı Özel Stilleri (Forgot Password) --- */
+/* --- Special Styles for Login Card (Forgot Password) --- */
 
 .login-options-row {
     display: flex;
-    justify-content: flex-end; 
+    justify-content: flex-end;
     align-items: center;
     width: 100%;
-    margin-top: -8px; 
+    margin-top: -8px;
     margin-bottom: 5px;
 }
 
 .forgot-password-link {
-    color: #1e90ff; 
+    color: #1e90ff;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -179,14 +212,14 @@
 }
 
 .remember-me-placeholder {
-    flex-grow: 1; 
+    flex-grow: 1;
 }
 
-/* --- Password Checks (Kayıt Kartı Özel) --- */
+/* --- Password Checks (Registration Card Specific) --- */
 
 .password-checks {
-    margin-top: -5px; 
-    margin-bottom: 15px; 
+    margin-top: -5px;
+    margin-bottom: 15px;
     padding: 5px 0;
 }
 
@@ -199,64 +232,157 @@
 
 .check-item svg {
     margin-right: 5px;
-    font-size: 14px; 
+    font-size: 14px;
 }
 
 
 .password-checks-container {
-    /* Genel form alanıyla aynı hizada başlaması için sola bir miktar boşluk ekler. */
-    padding-left: 5px; 
-    margin-bottom: 20px; 
-    padding-top: 5px;
+    padding-left: 5px;
+    margin-bottom: 10px;
+    /* Reduced margin */
+    padding-top: 2px;
 }
 
-/* 2. HER BİR KONTROL MADDESİ */
 .password-check-item {
-    font-size: 12px;
-    font-weight: 500; 
-    display: flex; 
-    align-items: center; 
-    padding: 3px 0;
-    
-    /* Geçersiz maddelerin metin rengi (Hafif gri) */
-    color: #8c8c8c; 
+    font-size: 11px;
+    /* Slightly smaller font */
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    padding: 1px 0;
+    /* Minimal vertical padding */
+    color: #8c8c8c;
 }
 
-/* 3. SİMGE GÖSTERGESİ (✅ veya ⚪) */
 .check-indicator {
-    margin-right: 8px; 
-    font-size: 14px; 
-}
-
-/* 4. GEÇERLİ OLAN MADDELERİN STİLİ (Yeşil Renk) */
-.password-check-item.valid {
-    /* Geçerli maddelerin metin rengi (Koyu gri/siyah) */
-    color: #434343; 
-}
-
-/* YENİ: YEŞİL RENGİN UYGULANMASI */
-/* İkonların (check-indicator) geçerli olduğunda yeşil olmasını sağlar */
-.password-check-item.valid .check-indicator {
-    color: #52c41a !important; /* Mobil tasarımınızdaki yeşil tonu */
-}
-
-/* YENİ: GEÇERSİZLERİN RENGİNİ GRİ YAPMA */
-.password-check-item .check-indicator {
-    /* Geçersiz olanların simge rengini hafif gri yapar */
-    color: #bfbfbf; 
-}
-
-.password-checks-container {
-    padding-left: 5px; /* Sağa kaydırma */
-    margin-bottom: 20px; 
-    padding-top: 5px;
-}
-
-.password-check-item {
+    margin-right: 6px;
     font-size: 12px;
-    font-weight: 500; 
-    display: flex; 
-    align-items: center; 
-    padding: 3px 0;
-    color: #8c8c8c; 
+}
+
+/* 4. STYLE FOR VALID ITEMS (Green Color) */
+.password-check-item.valid {
+    /* Text color for valid items (Dark gray/black) */
+    color: #434343;
+}
+
+/* NEW: APPLYING GREEN COLOR */
+/* Ensures icons (check-indicator) turn green when valid */
+.password-check-item.valid .check-indicator {
+    color: #52c41a !important;
+    /* Green tone from your mobile design */
+}
+
+/* NEW: TURNING INVALID ITEMS GRAY */
+.password-check-item .check-indicator {
+    /* Makes the icon color of invalid items light gray */
+    color: #bfbfbf;
+}
+
+
+
+
+/* --- Preferred Name Section --- */
+
+.preferred-name-section {
+    margin-bottom: 10px;
+}
+
+.preferred-name-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.preferred-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    /* Rounded pill like FilterChip */
+    border: 1.4px solid #e5e9ec;
+    background: #fff;
+    color: #555;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.preferred-chip:hover {
+    border-color: #3da8c8;
+    color: #3da8c8;
+}
+
+.preferred-chip--active {
+    border-color: #3da8c8;
+    background: #eef8fb;
+    color: #2b8fae;
+    font-weight: 600;
+}
+
+.preferred-chip--active .anticon {
+    color: #3da8c8;
+}
+
+
+/* ================================================== */
+/* ========== REGISTER CARD RESPONSIVE ============== */
+/* ================================================== */
+
+@media (max-width: 768px) {
+    .register-card {
+        max-width: 100%;
+        padding: 28px 20px;
+        border-radius: 20px;
+        box-shadow: none;
+    }
+
+    .card-header h3 {
+        font-size: 20px;
+    }
+
+    .header-subtext {
+        font-size: 13px;
+    }
+
+    .vacanza-logo .logo-icon {
+        width: 46px;
+        height: 46px;
+        font-size: 20px;
+    }
+
+    .cta-button.ant-btn-primary {
+        padding: 12px;
+        font-size: 15px;
+    }
+
+    .login-redirect {
+        margin-top: 20px;
+        font-size: 13px;
+    }
+
+    .preferred-chip {
+        min-width: 60px;
+        padding: 7px 16px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 400px) {
+    .register-card {
+        padding: 20px 14px;
+    }
+
+    .card-header {
+        margin-bottom: 20px;
+    }
+
+    .card-header h3 {
+        font-size: 18px;
+    }
 }

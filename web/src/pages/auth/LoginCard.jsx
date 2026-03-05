@@ -21,15 +21,15 @@ const LoginCard = () => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-  console.log("Firebase login successful.");
+      console.log("Firebase login successful.");
       try {
         await authApi.login();
         console.log("Backend sync successful.");
-      // eslint-disable-next-line no-unused-vars
+        // eslint-disable-next-line no-unused-vars
       } catch (syncError) {
         console.warn("Backend sync skipped: Server returned HTML, but we are logged in via Firebase.");
       }
-   message.success("Logged in successfully!");
+      message.success("Logged in successfully!");
       navigate("/map");
     } catch (error) {
       console.error("Firebase login error:", error);

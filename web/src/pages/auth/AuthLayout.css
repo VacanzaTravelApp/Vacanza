@@ -1,7 +1,9 @@
 /* src/pages/auth/AuthLayout.css */
 
-/* Genel Sıfırlama ve Konteyner Ayarları */
-html, body, #root {
+/* General Reset and Container Styles */
+html,
+body,
+#root {
     margin: 0;
     padding: 0;
     height: 100%;
@@ -9,23 +11,23 @@ html, body, #root {
 }
 
 /*
-** 1. ANA KAPSAYICI (AUTH-CONTAINER): TAM EKRAN GÖRSEL
+** 1. MAIN CONTAINER (AUTH-CONTAINER): FULLSCREEN IMAGE
 */
 .auth-container {
     min-height: 100vh;
     width: 100%;
-    
-    /* Tüm sayfanın arka plan görseli */
-    background-image: url('https://picsum.photos/1000/1000?random=1'); 
-    background-size: cover; 
+
+    /* Background image for the whole page */
+    background-image: url('https://picsum.photos/1000/1000?random=1');
+    background-size: cover;
     background-position: center;
-    background-attachment: fixed; 
-    
-    display: flex; 
-    position: relative; 
+    background-attachment: fixed;
+
+    display: flex;
+    position: relative;
 }
 
-/* ** Saydam Koyu Katman (Görselin Okunabilirliğini Artırır) */
+/* ** Semi-transparent Dark Overlay (Improves Readability) */
 .auth-container::before {
     content: '';
     position: absolute;
@@ -33,31 +35,33 @@ html, body, #root {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.4); /* Koyu opaklık katmanı */
+    background: rgba(0, 0, 0, 0.4);
+    /* Dark opacity layer */
     z-index: 1;
 }
 
-/* Tüm içerik sütunlarının katmanın önünde görünmesini sağlar */
-.auth-container > * {
-    z-index: 2; 
+/* Ensures all content columns appear in front of the overlay */
+.auth-container>* {
+    z-index: 2;
 }
 
 
 /* ---------------------------------------------------- */
-/* --- SOL SÜTUN (İÇERİK SÜTUNU) --- */
+/* --- LEFT COLUMN (CONTENT COLUMN) --- */
 
 .auth-visual-column {
     flex: 1;
     background-image: none;
-    background-color: transparent; 
-    
-    color: white; 
-    padding: 60px 40px; 
+    background-color: transparent;
+
+    color: white;
+    padding: 60px 40px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between; 
+    justify-content: space-between;
     overflow: hidden;
-    z-index: 2; /* Arka plan katmanının üstünde */
+    z-index: 2;
+    /* On top of the background layer */
 }
 
 .auth-visual-column::before {
@@ -66,19 +70,19 @@ html, body, #root {
 }
 
 
-/* --- BAŞLIK KISMI STİLLERİ --- */
+/* --- HEADER SECTION STYLES --- */
 
 .vacanza-header {
-    text-align: center; 
-    margin-bottom: 30px; 
+    text-align: center;
+    margin-bottom: 30px;
 }
 
 .logo-text {
-    font-size: 42px; 
-    font-weight: 900; 
-    letter-spacing: 3px; 
-    display: block; 
-    margin-bottom: 5px; 
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    display: block;
+    margin-bottom: 5px;
 }
 
 .slogan {
@@ -94,127 +98,224 @@ html, body, #root {
     line-height: 1.4;
 }
 
-/* --- 4 ÖZELLİK KUTUCUĞU (FEATURE GRID) --- */
+/* --- 4 FEATURE CARDS (FEATURE GRID) --- */
 
-.feature-grid { 
+.feature-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr); 
-    gap: 12px; 
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
     margin-top: 30px;
 }
 
 .feature-card {
-    background: rgba(255, 255, 255, 0.15); 
-    backdrop-filter: blur(8px); 
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
     border-radius: 12px;
-    padding: 15px; 
+    padding: 15px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     cursor: default;
     transition: background 0.3s, transform 0.3s;
-    
+
     display: flex;
-    align-items: flex-start; 
+    align-items: flex-start;
     text-align: left;
-    height: auto; 
+    height: auto;
 }
 
 .feature-card:hover {
-    background: rgba(255, 255, 255, 0.3); 
-    transform: translateY(-3px); 
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-3px);
 }
 
 .card-icon {
-    font-size: 20px; 
-    margin-right: 12px; 
-    flex-shrink: 0; 
+    font-size: 20px;
+    margin-right: 12px;
+    flex-shrink: 0;
 }
 
 .card-title {
     font-weight: 700;
-    font-size: 15px; 
+    font-size: 15px;
     margin: 0;
     line-height: 1.2;
 }
 
 .card-description {
-    font-size: 12px; 
+    font-size: 12px;
     opacity: 0.8;
     margin-top: 3px;
 }
 
 
-/* --- İSTATİSTİK KISMI (ALT ÇUBUK) --- */
+/* --- STATISTICS SECTION (BOTTOM BAR) --- */
 
 .stats-container {
     display: flex;
-    justify-content: space-between; 
-    padding-top: 25px; 
-    margin-top: 40px; 
-    border-top: 1px solid rgba(255, 255, 255, 0.3); 
+    justify-content: space-between;
+    padding-top: 25px;
+    margin-top: 40px;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
     text-align: center;
     padding-left: 10px;
     padding-right: 10px;
 }
 
-.stats-container > div {
+.stats-container>div {
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
 .stat-icon {
-    font-size: 28px; 
+    font-size: 28px;
     color: #fff;
     margin-bottom: 5px;
-    order: -1; 
+    order: -1;
 }
 
 .stat-number {
-    font-size: 24px; 
-    font-weight: 800; 
+    font-size: 24px;
+    font-weight: 800;
     letter-spacing: 1px;
-    margin-bottom: 5px; 
+    margin-bottom: 5px;
     display: block;
 }
 
 .stat-text {
-    font-size: 14px; 
+    font-size: 14px;
     font-weight: 500;
     opacity: 0.8;
-    text-transform: uppercase; 
+    text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 
 /* ---------------------------------------------------- */
 /*
-** 2. SAĞ SÜTUN (FORM)
+** 2. RIGHT COLUMN (FORM)
 */
 .auth-form-column {
     flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
-    /* Arka planı şeffaf */
-    background-color: transparent; 
+    /* Transparent background */
+    background-color: transparent;
     z-index: 2;
+    overflow-y: auto;
+    padding: 20px 10px;
+    max-height: 100vh;
 }
 
-/* ** 3. FORM KARTI GÖLGESİ VE ARKA PLAN 
-** Opaklık %75'e düşürülmüştür.
+/* ** 3. FORM CARD SHADOW AND BACKGROUND 
+** Opacity reduced to 75%.
 */
-.auth-form-column > * { 
-    /* GÜNCEL: Opaklığı %75'e düşürdük (Beyazlığı önemli ölçüde kırar) */
-    background-color: rgba(255, 255, 255, 0.75); 
-    
-    /* Küçültülmüş boyut ve iç boşluk ayarları */
-    max-width: 360px; 
-    width: 100%; 
-    padding: 30px;
-    
-    backdrop-filter: blur(8px); 
-    
-    /* Gölge ve köşe yuvarlaklığı */
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); 
-    border-radius: 16px; 
+.auth-form-column>* {
+    /* UPDATED: Reduced opacity to 75% (Substantially breaks the whiteness) */
+    background-color: rgba(255, 255, 255, 0.75);
+
+    /* Reduced size and padding settings */
+    max-width: 390px;
+    width: 100%;
+    padding: 16px;
+
+    backdrop-filter: blur(8px);
+
+    /* Shadow and border radius */
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    border-radius: 16px;
+}
+
+
+/* ================================================== */
+/* ========== RESPONSIVE BREAKPOINTS ================ */
+/* ================================================== */
+
+/* ── TABLET (769px – 1024px) ── */
+@media (max-width: 1024px) {
+    .auth-visual-column {
+        padding: 40px 24px;
+    }
+
+    .logo-text {
+        font-size: 32px;
+    }
+
+    .slogan {
+        font-size: 1.3em;
+    }
+
+    .feature-grid {
+        gap: 8px;
+    }
+
+    .feature-card {
+        padding: 12px;
+    }
+
+    .card-title {
+        font-size: 13px;
+    }
+
+    .card-description {
+        font-size: 11px;
+    }
+
+    .stat-number {
+        font-size: 20px;
+    }
+
+    .stat-text {
+        font-size: 12px;
+    }
+
+    .auth-form-column>* {
+        max-width: 340px;
+        padding: 24px;
+    }
+}
+
+/* ── MOBILE (≤ 768px) ── */
+@media (max-width: 768px) {
+    .auth-container {
+        flex-direction: column;
+        background-attachment: scroll;
+    }
+
+    /* Hide left visual column on mobile */
+    .auth-visual-column {
+        display: none;
+    }
+
+    /* Form column should take full screen */
+    .auth-form-column {
+        flex: none;
+        width: 100%;
+        min-height: 100vh;
+        padding: 24px 16px;
+        align-items: flex-start;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+
+    .auth-form-column>* {
+        max-width: 100%;
+        width: 100%;
+        padding: 28px 20px;
+        border-radius: 20px;
+        background-color: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* ── SMALL MOBILE (≤ 400px) ── */
+@media (max-width: 400px) {
+    .auth-form-column {
+        padding: 16px 10px;
+    }
+
+    .auth-form-column>* {
+        padding: 22px 16px;
+        border-radius: 16px;
+    }
 }
