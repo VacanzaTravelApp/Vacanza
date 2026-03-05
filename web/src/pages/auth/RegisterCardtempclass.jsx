@@ -1,217 +1,270 @@
 import React, { useState } from 'react';
-// Ant Design bileşenleri, hook'ları ve mesajlar
-import { Form, Input, Button, Checkbox, Row, Col, Space, message } from 'antd'; 
-import { 
-  UserOutlined, 
-  LockOutlined, 
-  MailOutlined, 
+import { Form, Input, Button, Checkbox, Row, Col, Space, message } from 'antd';
+import {
+  UserOutlined,
+  LockOutlined,
+  MailOutlined,
   SendOutlined,
-  CheckCircleOutlined, 
+  CheckCircleOutlined,
   CloseCircleOutlined,
 } from '@ant-design/icons';
-import './RegisterCard.css'; 
+import './RegisterCard.css';
 import { useNavigate } from 'react-router-dom';
 
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // <-- updateProfile EKLENDİ
-import auth from '../../firebase'; 
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import auth from '../../firebase';
 
-// PasswordChecks Bileşeni (Aynı kalır)
+// PasswordChecks Component
 const PasswordChecks = ({ password }) => {
-    const checks = [
-        { text: '8+ characters', valid: password && password.length >= 8 },
-        { text: '1+ uppercase', valid: /[A-Z]/.test(password) },
-        { text: '1+ lowercase', valid: /[a-z]/.test(password) },
-        { text: '1 number', valid: /[0-9]/.test(password) },
-        { text: '1 special char', valid: /[^A-Za-z0-9]/.test(password) },
-    ];
+  const checks = [
+    { text: '8+ characters', valid: password && password.length >= 8 },
+    { text: '1+ uppercase', valid: /[A-Z]/.test(password) },
+    { text: '1+ lowercase', valid: /[a-z]/.test(password) },
+    { text: '1 number', valid: /[0-9]/.test(password) },
+    { text: '1 special char', valid: /[^A-Za-z0-9]/.test(password) },
+  ];
 
-    if (!password) {
-        return null; 
-    }
+  if (!password) {
+    return null;
+  }
 
-    return (
-        <Row gutter={[10, 5]} className="password-checks-container"> 
-            {checks.map((check) => (
-                <Col span={12} key={check.text}>
-                    <div className={`password-check-item ${check.valid ? 'valid' : 'invalid'}`}>
-                        <span className="check-indicator" style={{ marginRight: '8px' }}>
-                            {check.valid ? (
-                                <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                            ) : (
-                                <CloseCircleOutlined style={{ color: '#bfbfbf' }} />
-                            )} 
-                        </span>
-                        {check.text}
-                    </div>
-                </Col>
-            ))}
-        </Row>
-    );
+  return (
+    <Row gutter={[10, 0]} className="password-checks-container">
+      {checks.map((check) => (
+        <Col span={12} key={check.text}>
+          <div className={`password-check-item ${check.valid ? 'valid' : 'invalid'}`}>
+            <span className="check-indicator">
+              {check.valid ? (
+                <CheckCircleOutlined style={{ color: '#52c41a' }} />
+              ) : (
+                <CloseCircleOutlined style={{ color: '#bfbfbf' }} />
+              )}
+            </span>
+            {check.text}
+          </div>
+        </Col>
+      ))}
+    </Row>
+  );
 };
 
 
 const RegisterCard = () => {
-  const navigate = useNavigate(); 
-  const [form] = Form.useForm(); 
-  const password = Form.useWatch('password', form); 
-  const [loading, setLoading] = useState(false); 
+  const navigate = useNavigate();
+  const [form] = Form.useForm();
+  const password = Form.useWatch('password', form);
+  const firstName = Form.useWatch('firstName', form);
+  const middleName = Form.useWatch('middleName', form);
+  const [loading, setLoading] = useState(false);
+  const [preferredName, setPreferredName] = useState(null);
+  const [showPreferredError, setShowPreferredError] = useState(false);
 
 
   const onFinish = async (values) => {
-    setLoading(true);
-    const { email, password, firstName, lastName } = values; 
+    if (middleName && !preferredName) {
+      setShowPreferredError(true);
+      setLoading(false);
+      return;
+    }
+    setShowPreferredError(false);
+
+    const { email, password, firstName, lastName } = values;
 
     try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-        await updateProfile(userCredential.user, {
-            displayName: `${firstName} ${lastName}` 
-        });
-        
-        message.success('Kayıt başarılı! Haritaya yönlendiriliyorsunuz.');
-        console.log('Registration Successful, redirecting to /map');
-        navigate('/map'); 
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+      await updateProfile(userCredential.user, {
+        displayName: `${firstName} ${lastName}`
+      });
+
+      message.success('Registration successful! Redirecting you to the map.');
+      console.log('Registration Successful, redirecting to /map');
+      navigate('/map');
 
     } catch (error) {
-        console.error("Firebase Kayıt Hatası:", error.code, error.message);
-        
-        let errorMessage = "Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.";
-        if (error.code === 'auth/email-already-in-use') {
-            errorMessage = "Bu e-posta adresi zaten kullanımda.";
-        } else if (error.code === 'auth/invalid-email') {
-            errorMessage = "Geçersiz e-posta formatı.";
-        } else if (error.code === 'auth/weak-password') {
-             errorMessage = "Şifre çok zayıf. Lütfen daha güçlü bir şifre kullanın.";
-        }
+      console.error("Firebase Registration Error:", error.code, error.message);
 
-        message.error(errorMessage);
+      let errorMessage = "An error occurred during registration. Please try again.";
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "This email address is already in use.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "Invalid email format.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Password is too weak. Please use a stronger password.";
+      }
+
+      message.error(errorMessage);
 
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
 
   const handleLoginRedirect = () => {
-    navigate('/login'); 
+    navigate('/login');
   };
 
   return (
     <div className="register-card">
       <div className="card-header">
         <span className="vacanza-logo">
-           <SendOutlined className="logo-icon" />
-           Vacanza
+          <SendOutlined className="logo-icon" />
         </span>
-        <h3>Start Your Adventure</h3>
+        <h3>Create Your <span style={{ color: '#3da8c8' }}>Vacanza</span> Account</h3>
         <p className="header-subtext">
-          Create an account and sign in to continue
+          Start your personalized journey today
         </p>
       </div>
 
       <Form
-        form={form} 
+        form={form}
         name="register"
-        onFinish={onFinish} 
+        onFinish={onFinish}
         scrollToFirstError
-        layout="vertical" 
+        layout="vertical"
         className="auth-form"
+        requiredMark={false}
       >
-        <Row gutter={12}>
-            <Col span={12}>
-                <Form.Item
-                    name="firstName"
-                    rules={[{ required: true, message: 'Please enter your first name!' }]}
-                >
-                    <Input 
-                        prefix={<UserOutlined />} 
-                        placeholder="First Name" 
-                        size="large"
-                        autoComplete="given-name" 
-                    />
-                </Form.Item>
-            </Col>
-
-            <Col span={12}>
-                <Form.Item
-                    name="middleName"
-                >
-                    <Input 
-                        prefix={<UserOutlined />} 
-                        placeholder="Middle Name (Optional)" 
-                        size="large"
-                    />
-                </Form.Item>
-            </Col>
-        </Row>
-        <Form.Item
-            name="lastName"
-            rules={[{ required: true, message: 'Please enter your last name!' }]}
-        >
-            <Input 
-                prefix={<UserOutlined />} 
-                placeholder="Last Name" 
+        <Row gutter={10}>
+          <Col xs={24} sm={12}>
+            <Form.Item
+              name="firstName"
+              label="First Name"
+              rules={[{ required: true, message: 'First name is required' }]}
+            >
+              <Input
+                placeholder="First Name"
                 size="large"
-                autoComplete="family-name" 
-            />
+                autoComplete="given-name"
+              />
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} sm={12}>
+            <Form.Item
+              name="middleName"
+              label="Middle Name"
+            >
+              <Input
+                placeholder="Middle Name"
+                size="large"
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Form.Item
+          name="lastName"
+          label="Last Name"
+          rules={[{ required: true, message: 'Last name is required' }]}
+        >
+          <Input
+            placeholder="Last Name"
+            size="large"
+            autoComplete="family-name"
+          />
         </Form.Item>
+
+        {/* Preferred Name selector - only shows when middle name is entered */}
+        {middleName && (
+          <div className="preferred-name-section">
+            <span className="preferred-name-label">Preferred Name</span>
+            <Space size={8}>
+              {firstName && (
+                <button
+                  type="button"
+                  className={`preferred-chip ${preferredName === 'firstName' ? 'preferred-chip--active' : ''}`}
+                  onClick={() => {
+                    const newValue = preferredName === 'firstName' ? null : 'firstName';
+                    setPreferredName(newValue);
+                    if (!newValue) setShowPreferredError(true);
+                    else setShowPreferredError(false);
+                  }}
+                >
+                  {preferredName === 'firstName' && <CheckCircleOutlined style={{ marginRight: 4 }} />}
+                  {firstName}
+                </button>
+              )}
+              <button
+                type="button"
+                className={`preferred-chip ${preferredName === 'middleName' ? 'preferred-chip--active' : ''}`}
+                onClick={() => {
+                  const newValue = preferredName === 'middleName' ? null : 'middleName';
+                  setPreferredName(newValue);
+                  if (!newValue) setShowPreferredError(true);
+                  else setShowPreferredError(false);
+                }}
+              >
+                {preferredName === 'middleName' && <CheckCircleOutlined style={{ marginRight: 4 }} />}
+                {middleName}
+              </button>
+            </Space>
+            {showPreferredError && !preferredName && (
+              <div style={{ color: '#ff4d4f', fontSize: '12px', marginTop: '4px' }}>
+                Please choose at least one preferred name
+              </div>
+            )}
+          </div>
+        )}
 
         <Form.Item
           name="email"
+          label="Email"
           rules={[
-            { type: 'email', message: 'The input is not a valid E-mail!' },
-            { required: true, message: 'Please input your E-mail!' },
+            { type: 'email', message: 'Enter a valid email' },
+            { required: true, message: 'Email is required' },
           ]}
         >
-          <Input 
-            prefix={<MailOutlined />} 
-            placeholder="Email address" 
-            size="large" 
-            autoComplete="email" 
+          <Input
+            placeholder="you@example.com"
+            size="large"
+            autoComplete="email"
           />
         </Form.Item>
         <Form.Item
           name="password"
-          rules={[{ required: true, message: 'Please input your Password!' }]}
+          label="Password"
+          rules={[{ required: true, message: 'Password is required' }]}
           hasFeedback
         >
-          <Input.Password 
-            prefix={<LockOutlined />} 
-            placeholder="Password" 
-            size="large" 
-            autoComplete="new-password" 
+          <Input.Password
+            placeholder="Password"
+            size="large"
+            autoComplete="new-password"
           />
         </Form.Item>
-        
-        <PasswordChecks password={password} /> 
+
+        <PasswordChecks password={password} />
 
         <Form.Item
           name="confirmPassword"
+          label="Confirm Password"
           dependencies={['password']}
           hasFeedback
           rules={[
-            { required: true, message: 'Please confirm your Password!' },
+            { required: true, message: 'Confirm password' },
             ({ getFieldValue }) => ({
               validator(_, value) {
                 if (!value || getFieldValue('password') === value) {
                   return Promise.resolve();
                 }
-                return Promise.reject(new Error('The two passwords that you entered do not match!'));
+                return Promise.reject(new Error('Passwords do not match'));
               },
             }),
           ]}
         >
-          <Input.Password 
-            prefix={<LockOutlined />} 
-            placeholder="Confirm Password" 
-            size="large" 
-            autoComplete="new-password" 
+          <Input.Password
+            placeholder="Confirm Password"
+            size="large"
+            autoComplete="new-password"
           />
         </Form.Item>
 
         <Form.Item
           name="agreedToTerms"
           valuePropName="checked"
+          validateTrigger="onSubmit"
           rules={[
             {
               validator: (_, value) =>
@@ -219,24 +272,24 @@ const RegisterCard = () => {
             },
           ]}
         >
-            <Checkbox>
-                I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
-            </Checkbox>
+          <Checkbox>
+            I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
+          </Checkbox>
         </Form.Item>
         <Form.Item>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
-            className="cta-button" 
+          <Button
+            type="primary"
+            htmlType="submit"
+            className="cta-button"
             size="large"
             loading={loading}
           >
-            Start Your Adventure
+            Sign Up
           </Button>
         </Form.Item>
       </Form>
       <div className="login-redirect">
-        Already have a Vacanza account? 
+        Already have a Vacanza account?
         <span onClick={handleLoginRedirect} className="login-link">
           Log In
         </span>
