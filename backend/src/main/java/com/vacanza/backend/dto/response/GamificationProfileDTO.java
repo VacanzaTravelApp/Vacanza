@@ -44,6 +44,7 @@ public class GamificationProfileDTO {
         private Long id;
         private String title; // "Explorer", "Foodie"
         private String key; // "explorer" — frontend maps to icon
+        private String description; // badge explanation for UI
         private boolean earned;
     }
 }

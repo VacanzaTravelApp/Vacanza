@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // <-- updateProfile EKLENDİ
 import auth from '../../firebase';
 
-// PasswordChecks Bileşeni (Aynı kalır)
+// PasswordChecks Component
 const PasswordChecks = ({ password }) => {
   const checks = [
     { text: '8+ characters', valid: password && password.length >= 8 },
@@ -152,9 +152,9 @@ const RegisterCard = () => {
           <SendOutlined className="logo-icon" />
           Vacanza
         </span>
-        <h3>Start Your Adventure</h3>
+        <h3>Create Your <span style={{ color: '#3da8c8' }}>Vacanza</span> Account</h3>
         <p className="header-subtext">
-          Create an account and sign in to continue
+          Start your personalized journey today
         </p>
       </div>
 
@@ -165,6 +165,7 @@ const RegisterCard = () => {
         scrollToFirstError
         layout="vertical"
         className="auth-form"
+        requiredMark={false}
       >
         <Row gutter={12}>
           <Col span={12}>
@@ -227,9 +228,10 @@ const RegisterCard = () => {
 
         <Form.Item
           name="email"
+          label="Email"
           rules={[
-            { type: 'email', message: 'The input is not a valid E-mail!' },
-            { required: true, message: 'Please input your E-mail!' },
+            { type: 'email', message: 'Enter a valid email' },
+            { required: true, message: 'Email is required' },
           ]}
         >
           <Input
@@ -241,7 +243,8 @@ const RegisterCard = () => {
         </Form.Item>
         <Form.Item
           name="password"
-          rules={[{ required: true, message: 'Please input your Password!' }]}
+          label="Password"
+          rules={[{ required: true, message: 'Password is required' }]}
           hasFeedback
         >
           <Input.Password
@@ -256,16 +259,17 @@ const RegisterCard = () => {
 
         <Form.Item
           name="confirmPassword"
+          label="Confirm Password"
           dependencies={['password']}
           hasFeedback
           rules={[
-            { required: true, message: 'Please confirm your Password!' },
+            { required: true, message: 'Confirm password' },
             ({ getFieldValue }) => ({
               validator(_, value) {
                 if (!value || getFieldValue('password') === value) {
                   return Promise.resolve();
                 }
-                return Promise.reject(new Error('The two passwords that you entered do not match!'));
+                return Promise.reject(new Error('Passwords do not match'));
               },
             }),
           ]}
@@ -281,6 +285,7 @@ const RegisterCard = () => {
         <Form.Item
           name="agreedToTerms"
           valuePropName="checked"
+          validateTrigger="onSubmit"
           rules={[
             {
               validator: (_, value) =>

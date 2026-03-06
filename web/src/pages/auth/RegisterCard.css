@@ -9,7 +9,8 @@
 
 .card-header {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 12px;
+    /* Tightened header again */
 }
 
 .vacanza-logo {
@@ -22,19 +23,29 @@
 }
 
 .vacanza-logo .logo-icon {
-    margin-right: 8px;
-    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    /* Smaller logo */
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3da8c8 0%, #2b8fae 100%);
+    color: #fff;
+    font-size: 18px;
+    /* Smaller icon font */
+    box-shadow: 0 4px 12px rgba(61, 168, 200, 0.3);
 }
 
 .card-header h3 {
-    font-size: 22px;
+    font-size: 20px;
     color: #333;
-    margin-top: 10px;
-    margin-bottom: 5px;
+    margin-top: 8px;
+    margin-bottom: 4px;
 }
 
 .header-subtext {
-    font-size: 14px;
+    font-size: 13px;
     color: #666;
 }
 
@@ -49,7 +60,30 @@
     transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-/* --- HATA DURUMU İÇİN YENİ STİL --- */
+.ant-input-affix-wrapper:hover,
+.ant-input-password:hover,
+.ant-input-affix-wrapper-focused,
+.ant-input-password-focused {
+    border-color: #3da8c8 !important;
+    box-shadow: 0 0 0 3px rgba(61, 168, 200, 0.12) !important;
+    background-color: #ffffff !important;
+}
+
+.auth-form .ant-form-item {
+    margin-bottom: 6px !important;
+    /* Back to tighter spacing */
+}
+
+.auth-form .ant-form-item-label {
+    padding-bottom: 2px !important;
+}
+
+.auth-form .ant-form-item-label>label {
+    font-size: 13px !important;
+    font-weight: 600;
+}
+
+/* --- NEW STYLES FOR ERROR STATES --- */
 
 .ant-form-item-has-error .ant-input-affix-wrapper:not(.ant-input-affix-wrapper-disabled) {
     border-color: #ff4d4f !important;
@@ -69,8 +103,8 @@
     color: #ff4d4f !important;
 }
 
-/* --- Kayıt Butonu (CTA) --- */
-/* Kayıt formu için düz mavi buton */
+/* --- Registration Button (CTA) --- */
+/* Solid blue button for the registration form */
 .cta-button.ant-btn-primary {
     width: 100%;
     padding: 14px;
@@ -88,7 +122,7 @@
     background-color: #0d83e3;
 }
 
-/* Giriş Butonu için Gradient Stil */
+/* Gradient Style for Login Button */
 .cta-button.login-gradient-button {
     background: linear-gradient(90deg, #1e90ff, #00c6ff);
     border: none;
@@ -101,7 +135,7 @@
 }
 
 
-/* --- Alt Navigasyon (Özellik Butonları - Alt Kısım) --- */
+/* --- Alternative Navigation (Feature Buttons - Bottom Section) --- */
 
 .alt-nav {
     display: flex;
@@ -131,11 +165,12 @@
 }
 
 
-/* --- Giriş Yap Yönlendirmesi --- */
+/* --- Login Redirect --- */
 
 .login-redirect {
     text-align: center;
-    margin-top: 30px;
+    margin-top: 12px;
+    /* Halved the margin to bring it closer */
     font-size: 14px;
     color: #777;
 }
@@ -152,7 +187,7 @@
 }
 
 
-/* --- Login Kartı Özel Stilleri (Forgot Password) --- */
+/* --- Special Styles for Login Card (Forgot Password) --- */
 
 .login-options-row {
     display: flex;
@@ -180,7 +215,7 @@
     flex-grow: 1;
 }
 
-/* --- Password Checks (Kayıt Kartı Özel) --- */
+/* --- Password Checks (Registration Card Specific) --- */
 
 .password-checks {
     margin-top: -5px;
@@ -208,7 +243,6 @@
     padding-top: 5px;
 }
 
-/* 2. HER BİR KONTROL MADDESİ */
 .password-check-item {
     font-size: 12px;
     font-weight: 500;
@@ -220,7 +254,6 @@
     color: #8c8c8c;
 }
 
-/* 3. SİMGE GÖSTERGESİ (✅ veya ⚪) */
 .check-indicator {
     margin-right: 8px;
     font-size: 14px;
