@@ -20,6 +20,10 @@ import 'features/auth/presentation/bloc/register_bloc.dart';
 import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'features/auth/presentation/screens/auth_gate.dart';
 
+import 'features/profile/data/datasources/profile_remote_data_source.dart';
+import 'features/profile/data/repositories/profile_repository.dart';
+import 'features/profile/presentation/bloc/profile_bloc.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -65,6 +69,14 @@ class VacanzaApp extends StatelessWidget {
         RepositoryProvider<PoiSearchApiClient>(
           create: (ctx) => PoiSearchApiClient(ctx.read<Dio>()),
         ),
+        RepositoryProvider<ProfileRemoteDataSource>(
+          create: (ctx) => ProfileRemoteDataSource(ctx.read<Dio>()),
+        ),
+        RepositoryProvider<ProfileRepository>(
+          create: (ctx) => ProfileRepository(
+            dataSource: ctx.read<ProfileRemoteDataSource>(),
+          ),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -76,6 +88,11 @@ class VacanzaApp extends StatelessWidget {
           BlocProvider<LoginBloc>(
             create: (context) => LoginBloc(
               authRepository: context.read<AuthRepository>(),
+            ),
+          ),
+          BlocProvider<ProfileBloc>(
+            create: (context) => ProfileBloc(
+              repository: context.read<ProfileRepository>(),
             ),
           ),
         ],
