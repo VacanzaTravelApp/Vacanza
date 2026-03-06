@@ -10,6 +10,8 @@ import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/mapbox/map_canvas_mapbox.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/action_bar.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/profile_badge.dart';
+import 'package:mobile/features/profile/data/repositories/profile_repository.dart';
+import 'package:mobile/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:mobile/features/profile/presentation/screens/profile_screen.dart';
 
 import '../../../data/models/map_view_mode.dart';
@@ -103,7 +105,12 @@ class HomeMapScaffold extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const ProfileScreen(),
+                      builder: (_) => BlocProvider(
+                        create: (ctx) => ProfileBloc(
+                          repository: ctx.read<ProfileRepository>(),
+                        ),
+                        child: const ProfileScreen(),
+                      ),
                     ),
                   );
                 },

@@ -7,6 +7,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../gamification/presentation/cubit/gamification_cubit.dart';
 import '../../../gamification/presentation/cubit/gamification_state.dart';
 import '../../../gamification/presentation/screens/gamification_profile_screen.dart';
+import '../bloc/load_status.dart';
+import '../bloc/profile_bloc.dart';
+import '../bloc/profile_event.dart';
+import '../bloc/profile_section.dart';
+import '../bloc/profile_state.dart';
 import '../widgets/profile_character_card.dart';
 
 /// MOB-9 / MOB-10: Profile hub screen.
@@ -36,6 +41,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         log('[GAM_UI] ProfileScreen opened — TRIGGERING_FETCH state=$stateName');
         cubit.fetchProfile();
       }
+
+      context.read<ProfileBloc>().add(const ProfileStarted());
     });
   }
 
@@ -111,6 +118,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       builder: (_) => const GamificationProfileScreen(),
                     ),
                   );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // ─── Task 2: minimal profile bloc proof (displayName/email, loading, error) ───
+              BlocBuilder<ProfileBloc, ProfileState>(
+                builder: (context, state) {
+                  if (state.profileStatus == LoadStatus.loading &&
+                      state.profile == null) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 8),
+                          Text('Loading profile…', style: TextStyle(fontSize: 14)),
+                        ],
+                      ),
+                    );
+                  }
+                  if (state.profileStatus == LoadStatus.failure) {
+                    final msg = state.errorFor(ProfileSection.profile) ?? 'Error';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Profile: $msg',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFFB00020),
+                        ),
+                      ),
+                    );
+                  }
+                  if (state.profile != null) {
+                    final p = state.profile!;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        '${p.displayName} · ${p.email}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF2C3E50),
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
                 },
               ),
             ],
