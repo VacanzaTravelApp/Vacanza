@@ -68,6 +68,7 @@ public class GamificationProfileService {
                                                 .id(b.getId())
                                                 .title(b.getTitle())
                                                 .key(b.getKey())
+                                                .description(b.getDescription())
                                                 .earned(earnedBadgeIds.contains(b.getId()))
                                                 .build())
                                 .toList();

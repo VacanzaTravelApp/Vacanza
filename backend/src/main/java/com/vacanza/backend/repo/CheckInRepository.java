@@ -25,4 +25,15 @@ public interface CheckInRepository extends JpaRepository<CheckIn, UUID> {
     // Gamification: distinct category count for a user (Explorer badge)
     @Query("SELECT COUNT(DISTINCT c.pointOfInterest.category) FROM CheckIn c WHERE c.user = :user")
     long countDistinctCategoriesByUser(@Param("user") User user);
+
+    // Check-in history: all check-ins for a user, most recent first
+    List<CheckIn> findAllByUserOrderByCheckedInAtDesc(User user);
+
+    // Stats: most recent check-in
+    java.util.Optional<CheckIn> findTopByUserOrderByCheckedInAtDesc(User user);
+
+    // Stats: most frequently checked-in POI category
+    @Query("SELECT c.pointOfInterest.category FROM CheckIn c WHERE c.user = :user " +
+            "GROUP BY c.pointOfInterest.category ORDER BY COUNT(c) DESC LIMIT 1")
+    java.util.Optional<String> findTopCategoryByUser(@Param("user") User user);
 }

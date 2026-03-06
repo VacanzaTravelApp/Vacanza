@@ -59,7 +59,7 @@ public class CheckInControllerTest {
                 when(checkInService.evaluateAutoCheckIn(any(User.class), any(AutoCheckInRequestDTO.class)))
                                 .thenReturn(responseDTO);
 
-                mockMvc.perform(post("/checkins/auto")
+                mockMvc.perform(post("/users/me/checkins/auto")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(requestDTO))
                                 .with(csrf()))

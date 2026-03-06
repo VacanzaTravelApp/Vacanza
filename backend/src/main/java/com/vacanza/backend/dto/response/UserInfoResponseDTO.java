@@ -1,6 +1,5 @@
 package com.vacanza.backend.dto.response;
 
-import com.vacanza.backend.entity.enums.Budget;
 import com.vacanza.backend.entity.enums.Gender;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +18,7 @@ public class UserInfoResponseDTO {
 
     private UUID infoId;
     private UUID userId;
+    private String email;
 
     private String firstName;
     private String middleName;
@@ -30,8 +30,6 @@ public class UserInfoResponseDTO {
     private String country;
     private LocalDate birthDate;
     private Gender gender;
-
-    private Budget budget;
 
     private String profileImageUrl;
 

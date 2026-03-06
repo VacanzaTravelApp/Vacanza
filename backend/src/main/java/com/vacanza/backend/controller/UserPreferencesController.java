@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/user/preferences")
+@RequestMapping("/users/me/preferences")
 @AllArgsConstructor
 public class UserPreferencesController {
 

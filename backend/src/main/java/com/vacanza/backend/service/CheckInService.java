@@ -1,6 +1,7 @@
 package com.vacanza.backend.service;
 
 import com.vacanza.backend.dto.request.AutoCheckInRequestDTO;
+import com.vacanza.backend.dto.response.CheckInHistoryDTO;
 import com.vacanza.backend.dto.response.CheckInResponseDTO;
 import com.vacanza.backend.entity.CheckIn;
 import com.vacanza.backend.entity.PointOfInterest;
@@ -99,6 +100,30 @@ public class CheckInService {
                                 .checkedInAt(savedCheckIn.getCheckedInAt())
                                 .message("Successfully checked in")
                                 .gamificationTriggered(true)
+                                .build();
+        }
+
+        /**
+         * Returns the user's check-in history, most recent first.
+         */
+        @Transactional(readOnly = true)
+        public List<CheckInHistoryDTO> getCheckInHistory(User user) {
+                return checkInRepository.findAllByUserOrderByCheckedInAtDesc(user)
+                                .stream()
+                                .map(this::toHistoryDto)
+                                .toList();
+        }
+
+        private CheckInHistoryDTO toHistoryDto(CheckIn checkIn) {
+                PointOfInterest poi = checkIn.getPointOfInterest();
+                return CheckInHistoryDTO.builder()
+                                .checkInId(checkIn.getCheckInId())
+                                .poiId(poi.getPoiId())
+                                .poiName(poi.getName())
+                                .category(poi.getCategory())
+                                .checkedInAt(checkIn.getCheckedInAt())
+                                .latitude(poi.getLatitude())
+                                .longitude(poi.getLongitude())
                                 .build();
         }
 
