@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:developer' as dev;
+
 import 'package:dio/dio.dart';
 
 import '../dto/check_in_dto.dart';
@@ -51,17 +54,26 @@ class ProfileRemoteDataSource {
   }
 
   Future<UserPreferencesDto> updatePreferences(Map<String, dynamic> partial) async {
-    final response = await _dio.put<dynamic>(
-      '$_basePath/preferences',
-      data: partial,
-    );
-    final data = response.data;
-    if (data is! Map<String, dynamic>) {
-      throw FormatException(
-        'Expected Map from PUT $_basePath/preferences, got ${data.runtimeType}',
-      );
+    const method = 'PUT';
+    final path = '$_basePath/preferences';
+    final bodyJson = jsonEncode(partial);
+    // Token is in Authorization header (set by interceptor); not logged.
+    dev.log('$method $path body: $bodyJson', name: 'ProfileRemote');
+    try {
+      final response = await _dio.put<dynamic>(path, data: partial);
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw FormatException(
+          'Expected Map from PUT $_basePath/preferences, got ${data.runtimeType}',
+        );
+      }
+      return UserPreferencesDto.fromJson(data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        dev.log('PUT preferences 400 response: ${e.response?.data}', name: 'ProfileRemote');
+      }
+      rethrow;
     }
-    return UserPreferencesDto.fromJson(data);
   }
 
   Future<TravelStatsDto> getStats() async {
