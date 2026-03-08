@@ -20,6 +20,8 @@ class ProfileState extends Equatable {
   final Map<ProfileSection, String> sectionErrors;
   /// One-off error after failed preferences update; clear via [PreferencesUpdateErrorDismissed].
   final String? preferencesUpdateError;
+  /// One-off error after failed profile update; clear via [ProfileUpdateErrorDismissed].
+  final String? profileUpdateError;
 
   const ProfileState({
     this.profileStatus = LoadStatus.initial,
@@ -32,6 +34,7 @@ class ProfileState extends Equatable {
     this.checkIns = const [],
     this.sectionErrors = const {},
     this.preferencesUpdateError,
+    this.profileUpdateError,
   });
 
   ProfileState copyWith({
@@ -45,7 +48,9 @@ class ProfileState extends Equatable {
     List<CheckIn>? checkIns,
     Map<ProfileSection, String>? sectionErrors,
     String? preferencesUpdateError,
+    String? profileUpdateError,
     bool clearPreferencesUpdateError = false,
+    bool clearProfileUpdateError = false,
     bool clearPreferences = false,
   }) {
     return ProfileState(
@@ -61,6 +66,9 @@ class ProfileState extends Equatable {
       preferencesUpdateError: clearPreferencesUpdateError
           ? null
           : (preferencesUpdateError ?? this.preferencesUpdateError),
+      profileUpdateError: clearProfileUpdateError
+          ? null
+          : (profileUpdateError ?? this.profileUpdateError),
     );
   }
 
@@ -78,5 +86,6 @@ class ProfileState extends Equatable {
         checkIns,
         sectionErrors,
         preferencesUpdateError,
+        profileUpdateError,
       ];
 }

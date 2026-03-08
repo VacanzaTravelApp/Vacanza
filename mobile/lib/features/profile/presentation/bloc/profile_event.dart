@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../data/models/user_preferences.dart';
+import '../../data/models/user_profile.dart';
 import 'profile_section.dart';
 
 abstract class ProfileEvent extends Equatable {
@@ -45,4 +46,20 @@ class PreferencesUpdateRequested extends ProfileEvent {
 /// Clear the one-off preferences update error (e.g. after showing SnackBar).
 class PreferencesUpdateErrorDismissed extends ProfileEvent {
   const PreferencesUpdateErrorDismissed();
+}
+
+/// Edit Profile sheet saved: optimistic update then PUT; rollback on failure.
+class ProfileUpdateRequested extends ProfileEvent {
+  final UserProfile initialProfile;
+  final UserProfile draft;
+
+  const ProfileUpdateRequested(this.initialProfile, this.draft);
+
+  @override
+  List<Object?> get props => [initialProfile, draft];
+}
+
+/// Clear the one-off profile update error (e.g. after showing SnackBar).
+class ProfileUpdateErrorDismissed extends ProfileEvent {
+  const ProfileUpdateErrorDismissed();
 }
