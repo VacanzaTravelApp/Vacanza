@@ -1,17 +1,27 @@
 import React, { useReducer, useEffect, useMemo } from "react";
-import "../styles/bookingSheet.css"; 
-import { bookingReducer, initialState } from "../bookingReducer"; 
-import { auth } from "../../../firebase"; 
+import "../styles/bookingSheet.css";
+import { bookingReducer, initialState } from "../bookingReducer";
+import { auth } from "../../../firebase";
 
 export default function BookingSheet({ open, onClose }) {
   const [state, dispatch] = useReducer(bookingReducer, initialState);
 
   useEffect(() => {
-    if (!open) dispatch({ type: "RESET_STATE" }); 
+    if (!open) dispatch({ type: "RESET_STATE" });
   }, [open]);
 
-  const sortedItems = useMemo(() => {
+  const filteredAndSortedItems = useMemo(() => {
     let list = [...state.items];
+
+    // Hard filtering by budget in frontend to guarantee results
+    const maxBudget = parseFloat(state.searchParams.budget);
+    if (!isNaN(maxBudget) && maxBudget > 0) {
+      list = list.filter(item => {
+        const itemPrice = item.pricePerNight || item.price;
+        return itemPrice <= maxBudget;
+      });
+    }
+
     if (state.sortBy === 'low') {
       list.sort((a, b) => (a.pricePerNight || a.price) - (b.pricePerNight || b.price));
     } else if (state.sortBy === 'high') {
@@ -20,14 +30,23 @@ export default function BookingSheet({ open, onClose }) {
       list.sort((a, b) => (a.duration || "").localeCompare(b.duration || ""));
     }
     return list;
-  }, [state.items, state.sortBy]);
+  }, [state.items, state.sortBy, state.searchParams.budget]);
 
   const handleSearch = async () => {
     const { destination, origin, dates, checkOutDate, adults, budget, isRoundTrip } = state.searchParams;
     const isHotel = state.bookingType === 'hotels';
-    
-    if (!destination || (!isHotel && !origin)) {
-      alert("Lütfen IATA kodlarını giriniz (Örn: IST, PAR)."); 
+
+    const errors = {};
+    if (!destination) errors.destination = "Entry required";
+    if (!isHotel && !origin) errors.origin = "Entry required";
+    if (!dates) errors.dates = "Selection required";
+
+    if ((isHotel || isRoundTrip) && !checkOutDate) {
+      errors.checkOutDate = "Selection required";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      dispatch({ type: "SET_ERRORS", payload: errors });
       return;
     }
 
@@ -35,15 +54,16 @@ export default function BookingSheet({ open, onClose }) {
     try {
       const user = auth.currentUser;
       if (!user) { alert("Lütfen önce giriş yapın!"); dispatch({ type: "SEARCH_ERROR" }); return; }
-      const token = await user.getIdToken(); 
-      const endpoint = isHotel ? `/bookings/accommodations/search` : `/bookings/transportation/search`; 
-      
+      const token = await user.getIdToken();
+      const endpoint = isHotel ? `/bookings/accommodations/search` : `/bookings/transportation/search`;
+
       const payload = isHotel ? {
         cityCode: destination, checkInDate: dates, checkOutDate: checkOutDate || dates,
         adults: parseInt(adults) || 1, budget: budget ? parseFloat(budget) : null
       } : {
         origin, destination, departureDate: dates,
-        returnDate: isRoundTrip ? checkOutDate : null, adults: parseInt(adults) || 1
+        returnDate: isRoundTrip ? checkOutDate : null, adults: parseInt(adults) || 1,
+        budget: budget ? parseFloat(budget) : null
       };
 
       const response = await fetch(endpoint, {
@@ -66,14 +86,21 @@ export default function BookingSheet({ open, onClose }) {
   const formatTime = (t) => t?.includes('T') ? t.split('T')[1].substring(0, 5) : t;
   const formatDuration = (d) => d?.replace('PT', '').toLowerCase() || '2h 15m';
 
+  const renderError = (field) => {
+    if (state.errors?.[field]) {
+      return <span className="field-error-msg">{state.errors[field]}</span>;
+    }
+    return null;
+  };
+
   // ORTAK SORT COMPONENTİ (Tekrardan kurtulmak için)
   const SortField = (
     <div className="sort-container-refined">
       <label>Sort by</label>
-      <select 
+      <select
         className="modern-sort-select"
         value={state.sortBy || 'low'}
-        onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { sortBy: e.target.value }})}
+        onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { sortBy: e.target.value } })}
       >
         <option value="low">Price: Low to High</option>
         <option value="high">Price: High to Low</option>
@@ -86,38 +113,44 @@ export default function BookingSheet({ open, onClose }) {
     <div className="custom-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="custom-sheet modern-ui" onClick={(e) => e.stopPropagation()}>
         <div className="drag-handle-line" />
-        
+
         <button className="close-circle-btn-top" onClick={onClose}>✕</button>
 
         <div className="sheet-scrollable-content">
           {state.view === 'search' ? (
             <div className="search-form-container">
-              <div className="tab-pill-container">
-                <button className={state.bookingType === 'hotels' ? 'pill-active' : ''} 
-                  onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'hotels' }})}>🏨 Hotels</button>
-                <button className={state.bookingType === 'flights' ? 'pill-active' : ''} 
-                  onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'flights' }})}>✈️ Flights</button>
+              <div className="tab-pill-container-mock">
+                <button className={state.bookingType === 'hotels' ? 'pill-active-mock' : ''}
+                  onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'hotels' } })}>
+                  <span className="pill-icon">🏨</span> Hotels
+                </button>
+                <button className={state.bookingType === 'flights' ? 'pill-active-mock' : ''}
+                  onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'flights' } })}>
+                  <span className="pill-icon">✈️</span> Flights
+                </button>
               </div>
 
               <div className="inputs-grid-refined">
                 {state.bookingType === 'flights' && (
                   <div className="input-group-modern">
                     <label>Origin (IATA)</label>
-                    <input type="text" placeholder="E.g. IST" maxLength="3" value={state.searchParams.origin} 
-                      onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { origin: e.target.value.toUpperCase() }})} />
+                    <input type="text" placeholder="E.g. IST" maxLength="3" value={state.searchParams.origin}
+                      onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { origin: e.target.value.toUpperCase() } })} />
+                    {renderError('origin')}
                   </div>
                 )}
 
                 <div className="input-group-modern">
                   <label>{state.bookingType === 'hotels' ? 'City (IATA)' : 'Destination (IATA)'}</label>
-                  <input type="text" placeholder="E.g. PAR" maxLength="3" value={state.searchParams.destination} 
-                    onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { destination: e.target.value.toUpperCase() }})} />
+                  <input type="text" placeholder="E.g. PAR" maxLength="3" value={state.searchParams.destination}
+                    onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { destination: e.target.value.toUpperCase() } })} />
+                  {renderError('destination')}
                 </div>
 
                 {state.bookingType === 'flights' && (
                   <div className="checkbox-wrapper-ios">
-                    <input type="checkbox" id="rt-check" checked={state.searchParams.isRoundTrip} 
-                      onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { isRoundTrip: e.target.checked }})} />
+                    <input type="checkbox" id="rt-check" checked={state.searchParams.isRoundTrip}
+                      onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { isRoundTrip: e.target.checked } })} />
                     <label htmlFor="rt-check">Round trip flight</label>
                   </div>
                 )}
@@ -125,14 +158,31 @@ export default function BookingSheet({ open, onClose }) {
                 <div className="row-compact">
                   <div className="input-group-modern half">
                     <label>{state.bookingType === 'hotels' ? 'Check-in' : 'Date'}</label>
-                    <input type="date" value={state.searchParams.dates} 
-                      onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { dates: e.target.value }})} />
+                    <input
+                      type="date"
+                      value={state.searchParams.dates}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => {
+                        const newCheckIn = e.target.value;
+                        const update = { dates: newCheckIn };
+                        if (state.searchParams.checkOutDate && newCheckIn > state.searchParams.checkOutDate) {
+                          update.checkOutDate = newCheckIn;
+                        }
+                        dispatch({ type: "UPDATE_PARAM", payload: update });
+                      }}
+                    />
+                    {renderError('dates')}
                   </div>
                   {(state.bookingType === 'hotels' || state.searchParams.isRoundTrip) && (
                     <div className="input-group-modern half">
                       <label>{state.bookingType === 'hotels' ? 'Check-out' : 'Return'}</label>
-                      <input type="date" value={state.searchParams.checkOutDate} 
-                        onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { checkOutDate: e.target.value }})} />
+                      <input
+                        type="date"
+                        value={state.searchParams.checkOutDate}
+                        min={state.searchParams.dates || new Date().toISOString().split("T")[0]}
+                        onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { checkOutDate: e.target.value } })}
+                      />
+                      {renderError('checkOutDate')}
                     </div>
                   )}
                 </div>
@@ -141,15 +191,25 @@ export default function BookingSheet({ open, onClose }) {
                   <div className="input-group-modern half">
                     <label>Adults</label>
                     <div className="counter-box">
-                      <button onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { adults: Math.max(1, (state.searchParams.adults || 1) - 1) }})}>−</button>
+                      <button onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { adults: Math.max(1, (state.searchParams.adults || 1) - 1) } })}>−</button>
                       <span>{state.searchParams.adults || 1}</span>
-                      <button onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { adults: (state.searchParams.adults || 1) + 1 }})}>+</button>
+                      <button onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { adults: (state.searchParams.adults || 1) + 1 } })}>+</button>
                     </div>
                   </div>
                   <div className="input-group-modern half">
                     <label>Budget <small>(Optional)</small></label>
-                    <input type="number" placeholder="Max $" value={state.searchParams.budget} 
-                      onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { budget: e.target.value }})} />
+                    <input
+                      type="number"
+                      placeholder="Max $"
+                      value={state.searchParams.budget}
+                      min="0"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || parseFloat(val) >= 0) {
+                          dispatch({ type: "UPDATE_PARAM", payload: { budget: val } });
+                        }
+                      }}
+                    />
                   </div>
                 </div>
               </div>
@@ -161,33 +221,62 @@ export default function BookingSheet({ open, onClose }) {
               </button>
             </div>
           ) : (
-            <div className="results-container">
-              <div className="results-summary-info">
-                <h3 className="found-count-title">
-                  {state.items.length} {state.bookingType === 'flights' ? 'Flights' : 'Hotels'} Found
+            <div className="results-container-mock">
+              <div className="results-header-mock">
+                <h3 className="found-count-title-mock">
+                  {filteredAndSortedItems.length} {state.bookingType === 'flights' ? 'Flights' : 'Hotels'} Found
                 </h3>
-                <p className="route-sub-detail">
-                  {state.bookingType === 'flights' ? `${state.searchParams.origin} → ${state.searchParams.destination}` : state.searchParams.destination} • {state.searchParams.dates}
+                <p className="route-sub-detail-mock">
+                  {state.bookingType === 'flights' ? `${state.searchParams.origin} • ${state.searchParams.destination}` : state.searchParams.destination} • {state.searchParams.dates}
                 </p>
               </div>
 
-              {sortedItems.map((item, idx) => {
-                const isHotel = state.bookingType === 'hotels';
-                return (
-                  <div key={idx} className={isHotel ? "hotel-detail-card" : "flight-detail-card"}>
-                    <div className="card-top-row">
-                      <span className="carrier-tag">{isHotel ? "🏨 HOTEL" : `✈️ ${item.carrier || 'AIRLINE'}`}</span>
-                      <span className="price-tag-blue">
-                        ${isHotel ? item.pricePerNight || item.price : item.price}
-                      </span>
-                    </div>
-
-                    {isHotel ? (
-                      <div className="hotel-content-refined">
-                        <p className="hotel-name-text">{item.hotelName || 'Property'}</p>
-                        <p className="hotel-loc-text">📍 {state.searchParams.destination}</p>
+              <div className="results-list-mock">
+                {filteredAndSortedItems.map((item, idx) => {
+                  const isHotel = state.bookingType === 'hotels';
+                  if (isHotel) {
+                    const thumbUrl = item.photo || `https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=200&h=200`;
+                    return (
+                      <div key={idx} className="premium-result-card">
+                        <div className="result-card-main">
+                          <div className="result-thumb-container">
+                            <img
+                              src={thumbUrl}
+                              alt={item.hotelName}
+                              className="result-thumb"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.style.display = 'none';
+                                e.target.parentNode.innerHTML = `<span class="thumb-fallback-icon">🏨</span>`;
+                              }}
+                            />
+                          </div>
+                          <div className="result-info-center">
+                            <h4 className="result-title">{item.hotelName}</h4>
+                            <div className="result-meta-row">
+                              {item.rating && <><span className="result-rating">★ {item.rating}</span><span className="meta-dot">•</span></>}
+                              <span className="result-dist">{item.distance ? `${item.distance} km` : state.searchParams.destination}</span>
+                            </div>
+                            <div className="result-price-row">
+                              <span className="price-val">${item.pricePerNight || item.price}</span>
+                              <span className="price-unit">/ night</span>
+                            </div>
+                          </div>
+                          <button className="book-now-btn-green" onClick={() => window.open(item.externalBookingUrl, '_blank')}>
+                            Book Now
+                          </button>
+                        </div>
                       </div>
-                    ) : (
+                    );
+                  }
+
+                  // FLIGHTS: Geleneksel Zaman Çizelgesi UI'ına geri dönüş
+                  return (
+                    <div key={idx} className="hotel-detail-card">
+                      <div className="card-top-row">
+                        <span className="carrier-tag">✈️ {item.carrier || 'AIRLINE'}</span>
+                        <span className="price-tag-blue">${item.price}</span>
+                      </div>
                       <div className="flight-path-row">
                         <div className="time-node">
                           <span className="t-val">{formatTime(item.departureTime)}</span>
@@ -203,18 +292,22 @@ export default function BookingSheet({ open, onClose }) {
                           <span className="c-val">{item.destination}</span>
                         </div>
                       </div>
-                    )}
+                      <button className="google-action-btn" onClick={() => window.open(item.externalBookingUrl, '_blank')}>
+                        Open in Google Flights ↗
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
 
-                    <button className="google-action-btn" onClick={() => window.open(item.externalBookingUrl, '_blank')}>
-                      {isHotel ? 'View Hotel Details ↗' : 'Open in Google Flights ↗'}
-                    </button>
-                  </div>
-                );
-              })}
-              
+              <div className="results-footer-mock">
+                <div className="footer-credits">
+                  <span>Powered by Amadeus API</span>
+                </div>
+              </div>
+
               {/* SONUÇ EKRANI SORT VE GERİ DÖN BUTONU */}
               <div className="results-footer-actions">
-                {SortField}
                 <div className="center-btn-wrapper">
                   <button className="retry-link-btn" onClick={() => dispatch({ type: "RETRY" })}>
                     ← Back to Search

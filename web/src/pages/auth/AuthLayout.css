@@ -1,6 +1,6 @@
 /* src/pages/auth/AuthLayout.css */
 
-/* General Reset and Container Styles */
+/* Genel Sıfırlama ve Konteyner Ayarları */
 html,
 body,
 #root {
@@ -17,7 +17,7 @@ body,
     min-height: 100vh;
     width: 100%;
 
-    /* Background image for the whole page */
+    /* Tüm sayfanın arka plan görseli */
     background-image: url('https://picsum.photos/1000/1000?random=1');
     background-size: cover;
     background-position: center;
@@ -36,11 +36,11 @@ body,
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.4);
-    /* Dark opacity layer */
+    /* Koyu opaklık katmanı */
     z-index: 1;
 }
 
-/* Ensures all content columns appear in front of the overlay */
+/* Tüm içerik sütunlarının katmanın önünde görünmesini sağlar */
 .auth-container>* {
     z-index: 2;
 }
@@ -61,7 +61,7 @@ body,
     justify-content: space-between;
     overflow: hidden;
     z-index: 2;
-    /* On top of the background layer */
+    /* Arka plan katmanının üstünde */
 }
 
 .auth-visual-column::before {
@@ -199,7 +199,7 @@ body,
     display: flex;
     justify-content: center;
     align-items: center;
-    /* Transparent background */
+    /* Arka planı şeffaf */
     background-color: transparent;
     z-index: 2;
     overflow-y: auto;
@@ -211,111 +211,34 @@ body,
 ** Opacity reduced to 75%.
 */
 .auth-form-column>* {
-    /* UPDATED: Reduced opacity to 75% (Substantially breaks the whiteness) */
+    /* GÜNCEL: Opaklığı %75'e düşürdük (Beyazlığı önemli ölçüde kırar) */
     background-color: rgba(255, 255, 255, 0.75);
 
-    /* Reduced size and padding settings */
-    max-width: 390px;
+    /* Küçültülmüş boyut ve iç boşluk ayarları */
+    max-width: 360px;
     width: 100%;
-    padding: 16px;
+    padding: 30px;
 
     backdrop-filter: blur(8px);
 
-    /* Shadow and border radius */
+    /* Gölge ve köşe yuvarlaklığı */
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
     border-radius: 16px;
 }
 
-
-/* ================================================== */
-/* ========== RESPONSIVE BREAKPOINTS ================ */
-/* ================================================== */
-
-/* ── TABLET (769px – 1024px) ── */
-@media (max-width: 1024px) {
-    .auth-visual-column {
-        padding: 40px 24px;
-    }
-
-    .logo-text {
-        font-size: 32px;
-    }
-
-    .slogan {
-        font-size: 1.3em;
-    }
-
-    .feature-grid {
-        gap: 8px;
-    }
-
-    .feature-card {
-        padding: 12px;
-    }
-
-    .card-title {
-        font-size: 13px;
-    }
-
-    .card-description {
-        font-size: 11px;
-    }
-
-    .stat-number {
-        font-size: 20px;
-    }
-
-    .stat-text {
-        font-size: 12px;
-    }
-
-    .auth-form-column>* {
-        max-width: 340px;
-        padding: 24px;
-    }
-}
-
-/* ── MOBILE (≤ 768px) ── */
-@media (max-width: 768px) {
-    .auth-container {
-        flex-direction: column;
-        background-attachment: scroll;
-    }
-
-    /* Hide left visual column on mobile */
+/* --- MOBİL UYUMLULUK (RESPONSIVE) --- */
+@media (max-width: 992px) {
     .auth-visual-column {
         display: none;
+        /* Hide visual column on mobile to save space */
     }
 
-    /* Form column should take full screen */
     .auth-form-column {
-        flex: none;
-        width: 100%;
-        min-height: 100vh;
-        padding: 24px 16px;
-        align-items: flex-start;
-        justify-content: center;
-        box-sizing: border-box;
+        padding: 20px;
     }
 
     .auth-form-column>* {
         max-width: 100%;
-        width: 100%;
-        padding: 28px 20px;
-        border-radius: 20px;
-        background-color: rgba(255, 255, 255, 0.9);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    }
-}
-
-/* ── SMALL MOBILE (≤ 400px) ── */
-@media (max-width: 400px) {
-    .auth-form-column {
-        padding: 16px 10px;
-    }
-
-    .auth-form-column>* {
-        padding: 22px 16px;
-        border-radius: 16px;
+        padding: 24px 20px;
     }
 }

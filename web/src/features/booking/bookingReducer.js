@@ -3,32 +3,52 @@ export const initialState = {
   view: 'search',
   loading: false,
   items: [],
-  sortBy: 'low', 
+  sortBy: 'low',
   searchParams: {
-    origin: '', 
+    origin: '',
     destination: '',
     dates: '',
     checkOutDate: '',
     adults: 1,
     budget: '',
     isRoundTrip: false
-  }
+  },
+  errors: {}
 };
 
 export function bookingReducer(state, action) {
   switch (action.type) {
     case "UPDATE_PARAM":
-      // Eğer payload doğrudan sortBy içeriyorsa state'in köküne yazar
-      // Diğer her şeyi searchParams içine güvenli bir şekilde merge eder
-      return { 
-        ...state, 
+      if (action.payload.bookingType && action.payload.bookingType !== state.bookingType) {
+        return {
+          ...state,
+          bookingType: action.payload.bookingType,
+          searchParams: { ...initialState.searchParams, bookingType: action.payload.bookingType },
+          errors: {}
+        };
+      }
+
+      // Clear error for the field being updated
+      const newErrors = { ...state.errors };
+      Object.keys(action.payload).forEach(key => {
+        delete newErrors[key];
+        if (key === 'dates') delete newErrors['dates'];
+        if (key === 'origin') delete newErrors['origin'];
+        if (key === 'destination') delete newErrors['destination'];
+      });
+
+      return {
+        ...state,
         sortBy: action.payload.sortBy !== undefined ? action.payload.sortBy : state.sortBy,
         bookingType: action.payload.bookingType || state.bookingType,
-        searchParams: { 
-          ...state.searchParams, 
-          ...action.payload 
-        }
+        searchParams: {
+          ...state.searchParams,
+          ...action.payload
+        },
+        errors: newErrors
       };
+    case "SET_ERRORS":
+      return { ...state, errors: action.payload };
     case "SEARCH_START":
       return { ...state, loading: true };
     case "SEARCH_SUCCESS":

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+// Ant Design bileşenleri, hook'ları ve mesajlar
 import { Form, Input, Button, Checkbox, Row, Col, Space, message } from 'antd';
 import {
   UserOutlined,
@@ -7,11 +8,12 @@ import {
   SendOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  CheckOutlined,
 } from '@ant-design/icons';
 import './RegisterCard.css';
 import { useNavigate } from 'react-router-dom';
 
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // <-- updateProfile EKLENDİ
 import auth from '../../firebase';
 
 // PasswordChecks Component
@@ -29,11 +31,11 @@ const PasswordChecks = ({ password }) => {
   }
 
   return (
-    <Row gutter={[10, 0]} className="password-checks-container">
+    <Row gutter={[10, 5]} className="password-checks-container">
       {checks.map((check) => (
         <Col span={12} key={check.text}>
           <div className={`password-check-item ${check.valid ? 'valid' : 'invalid'}`}>
-            <span className="check-indicator">
+            <span className="check-indicator" style={{ marginRight: '8px' }}>
               {check.valid ? (
                 <CheckCircleOutlined style={{ color: '#52c41a' }} />
               ) : (
@@ -49,25 +51,51 @@ const PasswordChecks = ({ password }) => {
 };
 
 
+const PreferredNameSelector = ({ value = [], onChange, firstName, middleName }) => {
+  const options = [];
+  if (firstName && firstName.trim() !== '') options.push(firstName);
+  if (middleName && middleName.trim() !== '') options.push(middleName);
+
+  const toggleSelection = (name) => {
+    let newValue = [...(value || [])];
+    if (newValue.includes(name)) {
+      newValue = newValue.filter(n => n !== name);
+    } else {
+      newValue.push(name);
+    }
+    onChange(newValue);
+  };
+
+  return (
+    <div className="preferred-name-options">
+      {options.map((name, index) => {
+        const isSelected = value?.includes(name);
+        return (
+          <div
+            key={index}
+            className={`pn-option ${isSelected ? 'selected' : ''}`}
+            onClick={() => toggleSelection(name)}
+          >
+            {isSelected && <CheckOutlined style={{ marginRight: '6px', fontSize: '12px', fontWeight: 'bold' }} />}
+            {name}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const RegisterCard = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const password = Form.useWatch('password', form);
-  const firstName = Form.useWatch('firstName', form);
   const middleName = Form.useWatch('middleName', form);
+  const firstName = Form.useWatch('firstName', form);
   const [loading, setLoading] = useState(false);
-  const [preferredName, setPreferredName] = useState(null);
-  const [showPreferredError, setShowPreferredError] = useState(false);
 
 
   const onFinish = async (values) => {
-    if (middleName && !preferredName) {
-      setShowPreferredError(true);
-      setLoading(false);
-      return;
-    }
-    setShowPreferredError(false);
-
+    setLoading(true);
     const { email, password, firstName, lastName } = values;
 
     try {
@@ -77,24 +105,36 @@ const RegisterCard = () => {
         displayName: `${firstName} ${lastName}`
       });
 
-      message.success('Registration successful! Redirecting you to the map.');
       console.log('Registration Successful, redirecting to /map');
       navigate('/map');
 
     } catch (error) {
       console.error("Firebase Registration Error:", error.code, error.message);
 
-      let errorMessage = "An error occurred during registration. Please try again.";
       if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "This email address is already in use.";
+        form.setFields([
+          {
+            name: 'email',
+            errors: ['An account already exists with this email address.'],
+          },
+        ]);
       } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "Invalid email format.";
+        form.setFields([
+          {
+            name: 'email',
+            errors: ['Please enter a valid email address.'],
+          },
+        ]);
       } else if (error.code === 'auth/weak-password') {
-        errorMessage = "Password is too weak. Please use a stronger password.";
+        form.setFields([
+          {
+            name: 'password',
+            errors: ['Your password is too weak. Please choose a stronger one.'],
+          },
+        ]);
+      } else {
+        message.error("Oops! Something went wrong during registration. Please try again.");
       }
-
-      message.error(errorMessage);
-
     } finally {
       setLoading(false);
     }
@@ -110,6 +150,7 @@ const RegisterCard = () => {
       <div className="card-header">
         <span className="vacanza-logo">
           <SendOutlined className="logo-icon" />
+          Vacanza
         </span>
         <h3>Create Your <span style={{ color: '#3da8c8' }}>Vacanza</span> Account</h3>
         <p className="header-subtext">
@@ -126,14 +167,14 @@ const RegisterCard = () => {
         className="auth-form"
         requiredMark={false}
       >
-        <Row gutter={10}>
-          <Col xs={24} sm={12}>
+        <Row gutter={12}>
+          <Col span={12}>
             <Form.Item
               name="firstName"
-              label="First Name"
-              rules={[{ required: true, message: 'First name is required' }]}
+              rules={[{ required: true, message: 'Please enter your first name!' }]}
             >
               <Input
+                prefix={<UserOutlined />}
                 placeholder="First Name"
                 size="large"
                 autoComplete="given-name"
@@ -141,13 +182,13 @@ const RegisterCard = () => {
             </Form.Item>
           </Col>
 
-          <Col xs={24} sm={12}>
+          <Col span={12}>
             <Form.Item
               name="middleName"
-              label="Middle Name"
             >
               <Input
-                placeholder="Middle Name"
+                prefix={<UserOutlined />}
+                placeholder="Middle Name (Optional)"
                 size="large"
               />
             </Form.Item>
@@ -156,56 +197,33 @@ const RegisterCard = () => {
 
         <Form.Item
           name="lastName"
-          label="Last Name"
-          rules={[{ required: true, message: 'Last name is required' }]}
+          rules={[{ required: true, message: 'Please enter your last name!' }]}
         >
           <Input
+            prefix={<UserOutlined />}
             placeholder="Last Name"
             size="large"
             autoComplete="family-name"
           />
         </Form.Item>
 
-        {/* Preferred Name selector - only shows when middle name is entered */}
-        {middleName && (
-          <div className="preferred-name-section">
-            <span className="preferred-name-label">Preferred Name</span>
-            <Space size={8}>
-              {firstName && (
-                <button
-                  type="button"
-                  className={`preferred-chip ${preferredName === 'firstName' ? 'preferred-chip--active' : ''}`}
-                  onClick={() => {
-                    const newValue = preferredName === 'firstName' ? null : 'firstName';
-                    setPreferredName(newValue);
-                    if (!newValue) setShowPreferredError(true);
-                    else setShowPreferredError(false);
-                  }}
-                >
-                  {preferredName === 'firstName' && <CheckCircleOutlined style={{ marginRight: 4 }} />}
-                  {firstName}
-                </button>
-              )}
-              <button
-                type="button"
-                className={`preferred-chip ${preferredName === 'middleName' ? 'preferred-chip--active' : ''}`}
-                onClick={() => {
-                  const newValue = preferredName === 'middleName' ? null : 'middleName';
-                  setPreferredName(newValue);
-                  if (!newValue) setShowPreferredError(true);
-                  else setShowPreferredError(false);
-                }}
-              >
-                {preferredName === 'middleName' && <CheckCircleOutlined style={{ marginRight: 4 }} />}
-                {middleName}
-              </button>
-            </Space>
-            {showPreferredError && !preferredName && (
-              <div style={{ color: '#ff4d4f', fontSize: '12px', marginTop: '4px' }}>
-                Please choose at least one preferred name
-              </div>
-            )}
-          </div>
+        {middleName && middleName.trim() !== '' && (
+          <Form.Item
+            name="preferredName"
+            label={<span style={{ color: '#455A64', fontWeight: 600, fontSize: '13px' }}>Preferred Name</span>}
+            rules={[
+              {
+                validator: (_, value) => {
+                  if (!value || value.length === 0) {
+                    return Promise.reject(new Error('Please choose at least one preffered name'));
+                  }
+                  return Promise.resolve();
+                }
+              }
+            ]}
+          >
+            <PreferredNameSelector firstName={firstName} middleName={middleName} />
+          </Form.Item>
         )}
 
         <Form.Item
@@ -217,7 +235,8 @@ const RegisterCard = () => {
           ]}
         >
           <Input
-            placeholder="you@example.com"
+            prefix={<MailOutlined />}
+            placeholder="Email address"
             size="large"
             autoComplete="email"
           />
@@ -229,6 +248,7 @@ const RegisterCard = () => {
           hasFeedback
         >
           <Input.Password
+            prefix={<LockOutlined />}
             placeholder="Password"
             size="large"
             autoComplete="new-password"
@@ -255,6 +275,7 @@ const RegisterCard = () => {
           ]}
         >
           <Input.Password
+            prefix={<LockOutlined />}
             placeholder="Confirm Password"
             size="large"
             autoComplete="new-password"
