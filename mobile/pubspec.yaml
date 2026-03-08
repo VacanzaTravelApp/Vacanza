@@ -50,6 +50,9 @@ dependencies:
 
   # External URL launcher (MOB9)
   url_launcher: ^6.2.0
+
+  # Profile photo picker (camera / gallery)
+  image_picker: ^1.0.7
 dev_dependencies:
   flutter_test:
     sdk: flutter
