@@ -38,6 +38,9 @@ import '../../../poi_search/presentation/widgets/poi_filter_panel.dart';
 import '../../../../features/booking/presentation/widgets/booking_bottom_sheet.dart';
 
 import '../../../chat/presentation/screens/chat_screen.dart';
+import '../../../profile/data/repositories/profile_repository.dart';
+import '../../../profile/presentation/bloc/profile_bloc.dart';
+import '../../../profile/presentation/bloc/profile_event.dart';
 import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
@@ -85,6 +88,11 @@ class HomeMapScreen extends StatelessWidget {
           BlocProvider<CheckinBloc>(
             create: (ctx) => CheckinBloc(
               repository: ctx.read<CheckinRepository>(),
+            ),
+          ),
+          BlocProvider<ProfileBloc>(
+            create: (ctx) => ProfileBloc(
+              repository: ctx.read<ProfileRepository>(),
             ),
           ),
         ],
@@ -178,9 +186,9 @@ class _HomeMapViewState extends State<_HomeMapView>
     WidgetsBinding.instance.addObserver(this);
     _locationBloc = context.read<LocationBloc>();
 
-    // Start foreground GPS tracking (MOB-1)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _locationBloc.add(const StartTracking());
+      context.read<ProfileBloc>().add(ProfileStarted());
     });
   }
 
