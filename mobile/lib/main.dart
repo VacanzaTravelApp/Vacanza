@@ -25,6 +25,9 @@ import 'features/booking/data/repositories/booking_repository.dart';
 
 import 'features/chat/data/api/chat_api_client.dart';
 
+import 'features/profile/data/datasources/profile_remote_data_source.dart';
+import 'features/profile/data/repositories/profile_repository.dart';
+
 import 'features/auth/presentation/bloc/register_bloc.dart';
 import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'features/auth/presentation/screens/auth_gate.dart';
@@ -102,6 +105,16 @@ class VacanzaApp extends StatelessWidget {
         /// Chat API client (AI chatbot)
         RepositoryProvider<ChatApiClient>(
           create: (ctx) => ChatApiClient(ctx.read<Dio>()),
+        ),
+
+        /// Profile (MOB-9 / profile feature)
+        RepositoryProvider<ProfileRemoteDataSource>(
+          create: (ctx) => ProfileRemoteDataSource(ctx.read<Dio>()),
+        ),
+        RepositoryProvider<ProfileRepository>(
+          create: (ctx) => ProfileRepository(
+            dataSource: ctx.read<ProfileRemoteDataSource>(),
+          ),
         ),
       ],
       child: MultiBlocProvider(
