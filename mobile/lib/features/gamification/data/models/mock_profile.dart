@@ -5,7 +5,7 @@ import 'stat_dto.dart';
 /// Returns a realistic mock [GamificationProfileDto] for demo purposes.
 ///
 /// Badge keys and level titles match the backend seed data.
-/// Remove this once GET /gamification/profile is live.
+/// Remove this once GET /users/me/gamification is live.
 GamificationProfileDto mockGamificationProfile() {
   return GamificationProfileDto(
     roleText: 'Urban Adventurer',

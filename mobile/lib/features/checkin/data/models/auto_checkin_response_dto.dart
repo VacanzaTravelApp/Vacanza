@@ -1,4 +1,4 @@
-/// Response payload from `POST /checkins/auto`.
+/// Response payload from `POST /users/me/checkins/auto`.
 ///
 /// All fields parsed null-safely — backend may omit fields
 /// when no check-in occurred (e.g. user too far from any POI).

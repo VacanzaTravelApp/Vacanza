@@ -14,7 +14,9 @@ import '../bloc/profile_bloc.dart';
 import '../bloc/profile_event.dart';
 import '../bloc/profile_section.dart';
 import '../bloc/profile_state.dart';
+import '../widgets/edit_preferences_sheet.dart';
 import '../widgets/profile_character_card.dart';
+import '../../data/models/user_preferences.dart';
 
 /// MOB-9 / MOB-10: Profile hub screen.
 ///
@@ -50,9 +52,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  void _openEditPreferencesSheet(BuildContext context, UserPreferences initialPrefs) {
+    final profileBloc = context.read<ProfileBloc>();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: profileBloc,
+        child: EditPreferencesSheet(initialPrefs: initialPrefs),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BlocListener<ProfileBloc, ProfileState>(
+      listenWhen: (prev, curr) => prev.preferencesUpdateError != curr.preferencesUpdateError,
+      listener: (context, state) {
+        final error = state.preferencesUpdateError;
+        if (error != null && error.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error)),
+          );
+          context.read<ProfileBloc>().add(const PreferencesUpdateErrorDismissed());
+        }
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -117,7 +143,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 16),
 
               // ─── Travel Preferences ───
-              const _TravelPreferencesCard(),
+              _TravelPreferencesCard(
+                onEditPreferences: (initial) => _openEditPreferencesSheet(context, initial),
+              ),
               const SizedBox(height: 16),
 
               // ─── Travel Statistics ───
@@ -129,11 +157,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 16),
 
               // ─── Account actions ───
-              const _AccountActionsSection(),
+              BlocBuilder<ProfileBloc, ProfileState>(
+                builder: (context, state) {
+                  return _AccountActionsSection(
+                    onEditPreferences: () {
+                      final initial = state.preferences ??
+                          UserPreferences.defaultForDraft(
+                            userId: state.profile?.userId ?? '',
+                          );
+                      _openEditPreferencesSheet(context, initial);
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
       ),
+    ),
     );
   }
 }
@@ -252,7 +293,15 @@ String _capitalize(String s) {
 // ──────────────────────────────────────────────────────────────────
 
 class _TravelPreferencesCard extends StatelessWidget {
-  const _TravelPreferencesCard();
+  final void Function(UserPreferences initialPrefs) onEditPreferences;
+
+  const _TravelPreferencesCard({required this.onEditPreferences});
+
+  void _openSheet(BuildContext context, ProfileState state) {
+    final initial = state.preferences ??
+        UserPreferences.defaultForDraft(userId: state.profile?.userId ?? '');
+    onEditPreferences(initial);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -261,11 +310,10 @@ class _TravelPreferencesCard extends StatelessWidget {
           prev.preferencesStatus != curr.preferencesStatus ||
           prev.preferences != curr.preferences,
       builder: (context, state) {
+        Widget cardChild;
         if (state.preferencesStatus == LoadStatus.loading &&
             state.preferences == null) {
-          return _SectionCard(
-            title: 'Travel Preferences',
-            child: const Padding(
+          cardChild = const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Row(
                 children: [
@@ -278,72 +326,85 @@ class _TravelPreferencesCard extends StatelessWidget {
                   Text('Loading…', style: TextStyle(fontSize: 14)),
                 ],
               ),
-            ),
-          );
-        }
-        if (state.preferencesStatus == LoadStatus.failure) {
-          final msg = state.errorFor(ProfileSection.preferences) ?? 'Error';
-          return _SectionCard(
-            title: 'Travel Preferences',
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, size: 20, color: Color(0xFFB00020)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      msg,
-                      style: const TextStyle(fontSize: 14, color: Color(0xFFB00020)),
+            );
+        } else if (state.preferencesStatus == LoadStatus.failure) {
+          final rawMsg = state.errorFor(ProfileSection.preferences) ?? 'Error';
+          final is404 = rawMsg.contains('404');
+          final msg = is404
+              ? 'Preferences not available yet. Tap to set your preferences anyway.'
+              : rawMsg;
+          cardChild = Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  is404 ? Icons.info_outline : Icons.error_outline,
+                  size: 20,
+                  color: is404 ? const Color(0xFF5F7A8F) : const Color(0xFFB00020),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    msg,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: is404 ? const Color(0xFF5F7A8F) : const Color(0xFFB00020),
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => context.read<ProfileBloc>().add(
-                          ProfileSectionRetryRequested(ProfileSection.preferences),
-                        ),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+                ),
+                TextButton(
+                  onPressed: () => context.read<ProfileBloc>().add(
+                        ProfileSectionRetryRequested(ProfileSection.preferences),
+                      ),
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
           );
-        }
-        final prefs = state.preferences;
-        if (prefs == null || prefs.favoriteCategories.isEmpty) {
-          final fallback = prefs?.travelStyle ?? prefs?.activityLevel;
-          return _SectionCard(
-            title: 'Travel Preferences',
-            child: Padding(
+        } else {
+          final prefs = state.preferences;
+          if (prefs == null || prefs.favoriteCategories.isEmpty) {
+            final fallback = prefs?.travelStyle ?? prefs?.activityLevel;
+            cardChild = Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 fallback != null ? _capitalize(fallback.replaceAll('_', ' ')) : 'No preferences set',
                 style: const TextStyle(fontSize: 14, color: Color(0xFF5F7A8F)),
               ),
-            ),
-          );
-        }
-        final categories = prefs.favoriteCategories;
-        const maxChips = 3;
-        final show = categories.take(maxChips).toList();
-        final extra = categories.length > maxChips ? categories.length - maxChips : 0;
-        return _SectionCard(
-          title: 'Travel Preferences',
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ...show.map((c) => Chip(
-                    label: Text(_capitalize(c)),
+            );
+          } else {
+            final categories = prefs.favoriteCategories;
+            const maxChips = 3;
+            final show = categories.take(maxChips).toList();
+            final extra = categories.length > maxChips ? categories.length - maxChips : 0;
+            cardChild = Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ...show.map((c) => Chip(
+                      label: Text(_capitalize(c)),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    )),
+                if (extra > 0)
+                  Chip(
+                    label: Text('+$extra'),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
-                  )),
-              if (extra > 0)
-                Chip(
-                  label: Text('+$extra'),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                ),
-            ],
+                  ),
+              ],
+            );
+          }
+        }
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _openSheet(context, state),
+            borderRadius: BorderRadius.circular(20),
+            child: _SectionCard(
+              title: 'Travel Preferences',
+              child: cardChild,
+            ),
           ),
         );
       },
@@ -576,7 +637,9 @@ class _CheckInHistoryCard extends StatelessWidget {
 // ──────────────────────────────────────────────────────────────────
 
 class _AccountActionsSection extends StatelessWidget {
-  const _AccountActionsSection();
+  final VoidCallback onEditPreferences;
+
+  const _AccountActionsSection({required this.onEditPreferences});
 
   @override
   Widget build(BuildContext context) {
@@ -598,11 +661,7 @@ class _AccountActionsSection extends StatelessWidget {
             leading: const Icon(Icons.tune, size: 22, color: Color(0xFF2C3E50)),
             title: const Text('Edit Preferences', style: TextStyle(fontSize: 15)),
             trailing: const Icon(Icons.chevron_right, size: 22, color: Color(0xFFB0BEC5)),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Edit Preferences — coming in Task 4')),
-              );
-            },
+            onTap: onEditPreferences,
           ),
           ListTile(
             leading: const Icon(Icons.logout_rounded, size: 22, color: Color(0xFF2C3E50)),

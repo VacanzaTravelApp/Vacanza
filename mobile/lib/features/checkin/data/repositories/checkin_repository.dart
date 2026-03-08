@@ -15,7 +15,7 @@ class CheckinRepository {
 
   CheckinRepository(this._apiClient);
 
-  /// Calls `POST /checkins/auto` and returns the parsed response.
+  /// Calls `POST /users/me/checkins/auto` and returns the parsed response.
   ///
   /// On failure, throws a [CheckinException] with a user-friendly message.
   Future<AutoCheckinResponseDto> autoCheckin({

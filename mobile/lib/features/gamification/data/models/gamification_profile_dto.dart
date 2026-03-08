@@ -1,7 +1,7 @@
 import 'badge_dto.dart';
 import 'stat_dto.dart';
 
-/// Top-level response from `GET /gamification/profile`.
+/// Top-level response from `GET /users/me/gamification`.
 ///
 /// All fields have safe defaults. [xpProgressPercent] is clamped to 0–100.
 class GamificationProfileDto {
