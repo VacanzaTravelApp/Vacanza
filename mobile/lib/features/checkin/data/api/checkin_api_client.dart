@@ -18,8 +18,9 @@ class CheckinApiClient {
   Future<AutoCheckinResponseDto> autoCheckin(
     AutoCheckinRequestDto request,
   ) async {
+    const path = '/users/me/checkins/auto';
     final response = await _dio.post(
-      '/checkins/auto',
+      path,
       data: request.toJson(),
     );
 

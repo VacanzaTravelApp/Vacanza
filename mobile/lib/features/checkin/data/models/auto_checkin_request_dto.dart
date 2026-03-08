@@ -1,4 +1,4 @@
-/// Request payload for `POST /checkins/auto`.
+/// Request payload for `POST /users/me/checkins/auto`.
 class AutoCheckinRequestDto {
   final double latitude;
   final double longitude;

@@ -18,12 +18,11 @@ class GamificationApiClient {
   /// Throws [FormatException] if response body is not a JSON map
   /// (caught by [GamificationRepository] → `GamificationError`).
   Future<GamificationProfileDto> fetchProfile() async {
-    final fullUrl = '${_dio.options.baseUrl}/gamification/profile';
+    const path = '/users/me/gamification';
+    final fullUrl = '${_dio.options.baseUrl}$path';
     log('[GAM_API] GET $fullUrl');
 
-    final response = await _dio.get<dynamic>(
-      '/gamification/profile',
-    );
+    final response = await _dio.get<dynamic>(path);
 
     final status = response.statusCode;
     final data = response.data;

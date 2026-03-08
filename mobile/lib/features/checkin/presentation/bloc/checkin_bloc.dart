@@ -57,7 +57,7 @@ class CheckinBloc extends Bloc<CheckinEvent, CheckinState> {
     _lastCallTime = now;
     emit(state.copyWith(status: CheckinStatus.loading));
 
-    log('[CheckinBloc] calling POST /checkins/auto');
+    log('[CheckinBloc] calling POST /users/me/checkins/auto');
 
     try {
       final response = await _repository.autoCheckin(
