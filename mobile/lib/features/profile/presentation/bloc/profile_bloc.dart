@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/user_preferences.dart';
+import '../../data/models/user_profile.dart';
 import '../../data/repositories/profile_repository.dart';
 import 'load_status.dart';
 import 'profile_event.dart';
@@ -18,6 +19,83 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     on<ProfileSectionRetryRequested>(_onProfileSectionRetryRequested);
     on<PreferencesUpdateRequested>(_onPreferencesUpdateRequested);
     on<PreferencesUpdateErrorDismissed>(_onPreferencesUpdateErrorDismissed);
+    on<ProfileUpdateRequested>(_onProfileUpdateRequested);
+    on<ProfileUpdateErrorDismissed>(_onProfileUpdateErrorDismissed);
+  }
+
+  /// Build PUT /users/me/profile patch: only changed editable keys; no nulls; empty string allowed.
+  static Map<String, dynamic> _buildProfilePatch(
+    UserProfile draft,
+    UserProfile initial,
+  ) {
+    final patch = <String, dynamic>{};
+    if (draft.firstName != initial.firstName && draft.firstName.isNotEmpty) {
+      patch['firstName'] = draft.firstName;
+    }
+    if (draft.middleName != initial.middleName) {
+      patch['middleName'] = draft.middleName ?? '';
+    }
+    if (draft.lastName != initial.lastName && draft.lastName.isNotEmpty) {
+      patch['lastName'] = draft.lastName;
+    }
+    if (draft.preferredName != initial.preferredName) {
+      patch['preferredName'] = draft.preferredName ?? '';
+    }
+    if (draft.country != initial.country) {
+      patch['country'] = draft.country ?? '';
+    }
+    if (draft.birthDate != initial.birthDate) {
+      if (draft.birthDate != null && draft.birthDate!.isNotEmpty) {
+        patch['birthDate'] = draft.birthDate!;
+      }
+    }
+    if (draft.gender != initial.gender) {
+      if (draft.gender != null && draft.gender!.isNotEmpty) {
+        patch['gender'] = draft.gender!;
+      }
+    }
+    if (draft.profileImageUrl != initial.profileImageUrl) {
+      patch['profileImageUrl'] = draft.profileImageUrl ?? '';
+    }
+    return patch;
+  }
+
+  Future<void> _onProfileUpdateRequested(
+    ProfileUpdateRequested event,
+    Emitter<ProfileState> emit,
+  ) async {
+    final previous = state.profile;
+    final draft = event.draft;
+    final patch = _buildProfilePatch(draft, event.initialProfile);
+    if (patch.isEmpty) return;
+
+    emit(state.copyWith(
+      profile: draft,
+      clearProfileUpdateError: true,
+    ));
+
+    if (!isClosed) {
+      try {
+        final updated = await _repository.updateProfile(patch);
+        if (!isClosed) {
+          emit(state.copyWith(profile: updated));
+        }
+      } catch (e) {
+        if (!isClosed) {
+          emit(state.copyWith(
+            profile: previous,
+            profileUpdateError: e.toString(),
+          ));
+        }
+      }
+    }
+  }
+
+  void _onProfileUpdateErrorDismissed(
+    ProfileUpdateErrorDismissed event,
+    Emitter<ProfileState> emit,
+  ) {
+    emit(state.copyWith(clearProfileUpdateError: true));
   }
 
   static bool _listEquals(List<String> a, List<String> b) {

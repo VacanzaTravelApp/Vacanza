@@ -35,4 +35,48 @@ class UserProfile {
       (preferredName != null && preferredName!.trim().isNotEmpty)
           ? preferredName!
           : '$firstName ${lastName.trim()}'.trim();
+
+  /// Safe defaults when opening Edit Profile before profile is loaded.
+  static UserProfile defaultForDraft({String userId = '', String email = ''}) {
+    return UserProfile(
+      infoId: '',
+      userId: userId,
+      email: email,
+      firstName: '',
+      lastName: '',
+      displayName: '',
+    );
+  }
+
+  UserProfile copyWith({
+    String? infoId,
+    String? userId,
+    String? email,
+    String? firstName,
+    String? middleName,
+    String? lastName,
+    String? preferredName,
+    String? displayName,
+    String? country,
+    String? birthDate,
+    String? gender,
+    String? profileImageUrl,
+    DateTime? joinDate,
+  }) {
+    return UserProfile(
+      infoId: infoId ?? this.infoId,
+      userId: userId ?? this.userId,
+      email: email ?? this.email,
+      firstName: firstName ?? this.firstName,
+      middleName: middleName ?? this.middleName,
+      lastName: lastName ?? this.lastName,
+      preferredName: preferredName ?? this.preferredName,
+      displayName: displayName ?? this.displayName,
+      country: country ?? this.country,
+      birthDate: birthDate ?? this.birthDate,
+      gender: gender ?? this.gender,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      joinDate: joinDate ?? this.joinDate,
+    );
+  }
 }
