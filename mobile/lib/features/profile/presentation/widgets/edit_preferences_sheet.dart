@@ -5,6 +5,7 @@ import '../../data/models/user_preferences.dart';
 import '../../data/profile_preference_options.dart';
 import '../bloc/profile_bloc.dart';
 import '../bloc/profile_event.dart';
+import '../styles/profile_sheet_styles.dart';
 import 'searchable_multi_select_picker_sheet.dart';
 
 /// Edit Preferences bottom sheet: Basics visible, Advanced collapsed by default.
@@ -282,19 +283,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
               child: TextField(
                 controller: _budgetController,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: '150',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                ),
+                decoration: ProfileSheetStyles.inputDecoration('150'),
                 onChanged: (s) {
                   final v = num.tryParse(s);
                   _updateDraft((d) => d.copyWith(dailyBudget: v));
@@ -306,18 +295,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
               child: DropdownButtonFormField<String>(
                 key: ValueKey<String?>(_draft.budgetCurrency),
                 initialValue: _draft.budgetCurrency ?? 'EUR',
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                ),
+                decoration: ProfileSheetStyles.inputDecoration(''),
                 items: optionBudgetCurrency
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
@@ -665,29 +643,16 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton(
+            child: ProfileSheetStyles.secondaryButton(
+              text: 'Cancel',
               onPressed: () => Navigator.of(context).pop(),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text('Cancel'),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: FilledButton(
+            child: ProfileSheetStyles.primaryButton(
+              text: 'Save',
               onPressed: _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: _accentBlue,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text('Save'),
             ),
           ),
         ],
