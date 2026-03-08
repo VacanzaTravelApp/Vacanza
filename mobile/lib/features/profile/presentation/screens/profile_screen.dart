@@ -15,8 +15,10 @@ import '../bloc/profile_event.dart';
 import '../bloc/profile_section.dart';
 import '../bloc/profile_state.dart';
 import '../widgets/edit_preferences_sheet.dart';
+import '../widgets/edit_profile_sheet.dart';
 import '../widgets/profile_character_card.dart';
 import '../../data/models/user_preferences.dart';
+import '../../data/models/user_profile.dart';
 
 /// MOB-9 / MOB-10: Profile hub screen.
 ///
@@ -65,17 +67,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _openEditProfileSheet(BuildContext context, UserProfile initialProfile) {
+    final profileBloc = context.read<ProfileBloc>();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => BlocProvider.value(
+        value: profileBloc,
+        child: EditProfileSheet(initialProfile: initialProfile),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<ProfileBloc, ProfileState>(
-      listenWhen: (prev, curr) => prev.preferencesUpdateError != curr.preferencesUpdateError,
+      listenWhen: (prev, curr) =>
+          prev.preferencesUpdateError != curr.preferencesUpdateError ||
+          prev.profileUpdateError != curr.profileUpdateError,
       listener: (context, state) {
-        final error = state.preferencesUpdateError;
-        if (error != null && error.isNotEmpty) {
+        final prefsError = state.preferencesUpdateError;
+        if (prefsError != null && prefsError.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(error)),
+            SnackBar(content: Text(prefsError)),
           );
           context.read<ProfileBloc>().add(const PreferencesUpdateErrorDismissed());
+          return;
+        }
+        final profileError = state.profileUpdateError;
+        if (profileError != null && profileError.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(profileError)),
+          );
+          context.read<ProfileBloc>().add(const ProfileUpdateErrorDismissed());
         }
       },
       child: Scaffold(
@@ -125,10 +150,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   }
                   if (state.profile != null) {
                     final p = state.profile!;
+                    final name = p.displayName.trim().isNotEmpty
+                        ? p.displayName
+                        : p.displayNameFallback;
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
-                        '${p.displayName} · ${p.email}',
+                        '$name · ${p.email}',
                         style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFF2C3E50),
@@ -160,6 +188,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               BlocBuilder<ProfileBloc, ProfileState>(
                 builder: (context, state) {
                   return _AccountActionsSection(
+                    onEditProfile: () {
+                      final initial = state.profile ??
+                          UserProfile.defaultForDraft(
+                            userId: state.profile?.userId ?? '',
+                            email: state.profile?.email ?? '',
+                          );
+                      _openEditProfileSheet(context, initial);
+                    },
                     onEditPreferences: () {
                       final initial = state.preferences ??
                           UserPreferences.defaultForDraft(
@@ -211,35 +247,45 @@ class _ProfileHeaderSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 24),
-        BlocBuilder<GamificationCubit, GamificationState>(
-          buildWhen: (prev, curr) {
-            if (prev.runtimeType != curr.runtimeType) return true;
-            if (prev is GamificationLoaded && curr is GamificationLoaded) {
-              return prev.profile != curr.profile;
-            }
-            return false;
-          },
-          builder: (context, state) {
-            return switch (state) {
-              GamificationInitial() || GamificationLoading() =>
-                const ProfileCharacterCard(
-                  name: 'Serhat',
-                  roleText: '—',
-                  levelText: '—',
-                ),
-              GamificationError() => const ProfileCharacterCard(
-                  name: 'Serhat',
-                  roleText: 'Traveler',
-                  levelText: '—',
-                ),
-              GamificationLoaded(:final profile) => ProfileCharacterCard(
-                  name: 'Serhat',
-                  roleText: profile.roleText,
-                  levelText: profile.levelText,
-                  totalXp: profile.totalXp,
-                  xpProgressPercent: profile.xpProgressPercent,
-                ),
-            };
+        BlocBuilder<ProfileBloc, ProfileState>(
+          buildWhen: (prev, curr) => prev.profile != curr.profile,
+          builder: (context, profileState) {
+            final displayName = profileState.profile != null
+                ? (profileState.profile!.displayName.trim().isNotEmpty
+                    ? profileState.profile!.displayName
+                    : profileState.profile!.displayNameFallback)
+                : '—';
+            return BlocBuilder<GamificationCubit, GamificationState>(
+              buildWhen: (prev, curr) {
+                if (prev.runtimeType != curr.runtimeType) return true;
+                if (prev is GamificationLoaded && curr is GamificationLoaded) {
+                  return prev.profile != curr.profile;
+                }
+                return false;
+              },
+              builder: (context, state) {
+                return switch (state) {
+                  GamificationInitial() || GamificationLoading() =>
+                    ProfileCharacterCard(
+                      name: displayName,
+                      roleText: '—',
+                      levelText: '—',
+                    ),
+                  GamificationError() => ProfileCharacterCard(
+                      name: displayName,
+                      roleText: 'Traveler',
+                      levelText: '—',
+                    ),
+                  GamificationLoaded(:final profile) => ProfileCharacterCard(
+                      name: displayName,
+                      roleText: profile.roleText,
+                      levelText: profile.levelText,
+                      totalXp: profile.totalXp,
+                      xpProgressPercent: profile.xpProgressPercent,
+                    ),
+                };
+              },
+            );
           },
         ),
         const SizedBox(height: 24),
@@ -637,9 +683,13 @@ class _CheckInHistoryCard extends StatelessWidget {
 // ──────────────────────────────────────────────────────────────────
 
 class _AccountActionsSection extends StatelessWidget {
+  final VoidCallback onEditProfile;
   final VoidCallback onEditPreferences;
 
-  const _AccountActionsSection({required this.onEditPreferences});
+  const _AccountActionsSection({
+    required this.onEditProfile,
+    required this.onEditPreferences,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -651,11 +701,7 @@ class _AccountActionsSection extends StatelessWidget {
             leading: const Icon(Icons.person_outline, size: 22, color: Color(0xFF2C3E50)),
             title: const Text('Edit Profile', style: TextStyle(fontSize: 15)),
             trailing: const Icon(Icons.chevron_right, size: 22, color: Color(0xFFB0BEC5)),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Edit Profile — coming in Task 5')),
-              );
-            },
+            onTap: onEditProfile,
           ),
           ListTile(
             leading: const Icon(Icons.tune, size: 22, color: Color(0xFF2C3E50)),
