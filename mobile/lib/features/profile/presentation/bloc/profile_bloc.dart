@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../data/models/user_preferences.dart';
 import '../../data/repositories/profile_repository.dart';
 import 'load_status.dart';
 import 'profile_event.dart';
@@ -15,6 +16,121 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     on<ProfileStarted>(_onProfileStarted);
     on<ProfileRefreshed>(_onProfileRefreshed);
     on<ProfileSectionRetryRequested>(_onProfileSectionRetryRequested);
+    on<PreferencesUpdateRequested>(_onPreferencesUpdateRequested);
+    on<PreferencesUpdateErrorDismissed>(_onPreferencesUpdateErrorDismissed);
+  }
+
+  static bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  /// Build PUT patch from draft vs previous; only changed fields. Empty lists included to clear.
+  static Map<String, dynamic> _buildPreferencesPatch(
+    UserPreferences draft,
+    UserPreferences previous,
+  ) {
+    final patch = <String, dynamic>{};
+    if (draft.travelStyle != previous.travelStyle) {
+      if (draft.travelStyle != null) patch['travelStyle'] = draft.travelStyle;
+    }
+    if (!_listEquals(draft.favoriteCategories, previous.favoriteCategories)) {
+      patch['favoriteCategories'] = draft.favoriteCategories;
+    }
+    if (draft.activityLevel != previous.activityLevel) {
+      if (draft.activityLevel != null) patch['activityLevel'] = draft.activityLevel;
+    }
+    if (!_listEquals(draft.cuisinePreferences, previous.cuisinePreferences)) {
+      patch['cuisinePreferences'] = draft.cuisinePreferences;
+    }
+    if (draft.preferredClimate != previous.preferredClimate) {
+      if (draft.preferredClimate != null) patch['preferredClimate'] = draft.preferredClimate;
+    }
+    if (draft.tripPace != previous.tripPace) {
+      if (draft.tripPace != null) patch['tripPace'] = draft.tripPace;
+    }
+    if (draft.accommodationType != previous.accommodationType) {
+      if (draft.accommodationType != null) patch['accommodationType'] = draft.accommodationType;
+    }
+    if (draft.transportPreference != previous.transportPreference) {
+      if (draft.transportPreference != null) {
+        patch['transportPreference'] = draft.transportPreference;
+      }
+    }
+    if (!_listEquals(draft.dietaryRestrictions, previous.dietaryRestrictions)) {
+      patch['dietaryRestrictions'] = draft.dietaryRestrictions;
+    }
+    if (!_listEquals(draft.accessibilityNeeds, previous.accessibilityNeeds)) {
+      patch['accessibilityNeeds'] = draft.accessibilityNeeds;
+    }
+    if (!_listEquals(draft.avoidCategories, previous.avoidCategories)) {
+      patch['avoidCategories'] = draft.avoidCategories;
+    }
+    if (draft.dailyBudget != previous.dailyBudget) {
+      if (draft.dailyBudget != null) {
+        final v = draft.dailyBudget!;
+        patch['dailyBudget'] = (v is int) ? v.toDouble() : v;
+      }
+    }
+    if (draft.budgetCurrency != previous.budgetCurrency) {
+      if (draft.budgetCurrency != null) patch['budgetCurrency'] = draft.budgetCurrency;
+    }
+    if (!_listEquals(draft.splurgeCategories, previous.splurgeCategories)) {
+      patch['splurgeCategories'] = draft.splurgeCategories;
+    }
+    if (draft.preferredLanguage != previous.preferredLanguage) {
+      if (draft.preferredLanguage != null) {
+        patch['preferredLanguage'] = draft.preferredLanguage;
+      }
+    }
+    if (!_listEquals(draft.spokenLanguages, previous.spokenLanguages)) {
+      patch['spokenLanguages'] = draft.spokenLanguages;
+    }
+    return patch;
+  }
+
+  Future<void> _onPreferencesUpdateRequested(
+    PreferencesUpdateRequested event,
+    Emitter<ProfileState> emit,
+  ) async {
+    final previous = state.preferences;
+    final draft = event.draft;
+    final patch = _buildPreferencesPatch(draft, event.initialPrefs);
+    if (patch.isEmpty) {
+      return;
+    }
+
+    emit(state.copyWith(
+      preferences: draft,
+      clearPreferencesUpdateError: true,
+    ));
+
+    if (!isClosed) {
+      try {
+        final updated = await _repository.updatePreferences(patch);
+        if (!isClosed) {
+          emit(state.copyWith(preferences: updated));
+        }
+      } catch (e) {
+        if (!isClosed) {
+          emit(state.copyWith(
+            preferences: previous,
+            clearPreferences: previous == null,
+            preferencesUpdateError: e.toString(),
+          ));
+        }
+      }
+    }
+  }
+
+  void _onPreferencesUpdateErrorDismissed(
+    PreferencesUpdateErrorDismissed event,
+    Emitter<ProfileState> emit,
+  ) {
+    emit(state.copyWith(clearPreferencesUpdateError: true));
   }
 
   /// Load all sections in parallel; each section's failure is isolated.
