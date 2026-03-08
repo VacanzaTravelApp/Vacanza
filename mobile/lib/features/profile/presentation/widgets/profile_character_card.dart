@@ -10,6 +10,7 @@ class ProfileCharacterCard extends StatelessWidget {
   final String levelText;
   final int? totalXp;
   final int? xpProgressPercent;
+  final String? profileImageUrl;
 
   const ProfileCharacterCard({
     super.key,
@@ -18,6 +19,7 @@ class ProfileCharacterCard extends StatelessWidget {
     required this.levelText,
     this.totalXp,
     this.xpProgressPercent,
+    this.profileImageUrl,
   });
 
   @override
@@ -135,6 +137,7 @@ class ProfileCharacterCard extends StatelessWidget {
   }
 
   Widget _buildAvatar() {
+    final hasUrl = profileImageUrl != null && profileImageUrl!.trim().isNotEmpty;
     return Container(
       width: 72,
       height: 72,
@@ -150,11 +153,27 @@ class ProfileCharacterCard extends StatelessWidget {
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: 2),
           color: Colors.grey.shade200,
-          image: const DecorationImage(
-            image: AssetImage('assets/core/theme/profile/serhat.jpg'),
-            fit: BoxFit.cover,
-          ),
         ),
+        clipBehavior: Clip.antiAlias,
+        child: hasUrl
+            ? Image.network(
+                profileImageUrl!,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                loadingBuilder: (_, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(
+                    child: Icon(Icons.person, size: 36, color: Color(0xFF9CA3AF)),
+                  );
+                },
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Icon(Icons.person, size: 36, color: Color(0xFF9CA3AF)),
+                ),
+              )
+            : const Center(
+                child: Icon(Icons.person, size: 36, color: Color(0xFF9CA3AF)),
+              ),
       ),
     );
   }

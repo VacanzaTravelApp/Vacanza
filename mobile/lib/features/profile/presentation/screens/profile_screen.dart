@@ -272,11 +272,13 @@ class _ProfileHeaderSection extends StatelessWidget {
                       name: displayName,
                       roleText: '—',
                       levelText: '—',
+                      profileImageUrl: profileState.profile?.profileImageUrl,
                     ),
                   GamificationError() => ProfileCharacterCard(
                       name: displayName,
                       roleText: 'Traveler',
                       levelText: '—',
+                      profileImageUrl: profileState.profile?.profileImageUrl,
                     ),
                   GamificationLoaded(:final profile) => ProfileCharacterCard(
                       name: displayName,
@@ -284,6 +286,7 @@ class _ProfileHeaderSection extends StatelessWidget {
                       levelText: profile.levelText,
                       totalXp: profile.totalXp,
                       xpProgressPercent: profile.xpProgressPercent,
+                      profileImageUrl: profileState.profile?.profileImageUrl,
                     ),
                 };
               },

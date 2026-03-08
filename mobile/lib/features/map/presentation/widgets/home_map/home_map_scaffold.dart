@@ -110,7 +110,7 @@ class HomeMapScaffold extends StatelessWidget {
                   return ProfileBadge(
                     name: displayName,
                     subtitle: 'Traveler',
-                    imagePath: 'assets/core/theme/profile/serhat.jpg',
+                    imageUrl: p?.profileImageUrl,
                     onTap: () {
                       Navigator.push(
                         context,
