@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // <-- updateProfile EKLENDİ
 import auth from '../../firebase';
+import { authApi } from '../../api/userApi';
 
 // PasswordChecks Component
 const PasswordChecks = ({ password }) => {
@@ -96,13 +97,27 @@ const RegisterCard = () => {
 
   const onFinish = async (values) => {
     setLoading(true);
-    const { email, password, firstName, lastName } = values;
+    const { email, password, firstName, lastName, middleName, preferredName } = values;
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
+      // 1. Update Firebase Internal Profile
+      const dispName = (preferredName && preferredName.length > 0)
+        ? preferredName[0]
+        : `${firstName} ${lastName}`;
+
       await updateProfile(userCredential.user, {
-        displayName: `${firstName} ${lastName}`
+        displayName: dispName
+      });
+
+      // 2. Sync with Backend Database
+      await authApi.register({
+        email,
+        firstName,
+        lastName,
+        middleName: middleName || null,
+        preferredName: (preferredName && preferredName.length > 0) ? preferredName[0] : null
       });
 
       console.log('Registration Successful, redirecting to /map');
