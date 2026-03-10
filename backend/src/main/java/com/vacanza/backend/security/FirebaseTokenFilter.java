@@ -19,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Validates Firebase ID Token sent by frontend:
@@ -26,19 +27,36 @@ import java.util.List;
  *
  * Behavior:
  * - OPTIONS (preflight) requests are always allowed.
- * - If Authorization header is missing or not Bearer => do nothing, continue filter chain.
- *   (SecurityConfig decides if endpoint is public or requires authentication.)
+ * - If Authorization header is missing or not Bearer => do nothing, continue
+ * filter chain.
+ * (SecurityConfig decides if endpoint is public or requires authentication.)
  * - If Bearer token is present:
- *   - verify token using Firebase Admin SDK
- *   - ensure user exists in DB (users table)
- *   - set SecurityContext principal=firebaseUid, authority=ROLE_*
- *   - attach request attributes: firebaseEmail, firebaseEmailVerified
+ * - verify token using Firebase Admin SDK
+ * - ensure user exists in DB (users table)
+ * - check emailVerified flag — block unverified users (except whitelisted
+ * paths)
+ * - set SecurityContext principal=firebaseUid, authority=ROLE_*
+ * - attach request attributes: firebaseEmail, firebaseEmailVerified
  * - If Bearer token is present but invalid/expired => 401
+ * - If Bearer token is valid but emailVerified=false => 403 (except whitelisted
+ * paths)
  */
 @Component
 public class FirebaseTokenFilter extends OncePerRequestFilter {
 
     private final UserRepository userRepository;
+
+    /**
+     * Unverified users can only access these paths.
+     * /auth/me, /auth/login → frontend needs to check user status
+     * /auth/register → profile completion after Firebase signup
+     * /auth/logout → user should be able to logout
+     */
+    private static final Set<String> UNVERIFIED_ALLOWED_PATHS = Set.of(
+            "/auth/me",
+            "/auth/login",
+            "/auth/register",
+            "/auth/logout");
 
     public FirebaseTokenFilter(UserRepository userRepository) {
         this.userRepository = userRepository;
@@ -48,8 +66,7 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+            FilterChain filterChain) throws ServletException, IOException {
 
         // Preflight is not an authenticated request; let it pass.
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -60,7 +77,8 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
 
         // No bearer -> just continue.
-        // Public endpoints will succeed; protected endpoints will be blocked by SecurityConfig.
+        // Public endpoints will succeed; protected endpoints will be blocked by
+        // SecurityConfig.
         if (header == null || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -77,23 +95,19 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             boolean emailVerified = Boolean.TRUE.equals(decoded.isEmailVerified());
 
             // DB sync: create user if missing
-            User user = userRepository.findByFirebaseUid(uid).orElseGet(() ->
-                    userRepository.save(
-                            User.builder()
-                                    .firebaseUid(uid)
-                                    // If email is null, set a safe placeholder to avoid null constraints.
-                                    .email(email != null ? email : ("uid:" + uid))
-                                    .role(Role.USER)
-                                    .build()
-                    )
-            );
+            User user = userRepository.findByFirebaseUid(uid).orElseGet(() -> userRepository.save(
+                    User.builder()
+                            .firebaseUid(uid)
+                            // If email is null, set a safe placeholder to avoid null constraints.
+                            .email(email != null ? email : ("uid:" + uid))
+                            .role(Role.USER)
+                            .build()));
 
             List<SimpleGrantedAuthority> authorities = List.of(
-                    new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
-            );
+                    new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(user.getFirebaseUid(), null, authorities);
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    user.getFirebaseUid(), null, authorities);
 
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
@@ -101,6 +115,17 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             // Useful attributes for services/controllers (AuthService reads this)
             request.setAttribute("firebaseEmail", email);
             request.setAttribute("firebaseEmailVerified", emailVerified);
+
+            // Block unverified users from protected endpoints
+            if (!emailVerified && !UNVERIFIED_ALLOWED_PATHS.contains(request.getRequestURI())) {
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType("application/json");
+                response.getWriter().write(
+                        "{\"status\":403,\"error\":\"Forbidden\","
+                                + "\"message\":\"Account not verified. Please verify your email first.\","
+                                + "\"path\":\"" + request.getRequestURI() + "\"}");
+                return;
+            }
 
             filterChain.doFilter(request, response);
 

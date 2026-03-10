@@ -9,16 +9,18 @@ import com.vacanza.backend.security.CurrentUserProvider;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AllArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
 /**
- * /auth/me implementation:
- * - resolves current user from SecurityContext (set by FirebaseTokenFilter)
- * - returns identity + role + verified + profileCompleted
- * - writes login_history entry (server-side)
+ * Authentication service:
+ * - /auth/me: resolves current user, returns identity + role + verified +
+ * profileCompleted
+ * - /auth/logout: logs logout event, clears security context
+ * - writes login_history entries (server-side)
  */
 @Service
 @AllArgsConstructor
@@ -54,6 +56,25 @@ public class AuthService {
                 .verified(emailVerified)
                 .profileCompleted(profileCompleted)
                 .build();
+    }
+
+    /**
+     * Logout: logs the event and clears SecurityContext.
+     * Token invalidation is handled by Firebase on the client side.
+     */
+    @Transactional
+    public void logout(HttpServletRequest request) {
+        User user = currentUserProvider.getCurrentUserEntity();
+
+        loginHistoryRepository.save(
+                LoginHistory.builder()
+                        .user(user)
+                        .loginProvider("firebase-logout")
+                        .loginTime(Instant.now())
+                        .ipAddress(resolveClientIp(request))
+                        .build());
+
+        SecurityContextHolder.clearContext();
     }
 
     /**
