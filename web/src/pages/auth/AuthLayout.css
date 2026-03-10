@@ -17,8 +17,8 @@ body,
     min-height: 100vh;
     width: 100%;
 
-    /* Tüm sayfanın arka plan görseli */
-    background-image: url('https://picsum.photos/1000/1000?random=1');
+    /* Arka plan görselini yüksek kaliteli bir seyahat temalı görselle güncelledik */
+    background-image: url('https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1920&q=80');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -211,8 +211,8 @@ body,
 ** Opacity reduced to 75%.
 */
 .auth-form-column>* {
-    /* GÜNCEL: Opaklığı %75'e düşürdük (Beyazlığı önemli ölçüde kırar) */
-    background-color: rgba(255, 255, 255, 0.75);
+    /* GÜNCEL: Beyazlığı kırmak için hafif gri tonlu bir kırık beyaz seçildi */
+    background-color: rgba(248, 249, 252, 0.82);
 
     /* Küçültülmüş boyut ve iç boşluk ayarları */
     max-width: 360px;

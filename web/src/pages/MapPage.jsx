@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
 
 import { auth } from "../firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
@@ -424,6 +424,13 @@ export default function MapPage() {
         navigate("/login");
         return;
       }
+
+      // If email is not verified, send to verification page
+      if (!currentUser.emailVerified) {
+        navigate("/verify-email");
+        return;
+      }
+
       setUser(currentUser);
       setLoadingAuth(false);
     });
@@ -873,9 +880,9 @@ export default function MapPage() {
           <Card
             onClick={() => setProfileModalOpen(true)}
             style={{
-              position: "absolute",
-              top: isMobile ? 10 : 20,
-              left: isMobile ? 10 : 20,
+              position: "fixed",
+              top: isMobile ? headerHeight + 10 : headerHeight + contentPadding + 20,
+              left: isMobile ? 12 : contentPadding + 20,
               zIndex: 100,
               width: isMobile ? 240 : 280,
               borderRadius: 20,
@@ -926,15 +933,14 @@ export default function MapPage() {
           {/* sağdaki butonlar */}
           <div
             style={{
-              position: "absolute",
-              top: isMobile ? 12 : 18,
-              right: isMobile ? 12 : 18,
+              position: "fixed",
+              top: isMobile ? headerHeight + 12 : headerHeight + contentPadding + 18,
+              right: isMobile ? 12 : contentPadding + 18,
               zIndex: 60,
               display: "flex",
               flexDirection: "column",
               gap: fabGap,
             }}
-
           >
             <Tooltip title="Ask Vacanza AI" placement="left">
               <Button
@@ -1023,9 +1029,9 @@ export default function MapPage() {
           {filterOpen && (
             <div
               style={{
-                position: "absolute",
-                top: filterPanelTop,
-                right: filterPanelRight,
+                position: "fixed",
+                top: isMobile ? headerHeight + 10 : headerHeight + contentPadding + 28,
+                right: isMobile ? 12 : 78 + contentPadding,
                 zIndex: 70,
                 width: filterPanelWidth,
                 maxHeight: isMobile ? "62vh" : "unset",
@@ -1100,7 +1106,7 @@ export default function MapPage() {
           {canShowResultsPanel && (
             <div
               style={{
-                position: "absolute",
+                position: "fixed",
                 left: "50%",
                 transform: "translateX(-50%)",
                 bottom: resultsBottom,
@@ -1242,8 +1248,6 @@ export default function MapPage() {
             open={profileModalOpen}
             onClose={() => setProfileModalOpen(false)}
             user={user}
-            gamification={gamification}
-            gamificationLoading={gamificationLoading}
           />
         </div>
       </Content>

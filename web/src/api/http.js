@@ -14,9 +14,6 @@ http.interceptors.request.use(
       // Debug/stabilite için token'ı zorla yenile
       const token = await user.getIdToken(true);
       config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      // İstersen debug için aç:
-      // console.warn("No current user, sending request without Authorization");
     }
 
     return config;
@@ -44,9 +41,31 @@ http.interceptors.response.use(
   },
   (error) => {
     const status = error?.response?.status;
+    const message = error?.response?.data?.message || "";
 
-    if (status === 401 || status === 403) {
-      console.warn("⚠️ Unauthorized/Forbidden (401/403). Token geçmiyor veya backend reddediyor.");
+    if (status === 403) {
+      // Email verification check
+      const isEmailNotVerified =
+        message.toLowerCase().includes("not verified") ||
+        message.toLowerCase().includes("verify your email") ||
+        message.toLowerCase().includes("email");
+
+      if (isEmailNotVerified) {
+        console.warn("⚠️ 403: Email not verified. Backend requires email verification.");
+        // Attach a custom flag so components can detect this specific error
+        error.isEmailNotVerified = true;
+        error.friendlyMessage = "Please verify your email address first. Check your inbox for the verification link.";
+      } else {
+        console.warn("⚠️ 403 Forbidden. Access denied.");
+        error.friendlyMessage = "Access denied. You don't have permission for this action.";
+      }
+    } else if (status === 401) {
+      console.warn("⚠️ 401 Unauthorized. Token invalid or expired.");
+      error.friendlyMessage = "Session expired. Please log in again.";
+    } else if (status === 400) {
+      error.friendlyMessage = message || "Invalid request. Please check your input.";
+    } else if (status === 409) {
+      error.friendlyMessage = message || "This email is already registered.";
     }
 
     return Promise.reject(error);

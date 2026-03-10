@@ -1,15 +1,113 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { aiApi } from "../../../api/aiApi";
+import { Spin, message } from "antd";
 import "../styles/vacanzaChat.css";
 
 export default function VacanzaChat({ isOpen, onClose }) {
-  if (!isOpen) return null;
+  const [messages, setMessages] = useState([]);
+  const [inputText, setInputText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [conversationId, setConversationId] = useState(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
-  // Şimdilik Python'dan veri gelmediği için statik örnek mesajlar
-  const staticMessages = [
-    { id: 1, type: "ai", text: "Hi! ✨ I'm Vacanza AI. How can I help you explore today?", time: "10:30" },
-    { id: 2, type: "user", text: "Find some Italian restaurants nearby.", time: "10:31" },
-    { id: 3, type: "ai", text: "I found 3 great spots! 'La Bella Vita' is highly rated and just 5 mins away. 🍝", time: "10:31" }
-  ];
+  const scrollToBottom = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadConversation();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
+    }
+  }, [messages, isOpen]);
+
+  const loadConversation = async () => {
+    try {
+      setInitialLoading(true);
+      // Try to get latest conversation
+      const conversations = await aiApi.listConversations(1, 0);
+
+      let currentId;
+      if (conversations && conversations.length > 0) {
+        currentId = conversations[0].id;
+        setConversationId(currentId);
+        // Load messages
+        const history = await aiApi.getMessages(currentId);
+        setMessages(history.map(m => ({
+          id: m.id,
+          type: m.role?.toLowerCase() === 'user' ? 'user' : 'ai',
+          text: m.content,
+          time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        })));
+      } else {
+        // Create new if none exists
+        const newConv = await aiApi.createConversation();
+        setConversationId(newConv.id);
+        // Default greeting
+        setMessages([{
+          id: 'greeting',
+          type: 'ai',
+          text: "Hi! ✨ I'm Vacanza AI. How can I help you explore today?",
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }]);
+      }
+    } catch (err) {
+      console.error("Failed to load chat:", err);
+      // If unauthorized or other error, fallback to initial state
+      setMessages([{
+        id: 'error',
+        type: 'ai',
+        text: "I'm having trouble connecting to my brain right now. Please try again later! 🧠",
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  const handleSendMessage = async (customText = null) => {
+    const textToSend = (customText || inputText)?.trim();
+    if (!textToSend || loading || !conversationId) return;
+
+    const userMsg = {
+      id: Date.now(),
+      type: "user",
+      text: textToSend,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setInputText("");
+    setLoading(true);
+
+    try {
+      const response = await aiApi.sendMessage(conversationId, textToSend);
+      if (response && response.content) {
+        const aiMsg = {
+          id: Date.now() + 1,
+          type: "ai",
+          text: response.content,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, aiMsg]);
+      }
+    } catch (err) {
+      message.error("AI service is busy. Please try again in a moment.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div className={`ai-chat-container ${isOpen ? "active" : ""}`}>
@@ -26,28 +124,57 @@ export default function VacanzaChat({ isOpen, onClose }) {
       </div>
 
       {/* Messages Area */}
-      <div className="chat-content-scroll">
-        {staticMessages.map((msg) => (
-          <div key={msg.id} className={`chat-row ${msg.type}-row`}>
-            <div className={`message-bubble ${msg.type}-bubble`}>
-              {msg.text}
-              <span className="msg-time">{msg.time}</span>
-            </div>
+      <div className="chat-content-scroll" ref={scrollContainerRef}>
+        {initialLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <Spin tip="Connecting..." />
           </div>
-        ))}
+        ) : (
+          <>
+            {messages.map((msg) => (
+              <div key={msg.id} className={`chat-row ${msg.type}-row`}>
+                <div className={`message-bubble ${msg.type}-bubble`}>
+                  {msg.text}
+                  <span className="msg-time">{msg.time}</span>
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="chat-row ai-row">
+                <div className="message-bubble ai-bubble" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px' }}>
+                  <Spin size="small" />
+                  <span style={{ fontSize: 12, color: '#888' }}>Thinking...</span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
+        )}
       </div>
 
       {/* Footer Area (Input & Quick Actions) */}
-      <div className="chat-footer-refined">
-        <div className="quick-action-pills">
-          <button>🍝 Best Pasta</button>
-          <button>🗼 City Tour</button>
+      {!initialLoading && (
+        <div className="chat-footer-refined">
+          <div className="chat-input-field-group">
+            <input
+              type="text"
+              placeholder="Ask anything..."
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              disabled={loading}
+            />
+            <button
+              className="chat-send-icon"
+              onClick={() => handleSendMessage()}
+              disabled={loading || !inputText.trim()}
+              style={{ opacity: loading || !inputText.trim() ? 0.5 : 1 }}
+            >
+              🚀
+            </button>
+          </div>
         </div>
-        <div className="chat-input-field-group">
-          <input type="text" placeholder="Ask anything..." disabled />
-          <button className="chat-send-icon" disabled>🚀</button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ import {
 import './RegisterCard.css';
 import { useNavigate } from 'react-router-dom';
 
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'; // <-- updateProfile EKLENDİ
+import { createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth'; // <-- updateProfile and sendEmailVerification EKLENDİ
 import auth from '../../firebase';
 import { authApi } from '../../api/userApi';
 
@@ -120,8 +120,11 @@ const RegisterCard = () => {
         preferredName: (preferredName && preferredName.length > 0) ? preferredName[0] : null
       });
 
-      console.log('Registration Successful, redirecting to /map');
-      navigate('/map');
+      // 3. Send Verification Email
+      await sendEmailVerification(userCredential.user);
+
+      console.log('Registration Successful, redirecting to /verify-email');
+      navigate('/verify-email');
 
     } catch (error) {
       console.error("Firebase Registration Error:", error.code, error.message);

@@ -4,6 +4,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import AuthLayout from "./pages/auth/AuthLayout";
 import RegisterCard from "./pages/auth/RegisterCardtempclass";
 import LoginCard from "./pages/auth/LoginCard";
+import EmailVerificationPage from "./pages/auth/EmailVerificationPage";
+import AuthActionPage from "./pages/auth/AuthActionPage";
 import MapPage from "./pages/MapPage";
 import GamificationSummary from "./gamification/GamificationSummary";
 
@@ -20,6 +22,7 @@ const App = () => {
         <Router>
             <Routes>
                 <Route path="/" element={<Navigate to="/register" replace />} />
+
                 <Route
                     path="/register"
                     element={
@@ -28,6 +31,7 @@ const App = () => {
                         </AuthLayout>
                     }
                 />
+
                 <Route
                     path="/login"
                     element={
@@ -36,8 +40,16 @@ const App = () => {
                         </AuthLayout>
                     }
                 />
+
+                {/* NEW ROUTES */}
+                <Route path="/verify-email" element={<EmailVerificationPage />} />
+                <Route path="/auth/action" element={<AuthActionPage />} />
+
                 <Route path="/map" element={<MapPage />} />
                 <Route path="/gamification" element={<GamificationSummary />} />
+
+                {/* Catch-all route */}
+                <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
         </Router>
     );
