@@ -1,3 +1,5 @@
+import 'dart:developer' as dev;
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/user_preferences.dart';
@@ -186,12 +188,21 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       clearPreferencesUpdateError: true,
     ));
 
+    dev.log(
+      '[ProfileBloc] preferences optimistic update applied; patchKeys=${patch.keys.toList()}',
+      name: 'ProfileBloc',
+    );
+
     if (!isClosed) {
       try {
         final updated = await _repository.updatePreferences(patch);
         if (!isClosed) {
           emit(state.copyWith(preferences: updated));
         }
+        dev.log(
+          '[ProfileBloc] preferences update confirmed from backend',
+          name: 'ProfileBloc',
+        );
       } catch (e) {
         if (!isClosed) {
           emit(state.copyWith(
@@ -200,6 +211,10 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
             preferencesUpdateError: e.toString(),
           ));
         }
+        dev.log(
+          '[ProfileBloc] preferences update failed, rolling back to previous; error=$e',
+          name: 'ProfileBloc',
+        );
       }
     }
   }
