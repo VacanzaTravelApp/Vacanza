@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CheckInService {
@@ -82,15 +83,24 @@ public class CheckInService {
 
                 CheckIn savedCheckIn = checkInRepository.save(checkIn);
 
-                // Publish event for gamification (best-effort, after transaction commit)
-                eventPublisher.publishEvent(CheckInCompletedEvent.builder()
-                                .checkInId(savedCheckIn.getCheckInId())
-                                .userId(user.getUserId())
-                                .poiId(targetPoi.getPoiId())
-                                .poiName(targetPoi.getName())
-                                .checkedInAt(savedCheckIn.getCheckedInAt())
-                                .source(savedCheckIn.getSource())
-                                .build());
+                // Publish event for gamification (best-effort — reward failure must NOT
+                // rollback check-in)
+                boolean rewardTriggered = false;
+                try {
+                        eventPublisher.publishEvent(CheckInCompletedEvent.builder()
+                                        .checkInId(savedCheckIn.getCheckInId())
+                                        .userId(user.getUserId())
+                                        .poiId(targetPoi.getPoiId())
+                                        .poiName(targetPoi.getName())
+                                        .checkedInAt(savedCheckIn.getCheckedInAt())
+                                        .source(savedCheckIn.getSource())
+                                        .build());
+                        rewardTriggered = true;
+                } catch (Exception e) {
+                        // Log but do not propagate — check-in is already saved
+                        log.error("Gamification event failed for checkIn={}, poi={}: {}",
+                                        savedCheckIn.getCheckInId(), targetPoi.getPoiId(), e.getMessage());
+                }
 
                 return CheckInResponseDTO.builder()
                                 .success(true)
@@ -99,7 +109,7 @@ public class CheckInService {
                                 .poiName(targetPoi.getName())
                                 .checkedInAt(savedCheckIn.getCheckedInAt())
                                 .message("Successfully checked in")
-                                .gamificationTriggered(true)
+                                .gamificationTriggered(rewardTriggered)
                                 .build();
         }
 
