@@ -77,6 +77,35 @@ class JwtInterceptor extends Interceptor {
 
     log('[JwtInterceptor] ERROR status=$status path=$path');
 
+    // 403 on protected endpoints:
+    // - If Firebase user is NOT verified → treat as \"account not verified\" and route to verify flow.
+    // - If Firebase user IS verified → do NOT bounce back to verify screen; just surface backend error.
+    if (status == 403 && !path.startsWith('/auth')) {
+      final firebaseUser = fb.FirebaseAuth.instance.currentUser;
+      final isVerified = firebaseUser?.emailVerified ?? false;
+
+      if (!isVerified) {
+        try {
+          NavigationService.showSnackBar(
+            'Account not verified. Please verify your email first.',
+          );
+          NavigationService.goToVerifyEmail();
+        } catch (_) {
+          // ignore navigation errors
+        }
+      } else {
+        final data = err.response?.data;
+        final msg = (data is Map && data['message'] is String)
+            ? data['message'] as String
+            : 'Request forbidden (403). Please try again.';
+        try {
+          NavigationService.showSnackBar(msg);
+        } catch (_) {
+          // ignore navigation errors
+        }
+      }
+    }
+
     if (_isPreferencesPath(path)) {
       final method = err.requestOptions.method;
       final data = err.response?.data;

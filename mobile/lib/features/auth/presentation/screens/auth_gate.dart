@@ -7,6 +7,7 @@ import 'package:mobile/core/theme/app_text_styles.dart';
 
 import 'package:mobile/features/auth/data/storage/secure_storage_service.dart';
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
+import 'package:mobile/features/auth/presentation/screens/verify_email_screen.dart';
 import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
 
 /// AuthGate
@@ -32,6 +33,7 @@ class _AuthGateState extends State<AuthGate> {
 
   bool _checking = true;
   bool _authenticated = false;
+  bool _needsEmailVerification = false;
 
   @override
   void initState() {
@@ -44,9 +46,9 @@ class _AuthGateState extends State<AuthGate> {
   /// Akış:
   /// 1) Firebase currentUser var mı?
   /// 2) Yoksa -> LOGIN
-  /// 3) Varsa -> getIdToken(forceRefresh: true)
+  /// 3) Varsa -> emailVerified + token refresh
   /// 4) Token geldiyse -> SecureStorage'a yaz
-  /// 5) -> HOME MAP
+  /// 5) emailVerified ise -> HOME MAP, değilse -> VerifyEmail
   ///
   /// HATA OLURSA:
   /// - Firebase signOut
@@ -62,20 +64,31 @@ class _AuthGateState extends State<AuthGate> {
         return;
       }
 
-      // 2️⃣ TOKEN'I ZORLA YENİDEN AL
-      final idToken = await firebaseUser.getIdToken(true);
+      // 2️⃣ Kullanıcı bilgisini tazele ve emailVerified durumunu oku
+      await firebaseUser.reload();
+      final refreshed = fb.FirebaseAuth.instance.currentUser;
+      if (refreshed == null) {
+        _goUnauthenticated();
+        return;
+      }
+
+      final isVerified = refreshed.emailVerified;
+
+      // 3️⃣ TOKEN'I ZORLA YENİDEN AL
+      final idToken = await refreshed.getIdToken(true);
 
       if (idToken == null || idToken.isEmpty) {
         throw Exception('Firebase ID Token alınamadı');
       }
 
-      // 3️⃣ TOKEN'I STORAGE'A YAZ
+      // 4️⃣ TOKEN'I STORAGE'A YAZ
       await _storage.writeAccessToken(idToken);
 
-      // 4️⃣ AUTH OK
+      // 5️⃣ AUTH / VERIFY KARARI
       setState(() {
-        _authenticated = true;
         _checking = false;
+        _authenticated = isVerified;
+        _needsEmailVerification = !isVerified;
       });
     } catch (e) {
       // ❌ HER TÜRLÜ FAIL → HARD LOGOUT
@@ -134,6 +147,10 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     // ✅ NET KARAR
+    if (_needsEmailVerification) {
+      return const VerifyEmailScreen();
+    }
+
     return _authenticated
         ? const HomeMapScreen()
         : const LoginScreen();
