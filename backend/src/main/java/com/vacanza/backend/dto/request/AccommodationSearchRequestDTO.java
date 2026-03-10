@@ -17,8 +17,8 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class AccommodationSearchRequestDTO {
 
-    @NotBlank(message = "City code is required (e.g. IST, PAR, LON)")
-    private String cityCode;
+    @NotBlank(message = "Search query is required (e.g. 'Hotels in Istanbul')")
+    private String query;
 
     @NotNull(message = "Check-in date is required")
     private LocalDate checkInDate;

@@ -27,7 +27,7 @@ public class BookingController {
     public ResponseEntity<List<AccommodationOptionDTO>> searchAccommodations(
             @Valid @RequestBody AccommodationSearchRequestDTO request) {
 
-        log.info("Accommodation search request: city={}", request.getCityCode());
+        log.info("Accommodation search request: query={}", request.getQuery());
         List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
         return ResponseEntity.ok(results);
     }
