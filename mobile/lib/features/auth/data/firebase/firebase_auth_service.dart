@@ -16,7 +16,7 @@ class FirebaseAuthService {
   /// Kullanıcıyı email + şifre ile Firebase üzerinden login eder.
   Future<fb.User> login(String email, String password) async {
     final cred = await _auth.signInWithEmailAndPassword(
-      email: email,
+      email: email.trim(),
       password: password,
     );
 
@@ -35,7 +35,7 @@ class FirebaseAuthService {
   ///  - aynı anda otomatik sign-in olur (currentUser dolar)
   Future<fb.User> register(String email, String password) async {
     final cred = await _auth.createUserWithEmailAndPassword(
-      email: email,
+      email: email.trim(),
       password: password,
     );
 
