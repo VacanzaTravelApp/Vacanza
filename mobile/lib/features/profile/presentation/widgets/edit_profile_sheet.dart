@@ -8,6 +8,7 @@ import '../../data/models/user_profile.dart';
 import '../../data/profile_profile_options.dart';
 import '../bloc/profile_bloc.dart';
 import '../bloc/profile_event.dart';
+import '../styles/profile_sheet_styles.dart';
 import 'searchable_multi_select_picker_sheet.dart';
 
 /// Edit Profile bottom sheet: basic info; read-only email/join date.
@@ -33,8 +34,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
 
   /// Local file path from camera/gallery picker; used for preview only (no upload infra yet).
   String? _pickedLocalFilePath;
-
-  static const _accentBlue = Color(0xFF0096FF);
 
   @override
   void initState() {
@@ -166,7 +165,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         options: profileCountryOptions,
         initialSelected: current != null && current.isNotEmpty ? [current] : [],
         searchable: true,
-        accentColor: _accentBlue,
+        accentColor: ProfileSheetStyles.primaryBlue,
         onDone: (selected) {
           setState(() {
             _draft = _draft.copyWith(
@@ -311,7 +310,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                   width: cameraButtonSize,
                   height: cameraButtonSize,
                   decoration: BoxDecoration(
-                    color: _accentBlue,
+                    color: ProfileSheetStyles.primaryBlue,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -402,7 +401,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
           const Divider(height: 24),
           Row(
             children: [
-              Icon(Icons.person_outline, size: 14, color: _accentBlue),
+              Icon(Icons.person_outline, size: 14, color: ProfileSheetStyles.primaryBlue),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -410,7 +409,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                   children: [
                     Text('Display name', style: TextStyle(fontSize: 10, color: Colors.grey.shade500, letterSpacing: 0.5)),
                     const SizedBox(height: 2),
-                    Text(displayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: _accentBlue), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(displayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: ProfileSheetStyles.primaryBlue), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -539,7 +538,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                     decoration: BoxDecoration(
-                      color: _draft.gender == g ? _accentBlue : Colors.grey.shade100,
+                      color: _draft.gender == g ? ProfileSheetStyles.primaryBlue : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -576,16 +575,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   }
 
   InputDecoration _inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: Colors.grey.shade100,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    );
+    return ProfileSheetStyles.inputDecoration(hint);
   }
 
   Widget _buildFooter(BuildContext context) {
@@ -594,55 +584,16 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
       child: Row(
         children: [
           Expanded(
-            child: TextButton(
+            child: ProfileSheetStyles.secondaryButton(
+              text: 'Cancel',
               onPressed: () => Navigator.of(context).pop(),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                backgroundColor: Colors.grey.shade100,
-                foregroundColor: Colors.grey.shade700,
-              ),
-              child: const Text('Cancel'),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0096FF), Color(0xFF00C6FF)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF0096FF).withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _save,
-                  borderRadius: BorderRadius.circular(14),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 14),
-                    child: Center(
-                      child: Text(
-                        'Save',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            child: ProfileSheetStyles.primaryButton(
+              text: 'Save',
+              onPressed: _save,
             ),
           ),
         ],

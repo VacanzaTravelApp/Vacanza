@@ -18,6 +18,12 @@ class JwtInterceptor extends Interceptor {
   })  : _storage = storage,
         _dio = dio;
 
+  bool _isPreferencesPath(String path) {
+    // Handles both absolute and relative paths (with or without baseUrl).
+    return path.endsWith('/users/me/preferences') ||
+        path.contains('/users/me/preferences?');
+  }
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     try {
@@ -37,7 +43,31 @@ class JwtInterceptor extends Interceptor {
         ? 'Bearer ${authHeader.substring(7, authHeader.length.clamp(0, 13))}...'
         : authHeader ?? 'MISSING';
     log('[JwtInterceptor] REQ path=${options.path} auth=$maskedAuth');
+
+    if (_isPreferencesPath(options.path)) {
+      log(
+        '[PrefsHTTP] REQ method=${options.method} path=${options.path}',
+        name: 'PrefsHTTP',
+      );
+    }
+
     handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final path = response.requestOptions.path;
+    if (_isPreferencesPath(path)) {
+      final method = response.requestOptions.method;
+      final status = response.statusCode;
+      final data = response.data;
+      final bodyType = data == null ? 'null' : data.runtimeType.toString();
+      log(
+        '[PrefsHTTP] RES method=$method path=$path status=$status bodyType=$bodyType',
+        name: 'PrefsHTTP',
+      );
+    }
+    handler.next(response);
   }
 
   @override
@@ -46,6 +76,17 @@ class JwtInterceptor extends Interceptor {
     final path = err.requestOptions.path;
 
     log('[JwtInterceptor] ERROR status=$status path=$path');
+
+    if (_isPreferencesPath(path)) {
+      final method = err.requestOptions.method;
+      final data = err.response?.data;
+      final bodyType = data == null ? 'null' : data.runtimeType.toString();
+      log(
+        '[PrefsHTTP] ERROR method=$method path=$path status=$status '
+        'bodyType=$bodyType body=$data',
+        name: 'PrefsHTTP',
+      );
+    }
 
     if (status == 401) {
       final body = err.response?.data;

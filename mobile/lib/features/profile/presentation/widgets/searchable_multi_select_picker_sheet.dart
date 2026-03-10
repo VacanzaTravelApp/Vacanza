@@ -23,16 +23,17 @@ class SearchableMultiSelectPickerConfig {
 
 /// Bottom sheet: multi-select with optional search, checkboxes, and Done.
 /// Use via [showSearchableMultiSelectPicker].
-void showSearchableMultiSelectPicker(
+/// Returns a [Future] that completes when the sheet is closed.
+Future<void> showSearchableMultiSelectPicker(
   BuildContext context, {
   required SearchableMultiSelectPickerConfig config,
 }) {
-  showModalBottomSheet<void>(
+  return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (context) => _SearchableMultiSelectPickerSheet(config: config),
-  );
+  ).then((_) {});
 }
 
 class _SearchableMultiSelectPickerSheet extends StatefulWidget {
