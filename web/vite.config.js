@@ -6,7 +6,7 @@ export default defineConfig(({ mode }) => {
   // .env dosyasındaki değişkenleri yükle
   // eslint-disable-next-line no-undef
   const env = loadEnv(mode, process.cwd(), '');
-  
+
   // .env'den gelen URL'i al (Yoksa senin IP'ni fallback olarak kullanır)
   const backendUrl = env.VITE_BACKEND_BASE_URL;
 
@@ -36,7 +36,17 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        "/users": {
+          target: backendUrl,
+          changeOrigin: true,
+          secure: false,
+        },
         "/bookings": {
+          target: backendUrl,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/chat": {
           target: backendUrl,
           changeOrigin: true,
           secure: false,
