@@ -54,17 +54,29 @@ class _FlightCardState extends State<FlightCard> {
                   color: const Color(0xFFF5F5F5),
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFF0F0F0)),
+                  image: flight.airlineLogo != null &&
+                          flight.airlineLogo!.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(flight.airlineLogo!),
+                          fit: BoxFit.contain,
+                        )
+                      : null,
                 ),
-                child: Center(
-                  child: Text(
-                    flight.carrier,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF888888),
-                    ),
-                  ),
-                ),
+                child: (flight.airlineLogo == null ||
+                        flight.airlineLogo!.isEmpty)
+                    ? Center(
+                        child: Text(
+                          flight.carrier,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF888888),
+                          ),
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -80,7 +92,12 @@ class _FlightCardState extends State<FlightCard> {
                       ),
                     ),
                     Text(
-                      flight.carrier,
+                      [
+                        flight.carrier,
+                        if (flight.flightNumber != null &&
+                            flight.flightNumber!.isNotEmpty)
+                          flight.flightNumber!,
+                      ].join(' · '),
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade500,
@@ -89,13 +106,41 @@ class _FlightCardState extends State<FlightCard> {
                   ],
                 ),
               ),
-              Text(
-                '\$${flight.price.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: _accent,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '\$${flight.price.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: _accent,
+                    ),
+                  ),
+                  if (flight.travelClass != null &&
+                      flight.travelClass!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          flight.travelClass!,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF1D4ED8),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),

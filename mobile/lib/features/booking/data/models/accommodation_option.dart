@@ -11,6 +11,15 @@ class AccommodationOption {
   final double? rating; // nullable per contract
   final String externalBookingUrl;
 
+  // SerpApi (Google Hotels) enriched fields
+  final String? imageUrl;
+  final int? hotelClass;
+  final int? totalReviews;
+  final String? providerName;
+  final String? description;
+  final double? latitude;
+  final double? longitude;
+
   const AccommodationOption({
     required this.hotelName,
     required this.hotelId,
@@ -19,6 +28,13 @@ class AccommodationOption {
     required this.currency,
     this.rating,
     required this.externalBookingUrl,
+    this.imageUrl,
+    this.hotelClass,
+    this.totalReviews,
+    this.providerName,
+    this.description,
+    this.latitude,
+    this.longitude,
   });
 
   factory AccommodationOption.fromJson(Map<String, dynamic> json) {
@@ -30,10 +46,18 @@ class AccommodationOption {
       currency: (json['currency'] ?? 'USD').toString(),
       rating: (json['rating'] as num?)?.toDouble(),
       externalBookingUrl: (json['externalBookingUrl'] ?? '').toString(),
+      imageUrl: (json['imageUrl'] as String?) ?? (json['thumbnailUrl'] as String?),
+      hotelClass: (json['hotelClass'] as num?)?.toInt(),
+      totalReviews: (json['totalReviews'] as num?)?.toInt(),
+      providerName: (json['providerName'] as String?),
+      description: (json['description'] as String?),
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
     );
   }
 
   @override
   String toString() =>
-      'AccommodationOption($hotelName, $price $currency, rating=$rating)';
+      'AccommodationOption($hotelName, $price $currency, rating=$rating, '
+      'hotelClass=$hotelClass, reviews=$totalReviews, provider=$providerName)';
 }
