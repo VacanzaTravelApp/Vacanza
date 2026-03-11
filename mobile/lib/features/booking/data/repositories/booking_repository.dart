@@ -80,6 +80,17 @@ class BookingRepository {
       return const BookingException('Invalid search parameters');
     }
 
+    if (status == 401) {
+      return const BookingException('Unauthorized');
+    }
+
+    if (status == 500) {
+      // Backend wraps SerpApi/Google Flights errors into 500.
+      return const BookingException(
+        'Search is temporarily unavailable, please try again later.',
+      );
+    }
+
     if (status == 502) {
       return const BookingException('Search service temporarily unavailable');
     }
