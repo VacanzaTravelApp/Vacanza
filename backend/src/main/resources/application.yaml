@@ -33,9 +33,8 @@ ai-service:
   connect-timeout: 10s
   read-timeout: 30s
 
-amadeus:
-  base-url: https://test.api.amadeus.com
-  client-id: ${AMADEUS_CLIENT_ID}
-  client-secret: ${AMADEUS_CLIENT_SECRET}
+serpapi:
+  base-url: https://serpapi.com
+  api-key: ${SERPAPI_API_KEY}
   connect-timeout: 10s
   read-timeout: 30s

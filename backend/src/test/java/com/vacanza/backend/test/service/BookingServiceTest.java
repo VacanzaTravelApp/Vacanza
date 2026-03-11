@@ -5,7 +5,7 @@ import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
 import com.vacanza.backend.entity.enums.SortCriteria;
-import com.vacanza.backend.integration.booking.AmadeusClient;
+import com.vacanza.backend.integration.booking.SerpApiClient;
 import com.vacanza.backend.service.impl.BookingServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -28,7 +27,7 @@ import static org.mockito.Mockito.when;
 class BookingServiceTest {
 
         @Mock
-        private AmadeusClient amadeusClient;
+        private SerpApiClient serpApiClient;
 
         @InjectMocks
         private BookingServiceImpl bookingService;
@@ -36,34 +35,6 @@ class BookingServiceTest {
         // ──────────────────────────────────────────────────────────────
         // Budget filtering
         // ──────────────────────────────────────────────────────────────
-
-        @Test
-        @DisplayName("Should filter out accommodations exceeding per-night budget")
-        void shouldFilterAccommodations_ExceedingBudget() {
-                AccommodationSearchRequestDTO request = new AccommodationSearchRequestDTO();
-                request.setCityCode("PAR");
-                request.setCheckInDate(LocalDate.of(2025, 7, 1));
-                request.setCheckOutDate(LocalDate.of(2025, 7, 5)); // 4 nights
-                request.setBudget(new BigDecimal("150.00")); // per-night budget
-
-                // Amadeus returns total-stay prices
-                List<AccommodationOptionDTO> mockResults = List.of(
-                                AccommodationOptionDTO.builder().hotelName("Cheap Hotel")
-                                                .price(new BigDecimal("400.00")).build(), // 400/4 = 100/night → passes
-                                AccommodationOptionDTO.builder().hotelName("Mid Hotel")
-                                                .price(new BigDecimal("600.00")).build(), // 600/4 = 150/night → passes
-                                AccommodationOptionDTO.builder().hotelName("Expensive Hotel")
-                                                .price(new BigDecimal("800.00")).build()); // 800/4 = 200/night →
-                                                                                           // filtered out
-
-                when(amadeusClient.searchHotels(any())).thenReturn(mockResults);
-
-                List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
-
-                assertThat(results).hasSize(2);
-                assertThat(results).extracting(AccommodationOptionDTO::getHotelName)
-                                .containsExactlyInAnyOrder("Cheap Hotel", "Mid Hotel");
-        }
 
         @Test
         @DisplayName("Should filter out flights exceeding budget")
@@ -79,7 +50,7 @@ class BookingServiceTest {
                                 TransportOptionDTO.builder().carrier("AF").price(new BigDecimal("400.00")).build(),
                                 TransportOptionDTO.builder().carrier("PC").price(new BigDecimal("150.00")).build());
 
-                when(amadeusClient.searchFlights(any())).thenReturn(mockResults);
+                when(serpApiClient.searchFlights(any())).thenReturn(mockResults);
 
                 List<TransportOptionDTO> results = bookingService.searchTransportation(request);
 
@@ -89,10 +60,10 @@ class BookingServiceTest {
         }
 
         @Test
-        @DisplayName("Should return all results when budget is null")
+        @DisplayName("Should return all accommodation results (SerpApi handles budget filter)")
         void shouldReturnAll_WhenBudgetIsNull() {
                 AccommodationSearchRequestDTO request = new AccommodationSearchRequestDTO();
-                request.setCityCode("PAR");
+                request.setQuery("Hotels in Paris");
                 request.setCheckInDate(LocalDate.of(2025, 7, 1));
                 request.setCheckOutDate(LocalDate.of(2025, 7, 5));
                 request.setBudget(null);
@@ -102,7 +73,7 @@ class BookingServiceTest {
                                 AccommodationOptionDTO.builder().hotelName("B").price(new BigDecimal("500.00"))
                                                 .build());
 
-                when(amadeusClient.searchHotels(any())).thenReturn(mockResults);
+                when(serpApiClient.searchHotels(any())).thenReturn(mockResults);
 
                 List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
 
@@ -117,7 +88,7 @@ class BookingServiceTest {
         @DisplayName("Should sort accommodations by PRICE_ASC")
         void shouldSortAccommodations_PriceAsc() {
                 AccommodationSearchRequestDTO request = new AccommodationSearchRequestDTO();
-                request.setCityCode("PAR");
+                request.setQuery("Hotels in Paris");
                 request.setCheckInDate(LocalDate.of(2025, 7, 1));
                 request.setCheckOutDate(LocalDate.of(2025, 7, 5));
                 request.setSortBy(SortCriteria.PRICE_ASC);
@@ -130,7 +101,7 @@ class BookingServiceTest {
                                 AccommodationOptionDTO.builder().hotelName("Mid").price(new BigDecimal("150.00"))
                                                 .build());
 
-                when(amadeusClient.searchHotels(any())).thenReturn(mockResults);
+                when(serpApiClient.searchHotels(any())).thenReturn(mockResults);
 
                 List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
 
@@ -145,7 +116,7 @@ class BookingServiceTest {
         @DisplayName("Should sort accommodations by PRICE_DESC")
         void shouldSortAccommodations_PriceDesc() {
                 AccommodationSearchRequestDTO request = new AccommodationSearchRequestDTO();
-                request.setCityCode("PAR");
+                request.setQuery("Hotels in Paris");
                 request.setCheckInDate(LocalDate.of(2025, 7, 1));
                 request.setCheckOutDate(LocalDate.of(2025, 7, 5));
                 request.setSortBy(SortCriteria.PRICE_DESC);
@@ -156,7 +127,7 @@ class BookingServiceTest {
                                 AccommodationOptionDTO.builder().hotelName("Expensive").price(new BigDecimal("300.00"))
                                                 .build());
 
-                when(amadeusClient.searchHotels(any())).thenReturn(mockResults);
+                when(serpApiClient.searchHotels(any())).thenReturn(mockResults);
 
                 List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
 
@@ -168,7 +139,7 @@ class BookingServiceTest {
         @DisplayName("Should sort accommodations by RATING_DESC")
         void shouldSortAccommodations_RatingDesc() {
                 AccommodationSearchRequestDTO request = new AccommodationSearchRequestDTO();
-                request.setCityCode("PAR");
+                request.setQuery("Hotels in Paris");
                 request.setCheckInDate(LocalDate.of(2025, 7, 1));
                 request.setCheckOutDate(LocalDate.of(2025, 7, 5));
                 request.setSortBy(SortCriteria.RATING_DESC);
@@ -178,7 +149,7 @@ class BookingServiceTest {
                                 AccommodationOptionDTO.builder().hotelName("High").rating(4.8).build(),
                                 AccommodationOptionDTO.builder().hotelName("Mid").rating(3.5).build());
 
-                when(amadeusClient.searchHotels(any())).thenReturn(mockResults);
+                when(serpApiClient.searchHotels(any())).thenReturn(mockResults);
 
                 List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
 
@@ -194,11 +165,11 @@ class BookingServiceTest {
         @DisplayName("Should return empty list when API client returns empty")
         void shouldReturnEmpty_WhenApiReturnsEmpty() {
                 AccommodationSearchRequestDTO request = new AccommodationSearchRequestDTO();
-                request.setCityCode("XXX");
+                request.setQuery("Hotels in Unknown City");
                 request.setCheckInDate(LocalDate.of(2025, 7, 1));
                 request.setCheckOutDate(LocalDate.of(2025, 7, 5));
 
-                when(amadeusClient.searchHotels(any())).thenReturn(Collections.emptyList());
+                when(serpApiClient.searchHotels(any())).thenReturn(Collections.emptyList());
 
                 List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
 
@@ -213,7 +184,7 @@ class BookingServiceTest {
                 request.setDestination("XXX");
                 request.setDepartureDate(LocalDate.of(2025, 7, 1));
 
-                when(amadeusClient.searchFlights(any())).thenReturn(Collections.emptyList());
+                when(serpApiClient.searchFlights(any())).thenReturn(Collections.emptyList());
 
                 List<TransportOptionDTO> results = bookingService.searchTransportation(request);
 

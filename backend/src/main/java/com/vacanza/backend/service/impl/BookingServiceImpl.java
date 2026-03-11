@@ -5,7 +5,7 @@ import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
 import com.vacanza.backend.entity.enums.SortCriteria;
-import com.vacanza.backend.integration.booking.AmadeusClient;
+import com.vacanza.backend.integration.booking.SerpApiClient;
 import com.vacanza.backend.service.BookingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,42 +20,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
 
-        private final AmadeusClient amadeusClient;
+        private final SerpApiClient serpApiClient;
 
         @Override
         public List<AccommodationOptionDTO> searchAccommodations(AccommodationSearchRequestDTO request) {
-                log.info("Searching accommodations: city={}, budget={}, currency={}, sort={}",
-                                request.getCityCode(), request.getBudget(),
+                log.info("Searching accommodations: query={}, budget={}, currency={}, sort={}",
+                                request.getQuery(), request.getBudget(),
                                 request.getCurrency(), request.getSortBy());
 
-                List<AccommodationOptionDTO> results = amadeusClient.searchHotels(request);
+                // SerpApi handles max_price filtering server-side
+                List<AccommodationOptionDTO> results = serpApiClient.searchHotels(request);
 
-                // Apply budget filter (compares total-stay price, only when currencies match)
-                if (request.getBudget() != null) {
-                        final String requestCurrency = request.getCurrency() != null
-                                        ? request.getCurrency()
-                                        : "USD";
-
-                        results = results.stream()
-                                        .filter(opt -> {
-                                                if (opt.getPrice() == null)
-                                                        return false;
-                                                // Skip filter if currencies don't match
-                                                if (opt.getCurrency() != null
-                                                                && !opt.getCurrency()
-                                                                                .equalsIgnoreCase(requestCurrency)) {
-                                                        return true;
-                                                }
-                                                // Compare per-night price; fallback to total if unavailable
-                                                java.math.BigDecimal comparePrice = opt.getPricePerNight() != null
-                                                                ? opt.getPricePerNight()
-                                                                : opt.getPrice();
-                                                return comparePrice.compareTo(request.getBudget()) <= 0;
-                                        })
-                                        .collect(Collectors.toList());
-                }
-
-                // Apply sorting
+                // Apply sorting (SerpApi sort may differ from our enum)
                 results = sortAccommodations(results, request.getSortBy());
 
                 log.info("Returning {} accommodation results after filtering", results.size());
@@ -68,9 +44,9 @@ public class BookingServiceImpl implements BookingService {
                                 request.getOrigin(), request.getDestination(),
                                 request.getBudget(), request.getSortBy());
 
-                List<TransportOptionDTO> results = amadeusClient.searchFlights(request);
+                List<TransportOptionDTO> results = serpApiClient.searchFlights(request);
 
-                // Apply budget filter
+                // Apply budget filter (SerpApi Google Flights doesn't support max price)
                 if (request.getBudget() != null) {
                         results = results.stream()
                                         .filter(opt -> opt.getPrice() != null

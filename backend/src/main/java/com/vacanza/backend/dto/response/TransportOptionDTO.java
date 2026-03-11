@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -14,13 +13,17 @@ import java.time.LocalDateTime;
 @Builder
 public class TransportOptionDTO {
     private String carrier;
+    private String airlineLogo;
+    private String flightNumber;
+    private String travelClass;
     private String origin;
     private String destination;
-    private LocalDateTime departureTime;
-    private LocalDateTime arrivalTime;
+    private String departureTime;
+    private String arrivalTime;
     private String duration;
     private BigDecimal price;
     private String currency;
     private Integer stops;
+    private String bookingToken;
     private String externalBookingUrl;
 }
