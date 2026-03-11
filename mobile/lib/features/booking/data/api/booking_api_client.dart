@@ -29,9 +29,10 @@ class BookingApiClient {
         '${_dio.options.baseUrl}/bookings/accommodations/search';
     log('[BOOKING_API] POST $fullUrl body=${request.toJson()}');
 
+    final body = request.toJson();
     final response = await _dio.post<dynamic>(
       '/bookings/accommodations/search',
-      data: request.toJson(),
+      data: body,
     );
 
     final status = response.statusCode;
@@ -45,11 +46,10 @@ class BookingApiClient {
     }
 
     // ── TEMP DEBUG: raw JSON inspection ─────────────────────────
-    final reqJson = request.toJson();
-    log('[BUDGET_DEBUG] REQUEST: city=${reqJson['cityCode']} '
-        'dates=${reqJson['checkInDate']}→${reqJson['checkOutDate']} '
-        'adults=${reqJson['adults']} budget=${reqJson['budget']} '
-        'sort=${reqJson['sortBy']}');
+    log('[BUDGET_DEBUG] REQUEST: query=${body['query']} '
+        'dates=${body['checkInDate']}→${body['checkOutDate']} '
+        'adults=${body['adults']} budget=${body['budget']} '
+        'sort=${body['sortBy']}');
 
     for (var i = 0; i < data.length && i < 3; i++) {
       log('[BUDGET_DEBUG] RAW item[$i]: ${data[i]}');
