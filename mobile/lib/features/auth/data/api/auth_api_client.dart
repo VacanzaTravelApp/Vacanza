@@ -69,4 +69,17 @@ class AuthApiClient {
 
     throw Exception('Login response beklenen formatta değil.');
   }
+
+  /// LOGOUT
+  ///
+  /// POST /auth/logout
+  /// Header: Authorization: Bearer <FIREBASE_ID_TOKEN>
+  Future<void> logoutSync({
+    required String firebaseIdToken,
+  }) async {
+    await _dio.post(
+      '/auth/logout',
+      options: Options(headers: {'Authorization': 'Bearer $firebaseIdToken'}),
+    );
+  }
 }

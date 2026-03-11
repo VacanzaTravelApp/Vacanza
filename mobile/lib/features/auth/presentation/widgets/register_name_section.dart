@@ -40,7 +40,8 @@ class RegisterNameSection extends StatelessWidget {
           controller: firstNameController,
           label: "First Name",
           hintText: "Enter your first name",
-          validator: (v) => v!.isEmpty ? "Required" : null,
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? "Required" : null,
         ),
 
         const SizedBox(height: 16),
@@ -49,7 +50,7 @@ class RegisterNameSection extends StatelessWidget {
           controller: middleNameController,
           label: "Middle Name",
           hintText: "Enter your middle name",
-          validator: (v) => v!.isEmpty ? "Required" : null,
+          validator: (v) => null, // Optional
         ),
 
         const SizedBox(height: 16),
@@ -58,9 +59,9 @@ class RegisterNameSection extends StatelessWidget {
           controller: lastNameController,
           label: "Last Name",
           hintText: "Enter your last name",
-          validator: (v) => v!.isEmpty ? "Required" : null,
+          validator: (v) =>
+              v == null || v.trim().isEmpty ? "Required" : null,
         ),
-
         if (hasBothNames) ...[
           const SizedBox(height: 12),
 
@@ -105,7 +106,7 @@ class RegisterNameSection extends StatelessWidget {
                 style: TextStyle(color: Colors.red, fontSize: 11),
               ),
             ),
-        ]
+        ],
       ],
     );
   }

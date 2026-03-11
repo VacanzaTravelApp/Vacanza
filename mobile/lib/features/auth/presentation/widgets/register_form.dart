@@ -90,6 +90,32 @@ class _RegisterFormState extends State<RegisterForm> {
 
   /// Updates live validation flags and business rules.
   void _updateForm() {
+    // Normalize leading whitespace for all text fields: prevent starting with spaces.
+    void normalizeLeading(TextEditingController c, {bool clearIfAllWhitespace = false}) {
+      final raw = c.text;
+      if (raw.isEmpty) return;
+      final trimLeft = raw.replaceFirst(RegExp(r'^\s+'), '');
+      final trim = raw.trim();
+      if (clearIfAllWhitespace && raw.isNotEmpty && trim.isEmpty) {
+        c
+          ..text = ''
+          ..selection = const TextSelection.collapsed(offset: 0);
+        return;
+      }
+      if (trimLeft != raw) {
+        c
+          ..text = trimLeft
+          ..selection = TextSelection.collapsed(offset: trimLeft.length);
+      }
+    }
+
+    normalizeLeading(_firstName);
+    normalizeLeading(_middleName, clearIfAllWhitespace: true);
+    normalizeLeading(_lastName);
+    normalizeLeading(_email);
+    normalizeLeading(_password);
+    normalizeLeading(_confirm);
+
     final pass = _password.text.trim();
     final conf = _confirm.text.trim();
 
@@ -101,17 +127,28 @@ class _RegisterFormState extends State<RegisterForm> {
 
     mismatch = conf.isNotEmpty && conf != pass;
 
+    final middleRaw = _middleName.text;
+    final middleTrim = middleRaw.trim();
+    if (middleRaw.isNotEmpty && middleTrim.isEmpty) {
+      // User only typed spaces -> clear field.
+      _middleName
+        ..text = ''
+        ..selection = const TextSelection.collapsed(offset: 0);
+    }
+
     final f = _firstName.text.trim().isNotEmpty;
-    final m = _middleName.text.trim().isNotEmpty;
+    final m = _middleName.text.trim().isNotEmpty; // optional; only used for info
     final l = _lastName.text.trim().isNotEmpty;
     final e = _emailRegex.hasMatch(_email.text.trim());
     final p = up && low && dig && spe && len8;
     final c = conf == pass && conf.isNotEmpty;
 
-    final prefOk = f && m ? (_preferredFirst || _preferredMiddle) : false;
+    final hasBothNames = f && m;
+    final prefOk = !hasBothNames || (_preferredFirst || _preferredMiddle);
 
     setState(() {
-      _formValid = f && m && l && e && p && c && prefOk;
+      // Middle name is optional; when both names are present user must choose preferred.
+      _formValid = f && l && e && p && c && prefOk;
     });
   }
 
@@ -126,14 +163,22 @@ class _RegisterFormState extends State<RegisterForm> {
 
     FocusScope.of(context).unfocus();
 
+    final first = _firstName.text.trim();
+    final middle = _middleName.text.trim();
+
     final preferredNames = <String>[];
-    if (_preferredFirst) preferredNames.add(_firstName.text.trim());
-    if (_preferredMiddle) preferredNames.add(_middleName.text.trim());
+    if (middle.isEmpty) {
+      // Middle yoksa preferred name otomatik olarak firstName.
+      preferredNames.add(first);
+    } else {
+      if (_preferredFirst) preferredNames.add(first);
+      if (_preferredMiddle) preferredNames.add(middle);
+    }
 
     context.read<RegisterBloc>().add(
       RegisterSubmitted(
-        firstName: _firstName.text.trim(),
-        middleName: _middleName.text.trim(),
+        firstName: first,
+        middleName: middle,
         lastName: _lastName.text.trim(),
         email: _email.text.trim(),
         password: _password.text,
