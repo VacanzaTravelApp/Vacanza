@@ -5,13 +5,14 @@ import com.vacanza.backend.dto.request.AccommodationSearchRequestDTO;
 import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
+import com.vacanza.backend.exceptions.BookingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -82,10 +83,27 @@ public class SerpApiClient {
         } catch (WebClientResponseException e) {
             log.error("[SERPAPI] Hotel search API error: {} - {}",
                     e.getStatusCode(), e.getResponseBodyAsString());
-            return Collections.emptyList();
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED
+                    || e.getStatusCode() == HttpStatus.FORBIDDEN) {
+                throw new BookingException(
+                        "SerpApi authentication failed — check SERPAPI_API_KEY",
+                        HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                throw new BookingException(
+                        "SerpApi rate limit exceeded — please try again later",
+                        HttpStatus.SERVICE_UNAVAILABLE);
+            }
+            throw new BookingException(
+                    "Hotel search unavailable: " + e.getStatusCode(),
+                    HttpStatus.BAD_GATEWAY);
+        } catch (BookingException e) {
+            throw e;
         } catch (Exception e) {
             log.error("[SERPAPI] Hotel search failed: {}", e.getMessage(), e);
-            return Collections.emptyList();
+            throw new BookingException(
+                    "Hotel search failed: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -136,10 +154,27 @@ public class SerpApiClient {
         } catch (WebClientResponseException e) {
             log.error("[SERPAPI] Flight search API error: {} - {}",
                     e.getStatusCode(), e.getResponseBodyAsString());
-            return Collections.emptyList();
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED
+                    || e.getStatusCode() == HttpStatus.FORBIDDEN) {
+                throw new BookingException(
+                        "SerpApi authentication failed — check SERPAPI_API_KEY",
+                        HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                throw new BookingException(
+                        "SerpApi rate limit exceeded — please try again later",
+                        HttpStatus.SERVICE_UNAVAILABLE);
+            }
+            throw new BookingException(
+                    "Flight search unavailable: " + e.getStatusCode(),
+                    HttpStatus.BAD_GATEWAY);
+        } catch (BookingException e) {
+            throw e;
         } catch (Exception e) {
             log.error("[SERPAPI] Flight search failed: {}", e.getMessage(), e);
-            return Collections.emptyList();
+            throw new BookingException(
+                    "Flight search failed: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }
