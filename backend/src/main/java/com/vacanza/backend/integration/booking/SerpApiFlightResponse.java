@@ -168,9 +168,17 @@ public class SerpApiFlightResponse {
                     String flightNumber = firstFlight.getFlightNumber();
                     String travelClass = firstFlight.getTravelClass();
 
+                    // Build a descriptive Google Flights deep-link
                     String bookingUrl = String.format(
-                            "https://www.google.com/travel/flights?q=%s+to+%s",
-                            origin, destination);
+                            "https://www.google.com/travel/flights?q=%s+to+%s+on+%s",
+                            origin, destination,
+                            departureTime != null ? departureTime.substring(0, 10) : "");
+
+                    // departure_token is only present in round-trip first-leg responses;
+                    // fall back to booking_token for one-way flights.
+                    String resolvedToken = fg.getDepartureToken() != null
+                            ? fg.getDepartureToken()
+                            : fg.getBookingToken();
 
                     return TransportOptionDTO.builder()
                             .carrier(carrier)
@@ -185,7 +193,7 @@ public class SerpApiFlightResponse {
                             .price(BigDecimal.valueOf(fg.getPrice()))
                             .currency(currency)
                             .stops(stops)
-                            .bookingToken(fg.getDepartureToken())
+                            .bookingToken(resolvedToken)
                             .externalBookingUrl(bookingUrl)
                             .build();
                 })
