@@ -14,6 +14,12 @@ class TransportOption {
   final int stops;
   final String externalBookingUrl;
 
+  // Google Flights enriched fields
+  final String? airlineLogo;
+  final String? flightNumber;
+  final String? travelClass;
+  final String? bookingToken;
+
   const TransportOption({
     required this.carrier,
     required this.origin,
@@ -25,6 +31,10 @@ class TransportOption {
     required this.currency,
     required this.stops,
     required this.externalBookingUrl,
+    this.airlineLogo,
+    this.flightNumber,
+    this.travelClass,
+    this.bookingToken,
   });
 
   factory TransportOption.fromJson(Map<String, dynamic> json) {
@@ -39,11 +49,15 @@ class TransportOption {
       currency: (json['currency'] ?? 'USD').toString(),
       stops: (json['stops'] as num?)?.toInt() ?? 0,
       externalBookingUrl: (json['externalBookingUrl'] ?? '').toString(),
+      airlineLogo: (json['airlineLogo'] as String?),
+      flightNumber: (json['flightNumber'] as String?),
+      travelClass: (json['travelClass'] as String?),
+      bookingToken: (json['bookingToken'] as String?),
     );
   }
 
   @override
   String toString() =>
       'TransportOption($carrier $origin→$destination, $price $currency, '
-      'stops=$stops)';
+      'stops=$stops, flightNumber=$flightNumber, travelClass=$travelClass)';
 }
