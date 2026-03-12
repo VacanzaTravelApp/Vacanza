@@ -2,7 +2,7 @@ import axios from "axios";
 import { auth } from "../firebase";
 
 const http = axios.create({
-  // baseURL yok -> istekler /... şeklinde gider, Vite proxy yakalar
+  baseURL: import.meta.env.VITE_BACKEND_BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
