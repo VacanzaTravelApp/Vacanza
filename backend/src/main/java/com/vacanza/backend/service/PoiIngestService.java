@@ -1,13 +1,17 @@
 package com.vacanza.backend.service;
 
+import com.vacanza.backend.entity.IngestedTile;
 import com.vacanza.backend.entity.PointOfInterest;
 import com.vacanza.backend.integration.GeoapifyClient;
 import com.vacanza.backend.integration.GeoapifyResponse;
+import com.vacanza.backend.repo.IngestedTileRepository;
 import com.vacanza.backend.repo.PointOfInterestRepository;
+import com.vacanza.backend.util.TileUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -16,6 +20,7 @@ public class PoiIngestService {
 
     private final GeoapifyClient geoapifyClient;
     private final PointOfInterestRepository poiRepository;
+    private final IngestedTileRepository ingestedTileRepository;
 
     @Transactional
     public int ingestMultipleCategories(
@@ -42,7 +47,7 @@ public class PoiIngestService {
         return totalSaved;
     }
 
-    private int ingestSingleCategory(
+    public int ingestSingleCategory(
             String filter,
             String geoapifyCategory,
             String internalCategory,
@@ -89,8 +94,26 @@ public class PoiIngestService {
         return saved;
     }
 
-    // FRONTEND → GEOAPIFY MAP
-    private String mapFrontendToGeoapify(String c) {
+    @Transactional
+    public int ingestTile(TileUtils.TileCoord tile, String frontendCategory, int limit) {
+        String geoapifyCategory = mapFrontendToGeoapify(frontendCategory);
+        if (geoapifyCategory == null) return 0;
+
+        String filter = TileUtils.tileToRectFilter(tile.x(), tile.y(), tile.zoom());
+        int saved = ingestSingleCategory(filter, geoapifyCategory, frontendCategory, limit);
+
+        ingestedTileRepository.save(IngestedTile.builder()
+                .tileX(tile.x())
+                .tileY(tile.y())
+                .zoomLevel(tile.zoom())
+                .category(frontendCategory)
+                .ingestedAt(Instant.now())
+                .build());
+
+        return saved;
+    }
+
+    public String mapFrontendToGeoapify(String c) {
         return switch (c.toLowerCase()) {
             case "restaurant" -> "catering.restaurant";
             case "cafe" -> "catering.cafe";
