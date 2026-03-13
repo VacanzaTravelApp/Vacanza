@@ -11,7 +11,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
-import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
+import Map, { NavigationControl, GeolocateControl, Source, Layer, Popup } from "react-map-gl";
 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
@@ -466,7 +466,7 @@ export default function MapPage() {
           polygon: selectionType === "POLYGON" ? polygon : null,
           categories: categoriesOverride !== undefined ? categoriesOverride : selectedBackendCats,
           page: 0,
-          limit: 200,
+          limit: 500,
           sort: "RATING_DESC",
         };
         const res = await fetch("/pois/search-in-area", {
@@ -514,17 +514,21 @@ export default function MapPage() {
     };
   }, []);
 
-  // İlk yükleme
+  // İlk yükleme + async ingest sonrası auto-refetch
   useEffect(() => {
     if (!MAPBOX_TOKEN || !user) return;
+    if (mode !== "VIEWPORT") return;
 
-    const t = setTimeout(() => {
-      if (mode !== "VIEWPORT") return;
+    const doFetch = () => {
       const bbox = getViewportBbox();
       if (bbox) fetchPois({ selectionType: "BBOX", bbox });
-    }, 600);
+    };
 
-    return () => clearTimeout(t);
+    const t1 = setTimeout(doFetch, 600);
+    const t2 = setTimeout(doFetch, 4000);
+    const t3 = setTimeout(doFetch, 10000);
+
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
 
   // Kategori değişince (VIEWPORT’ta) refetch
@@ -663,6 +667,110 @@ export default function MapPage() {
     });
   }, [poisRaw, mode, selection, selectedCats]);
 
+  const [popupPoi, setPopupPoi] = useState(null);
+
+  const poiGeoJSON = useMemo(() => ({
+    type: "FeatureCollection",
+    features: pois.map((p) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [p.longitude, p.latitude] },
+      properties: {
+        poiId: p.poiId,
+        name: getSafePoiTitle(p),
+        category: normalizeCategory(p.category),
+        rating: p.rating,
+      },
+    })),
+  }), [pois]);
+
+  const CATEGORY_COLORS = useMemo(() => [
+    "match", ["get", "category"],
+    "restaurant", "#FFB020",
+    "cafe", "#6F4E37",
+    "museum", "#9B51E0",
+    "monuments", "#FF7A45",
+    "parks", "#27AE60",
+    "#64748B",
+  ], []);
+
+  const clusterLayer = useMemo(() => ({
+    id: "poi-clusters",
+    type: "circle",
+    source: "poi-source",
+    filter: ["has", "point_count"],
+    paint: {
+      "circle-color": ["step", ["get", "point_count"],
+        "#51bbd6", 10, "#f1f075", 30, "#f28cb1"],
+      "circle-radius": ["step", ["get", "point_count"],
+        18, 10, 24, 30, 32],
+      "circle-stroke-width": 2,
+      "circle-stroke-color": "#fff",
+      "circle-opacity": 0.85,
+    },
+  }), []);
+
+  const clusterCountLayer = useMemo(() => ({
+    id: "poi-cluster-count",
+    type: "symbol",
+    source: "poi-source",
+    filter: ["has", "point_count"],
+    layout: {
+      "text-field": "{point_count_abbreviated}",
+      "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Bold"],
+      "text-size": 13,
+    },
+    paint: { "text-color": "#1a1a2e" },
+  }), []);
+
+  const unclusteredPointLayer = useMemo(() => ({
+    id: "poi-unclustered",
+    type: "circle",
+    source: "poi-source",
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-color": CATEGORY_COLORS,
+      "circle-radius": 8,
+      "circle-stroke-width": 2.5,
+      "circle-stroke-color": "#fff",
+    },
+  }), [CATEGORY_COLORS]);
+
+  const handleMapClick = useCallback((e) => {
+    if (!e.features?.length) {
+      setPopupPoi(null);
+      return;
+    }
+
+    const feature = e.features[0];
+
+    if (feature.layer.id === "poi-clusters") {
+      const map = mapRef.current?.getMap?.();
+      if (!map) return;
+      const source = map.getSource("poi-source");
+      if (!source) return;
+
+      source.getClusterExpansionZoom(feature.properties.cluster_id, (err, zoom) => {
+        if (err) return;
+        map.easeTo({
+          center: feature.geometry.coordinates,
+          zoom: zoom + 0.5,
+          duration: 500,
+        });
+      });
+      return;
+    }
+
+    if (feature.layer.id === "poi-unclustered") {
+      const [lng, lat] = feature.geometry.coordinates;
+      setPopupPoi({
+        longitude: lng,
+        latitude: lat,
+        name: feature.properties.name,
+        category: feature.properties.category,
+      });
+    }
+  }, []);
+
   const resultsPois = useMemo(() => {
     if (!resultsOpen) return [];
     if (!(selection?.mode === "polygon" && selection.polygon.length >= 3)) return [];
@@ -787,6 +895,8 @@ export default function MapPage() {
             cursor={freehandEnabled ? "crosshair" : "grab"}
             onLoad={onMapLoad}
             onStyleData={onStyleData}
+            interactiveLayerIds={["poi-clusters", "poi-unclustered"]}
+            onClick={handleMapClick}
           >
             <NavigationControl position="bottom-right" showCompass={false} />
             <GeolocateControl position="bottom-right" />
@@ -810,72 +920,38 @@ export default function MapPage() {
               </>
             )}
 
-            {pois.map((p) => {
-              const icon = poiIconByCategory(p.category);
-              const title = getSafePoiTitle(p);
+            <Source
+              id="poi-source"
+              type="geojson"
+              data={poiGeoJSON}
+              cluster={true}
+              clusterMaxZoom={14}
+              clusterRadius={50}
+            >
+              <Layer {...clusterLayer} />
+              <Layer {...clusterCountLayer} />
+              <Layer {...unclusteredPointLayer} />
+            </Source>
 
-              const ring = icon?.ring || "#64748B";
-              const fill = icon?.fill || "#F1F5F9";
-              const emoji = icon?.emoji || "📍";
-
-              return (
-                <Marker key={p.poiId || `${p.latitude}-${p.longitude}`} longitude={p.longitude} latitude={p.latitude} anchor="center">
-                  <Tooltip title={title} placement="top">
-                    {icon?.img ? (
-                      <div
-                        style={{
-                          width: 64,
-                          height: 64,
-                          cursor: "pointer",
-                          transition: "transform 0.2s",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
-                        }}
-                        onClick={(e) => {
-                          e.originalEvent.stopPropagation();
-                        }}
-                      >
-                        <img src={icon.img} alt={title} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          background: fill,
-                          border: `2px solid ${ring}`,
-                          borderRadius: "50%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer",
-                          boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
-                          transition: "transform 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
-                        }}
-                        onClick={(e) => {
-                          e.originalEvent.stopPropagation();
-                        }}
-                      >
-                        <span style={{ fontSize: 14 }}>{emoji}</span>
-                      </div>
-                    )}
-                  </Tooltip>
-                </Marker>
-              );
-            })}
+            {popupPoi && (
+              <Popup
+                longitude={popupPoi.longitude}
+                latitude={popupPoi.latitude}
+                anchor="bottom"
+                closeOnClick={false}
+                onClose={() => setPopupPoi(null)}
+                style={{ zIndex: 10 }}
+              >
+                <div style={{ padding: "4px 2px", minWidth: 120 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>
+                    {popupPoi.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#666", textTransform: "capitalize" }}>
+                    {popupPoi.category}
+                  </div>
+                </div>
+              </Popup>
+            )}
           </Map>
           <Card
             onClick={() => setProfileModalOpen(true)}

@@ -96,19 +96,28 @@ public class PoiIngestService {
 
     @Transactional
     public int ingestTile(TileUtils.TileCoord tile, String frontendCategory, int limit) {
+        if (ingestedTileRepository.existsByTileXAndTileYAndZoomLevelAndCategory(
+                tile.x(), tile.y(), tile.zoom(), frontendCategory)) {
+            return 0;
+        }
+
         String geoapifyCategory = mapFrontendToGeoapify(frontendCategory);
         if (geoapifyCategory == null) return 0;
 
         String filter = TileUtils.tileToRectFilter(tile.x(), tile.y(), tile.zoom());
         int saved = ingestSingleCategory(filter, geoapifyCategory, frontendCategory, limit);
 
-        ingestedTileRepository.save(IngestedTile.builder()
-                .tileX(tile.x())
-                .tileY(tile.y())
-                .zoomLevel(tile.zoom())
-                .category(frontendCategory)
-                .ingestedAt(Instant.now())
-                .build());
+        try {
+            ingestedTileRepository.save(IngestedTile.builder()
+                    .tileX(tile.x())
+                    .tileY(tile.y())
+                    .zoomLevel(tile.zoom())
+                    .category(frontendCategory)
+                    .ingestedAt(Instant.now())
+                    .build());
+        } catch (Exception ignored) {
+            // concurrent request already inserted this tile
+        }
 
         return saved;
     }

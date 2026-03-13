@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,8 +25,11 @@ public class PoiSearchService {
     private final PoiAreaRequestValidator validator;
 
     private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_LIMIT = 200;
+    private static final int DEFAULT_LIMIT = 500;
     private static final int INGEST_LIMIT = 50;
+    private static final int MAX_TILES_TO_INGEST = 25;
+    private static final int MIN_TILE_ZOOM = 10;
+    private static final int MAX_TILE_ZOOM = 14;
 
     public PoiSearchInAreaResponseDTO searchInArea(PoiSearchInAreaRequestDTO request) {
 
@@ -43,7 +47,14 @@ public class PoiSearchService {
                         .distinct()
                         .toList();
 
-        ingestMissingTiles(bbox, frontendCategories);
+        final PoiSearchInAreaRequestDTO.Bbox bboxFinal = bbox;
+        final List<String> categoriesFinal = frontendCategories;
+        CompletableFuture.runAsync(() -> {
+            try {
+                ingestMissingTiles(bboxFinal, categoriesFinal);
+            } catch (Exception ignored) {
+            }
+        });
 
         List<PointOfInterest> all = fetchByBbox(bbox, frontendCategories);
 
@@ -145,15 +156,18 @@ public class PoiSearchService {
 
         if (frontendCategories.isEmpty()) return;
 
+        int chosenZoom = chooseTileZoom(bbox);
+        if (chosenZoom < MIN_TILE_ZOOM) return;
+
         List<TileUtils.TileCoord> tiles = TileUtils.tilesForBbox(
                 bbox.getMinLat(), bbox.getMinLng(),
                 bbox.getMaxLat(), bbox.getMaxLng(),
-                TileUtils.DEFAULT_ZOOM);
+                chosenZoom);
 
         for (String category : frontendCategories) {
             if (poiIngestService.mapFrontendToGeoapify(category) == null) continue;
 
-            Set<String> ingestedKeys = findIngestedKeys(tiles, category);
+            Set<String> ingestedKeys = findIngestedKeys(tiles, chosenZoom, category);
 
             for (TileUtils.TileCoord tile : tiles) {
                 String key = tile.x() + ":" + tile.y();
@@ -164,7 +178,18 @@ public class PoiSearchService {
         }
     }
 
-    private Set<String> findIngestedKeys(List<TileUtils.TileCoord> tiles, String category) {
+    private int chooseTileZoom(PoiSearchInAreaRequestDTO.Bbox bbox) {
+        for (int z = MAX_TILE_ZOOM; z >= MIN_TILE_ZOOM; z--) {
+            List<TileUtils.TileCoord> tiles = TileUtils.tilesForBbox(
+                    bbox.getMinLat(), bbox.getMinLng(),
+                    bbox.getMaxLat(), bbox.getMaxLng(), z);
+            if (tiles.size() <= MAX_TILES_TO_INGEST) return z;
+        }
+        return MIN_TILE_ZOOM - 1;
+    }
+
+    private Set<String> findIngestedKeys(
+            List<TileUtils.TileCoord> tiles, int zoom, String category) {
         if (tiles.isEmpty()) return Set.of();
 
         int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
@@ -179,7 +204,7 @@ public class PoiSearchService {
 
         List<IngestedTile> existing = ingestedTileRepository
                 .findByZoomLevelAndTileXBetweenAndTileYBetweenAndCategory(
-                        TileUtils.DEFAULT_ZOOM, minX, maxX, minY, maxY, category);
+                        zoom, minX, maxX, minY, maxY, category);
 
         return existing.stream()
                 .map(it -> it.getTileX() + ":" + it.getTileY())
