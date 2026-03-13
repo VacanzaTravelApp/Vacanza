@@ -1,10 +1,13 @@
 package com.vacanza.backend.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vacanza.backend.entity.User;
+import com.vacanza.backend.integration.GeoapifyClient;
 import com.vacanza.backend.integration.ai.AiChatDto;
 import com.vacanza.backend.integration.ai.AiServiceClient;
 import com.vacanza.backend.integration.ai.UserProfileForAi;
 import com.vacanza.backend.security.CurrentUserProvider;
+import com.vacanza.backend.service.AiRouteService;
 import com.vacanza.backend.service.UserInfoService;
 import com.vacanza.backend.service.UserPreferenceAiService;
 import com.vacanza.backend.service.UserPreferencesService;
@@ -12,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,6 +31,9 @@ public class ChatProxyController {
         private final UserInfoService userInfoService;
         private final UserPreferencesService userPreferencesService;
         private final UserPreferenceAiService userPreferenceAiService;
+        private final AiRouteService aiRouteService;
+        private final GeoapifyClient geoapifyClient;
+        private final ObjectMapper objectMapper;
 
         @PostMapping("/conversations")
         public ResponseEntity<AiChatDto.ConversationCreateResponse> createConversation() {
@@ -72,6 +79,14 @@ public class ChatProxyController {
                         log.warn("Failed to save extracted preferences (non-blocking): {}", e.getMessage());
                 }
 
+                try {
+                        if (response != null && response.getRouteData() != null) {
+                                geocodeAndSaveRoute(user, conversationId, response.getRouteData());
+                        }
+                } catch (Exception e) {
+                        log.warn("Failed to process route data (non-blocking): {}", e.getMessage());
+                }
+
                 return ResponseEntity.ok(response);
         }
 
@@ -85,5 +100,51 @@ public class ChatProxyController {
                                 .getMessages(user.getUserId(), conversationId, limit, offset)
                                 .block();
                 return ResponseEntity.ok(list);
+        }
+
+        private static final int MAX_GEOCODE_WAYPOINTS = 20;
+
+        private void geocodeAndSaveRoute(User user, UUID conversationId,
+                        AiChatDto.RouteData routeData) {
+                if (routeData.getDays() == null) return;
+
+                List<AiChatDto.RouteWaypoint> toGeocode = routeData.getDays().stream()
+                                .filter(d -> d.getWaypoints() != null)
+                                .flatMap(d -> d.getWaypoints().stream())
+                                .filter(w -> w.getLatitude() == null || w.getLongitude() == null)
+                                .limit(MAX_GEOCODE_WAYPOINTS)
+                                .toList();
+
+                if (!toGeocode.isEmpty()) {
+                        String dest = routeData.getDestination() != null
+                                        ? routeData.getDestination() : "";
+
+                        Flux.fromIterable(toGeocode)
+                                        .flatMap(wp -> geoapifyClient
+                                                        .geocode(wp.getName() + ", " + dest)
+                                                        .doOnNext(result -> {
+                                                                wp.setLatitude(result.getLat());
+                                                                wp.setLongitude(result.getLon());
+                                                        })
+                                                        .onErrorResume(e -> {
+                                                                log.debug("Geocode skipped for '{}': {}",
+                                                                                wp.getName(), e.getMessage());
+                                                                return reactor.core.publisher.Mono.empty();
+                                                        }),
+                                                        4)
+                                        .blockLast();
+                }
+
+                try {
+                        String routeJson = objectMapper.writeValueAsString(routeData);
+                        aiRouteService.saveRoute(
+                                        user, conversationId,
+                                        routeData.getTitle(),
+                                        routeData.getDestination(),
+                                        routeData.getTotalDays(),
+                                        routeJson);
+                } catch (Exception e) {
+                        log.warn("Failed to save route to DB: {}", e.getMessage());
+                }
         }
 }
