@@ -123,7 +123,7 @@ async def send_message(
             detail="OpenAI API key not configured",
         )
 
-    content, extraction_result = await get_ai_response(
+    content, extraction_result, route_data = await get_ai_response(
         settings=settings,
         message_repo=message_repo,
         message_embedding_repo=message_embedding_repo,
@@ -139,6 +139,7 @@ async def send_message(
     return MessageSendResponse(
         content=content,
         extracted_preferences=extraction_result.preferences,
+        route_data=route_data,
     )
 
 
