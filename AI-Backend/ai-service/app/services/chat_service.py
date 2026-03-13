@@ -7,7 +7,7 @@ import uuid
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.core.config import Settings
-from app.schemas.chat import UserProfileForAi
+from app.schemas.chat import RouteData, UserProfileForAi
 from app.schemas.preference_extraction import PreferenceExtractionResult
 from app.db.models import Message
 from app.repositories import ConversationRepository, MessageEmbeddingRepository, MessageRepository
@@ -21,6 +21,32 @@ logger = logging.getLogger(__name__)
 MEMORY_WINDOW = 10  # Last N user+assistant pairs for context
 RAG_TOP_K = 8  # Max similar old messages (5-10 range for token limit)
 RAG_MAX_CHARS_PER_MSG = 250  # Truncate to avoid token overflow (~80 tokens/msg)
+ROUTE_JSON_SEPARATOR = "---ROUTE_JSON---"
+
+
+def _parse_route_from_response(raw_content: str) -> tuple[str, RouteData | None]:
+    """Split AI response into text content and optional route data.
+
+    If the response contains the ROUTE_JSON_SEPARATOR, the text before it
+    is returned as content and the JSON after it is parsed into RouteData.
+    On any parse failure the full text is returned with route_data=None.
+    """
+    if ROUTE_JSON_SEPARATOR not in raw_content:
+        return raw_content, None
+
+    parts = raw_content.split(ROUTE_JSON_SEPARATOR, 1)
+    text_content = parts[0].strip()
+    json_str = parts[1].strip() if len(parts) > 1 else ""
+
+    if not json_str:
+        return text_content, None
+
+    try:
+        route_data = RouteData.model_validate_json(json_str)
+        return text_content, route_data
+    except (ValueError, Exception) as e:
+        logger.warning("Failed to parse route JSON from AI response: %s", e)
+        return text_content, None
 
 
 async def _save_embedding_for_message(
@@ -181,11 +207,11 @@ async def get_ai_response(
     user_content: str,
     user_profile: UserProfileForAi | None = None,
     existing_preferences: list[dict] | None = None,
-) -> tuple[str, PreferenceExtractionResult]:
+) -> tuple[str, PreferenceExtractionResult, RouteData | None]:
     """Send user message, get AI response with context, save both to DB.
 
     Returns:
-        Tuple of (AI response content, extracted preferences).
+        Tuple of (AI response content, extracted preferences, optional route data).
     """
     # Content moderation: block harmful/illegal/policy-violating input before LLM
     is_flagged, flagged_cats = await is_content_flagged(settings, user_content)
@@ -195,7 +221,7 @@ async def get_ai_response(
             conversation_id,
             flagged_cats,
         )
-        return REFUSAL_MESSAGE, PreferenceExtractionResult(preferences=[])
+        return REFUSAL_MESSAGE, PreferenceExtractionResult(preferences=[]), None
 
     conversation = conversation_repo.get_by_id(conversation_id)
     user_id = conversation.user_id if conversation else None
@@ -308,7 +334,10 @@ Route generation rules:
     # Invoke LLM
     llm = create_chat_model(settings)
     response = await llm.ainvoke(llm_messages)
-    ai_content = str(response.content)
+    raw_ai_content = str(response.content)
+
+    # Extract route data if present, strip JSON from visible content
+    ai_content, route_data = _parse_route_from_response(raw_ai_content)
 
     # Output moderation: block harmful AI response before returning to user
     ai_flagged, ai_flagged_cats = await is_content_flagged(settings, ai_content)
@@ -353,4 +382,4 @@ Route generation rules:
         embedding_user_task, embedding_assistant_task, extraction_task
     )
 
-    return ai_content, extraction_result
+    return ai_content, extraction_result, route_data
