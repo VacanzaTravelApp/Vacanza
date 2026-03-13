@@ -273,7 +273,26 @@ Safety and refusal (critical — API is public):
 Vacanza app features (mention ONLY when directly relevant):
 - Map and POI search for nearby restaurants, attractions, etc.
 - Saved places and trip planning.
-- Search for flights, hotels, and current prices. """
+- Search for flights, hotels, and current prices.
+
+Route generation (CRITICAL — follow exactly):
+When the user asks for a trip plan, vacation plan, itinerary, or route (e.g. "plan 3 days in Rome", "tatil planla", "rota oluştur", "create an itinerary"), you MUST:
+1. Write a SHORT text summary (max 60 words) describing the plan highlights. This text is shown in a chat bubble.
+2. After the text, on a new line, write exactly: ---ROUTE_JSON---
+3. After that separator, write a single valid JSON object with this exact structure:
+{"title":"...","destination":"City, Country","total_days":N,"days":[{"day":1,"title":"Day 1: ...","waypoints":[{"name":"Place Name","description":"Short description","category":"museum","day":1,"order":1,"latitude":41.0086,"longitude":28.9802,"estimated_duration_min":60,"time_slot":"morning"}]}],"notes":"Optional tips"}
+
+Route generation rules:
+- category must be one of: museum, restaurant, cafe, beach, park, monument, landmark, market, nightlife, hotel, mosque, church, palace, square, bridge, theater, zoo, aquarium, spa, sports
+- time_slot must be one of: morning, afternoon, evening
+- For well-known places, provide accurate latitude/longitude. For lesser-known places, set both to null.
+- Order waypoints logically: nearby places consecutive, morning→afternoon→evening flow.
+- 3–6 waypoints per day. Do not exceed 6.
+- Use the user's preferred language for title, description, day titles, and notes.
+- Consider user profile (budget, travel_style, activity_level, cuisine preferences) when selecting places.
+- If the user does not specify the number of days, suggest a reasonable duration (2–5 days).
+- The text summary before ---ROUTE_JSON--- must NOT contain the JSON. Keep them strictly separated.
+- If the user is NOT asking for a route/plan (regular chat), do NOT include ---ROUTE_JSON--- or any JSON. Just reply normally. """
     system_parts = [base_prompt]
     if profile_prompt:
         system_parts.append(profile_prompt.strip())
