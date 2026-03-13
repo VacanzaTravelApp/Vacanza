@@ -39,6 +39,18 @@ public class WebClientConfig {
     }
 
     @Bean
+    @Qualifier("geoapifyGeocodeWebClient")
+    public WebClient geoapifyGeocodeWebClient(GeoapifyProperties props) {
+        return WebClient.builder()
+                .baseUrl("https://api.geoapify.com")
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(addApiKey(props))
+                .filter(log4xx5xx("[GEOAPIFY-GEOCODE]"))
+                .build();
+    }
+
+    @Bean
     @Qualifier("aiWebClient")
     public WebClient aiWebClient(AiServiceProperties props) {
         HttpClient httpClient = HttpClient.create()
