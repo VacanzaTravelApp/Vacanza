@@ -2,8 +2,11 @@ package com.vacanza.backend.service;
 
 import com.vacanza.backend.dto.request.PoiSearchInAreaRequestDTO;
 import com.vacanza.backend.dto.response.PoiSearchInAreaResponseDTO;
+import com.vacanza.backend.entity.IngestedTile;
 import com.vacanza.backend.entity.PointOfInterest;
+import com.vacanza.backend.repo.IngestedTileRepository;
 import com.vacanza.backend.repo.PointOfInterestRepository;
+import com.vacanza.backend.util.TileUtils;
 import com.vacanza.backend.validation.PoiAreaRequestValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,11 +20,12 @@ public class PoiSearchService {
 
     private final PointOfInterestRepository poiRepository;
     private final PoiIngestService poiIngestService;
+    private final IngestedTileRepository ingestedTileRepository;
     private final PoiAreaRequestValidator validator;
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_LIMIT = 200;
-    private static final int INGEST_LIMIT = 20;
+    private static final int INGEST_LIMIT = 50;
 
     public PoiSearchInAreaResponseDTO searchInArea(PoiSearchInAreaRequestDTO request) {
 
@@ -39,20 +43,9 @@ public class PoiSearchService {
                         .distinct()
                         .toList();
 
+        ingestMissingTiles(bbox, frontendCategories);
+
         List<PointOfInterest> all = fetchByBbox(bbox, frontendCategories);
-
-        // No results in DB — trigger ingest from Geoapify
-        if (all.isEmpty()) {
-
-            String geoapifyFilter = buildRectFilterFromRequest(request);
-
-            poiIngestService.ingestMultipleCategories(
-                    geoapifyFilter,
-                    frontendCategories,
-                    INGEST_LIMIT);
-
-            all = fetchByBbox(bbox, frontendCategories);
-        }
 
         // sort
         if (request.getSort() == PoiSearchInAreaRequestDTO.SortType.DISTANCE_TO_CENTER) {
@@ -146,32 +139,51 @@ public class PoiSearchService {
                 .build();
     }
 
-    private String buildRectFilterFromRequest(PoiSearchInAreaRequestDTO r) {
+    private void ingestMissingTiles(
+            PoiSearchInAreaRequestDTO.Bbox bbox,
+            List<String> frontendCategories) {
 
-        PoiSearchInAreaRequestDTO.Bbox b;
+        if (frontendCategories.isEmpty()) return;
 
-        if (r.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
-            b = r.getBbox();
-        } else {
-            // polygon → bbox
-            double minLat = Double.MAX_VALUE, minLng = Double.MAX_VALUE;
-            double maxLat = -Double.MAX_VALUE, maxLng = -Double.MAX_VALUE;
+        List<TileUtils.TileCoord> tiles = TileUtils.tilesForBbox(
+                bbox.getMinLat(), bbox.getMinLng(),
+                bbox.getMaxLat(), bbox.getMaxLng(),
+                TileUtils.DEFAULT_ZOOM);
 
-            for (var p : r.getPolygon()) {
-                minLat = Math.min(minLat, p.getLat());
-                minLng = Math.min(minLng, p.getLng());
-                maxLat = Math.max(maxLat, p.getLat());
-                maxLng = Math.max(maxLng, p.getLng());
+        for (String category : frontendCategories) {
+            if (poiIngestService.mapFrontendToGeoapify(category) == null) continue;
+
+            Set<String> ingestedKeys = findIngestedKeys(tiles, category);
+
+            for (TileUtils.TileCoord tile : tiles) {
+                String key = tile.x() + ":" + tile.y();
+                if (ingestedKeys.contains(key)) continue;
+
+                poiIngestService.ingestTile(tile, category, INGEST_LIMIT);
             }
+        }
+    }
 
-            b = new PoiSearchInAreaRequestDTO.Bbox(minLat, minLng, maxLat, maxLng);
+    private Set<String> findIngestedKeys(List<TileUtils.TileCoord> tiles, String category) {
+        if (tiles.isEmpty()) return Set.of();
+
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+        int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
+
+        for (TileUtils.TileCoord t : tiles) {
+            minX = Math.min(minX, t.x());
+            maxX = Math.max(maxX, t.x());
+            minY = Math.min(minY, t.y());
+            maxY = Math.max(maxY, t.y());
         }
 
-        return String.format(
-                Locale.US,
-                "rect:%f,%f,%f,%f",
-                b.getMinLng(), b.getMinLat(),
-                b.getMaxLng(), b.getMaxLat());
+        List<IngestedTile> existing = ingestedTileRepository
+                .findByZoomLevelAndTileXBetweenAndTileYBetweenAndCategory(
+                        TileUtils.DEFAULT_ZOOM, minX, maxX, minY, maxY, category);
+
+        return existing.stream()
+                .map(it -> it.getTileX() + ":" + it.getTileY())
+                .collect(Collectors.toSet());
     }
 
 }
