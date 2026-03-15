@@ -19,6 +19,7 @@ import { useGamificationProfile } from "../gamification/useGamification";
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
 import VacanzaChat from "../features/ai/components/VacanzaChat";
+import RoutePanel from "../features/ai/components/RoutePanel";
 import ProfileModal from "./ProfileModal";
 
 import cafeImg from "../assets/poi/poi_cafe.png";
@@ -985,106 +986,23 @@ export default function MapPage() {
           </Map>
 
           {activeRoute && (
-            <div
-              style={{
-                position: "fixed",
-                bottom: isMobile ? 70 : 56,
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 200,
-                background: "rgba(255,255,255,0.96)",
-                backdropFilter: "blur(12px)",
-                borderRadius: 20,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
-                padding: "14px 18px",
-                minWidth: isMobile ? "92vw" : 420,
-                maxWidth: isMobile ? "96vw" : 560,
+            <RoutePanel
+              route={activeRoute}
+              activeDay={activeDay}
+              onDayChange={setActiveDay}
+              onClose={() => {
+                setActiveRoute(null);
+                setActiveDay(1);
+                setFilterOpen(true);
               }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>{activeRoute.title}</div>
-                  <div style={{ fontSize: 12, color: "#888" }}>
-                    {activeRoute.destination} &middot; {activeRoute.total_days || activeRoute.totalDays} days
-                  </div>
-                </div>
-                <Button
-                  type="text"
-                  icon={<CloseOutlined />}
-                  onClick={() => {
-                    setActiveRoute(null);
-                    setActiveDay(1);
-                    setFilterOpen(true);
-                  }}
-                  style={{ borderRadius: 12 }}
-                />
-              </div>
-              <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 }}>
-                {(activeRoute.days || []).map((d) => (
-                  <Button
-                    key={d.day}
-                    type={d.day === activeDay ? "primary" : "default"}
-                    size="small"
-                    onClick={() => setActiveDay(d.day)}
-                    style={{
-                      borderRadius: 10,
-                      fontWeight: d.day === activeDay ? 700 : 500,
-                      minWidth: 64,
-                      ...(d.day === activeDay
-                        ? { background: "linear-gradient(135deg,#F97316,#EF4444)", border: "none" }
-                        : {}),
-                    }}
-                  >
-                    Day {d.day}
-                  </Button>
-                ))}
-              </div>
-              <div style={{ marginTop: 8, maxHeight: 140, overflowY: "auto" }}>
-                {activeWaypoints.map((wp, idx) => (
-                  <div
-                    key={`wp-${wp.day}-${wp.order}`}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "5px 0",
-                      borderBottom: idx < activeWaypoints.length - 1 ? "1px solid #f0f0f0" : "none",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        background: "linear-gradient(135deg,#F97316,#EF4444)",
-                        color: "white",
-                        fontSize: 11,
-                        fontWeight: 800,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {idx + 1}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {wp.name}
-                      </div>
-                      {wp.description && (
-                        <div style={{ fontSize: 11, color: "#999", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {wp.description}
-                        </div>
-                      )}
-                    </div>
-                    {wp.time_slot && (
-                      <span style={{ fontSize: 10, color: "#aaa", flexShrink: 0 }}>{wp.time_slot}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+              onWaypointClick={(wp) => {
+                mapRef.current?.getMap?.()?.flyTo({
+                  center: [wp.longitude, wp.latitude],
+                  zoom: 15,
+                  duration: 800,
+                });
+              }}
+            />
           )}
 
           <Card
