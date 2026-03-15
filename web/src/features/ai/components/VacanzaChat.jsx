@@ -93,11 +93,16 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
       const response = await aiApi.sendMessage(conversationId, textToSend);
       if (response && response.content) {
         const routeData = response.route_data || response.routeData || null;
+        const wasRouteRequest = /plan|rota|gün|tatil|itinerary|day/i.test(textToSend);
+        if (!routeData && wasRouteRequest) {
+          console.warn("[VacanzaChat] Rota isteği gönderildi ama route_data gelmedi:", response);
+        }
         const aiMsg = {
           id: Date.now() + 1,
           type: "ai",
           text: response.content,
           routeData,
+          noRouteHint: !routeData && wasRouteRequest,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => [...prev, aiMsg]);
@@ -139,17 +144,17 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
                   {msg.text}
                   <span className="msg-time">{msg.time}</span>
                 </div>
-                {msg.routeData && (
+                {msg.routeData ? (
                   <div className="route-card">
                     <div className="route-card-title">{msg.routeData.title}</div>
                     <div className="route-card-meta">
-                      {msg.routeData.destination} &middot; {msg.routeData.total_days || msg.routeData.totalDays} days &middot;{" "}
-                      {(msg.routeData.days || []).reduce((sum, d) => sum + (d.waypoints?.length || 0), 0)} places
+                      {msg.routeData.destination} &middot; {msg.routeData.total_days || msg.routeData.totalDays} gün &middot;{" "}
+                      {(msg.routeData.days || []).reduce((sum, d) => sum + (d.waypoints?.length || 0), 0)} yer
                     </div>
                     <div className="route-card-days">
                       {(msg.routeData.days || []).map((d) => (
                         <div key={d.day} className="route-card-day-row">
-                          <span className="route-card-day-badge">Day {d.day}</span>
+                          <span className="route-card-day-badge">Gün {d.day}</span>
                           <span className="route-card-day-text">
                             {(d.waypoints || []).map(w => w.name).join(", ")}
                           </span>
@@ -163,10 +168,14 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
                         onClose();
                       }}
                     >
-                      Show Route on Map
+                      Rotayı Haritada Göster
                     </button>
                   </div>
-                )}
+                ) : msg.type === "ai" && msg.noRouteHint ? (
+                  <div className="route-card route-card-hint">
+                    <span>Rota verisi alınamadı. Yukarıdaki hızlı butonlardan birini tekrar deneyin.</span>
+                  </div>
+                ) : null}
               </div>
             ))}
             {loading && (
@@ -185,10 +194,37 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
       {/* Footer Area (Input & Quick Actions) */}
       {!initialLoading && (
         <div className="chat-footer-refined">
+          <div className="chat-quick-actions">
+            <span className="chat-quick-label">Rota planla:</span>
+            <button
+              type="button"
+              className="chat-quick-chip"
+              onClick={() => handleSendMessage("3 günlük İstanbul planı yap")}
+              disabled={loading}
+            >
+              3 gün İstanbul
+            </button>
+            <button
+              type="button"
+              className="chat-quick-chip"
+              onClick={() => handleSendMessage("Plan a 2-day trip to Rome")}
+              disabled={loading}
+            >
+              2 gün Roma
+            </button>
+            <button
+              type="button"
+              className="chat-quick-chip"
+              onClick={() => handleSendMessage("Bana 4 günlük Antalya tatil planı oluştur")}
+              disabled={loading}
+            >
+              4 gün Antalya
+            </button>
+          </div>
           <div className="chat-input-field-group">
             <input
               type="text"
-              placeholder="Ask anything..."
+              placeholder="Rota planı için örn: 3 günlük Paris planı yap..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}

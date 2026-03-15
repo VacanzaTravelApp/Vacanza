@@ -30,8 +30,8 @@ geoapify:
 
 ai-service:
   base-url: ${AI_SERVICE_BASE_URL}
-  connect-timeout: 10s
-  read-timeout: 30s
+  connect-timeout: 15s
+  read-timeout: 120s
 
 serpapi:
   base-url: https://serpapi.com

@@ -107,6 +107,42 @@
   background: white;
 }
 
+.chat-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.chat-quick-label {
+  font-size: 11px;
+  color: #888;
+  margin-right: 4px;
+}
+
+.chat-quick-chip {
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  background: rgba(96, 165, 250, 0.08);
+  border-radius: 16px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #2563eb;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.chat-quick-chip:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.15);
+  border-color: rgba(96, 165, 250, 0.6);
+}
+
+.chat-quick-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .quick-action-pills {
   display: flex;
   gap: 6px;
@@ -211,4 +247,14 @@
 
 .route-show-btn:hover {
   opacity: 0.9;
+}
+
+.route-card-hint {
+  background: linear-gradient(135deg, #fff8e6 0%, #fff3e0 100%);
+  border-color: rgba(250, 173, 20, 0.3);
+}
+
+.route-card-hint span {
+  font-size: 12px;
+  color: #ad6800;
 }

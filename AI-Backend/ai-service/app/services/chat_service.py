@@ -41,6 +41,12 @@ def _parse_route_from_response(raw_content: str) -> tuple[str, RouteData | None]
     if not json_str:
         return text_content, None
 
+    # Strip markdown code block if AI wrapped JSON (e.g. ```json\n{...}\n```)
+    if json_str.startswith("```"):
+        lines = json_str.split("\n")
+        json_str = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        json_str = json_str.strip()
+
     try:
         route_data = RouteData.model_validate_json(json_str)
         return text_content, route_data
@@ -302,10 +308,10 @@ Vacanza app features (mention ONLY when directly relevant):
 - Search for flights, hotels, and current prices.
 
 Route generation (CRITICAL — follow exactly):
-When the user asks for a trip plan, vacation plan, itinerary, or route (e.g. "plan 3 days in Rome", "tatil planla", "rota oluştur", "create an itinerary"), you MUST:
-1. Write a SHORT text summary (max 60 words) describing the plan highlights. This text is shown in a chat bubble.
-2. After the text, on a new line, write exactly: ---ROUTE_JSON---
-3. After that separator, write a single valid JSON object with this exact structure:
+When the user asks for a trip plan, vacation plan, itinerary, or route (e.g. "plan 3 days in Rome", "tatil planla", "rota oluştur", "3 günlük plan", "create an itinerary"), you MUST:
+1. Write a VERY SHORT text summary: MAX 40 words, 2-3 sentences only. Do NOT list places in the text — the JSON contains them. Example: "İstanbul'da 3 günlük plan: tarihi yarımada, müzeler ve Boğaz. Aşağıda günlük program."
+2. On the next line, write exactly: ---ROUTE_JSON---
+3. On the next line, write a single valid JSON object (no markdown, no code block) with this structure:
 {"title":"...","destination":"City, Country","total_days":N,"days":[{"day":1,"title":"Day 1: ...","waypoints":[{"name":"Place Name","description":"Short description","category":"museum","day":1,"order":1,"latitude":41.0086,"longitude":28.9802,"estimated_duration_min":60,"time_slot":"morning"}]}],"notes":"Optional tips"}
 
 Route generation rules:
@@ -318,7 +324,8 @@ Route generation rules:
 - Consider user profile (budget, travel_style, activity_level, cuisine preferences) when selecting places.
 - If the user does not specify the number of days, suggest a reasonable duration (2–5 days).
 - The text summary before ---ROUTE_JSON--- must NOT contain the JSON. Keep them strictly separated.
-- If the user is NOT asking for a route/plan (regular chat), do NOT include ---ROUTE_JSON--- or any JSON. Just reply normally. """
+- If the user is NOT asking for a route/plan (regular chat), do NOT include ---ROUTE_JSON--- or any JSON. Just reply normally.
+- WARNING: Response has a token limit. Long text = JSON gets cut off = map fails. Always keep text under 40 words, then add ---ROUTE_JSON--- and the full JSON. """
     system_parts = [base_prompt]
     if profile_prompt:
         system_parts.append(profile_prompt.strip())
