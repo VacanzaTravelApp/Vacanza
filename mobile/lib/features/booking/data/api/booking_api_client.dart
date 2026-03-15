@@ -27,9 +27,8 @@ class BookingApiClient {
   ) async {
     final fullUrl =
         '${_dio.options.baseUrl}/bookings/accommodations/search';
-    log('[BOOKING_API] POST $fullUrl body=${request.toJson()}');
-
     final body = request.toJson();
+    log('[BOOKING_API] POST $fullUrl body=$body');
     final response = await _dio.post<dynamic>(
       '/bookings/accommodations/search',
       data: body,
@@ -39,13 +38,31 @@ class BookingApiClient {
     final data = response.data;
     log('[BOOKING_API] status=$status type=${data.runtimeType} url=$fullUrl');
 
+    // ── UC1.8 diagnostics: raw shape inspection ─────────────────
+    log('[UC1_8_DEBUG] accommodations status=$status type=${data.runtimeType}');
+    if (data is List) {
+      log('[UC1_8_DEBUG] accommodations list length=${data.length}');
+      if (data.isNotEmpty && data.first is Map<String, dynamic>) {
+        final first = data.first as Map<String, dynamic>;
+        log('[UC1_8_DEBUG] accommodations first keys=${first.keys.toList()}');
+      }
+    } else if (data is Map<String, dynamic>) {
+      log('[UC1_8_DEBUG] accommodations map keys=${data.keys.toList()}');
+      for (final key in ['results', 'items', 'data']) {
+        final value = data[key];
+        if (value is List) {
+          log('[UC1_8_DEBUG] accommodations nested list under "$key" length=${value.length}');
+        }
+      }
+    }
+
     if (data is! List) {
       throw FormatException(
         'Expected List from $fullUrl, got ${data.runtimeType}',
       );
     }
 
-    // ── TEMP DEBUG: raw JSON inspection ─────────────────────────
+    // ── TEMP DEBUG: budget / pricing inspection ─────────────────
     log('[BUDGET_DEBUG] REQUEST: query=${body['query']} '
         'dates=${body['checkInDate']}→${body['checkOutDate']} '
         'adults=${body['adults']} budget=${body['budget']} '
@@ -55,9 +72,21 @@ class BookingApiClient {
       log('[BUDGET_DEBUG] RAW item[$i]: ${data[i]}');
     }
 
-    final results = data
-        .map((e) => AccommodationOption.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final results = <AccommodationOption>[];
+    for (var i = 0; i < data.length; i++) {
+      final raw = data[i];
+      if (raw is! Map<String, dynamic>) {
+        log('[UC1_8_DEBUG] accommodations item[$i] is not Map, type=${raw.runtimeType}');
+        continue;
+      }
+      try {
+        results.add(AccommodationOption.fromJson(raw));
+      } catch (e, st) {
+        log('[UC1_8_DEBUG] accommodations parse error at index=$i error=$e '
+            'keys=${raw.keys.toList()}');
+        log('[UC1_8_DEBUG] accommodations parse stack=$st');
+      }
+    }
 
     if (results.isNotEmpty) {
       final prices = results.map((r) => r.price).toList();
@@ -88,14 +117,33 @@ class BookingApiClient {
         '${_dio.options.baseUrl}/bookings/transportation/search';
     log('[BOOKING_API] POST $fullUrl body=${request.toJson()}');
 
+    final body = request.toJson();
     final response = await _dio.post<dynamic>(
       '/bookings/transportation/search',
-      data: request.toJson(),
+      data: body,
     );
 
     final status = response.statusCode;
     final data = response.data;
     log('[BOOKING_API] status=$status type=${data.runtimeType} url=$fullUrl');
+
+    // ── UC1.8 diagnostics: raw shape inspection ─────────────────
+    log('[UC1_8_DEBUG] flights status=$status type=${data.runtimeType}');
+    if (data is List) {
+      log('[UC1_8_DEBUG] flights list length=${data.length}');
+      if (data.isNotEmpty && data.first is Map<String, dynamic>) {
+        final first = data.first as Map<String, dynamic>;
+        log('[UC1_8_DEBUG] flights first keys=${first.keys.toList()}');
+      }
+    } else if (data is Map<String, dynamic>) {
+      log('[UC1_8_DEBUG] flights map keys=${data.keys.toList()}');
+      for (final key in ['results', 'items', 'data']) {
+        final value = data[key];
+        if (value is List) {
+          log('[UC1_8_DEBUG] flights nested list under "$key" length=${value.length}');
+        }
+      }
+    }
 
     if (data is! List) {
       throw FormatException(
@@ -103,9 +151,21 @@ class BookingApiClient {
       );
     }
 
-    final results = data
-        .map((e) => TransportOption.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final results = <TransportOption>[];
+    for (var i = 0; i < data.length; i++) {
+      final raw = data[i];
+      if (raw is! Map<String, dynamic>) {
+        log('[UC1_8_DEBUG] flights item[$i] is not Map, type=${raw.runtimeType}');
+        continue;
+      }
+      try {
+        results.add(TransportOption.fromJson(raw));
+      } catch (e, st) {
+        log('[UC1_8_DEBUG] flights parse error at index=$i error=$e '
+            'keys=${raw.keys.toList()}');
+        log('[UC1_8_DEBUG] flights parse stack=$st');
+      }
+    }
 
     log('[BOOKING_API] flights count=${results.length}');
     return results;

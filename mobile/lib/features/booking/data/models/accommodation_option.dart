@@ -7,6 +7,7 @@ class AccommodationOption {
   final String hotelId;
   final String address;
   final double price;
+  final double? pricePerNight;
   final String currency;
   final double? rating; // nullable per contract
   final String externalBookingUrl;
@@ -25,6 +26,7 @@ class AccommodationOption {
     required this.hotelId,
     required this.address,
     required this.price,
+    this.pricePerNight,
     required this.currency,
     this.rating,
     required this.externalBookingUrl,
@@ -43,6 +45,7 @@ class AccommodationOption {
       hotelId: (json['hotelId'] ?? '').toString(),
       address: (json['address'] ?? '').toString(),
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      pricePerNight: (json['pricePerNight'] as num?)?.toDouble(),
       currency: (json['currency'] ?? 'USD').toString(),
       rating: (json['rating'] as num?)?.toDouble(),
       externalBookingUrl: (json['externalBookingUrl'] ?? '').toString(),

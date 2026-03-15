@@ -6,9 +6,9 @@ class TransportOption {
   final String carrier;
   final String origin;
   final String destination;
-  final String departureTime; // ISO 8601 local datetime
-  final String arrivalTime;   // ISO 8601 local datetime
-  final String duration;      // ISO 8601 duration, e.g. "PT3H15M"
+  final String departureTime; // String, e.g. "2025-07-01 08:30"
+  final String arrivalTime;   // String, e.g. "2025-07-01 11:45"
+  final String duration;      // e.g. "3h 15m" (treated as opaque string)
   final double price;
   final String currency;
   final int stops;
