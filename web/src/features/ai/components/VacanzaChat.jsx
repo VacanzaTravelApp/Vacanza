@@ -3,7 +3,7 @@ import { aiApi } from "../../../api/aiApi";
 import { Spin, message } from "antd";
 import "../styles/vacanzaChat.css";
 
-export default function VacanzaChat({ isOpen, onClose }) {
+export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -92,10 +92,12 @@ export default function VacanzaChat({ isOpen, onClose }) {
     try {
       const response = await aiApi.sendMessage(conversationId, textToSend);
       if (response && response.content) {
+        const routeData = response.route_data || response.routeData || null;
         const aiMsg = {
           id: Date.now() + 1,
           type: "ai",
           text: response.content,
+          routeData,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => [...prev, aiMsg]);
@@ -137,6 +139,34 @@ export default function VacanzaChat({ isOpen, onClose }) {
                   {msg.text}
                   <span className="msg-time">{msg.time}</span>
                 </div>
+                {msg.routeData && (
+                  <div className="route-card">
+                    <div className="route-card-title">{msg.routeData.title}</div>
+                    <div className="route-card-meta">
+                      {msg.routeData.destination} &middot; {msg.routeData.total_days || msg.routeData.totalDays} days &middot;{" "}
+                      {(msg.routeData.days || []).reduce((sum, d) => sum + (d.waypoints?.length || 0), 0)} places
+                    </div>
+                    <div className="route-card-days">
+                      {(msg.routeData.days || []).map((d) => (
+                        <div key={d.day} className="route-card-day-row">
+                          <span className="route-card-day-badge">Day {d.day}</span>
+                          <span className="route-card-day-text">
+                            {(d.waypoints || []).map(w => w.name).join(", ")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      className="route-show-btn"
+                      onClick={() => {
+                        if (onRouteGenerated) onRouteGenerated(msg.routeData);
+                        onClose();
+                      }}
+                    >
+                      Show Route on Map
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {loading && (

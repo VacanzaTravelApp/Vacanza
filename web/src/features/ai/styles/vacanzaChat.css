@@ -140,3 +140,75 @@
   padding: 8px;
   font-size: 14px;
 }
+
+.route-card {
+  margin-top: 6px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f0ff 100%);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 16px;
+  max-width: 85%;
+  align-self: flex-start;
+}
+
+.route-card-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #1a1a2e;
+  margin-bottom: 2px;
+}
+
+.route-card-meta {
+  font-size: 11px;
+  color: #777;
+  margin-bottom: 8px;
+}
+
+.route-card-days {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.route-card-day-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.route-card-day-badge {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #60A5FA, #A78BFA);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.route-card-day-text {
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-show-btn {
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.route-show-btn:hover {
+  opacity: 0.9;
+}
