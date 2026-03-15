@@ -4,6 +4,7 @@ import com.vacanza.backend.security.FirebaseTokenFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -39,6 +40,7 @@ public class SecurityConfigNonDev {
                     res.setStatus(HttpStatus.UNAUTHORIZED.value());
                 }))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/health", "/error").permitAll()
                         .requestMatchers("/pois/**").permitAll()   // POI endpoints public
                         .requestMatchers("/chat/**").authenticated()
