@@ -29,6 +29,21 @@ export const aiApi = {
             params: { limit, offset }
         });
         return response.data;
+    },
+
+    getRoutes: async () => {
+        const response = await http.get('/routes');
+        return response.data;
+    },
+
+    getRoute: async (routeId) => {
+        const response = await http.get(`/routes/${routeId}`);
+        return response.data;
+    },
+
+    deleteRoute: async (routeId) => {
+        const response = await http.delete(`/routes/${routeId}`);
+        return response.data;
     }
 };
 

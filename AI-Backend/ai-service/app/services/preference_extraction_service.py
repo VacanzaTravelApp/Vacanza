@@ -78,7 +78,7 @@ async def extract_preferences(
     """
     try:
         llm = create_chat_model(settings)
-        structured_llm = llm.with_structured_output(PreferenceExtractionResult)
+        structured_llm = llm.with_structured_output(PreferenceExtractionResult, include_raw=False)
 
         existing_ctx = _build_existing_preferences_context(existing_preferences)
         user_prompt_parts = []
@@ -99,13 +99,18 @@ async def extract_preferences(
         ]
 
         result = await structured_llm.ainvoke(messages)
-        if result and result.preferences:
+        # LangChain may return dict with 'parsed' key or AIMessage with .parsed attr
+        if isinstance(result, dict) and "parsed" in result:
+            result = result.get("parsed")
+        elif hasattr(result, "parsed") and result.parsed is not None:
+            result = result.parsed
+        if result and isinstance(result, PreferenceExtractionResult) and result.preferences:
             logger.info(
                 "Extracted %d preferences: %s",
                 len(result.preferences),
                 [(p.preference_key, p.preference_value, p.confidence) for p in result.preferences],
             )
-        return result or PreferenceExtractionResult(preferences=[])
+        return result if isinstance(result, PreferenceExtractionResult) else PreferenceExtractionResult(preferences=[])
 
     except Exception as e:
         logger.warning("Preference extraction failed (non-blocking): %s", e)

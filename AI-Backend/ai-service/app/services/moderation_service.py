@@ -37,7 +37,7 @@ async def is_content_flagged(settings: Settings, text: str) -> tuple[bool, list[
         client = AsyncOpenAI(api_key=settings.openai_api_key)
         response = await client.moderations.create(
             input=text.strip(),
-            model="text-moderation-latest",  # Stable, text-only; free to use
+            model="omni-moderation-latest",  # text-moderation-latest deprecated; omni supports text+image
         )
         result = response.results[0] if response.results else None
         if not result:

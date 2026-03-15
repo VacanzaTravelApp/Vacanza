@@ -19,6 +19,7 @@ import { useGamificationProfile } from "../gamification/useGamification";
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
 import VacanzaChat from "../features/ai/components/VacanzaChat";
+import RoutePanel from "../features/ai/components/RoutePanel";
 import ProfileModal from "./ProfileModal";
 
 import cafeImg from "../assets/poi/poi_cafe.png";
@@ -324,6 +325,8 @@ export default function MapPage() {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [activeRoute, setActiveRoute] = useState(null);
+  const [activeDay, setActiveDay] = useState(1);
   // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
   useEffect(() => {
     if (resultsOpen) setFilterOpen(false);
@@ -678,6 +681,69 @@ export default function MapPage() {
     return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
   }, [resultsOpen, selection]);
 
+  const activeWaypoints = useMemo(() => {
+    if (!activeRoute) return [];
+    const dayPlan = activeRoute.days?.find((d) => d.day === activeDay);
+    return (dayPlan?.waypoints || []).filter((w) => w.latitude && w.longitude);
+  }, [activeRoute, activeDay]);
+
+  const routeLineGeoJSON = useMemo(() => {
+    if (activeWaypoints.length < 2) return { type: "FeatureCollection", features: [] };
+    return {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: activeWaypoints.map((w) => [w.longitude, w.latitude]),
+          },
+        },
+      ],
+    };
+  }, [activeWaypoints]);
+
+  const routeGlowLayer = useMemo(
+    () => ({
+      id: "route-glow",
+      type: "line",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-width": 10, "line-opacity": 0.22, "line-color": "#F97316", "line-blur": 2.2 },
+    }),
+    []
+  );
+
+  const routeMainLayer = useMemo(
+    () => ({
+      id: "route-main",
+      type: "line",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-width": 4,
+        "line-opacity": 0.95,
+        "line-gradient": [
+          "interpolate", ["linear"], ["line-progress"],
+          0.0, "#F97316", 0.5, "#EF4444", 1.0, "#DC2626",
+        ],
+      },
+    }),
+    []
+  );
+
+  // fitBounds when route day changes
+  useEffect(() => {
+    if (activeWaypoints.length === 0) return;
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    const lngs = activeWaypoints.map((w) => w.longitude);
+    const lats = activeWaypoints.map((w) => w.latitude);
+    map.fitBounds(
+      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+      { duration: 650, padding: { top: 100, left: 100, right: 100, bottom: 340 } }
+    );
+  }, [activeWaypoints]);
+
   // ✅ Results panel açılınca: polygon panel altında kalmasın diye fitBounds + padding
   useEffect(() => {
     if (!canShowResultsPanel) return;
@@ -810,7 +876,7 @@ export default function MapPage() {
               </>
             )}
 
-            {pois.map((p) => {
+            {!activeRoute && pois.map((p) => {
               const icon = poiIconByCategory(p.category);
               const title = getSafePoiTitle(p);
 
@@ -876,7 +942,69 @@ export default function MapPage() {
                 </Marker>
               );
             })}
+
+            {activeWaypoints.length >= 2 && (
+              <Source id="route-src" type="geojson" data={routeLineGeoJSON} lineMetrics>
+                <Layer {...routeGlowLayer} />
+                <Layer {...routeMainLayer} />
+              </Source>
+            )}
+
+            {activeWaypoints.map((wp, idx) => (
+              <Marker
+                key={`route-wp-${wp.day}-${wp.order}`}
+                longitude={wp.longitude}
+                latitude={wp.latitude}
+                anchor="center"
+              >
+                <Tooltip title={wp.name} placement="top">
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, #F97316, #EF4444)",
+                      border: "2.5px solid white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "white",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      boxShadow: "0 2px 8px rgba(249,115,22,0.4)",
+                      cursor: "pointer",
+                      transition: "transform 0.2s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.2)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                  >
+                    {idx + 1}
+                  </div>
+                </Tooltip>
+              </Marker>
+            ))}
           </Map>
+
+          {activeRoute && (
+            <RoutePanel
+              route={activeRoute}
+              activeDay={activeDay}
+              onDayChange={setActiveDay}
+              onClose={() => {
+                setActiveRoute(null);
+                setActiveDay(1);
+                setFilterOpen(true);
+              }}
+              onWaypointClick={(wp) => {
+                mapRef.current?.getMap?.()?.flyTo({
+                  center: [wp.longitude, wp.latitude],
+                  zoom: 15,
+                  duration: 800,
+                });
+              }}
+            />
+          )}
+
           <Card
             onClick={() => setProfileModalOpen(true)}
             style={{
@@ -1026,7 +1154,7 @@ export default function MapPage() {
           </div>
 
           {/* Filter panel */}
-          {filterOpen && (
+          {filterOpen && !activeRoute && (
             <div
               style={{
                 position: "fixed",
@@ -1243,7 +1371,16 @@ export default function MapPage() {
           )}
           {/* End of User card logic */}
           <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
-          <VacanzaChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+          <VacanzaChat
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            onRouteGenerated={(routeData) => {
+              setActiveRoute(routeData);
+              setActiveDay(1);
+              setIsChatOpen(false);
+              setFilterOpen(false);
+            }}
+          />
           <ProfileModal
             open={profileModalOpen}
             onClose={() => setProfileModalOpen(false)}
