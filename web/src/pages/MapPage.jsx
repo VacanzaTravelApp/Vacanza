@@ -324,6 +324,8 @@ export default function MapPage() {
   const [bookingOpen, setBookingOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [activeRoute, setActiveRoute] = useState(null);
+  const [activeDay, setActiveDay] = useState(1);
   // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
   useEffect(() => {
     if (resultsOpen) setFilterOpen(false);
@@ -678,6 +680,69 @@ export default function MapPage() {
     return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
   }, [resultsOpen, selection]);
 
+  const activeWaypoints = useMemo(() => {
+    if (!activeRoute) return [];
+    const dayPlan = activeRoute.days?.find((d) => d.day === activeDay);
+    return (dayPlan?.waypoints || []).filter((w) => w.latitude && w.longitude);
+  }, [activeRoute, activeDay]);
+
+  const routeLineGeoJSON = useMemo(() => {
+    if (activeWaypoints.length < 2) return { type: "FeatureCollection", features: [] };
+    return {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: activeWaypoints.map((w) => [w.longitude, w.latitude]),
+          },
+        },
+      ],
+    };
+  }, [activeWaypoints]);
+
+  const routeGlowLayer = useMemo(
+    () => ({
+      id: "route-glow",
+      type: "line",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-width": 10, "line-opacity": 0.22, "line-color": "#F97316", "line-blur": 2.2 },
+    }),
+    []
+  );
+
+  const routeMainLayer = useMemo(
+    () => ({
+      id: "route-main",
+      type: "line",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-width": 4,
+        "line-opacity": 0.95,
+        "line-gradient": [
+          "interpolate", ["linear"], ["line-progress"],
+          0.0, "#F97316", 0.5, "#EF4444", 1.0, "#DC2626",
+        ],
+      },
+    }),
+    []
+  );
+
+  // fitBounds when route day changes
+  useEffect(() => {
+    if (activeWaypoints.length === 0) return;
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    const lngs = activeWaypoints.map((w) => w.longitude);
+    const lats = activeWaypoints.map((w) => w.latitude);
+    map.fitBounds(
+      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+      { duration: 650, padding: { top: 100, left: 100, right: 100, bottom: 340 } }
+    );
+  }, [activeWaypoints]);
+
   // ✅ Results panel açılınca: polygon panel altında kalmasın diye fitBounds + padding
   useEffect(() => {
     if (!canShowResultsPanel) return;
@@ -810,7 +875,7 @@ export default function MapPage() {
               </>
             )}
 
-            {pois.map((p) => {
+            {!activeRoute && pois.map((p) => {
               const icon = poiIconByCategory(p.category);
               const title = getSafePoiTitle(p);
 
@@ -876,7 +941,152 @@ export default function MapPage() {
                 </Marker>
               );
             })}
+
+            {activeWaypoints.length >= 2 && (
+              <Source id="route-src" type="geojson" data={routeLineGeoJSON} lineMetrics>
+                <Layer {...routeGlowLayer} />
+                <Layer {...routeMainLayer} />
+              </Source>
+            )}
+
+            {activeWaypoints.map((wp, idx) => (
+              <Marker
+                key={`route-wp-${wp.day}-${wp.order}`}
+                longitude={wp.longitude}
+                latitude={wp.latitude}
+                anchor="center"
+              >
+                <Tooltip title={wp.name} placement="top">
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, #F97316, #EF4444)",
+                      border: "2.5px solid white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "white",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      boxShadow: "0 2px 8px rgba(249,115,22,0.4)",
+                      cursor: "pointer",
+                      transition: "transform 0.2s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.2)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                  >
+                    {idx + 1}
+                  </div>
+                </Tooltip>
+              </Marker>
+            ))}
           </Map>
+
+          {activeRoute && (
+            <div
+              style={{
+                position: "fixed",
+                bottom: isMobile ? 70 : 56,
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 200,
+                background: "rgba(255,255,255,0.96)",
+                backdropFilter: "blur(12px)",
+                borderRadius: 20,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.14)",
+                padding: "14px 18px",
+                minWidth: isMobile ? "92vw" : 420,
+                maxWidth: isMobile ? "96vw" : 560,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{activeRoute.title}</div>
+                  <div style={{ fontSize: 12, color: "#888" }}>
+                    {activeRoute.destination} &middot; {activeRoute.total_days || activeRoute.totalDays} days
+                  </div>
+                </div>
+                <Button
+                  type="text"
+                  icon={<CloseOutlined />}
+                  onClick={() => {
+                    setActiveRoute(null);
+                    setActiveDay(1);
+                    setFilterOpen(true);
+                  }}
+                  style={{ borderRadius: 12 }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 }}>
+                {(activeRoute.days || []).map((d) => (
+                  <Button
+                    key={d.day}
+                    type={d.day === activeDay ? "primary" : "default"}
+                    size="small"
+                    onClick={() => setActiveDay(d.day)}
+                    style={{
+                      borderRadius: 10,
+                      fontWeight: d.day === activeDay ? 700 : 500,
+                      minWidth: 64,
+                      ...(d.day === activeDay
+                        ? { background: "linear-gradient(135deg,#F97316,#EF4444)", border: "none" }
+                        : {}),
+                    }}
+                  >
+                    Day {d.day}
+                  </Button>
+                ))}
+              </div>
+              <div style={{ marginTop: 8, maxHeight: 140, overflowY: "auto" }}>
+                {activeWaypoints.map((wp, idx) => (
+                  <div
+                    key={`wp-${wp.day}-${wp.order}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "5px 0",
+                      borderBottom: idx < activeWaypoints.length - 1 ? "1px solid #f0f0f0" : "none",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: "linear-gradient(135deg,#F97316,#EF4444)",
+                        color: "white",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {idx + 1}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {wp.name}
+                      </div>
+                      {wp.description && (
+                        <div style={{ fontSize: 11, color: "#999", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {wp.description}
+                        </div>
+                      )}
+                    </div>
+                    {wp.time_slot && (
+                      <span style={{ fontSize: 10, color: "#aaa", flexShrink: 0 }}>{wp.time_slot}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Card
             onClick={() => setProfileModalOpen(true)}
             style={{
@@ -1026,7 +1236,7 @@ export default function MapPage() {
           </div>
 
           {/* Filter panel */}
-          {filterOpen && (
+          {filterOpen && !activeRoute && (
             <div
               style={{
                 position: "fixed",
@@ -1243,7 +1453,16 @@ export default function MapPage() {
           )}
           {/* End of User card logic */}
           <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
-          <VacanzaChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+          <VacanzaChat
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            onRouteGenerated={(routeData) => {
+              setActiveRoute(routeData);
+              setActiveDay(1);
+              setIsChatOpen(false);
+              setFilterOpen(false);
+            }}
+          />
           <ProfileModal
             open={profileModalOpen}
             onClose={() => setProfileModalOpen(false)}
