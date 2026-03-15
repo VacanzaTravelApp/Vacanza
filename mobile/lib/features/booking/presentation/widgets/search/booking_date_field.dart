@@ -11,6 +11,7 @@ class BookingDateField extends StatefulWidget {
   final DateTime? firstDate;
   final DateTime? lastDate;
   final ValueChanged<DateTime>? onDateChanged;
+  final Future<void> Function()? onTapOverride;
 
   const BookingDateField({
     super.key,
@@ -20,6 +21,7 @@ class BookingDateField extends StatefulWidget {
     this.firstDate,
     this.lastDate,
     this.onDateChanged,
+    this.onTapOverride,
   });
 
   @override
@@ -49,7 +51,14 @@ class BookingDateFieldState extends State<BookingDateField> {
           ),
         ),
         GestureDetector(
-          onTap: _pickDate,
+          onTap: () async {
+            FocusScope.of(context).unfocus();
+            if (widget.onTapOverride != null) {
+              await widget.onTapOverride!();
+            } else {
+              await _pickDate();
+            }
+          },
           child: AbsorbPointer(
             child: TextFormField(
               controller: widget.controller,
@@ -118,12 +127,20 @@ class BookingDateFieldState extends State<BookingDateField> {
       firstDate: earliest,
       lastDate: latest,
       builder: (ctx, child) {
+        final baseTheme = Theme.of(ctx);
         return Theme(
-          data: Theme.of(ctx).copyWith(
-            colorScheme: const ColorScheme.light(
+          data: baseTheme.copyWith(
+            colorScheme: baseTheme.colorScheme.copyWith(
               primary: _accent,
               onPrimary: Colors.white,
-              surface: Colors.white,
+            ),
+            datePickerTheme: baseTheme.datePickerTheme.copyWith(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              headerBackgroundColor: _accent,
+              headerForegroundColor: Colors.white,
+              backgroundColor: Colors.white,
             ),
           ),
           child: child!,

@@ -58,7 +58,7 @@ class BookingCubit extends Cubit<BookingState> {
     _lastHotelRequest = request;
     _currentType = BookingType.hotels;
     final summary = _buildSummary(
-      city: request.cityCode,
+      city: request.query,
       dateRange: '${request.checkInDate}–${request.checkOutDate}',
       adults: request.adults,
     );

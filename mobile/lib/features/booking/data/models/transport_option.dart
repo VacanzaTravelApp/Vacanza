@@ -6,13 +6,19 @@ class TransportOption {
   final String carrier;
   final String origin;
   final String destination;
-  final String departureTime; // ISO 8601 local datetime
-  final String arrivalTime;   // ISO 8601 local datetime
-  final String duration;      // ISO 8601 duration, e.g. "PT3H15M"
+  final String departureTime; // String, e.g. "2025-07-01 08:30"
+  final String arrivalTime;   // String, e.g. "2025-07-01 11:45"
+  final String duration;      // e.g. "3h 15m" (treated as opaque string)
   final double price;
   final String currency;
   final int stops;
   final String externalBookingUrl;
+
+  // Google Flights enriched fields
+  final String? airlineLogo;
+  final String? flightNumber;
+  final String? travelClass;
+  final String? bookingToken;
 
   const TransportOption({
     required this.carrier,
@@ -25,6 +31,10 @@ class TransportOption {
     required this.currency,
     required this.stops,
     required this.externalBookingUrl,
+    this.airlineLogo,
+    this.flightNumber,
+    this.travelClass,
+    this.bookingToken,
   });
 
   factory TransportOption.fromJson(Map<String, dynamic> json) {
@@ -39,11 +49,15 @@ class TransportOption {
       currency: (json['currency'] ?? 'USD').toString(),
       stops: (json['stops'] as num?)?.toInt() ?? 0,
       externalBookingUrl: (json['externalBookingUrl'] ?? '').toString(),
+      airlineLogo: (json['airlineLogo'] as String?),
+      flightNumber: (json['flightNumber'] as String?),
+      travelClass: (json['travelClass'] as String?),
+      bookingToken: (json['bookingToken'] as String?),
     );
   }
 
   @override
   String toString() =>
       'TransportOption($carrier $origin→$destination, $price $currency, '
-      'stops=$stops)';
+      'stops=$stops, flightNumber=$flightNumber, travelClass=$travelClass)';
 }

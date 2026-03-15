@@ -29,7 +29,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   late BookingType _type;
 
   // Hotels
-  final _cityCodeCtrl = TextEditingController();
+  final _hotelQueryCtrl = TextEditingController();
   final _checkInCtrl = TextEditingController();
   final _checkOutCtrl = TextEditingController();
 
@@ -64,7 +64,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   }
 
   List<TextEditingController> get _allControllers => [
-        _cityCodeCtrl,
+        _hotelQueryCtrl,
         _checkInCtrl,
         _checkOutCtrl,
         _originCtrl,
@@ -91,7 +91,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     if (_type == BookingType.hotels) {
       final req = cubit.lastHotelRequest;
       if (req != null) {
-        _cityCodeCtrl.text = req.cityCode;
+        _hotelQueryCtrl.text = req.query;
         _checkInCtrl.text = req.checkInDate;
         _checkOutCtrl.text = req.checkOutDate;
         _adults = req.adults;
@@ -117,12 +117,12 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
 
   bool get _isValid {
     if (_type == BookingType.hotels) {
-      return _cityCodeCtrl.text.length == 3 &&
+      return _hotelQueryCtrl.text.trim().isNotEmpty &&
           _checkInCtrl.text.isNotEmpty &&
           _checkOutCtrl.text.isNotEmpty;
     }
-    return _originCtrl.text.length == 3 &&
-        _destinationCtrl.text.length == 3 &&
+    return _originCtrl.text.trim().length >= 3 &&
+        _destinationCtrl.text.trim().length >= 3 &&
         _departureCtrl.text.isNotEmpty;
   }
 
@@ -134,6 +134,73 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   }
 
   // ── Cross-field date logic ────────────────────────────────────
+
+  String _formatDate(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
+  }
+
+  Future<void> _pickHotelDateRange() async {
+    FocusScope.of(context).unfocus();
+    final now = DateTime.now();
+    final firstDate = now;
+    final lastDate = DateTime(now.year + 2);
+
+    DateTimeRange? initialRange;
+    final existingCheckIn =
+        _checkInCtrl.text.isNotEmpty ? DateTime.tryParse(_checkInCtrl.text) : null;
+    final existingCheckOut =
+        _checkOutCtrl.text.isNotEmpty ? DateTime.tryParse(_checkOutCtrl.text) : null;
+
+    if (existingCheckIn != null && existingCheckOut != null) {
+      initialRange = DateTimeRange(start: existingCheckIn, end: existingCheckOut);
+    } else {
+      final start = _checkInDate != null && _checkInDate!.isAfter(firstDate)
+          ? _checkInDate!
+          : firstDate;
+      final end = start.add(const Duration(days: 1));
+      initialRange = DateTimeRange(start: start, end: end);
+    }
+
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      initialDateRange: initialRange,
+      builder: (ctx, child) {
+        final baseTheme = Theme.of(ctx);
+        return Theme(
+          data: baseTheme.copyWith(
+            colorScheme: baseTheme.colorScheme.copyWith(
+              primary: _accent,
+              onPrimary: Colors.white,
+            ),
+            datePickerTheme: baseTheme.datePickerTheme.copyWith(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              headerBackgroundColor: _accent,
+              headerForegroundColor: Colors.white,
+              backgroundColor: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final start = picked.start;
+      final end = picked.end;
+      _checkInDate = start;
+      _checkInCtrl.text = _formatDate(start);
+      _checkOutCtrl.text = _formatDate(end);
+      _onCheckInChanged(start);
+      setState(() {});
+    }
+  }
 
   void _onCheckInChanged(DateTime date) {
     _checkInDate = date;
@@ -180,7 +247,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     if (_type == BookingType.hotels) {
       cubit.searchHotels(
         AccommodationSearchRequest(
-          cityCode: _cityCodeCtrl.text,
+          query: _hotelQueryCtrl.text.trim(),
           checkInDate: _checkInCtrl.text,
           checkOutDate: _checkOutCtrl.text,
           adults: _adults,
@@ -230,11 +297,18 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   List<Widget> _hotelFields() {
     final now = DateTime.now();
     return [
-      IataTextField(
-        controller: _cityCodeCtrl,
-        label: 'Destination (IATA)',
-        placeholder: 'e.g. PAR',
-        icon: Icons.search_rounded,
+      TextField(
+        controller: _hotelQueryCtrl,
+        decoration: const InputDecoration(
+          labelText: 'Search hotels',
+          hintText: 'e.g. Hotels in Paris, Bali resorts',
+          prefixIcon: Icon(Icons.search_rounded),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
+        ),
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _onSearch(),
       ),
       const SizedBox(height: 12),
       Row(
@@ -245,6 +319,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
               label: 'Check-in',
               firstDate: now,
               onDateChanged: _onCheckInChanged,
+              onTapOverride: _pickHotelDateRange,
             ),
           ),
           const SizedBox(width: 12),
@@ -269,15 +344,15 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     return [
       IataTextField(
         controller: _originCtrl,
-        label: 'Origin (IATA)',
-        placeholder: 'e.g. IST',
+        label: 'Origin',
+        placeholder: 'e.g. IST or Istanbul',
         icon: Icons.flight_takeoff_rounded,
       ),
       const SizedBox(height: 12),
       IataTextField(
         controller: _destinationCtrl,
-        label: 'Destination (IATA)',
-        placeholder: 'e.g. PAR',
+        label: 'Destination',
+        placeholder: 'e.g. CDG or Paris',
         icon: Icons.search_rounded,
       ),
       const SizedBox(height: 12),

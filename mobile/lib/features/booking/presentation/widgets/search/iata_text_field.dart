@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Reusable IATA code text field with uppercase enforcement.
+/// Reusable flight text field styled like other inputs.
 class IataTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
@@ -34,12 +34,7 @@ class IataTextField extends StatelessWidget {
         ),
         TextFormField(
           controller: controller,
-          textCapitalization: TextCapitalization.characters,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z]')),
-            LengthLimitingTextInputFormatter(3),
-            _UpperCaseFormatter(),
-          ],
+          textCapitalization: TextCapitalization.sentences,
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w500,
@@ -77,16 +72,5 @@ class IataTextField extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-/// Forces text to uppercase.
-class _UpperCaseFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    return newValue.copyWith(text: newValue.text.toUpperCase());
   }
 }

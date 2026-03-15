@@ -1,10 +1,9 @@
 import 'sort_criteria.dart';
 
-/// UC1.8-MOB3 — Request DTO for `POST /bookings/accommodations/search`.
-///
-/// Nullable fields (`budget`, `sortBy`) are omitted from JSON when null.
 class AccommodationSearchRequest {
-  final String cityCode;
+  /// Natural-language hotel query, e.g. "Hotels in Paris",
+  /// "Bali resorts", "Boutique hotels near Eiffel Tower".
+  final String query;
   final String checkInDate;  // YYYY-MM-DD
   final String checkOutDate; // YYYY-MM-DD
   final int adults;
@@ -13,7 +12,7 @@ class AccommodationSearchRequest {
   final SortCriteria? sortBy;
 
   const AccommodationSearchRequest({
-    required this.cityCode,
+    required this.query,
     required this.checkInDate,
     required this.checkOutDate,
     this.adults = 1,
@@ -24,7 +23,7 @@ class AccommodationSearchRequest {
 
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
-      'cityCode': cityCode,
+      'query': query,
       'checkInDate': checkInDate,
       'checkOutDate': checkOutDate,
       'adults': adults,
@@ -43,7 +42,7 @@ class AccommodationSearchRequest {
     bool clearSort = false,
   }) {
     return AccommodationSearchRequest(
-      cityCode: cityCode,
+      query: query,
       checkInDate: checkInDate,
       checkOutDate: checkOutDate,
       adults: adults,
@@ -55,6 +54,6 @@ class AccommodationSearchRequest {
 
   @override
   String toString() =>
-      'AccommodationSearchRequest(city=$cityCode, $checkInDate→$checkOutDate, '
+      'AccommodationSearchRequest(query="$query", $checkInDate→$checkOutDate, '
       'adults=$adults, budget=$budget, sort=$sortBy)';
 }
