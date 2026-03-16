@@ -22,7 +22,7 @@ import java.time.Duration;
 @Slf4j
 @Configuration
 @EnableConfigurationProperties({ GeoapifyProperties.class, AiServiceProperties.class,
-        SerpApiProperties.class })
+        SerpApiProperties.class, MapboxProperties.class })
 public class WebClientConfig {
 
     @Bean
@@ -47,6 +47,18 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .filter(addApiKey(props))
                 .filter(log4xx5xx("[GEOAPIFY-GEOCODE]"))
+                .build();
+    }
+
+    @Bean
+    @Qualifier("mapboxGeocodingWebClient")
+    public WebClient mapboxGeocodingWebClient(MapboxProperties props) {
+        return WebClient.builder()
+                .baseUrl("https://api.mapbox.com")
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(addMapboxAccessToken(props))
+                .filter(log4xx5xx("[MAPBOX-GEOCODE]"))
                 .build();
     }
 
@@ -85,13 +97,32 @@ public class WebClientConfig {
     }
 
     /**
-     * Automatically appends ?apiKey=... to every request
+     * Automatically appends ?apiKey=... to every Geoapify request
      */
     private ExchangeFilterFunction addApiKey(GeoapifyProperties props) {
         return (request, next) -> {
             var newUrl = UriComponentsBuilder
                     .fromUri(request.url())
                     .queryParam("apiKey", props.getApiKey())
+                    .build(false)
+                    .toUri();
+            var newRequest = ClientRequest
+                    .from(request)
+                    .url(newUrl)
+                    .build();
+
+            return next.exchange(newRequest);
+        };
+    }
+
+    /**
+     * Automatically appends ?access_token=... to every Mapbox request
+     */
+    private ExchangeFilterFunction addMapboxAccessToken(MapboxProperties props) {
+        return (request, next) -> {
+            var newUrl = UriComponentsBuilder
+                    .fromUri(request.url())
+                    .queryParam("access_token", props.getAccessToken())
                     .build(false)
                     .toUri();
             var newRequest = ClientRequest
