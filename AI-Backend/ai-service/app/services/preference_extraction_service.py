@@ -1,8 +1,10 @@
-"""Extract user preferences from chat conversations using LLM structured output."""
+"""Extract user preferences from chat conversations using LLM."""
 
+import json
 import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.schemas.preference_extraction import PreferenceExtractionResult
@@ -13,6 +15,9 @@ logger = logging.getLogger(__name__)
 EXTRACTION_SYSTEM_PROMPT = """You are a preference extraction engine for Vacanza, a travel planning app.
 
 Analyze the conversation between a user and the travel assistant. Extract any user preferences that are explicitly stated or strongly implied.
+
+Respond with ONLY a valid JSON object, no other text. Format: {"preferences": [{"preference_key": "...", "preference_value": "...", "confidence": 0.0-1.0}]}
+Return {"preferences": []} if no preferences detected.
 
 Focus on these preference categories:
 - cuisine_preference: Food and dining preferences
@@ -78,7 +83,6 @@ async def extract_preferences(
     """
     try:
         llm = create_chat_model(settings)
-        structured_llm = llm.with_structured_output(PreferenceExtractionResult, include_raw=False)
 
         existing_ctx = _build_existing_preferences_context(existing_preferences)
         user_prompt_parts = []
@@ -90,7 +94,8 @@ async def extract_preferences(
             "Extract any user preferences from the user's message above. "
             "For list-type preferences (allergies, cuisines, interests, etc.), "
             "MERGE new values with existing ones — do not discard the old values. "
-            "If the user corrects or negates an existing preference, return the updated value."
+            "If the user corrects or negates an existing preference, return the updated value. "
+            "Respond with ONLY valid JSON: {\"preferences\": [...]}"
         )
 
         messages = [
@@ -98,20 +103,36 @@ async def extract_preferences(
             HumanMessage(content="\n\n".join(user_prompt_parts)),
         ]
 
-        result = await structured_llm.ainvoke(messages)
-        # LangChain may return dict with 'parsed' key or AIMessage with .parsed attr
-        if isinstance(result, dict) and "parsed" in result:
-            result = result.get("parsed")
-        elif hasattr(result, "parsed") and result.parsed is not None:
-            result = result.parsed
-        if result and isinstance(result, PreferenceExtractionResult) and result.preferences:
+        response = await llm.ainvoke(messages)
+        content = response.content if hasattr(response, "content") else str(response)
+        content = content.strip()
+        # Extract JSON from response (handle markdown code blocks)
+        if "```" in content:
+            start = content.find("{")
+            end = content.rfind("}") + 1
+            if start >= 0 and end > start:
+                content = content[start:end]
+        start = content.find("{")
+        end = content.rfind("}") + 1
+        if start >= 0 and end > start:
+            content = content[start:end]
+        data = json.loads(content)
+        if not isinstance(data, dict) or "preferences" not in data:
+            data = {"preferences": []}
+        elif not isinstance(data.get("preferences"), list):
+            data = {"preferences": []}
+        result = PreferenceExtractionResult.model_validate(data)
+        if result.preferences:
             logger.info(
                 "Extracted %d preferences: %s",
                 len(result.preferences),
                 [(p.preference_key, p.preference_value, p.confidence) for p in result.preferences],
             )
-        return result if isinstance(result, PreferenceExtractionResult) else PreferenceExtractionResult(preferences=[])
+        return result
 
+    except (json.JSONDecodeError, ValueError, ValidationError) as e:
+        logger.warning("Preference extraction JSON parse failed (non-blocking): %s", e)
+        return PreferenceExtractionResult(preferences=[])
     except Exception as e:
         logger.warning("Preference extraction failed (non-blocking): %s", e)
         return PreferenceExtractionResult(preferences=[])
