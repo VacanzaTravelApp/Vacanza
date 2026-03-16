@@ -20,6 +20,9 @@ class ActionBar extends StatelessWidget {
   // ✅ NEW
   final VoidCallback onOpenFilters;
 
+  /// UC1.11 — Explore in AR entry point
+  final VoidCallback onOpenArMode;
+
   const ActionBar({
     super.key,
     required this.mode,
@@ -30,6 +33,7 @@ class ActionBar extends StatelessWidget {
     required this.onOpenBooking, // ✅ UC1.8-MOB1
     required this.onOpenChat, // ✅ Chatbot
     required this.onOpenFilters, // ✅ NEW
+    required this.onOpenArMode, // UC1.11 — AR Mode
   });
 
   @override
@@ -51,6 +55,14 @@ class ActionBar extends StatelessWidget {
           tooltip: 'Filter POIs',
           icon: Icons.layers_sharp,
           onPressed: onOpenFilters,
+        ),
+        const SizedBox(height: 16),
+
+        // UC1.11: Explore in AR
+        ActionIconButton(
+          tooltip: 'Explore in AR',
+          icon: Icons.view_in_ar_rounded,
+          onPressed: onOpenArMode,
         ),
         const SizedBox(height: 16),
 

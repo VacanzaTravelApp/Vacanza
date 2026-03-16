@@ -41,6 +41,8 @@ import '../../../chat/presentation/screens/chat_screen.dart';
 import '../../../profile/data/repositories/profile_repository.dart';
 import '../../../profile/presentation/bloc/profile_bloc.dart';
 import '../../../profile/presentation/bloc/profile_event.dart';
+import '../../../ar/presentation/screens/ar_explore_page.dart';
+
 import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
@@ -444,6 +446,15 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ✅ manual filter tuşu -> blur preview OFF
             onOpenFilters: () => _openFilters(fromUserSelection: false),
+
+            // UC1.11 — Explore in AR entry point
+            onOpenArMode: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ArExplorePage(),
+                ),
+              );
+            },
 
             // ✅ UC1.8-MOB1: booking entry point
             onOpenBooking: () {
