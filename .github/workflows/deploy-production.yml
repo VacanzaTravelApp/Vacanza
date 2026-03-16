@@ -55,6 +55,24 @@ jobs:
             echo "✔ Backend Production Deploy Finished!"
 
             ##############################################################
+            # AI SERVICE DEPLOY (Production)
+            ##############################################################
+            echo "🤖 Updating AI Service (Production)..."
+
+            cd /root/vacanza-ai/prod/Vacanza
+            git fetch origin
+            git reset --hard origin/Production
+
+            cd /root/vacanza-ai/prod/Vacanza/AI-Backend/ai-service
+            docker compose -p vacanza-prod-ai down --remove-orphans
+            docker compose -p vacanza-prod-ai build --no-cache
+            docker compose -p vacanza-prod-ai up -d
+
+            docker ps | grep vacanza-prod-ai || true
+
+            echo "✔ AI Service Production Deploy Finished!"
+
+            ##############################################################
             # WEB DEPLOY (Production)
             ##############################################################
             echo "🌍 Updating Web (Production)..."
