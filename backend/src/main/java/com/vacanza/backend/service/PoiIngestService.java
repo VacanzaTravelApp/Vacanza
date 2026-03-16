@@ -5,6 +5,7 @@ import com.vacanza.backend.integration.GeoapifyClient;
 import com.vacanza.backend.integration.GeoapifyResponse;
 import com.vacanza.backend.repo.PointOfInterestRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -82,8 +83,12 @@ public class PoiIngestService {
             poi.setRating(f.getProperties().getRating());
             poi.setPriceLevel(f.getProperties().getPrice_level());
 
-            poiRepository.save(poi);
-            saved++;
+            try {
+                poiRepository.save(poi);
+                saved++;
+            } catch (DataIntegrityViolationException e) {
+                // Race: another request may have inserted same external_id; skip and continue
+            }
         }
 
         return saved;

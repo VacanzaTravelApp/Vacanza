@@ -681,10 +681,18 @@ export default function MapPage() {
     return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
   }, [resultsOpen, selection]);
 
+  // Normalize waypoint coords: backend may send latitude/longitude (camelCase); ensure numeric and consistent order
   const activeWaypoints = useMemo(() => {
     if (!activeRoute) return [];
-    const dayPlan = activeRoute.days?.find((d) => d.day === activeDay);
-    return (dayPlan?.waypoints || []).filter(
+    const dayPlan = activeRoute.days?.find(
+      (d) => Number(d?.day) === Number(activeDay)
+    );
+    const raw = (dayPlan?.waypoints || []).map((w) => {
+      const lat = Number(w.latitude ?? w.lat ?? NaN);
+      const lon = Number(w.longitude ?? w.lon ?? NaN);
+      return { ...w, latitude: lat, longitude: lon };
+    });
+    return raw.filter(
       (w) => Number.isFinite(w.latitude) && Number.isFinite(w.longitude)
     );
   }, [activeRoute, activeDay]);

@@ -26,10 +26,12 @@ export default function RoutePanel({
   if (!route) return null;
 
   const days = route.days || [];
-  const dayPlan = days.find((d) => d.day === activeDay);
-  const waypoints = (dayPlan?.waypoints || []).filter(
-    (w) => w.latitude != null && w.longitude != null
-  );
+  const dayPlan = days.find((d) => Number(d?.day) === Number(activeDay));
+  const waypoints = (dayPlan?.waypoints || []).filter((w) => {
+    const lat = Number(w.latitude ?? w.lat);
+    const lon = Number(w.longitude ?? w.lon);
+    return Number.isFinite(lat) && Number.isFinite(lon);
+  });
   const totalDays = route.total_days ?? route.totalDays ?? days.length;
 
   return (
