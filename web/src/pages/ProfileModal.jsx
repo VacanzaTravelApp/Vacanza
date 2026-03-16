@@ -84,20 +84,20 @@ function formatDate(dateStr) {
 
 // --- Reusable mini components (Mobile-Aligned) ---
 
-const AccountListItem = ({ icon, label, onClick, color = "#1c1c1e", isLast }) => (
+const AccountListItem = ({ icon, label, onClick, color = "#1c1c1e", bgColor = "#f3f4f6", isLast }) => (
     <div
         onClick={onClick}
         style={{
-            display: "flex", alignItems: "center", gap: 14, padding: "16px 0",
+            display: "flex", alignItems: "center", gap: 14, padding: "12px 0",
             borderBottom: isLast ? "none" : "1px solid #f8f9fa", cursor: "pointer",
             transition: "all 0.2s ease"
         }}
     >
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: color === "#ff3b30" ? "rgba(255, 59, 48, 0.05)" : "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {React.cloneElement(icon, { style: { fontSize: 16, color: color } })}
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: bgColor, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {React.cloneElement(icon, { style: { fontSize: 18, color: color } })}
         </div>
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 800, color: color }}>{label}</span>
-        <RightOutlined style={{ fontSize: 12, color: "#d1d5db" }} />
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: color === "#ff3b30" ? "#ff3b30" : "#1c1c1e" }}>{label}</span>
+        <RightOutlined style={{ fontSize: 10, color: "#d1d5db" }} />
     </div>
 );
 
@@ -133,8 +133,8 @@ const SectionCard = ({ title, subtitle, children, icon, iconBg, onClick }) => (
                     </div>
                 )}
                 <div>
-                    <div style={{ fontSize: 17, fontWeight: 800, color: "#2c3e50" }}>{title}</div>
-                    {subtitle && <div style={{ fontSize: 13, color: "#8e8e93", fontWeight: 500, marginTop: 2 }}>{subtitle}</div>}
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#2c3e50" }}>{title}</div>
+                    {subtitle && <div style={{ fontSize: 12, color: "#8e8e93", fontWeight: 500, marginTop: 2 }}>{subtitle}</div>}
                 </div>
             </div>
             {onClick && <RightOutlined style={{ fontSize: 12, color: "#c7c7cc" }} />}
@@ -178,16 +178,16 @@ const ProfileCharacterCard = ({ name, role, level, xp, progress, imageUrl }) => 
             </div>
 
             <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 18, fontWeight: 850, color: "#2c3e50" }}>{name}</div>
+                <div style={{ fontSize: 17, fontWeight: 850, color: "#2c3e50" }}>{name}</div>
                 <div style={{
                     display: "inline-block", padding: "2px 10px", borderRadius: 20,
                     background: "#fff", border: "1px solid #f1f3f5",
                     fontSize: 12, color: "#5F7A8F", marginTop: 4, fontWeight: 600
                 }}>
-                    {role || "Solo Traveler"}
+                    {role || "—"}
                 </div>
                 <div style={{
-                    fontSize: 13, fontWeight: 800, color: "#0096FF", marginTop: 6
+                    fontSize: 12, fontWeight: 800, color: "#0096FF", marginTop: 6
                 }}>
                     Level {level} • {new Intl.NumberFormat().format(xp)} XP
                 </div>
@@ -306,144 +306,173 @@ const ProfileModal = ({ open, onClose, user }) => {
 
     // ================= MAIN VIEW =================
     const MainView = () => (
-        <div style={{ padding: "0 24px 40px", maxHeight: "88vh", overflowY: "auto", background: "#fff" }}>
-            <GrabHandle />
-
-            <div style={{ marginBottom: 24, marginTop: 12 }}>
-                <div style={{ fontSize: 26, fontWeight: 900, color: "#1c1c1e" }}>Profile</div>
+        <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff" }}>
+            <div style={{ padding: "0 24px" }}>
+                <GrabHandle />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, marginTop: 12 }}>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: "#1c1c1e" }}>Profile</div>
+                    <Button
+                        icon={<CloseOutlined style={{ fontSize: 14 }} />}
+                        type="text"
+                        style={{
+                            color: "#6b7280", padding: 0, width: 32, height: 32,
+                            borderRadius: "50%", background: "#f3f4f6",
+                            display: "flex", alignItems: "center", justifyContent: "center"
+                        }}
+                        onClick={onClose}
+                    />
+                </div>
             </div>
 
-            <ProfileCharacterCard
-                name={profile?.displayName || profile?.firstName || "Alex"}
-                role={gamification?.roleText || "Solo Traveler"}
-                level={gamification?.levelText ? parseInt(gamification.levelText.replace(/\D/g, ''), 10) : 1}
-                xp={gamification?.totalXp || 0}
-                progress={gamification?.xpProgressPercent || 0}
-                imageUrl={profile?.profileImageUrl}
-            />
+            <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 40px" }}>
+                <ProfileCharacterCard
+                    name={profile?.preferredName || profile?.firstName || profile?.displayName || "—"}
+                    role={gamification?.roleText || "—"}
+                    level={gamification?.levelText ? parseInt(gamification.levelText.replace(/\D/g, ''), 10) : 1}
+                    xp={gamification?.totalXp || 0}
+                    progress={gamification?.xpProgressPercent || 0}
+                    imageUrl={profile?.profileImageUrl}
+                />
 
-            <SectionCard
-                title="Gamification"
-                subtitle="XP, badges, and challenges"
-                icon={<TrophyOutlined />}
-                iconBg="#fb923c"
-                onClick={() => setView('GAMIFICATION')}
-            />
+                <SectionCard
+                    title="Gamification"
+                    subtitle="XP, badges, and challenges"
+                    icon={<TrophyOutlined />}
+                    iconBg="#fb923c"
+                    onClick={() => setView('GAMIFICATION')}
+                />
 
-            <SectionCard
-                title="Travel Preferences"
-                subtitle="Personalize recommendations"
-                icon={<ControlOutlined />}
-                iconBg="#0ea5e9"
-                onClick={() => setView('EDIT_PREFERENCES')}
-            >
-                <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 12 }}>
-                    <div style={{ display: "flex" }}>
-                        <span style={{ fontSize: 14, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Travel style</span>
-                        <span style={{ fontSize: 15, color: "#1c1c1e", fontWeight: 700 }}>{formatLabel(preferences?.travelStyle) || "Relaxed"}</span>
-                    </div>
+                <SectionCard
+                    title="Travel Preferences"
+                    subtitle="Personalize recommendations"
+                    icon={<ControlOutlined />}
+                    iconBg="#0ea5e9"
+                    onClick={() => setView('EDIT_PREFERENCES')}
+                >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 12 }}>
+                        <div style={{ display: "flex" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Travel style</span>
+                            <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>{formatLabel(preferences?.travelStyle) || "—"}</span>
+                        </div>
 
-                    <div style={{ display: "flex" }}>
-                        <span style={{ fontSize: 14, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0, marginTop: 4 }}>Categories</span>
-                        <div style={{ display: "flex", gap: "8px 6px", flexWrap: "wrap", flex: 1 }}>
-                            {preferences?.favoriteCategories?.length > 0 ? preferences.favoriteCategories.slice(0, 3).map((cat, i) => (
-                                <div key={i} style={{
-                                    padding: "4px 12px", background: "#e0f2fe", color: "#0ea5e9",
-                                    borderRadius: 14, fontSize: 13, fontWeight: 700
+                        <div style={{ display: "flex" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0, marginTop: 4 }}>Categories</span>
+                            <div style={{ display: "flex", gap: "8px 6px", flexWrap: "wrap", flex: 1 }}>
+                                {preferences?.favoriteCategories?.length > 0 ? preferences.favoriteCategories.slice(0, 3).map((cat, i) => (
+                                    <div key={i} style={{
+                                        padding: "4px 12px", background: "#e0f2fe", color: "#0ea5e9",
+                                        borderRadius: 14, fontSize: 12, fontWeight: 700
+                                    }}>
+                                        {formatLabel(cat)}
+                                    </div>
+                                )) : (
+                                    <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>—</span>
+                                )}
+                                {(preferences?.favoriteCategories?.length > 3) && <div style={{
+                                    padding: "4px 12px", background: "#f3f4f6", color: "#6b7280",
+                                    borderRadius: 14, fontSize: 12, fontWeight: 700
+                                }}>+{preferences.favoriteCategories.length - 3}</div>}
+                            </div>
+                        </div>
+
+                        <div style={{ display: "flex" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Daily budget</span>
+                            <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>{preferences?.dailyBudget || "—"} {preferences?.budgetCurrency || 'EUR'}</span>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Dietary</span>
+                            {preferences?.dietaryRestrictions?.length > 0 ? (
+                                <div style={{
+                                    padding: "4px 10px", background: "#fee2e2", color: "#ef4444",
+                                    borderRadius: 12, fontSize: 11, fontWeight: 700
                                 }}>
-                                    {formatLabel(cat)}
+                                    {formatLabel(preferences.dietaryRestrictions[0]).charAt(0).toUpperCase() + formatLabel(preferences.dietaryRestrictions[0]).slice(1)}
                                 </div>
-                            )) : (
-                                <span style={{ fontSize: 15, color: "#1c1c1e", fontWeight: 700 }}>—</span>
-                            )}
-                            {(preferences?.favoriteCategories?.length > 3) && <div style={{
-                                padding: "4px 12px", background: "#f3f4f6", color: "#6b7280",
-                                borderRadius: 14, fontSize: 13, fontWeight: 700
-                            }}>+{preferences.favoriteCategories.length - 3}</div>}
+                            ) : <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>—</span>}
+                        </div>
+
+                        <div style={{ display: "flex" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Language</span>
+                            <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>{(preferences?.preferredLanguage || 'EN').toUpperCase()}</span>
                         </div>
                     </div>
+                </SectionCard>
 
-                    <div style={{ display: "flex" }}>
-                        <span style={{ fontSize: 14, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Daily budget</span>
-                        <span style={{ fontSize: 15, color: "#1c1c1e", fontWeight: 700 }}>{preferences?.dailyBudget || "—"} {preferences?.budgetCurrency || 'EUR'}</span>
+                <SectionCard
+                    title="Travel Statistics"
+                    subtitle="Your journey so far"
+                    icon={<BarChartOutlined />}
+                    iconBg="#22c55e"
+                >
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                        <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: "#1c1c1e" }}>{stats?.visitedPoisCount || 0}</div>
+                            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>Total places visited</div>
+                        </div>
+                        <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: "#1c1c1e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{stats?.lastVisitPoiName || "—"}</div>
+                            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>{stats?.lastVisitDate ? dayjs(stats.lastVisitDate).format('MMM D, YYYY') : "—"}</div>
+                        </div>
+                        <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: "#1c1c1e", textTransform: "capitalize" }}>{stats?.favoriteCategory || "—"}</div>
+                            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>Favorite category</div>
+                        </div>
+                        <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: "#1c1c1e" }}>{stats?.distinctCategoriesCount || 0}</div>
+                            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>Categories explored</div>
+                        </div>
                     </div>
+                </SectionCard>
 
-                    <div style={{ display: "flex", alignItems: "center" }}>
-                        <span style={{ fontSize: 14, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Dietary</span>
-                        {preferences?.dietaryRestrictions?.length > 0 ? (
-                            <div style={{
-                                padding: "4px 10px", background: "#fee2e2", color: "#ef4444",
-                                borderRadius: 12, fontSize: 12, fontWeight: 700
-                            }}>
-                                {formatLabel(preferences.dietaryRestrictions[0]).charAt(0).toUpperCase() + formatLabel(preferences.dietaryRestrictions[0]).slice(1)}
-                            </div>
-                        ) : <span style={{ fontSize: 15, color: "#1c1c1e", fontWeight: 700 }}>—</span>}
+                <SectionCard
+                    title="Check-in History"
+                    subtitle="Places you've visited"
+                    icon={<ClockCircleOutlined />}
+                    iconBg="#fb923c"
+                >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                        {checkins?.length > 0 ? (
+                            checkins.slice(0, 3).map((item, idx) => (
+                                <CheckinItem key={item.checkInId || idx} name={item.poiName} category={item.category} date={item.checkedInAt} />
+                            ))
+                        ) : (
+                            <div style={{ textAlign: "center", padding: "16px 0", color: "#9ca3af", fontSize: 14, fontWeight: 600 }}>No check-ins yet</div>
+                        )}
                     </div>
+                </SectionCard>
 
-                    <div style={{ display: "flex" }}>
-                        <span style={{ fontSize: 14, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Language</span>
-                        <span style={{ fontSize: 15, color: "#1c1c1e", fontWeight: 700 }}>{(preferences?.preferredLanguage || 'EN').toUpperCase()}</span>
+                <div style={{ marginTop: 24, padding: "0 4px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px", marginBottom: 12, marginLeft: 16 }}>ACCOUNT</div>
+                    <div style={{ background: "#fff", borderRadius: 24, padding: "8px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
+                        <AccountListItem
+                            icon={<UserOutlined />}
+                            label="Edit Profile"
+                            color="#0096FF"
+                            bgColor="#e0f2fe"
+                            onClick={() => setView('EDIT_PROFILE')}
+                        />
+                        <AccountListItem
+                            icon={<SlidersOutlined />}
+                            label="Edit Preferences"
+                            color="#22c55e"
+                            bgColor="#dcfce7"
+                            onClick={() => setView('EDIT_PREFERENCES')}
+                        />
+                        <AccountListItem
+                            icon={<LogoutOutlined />}
+                            label="Logout"
+                            color="#ff3b30"
+                            bgColor="#fee2e2"
+                            isLast={true}
+                            onClick={() => {
+                                import("../firebase").then(({ auth }) => auth.signOut());
+                                onClose();
+                                navigate("/login");
+                            }}
+                        />
                     </div>
                 </div>
-            </SectionCard>
-
-            <SectionCard
-                title="Travel Statistics"
-                subtitle="Your journey so far"
-                icon={<BarChartOutlined />}
-                iconBg="#22c55e"
-            >
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-                    <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
-                        <div style={{ fontSize: 22, fontWeight: 900, color: "#1c1c1e" }}>{stats?.visitedPoisCount || 0}</div>
-                        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>Total places visited</div>
-                    </div>
-                    <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{stats?.lastVisitPoiName || "—"}</div>
-                        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>{stats?.lastVisitDate ? dayjs(stats.lastVisitDate).format('MMM D, YYYY') : "—"}</div>
-                    </div>
-                    <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: "#1c1c1e", textTransform: "capitalize" }}>{stats?.favoriteCategory || "—"}</div>
-                        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>Favorite category</div>
-                    </div>
-                    <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
-                        <div style={{ fontSize: 22, fontWeight: 900, color: "#1c1c1e" }}>{stats?.distinctCategoriesCount || 0}</div>
-                        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>Categories explored</div>
-                    </div>
-                </div>
-            </SectionCard>
-
-            <SectionCard
-                title="Check-in History"
-                subtitle="Your recently visited places"
-                icon={<EnvironmentOutlined />}
-                iconBg="#ef4444"
-            >
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
-                    {checkins?.length > 0 ? (
-                        checkins.slice(0, 3).map((item, idx) => (
-                            <CheckinItem key={item.checkInId || idx} name={item.poiName} category={item.category} date={item.checkedInAt} />
-                        ))
-                    ) : (
-                        <div style={{ textAlign: "center", padding: "16px 0", color: "#9ca3af", fontSize: 14, fontWeight: 600 }}>No check-ins yet</div>
-                    )}
-                </div>
-            </SectionCard>
-
-            <div style={{ marginTop: 12 }}>
-                <AccountListItem icon={<UserOutlined />} label="Edit Profile" onClick={() => setView('EDIT_PROFILE')} />
-                <AccountListItem icon={<SlidersOutlined />} label="Edit Preferences" onClick={() => setView('EDIT_PREFERENCES')} />
-                <AccountListItem
-                    icon={<LogoutOutlined />}
-                    label="Logout"
-                    color="#ff3b30"
-                    isLast={true}
-                    onClick={() => {
-                        import("../firebase").then(({ auth }) => auth.signOut());
-                        onClose();
-                        navigate("/login");
-                    }}
-                />
             </div>
         </div>
     );
@@ -453,80 +482,93 @@ const ProfileModal = ({ open, onClose, user }) => {
         const levelNum = gamification?.levelText ? parseInt(gamification.levelText.replace(/\D/g, ''), 10) : 1;
 
         return (
-            <div style={{ padding: "0 24px 40px", maxHeight: "88vh", overflowY: "auto", background: "#f8f9fa" }}>
-                <GrabHandle />
-
-                <div style={{ display: "flex", alignItems: "center", position: "relative", marginBottom: 32, marginTop: 12 }}>
-                    <Button
-                        icon={<ArrowLeftOutlined />}
-                        type="text"
-                        style={{ position: "absolute", left: -8, fontSize: 18, color: "#1c1c1e" }}
-                        onClick={() => setView('MAIN')}
-                    />
-                    <div style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>
-                            {gamification?.roleText || "Urban Adventurer"}
+            <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#f8f9fa" }}>
+                <div style={{ padding: "0 24px" }}>
+                    <GrabHandle />
+                    <div style={{ display: "flex", alignItems: "center", position: "relative", marginBottom: 32, marginTop: 12 }}>
+                        <Button
+                            icon={<ArrowLeftOutlined />}
+                            type="text"
+                            style={{ position: "absolute", left: -8, fontSize: 18, color: "#1c1c1e" }}
+                            onClick={() => setView('MAIN')}
+                        />
+                        <div style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>
+                                {gamification?.roleText || "Urban Adventurer"}
+                            </div>
+                            <div style={{ fontSize: 18, fontWeight: 850, color: "#1c1c1e" }}>Level {levelNum}</div>
                         </div>
-                        <div style={{ fontSize: 18, fontWeight: 850, color: "#1c1c1e" }}>Level {levelNum}</div>
-                    </div>
-                </div>
-
-                <div style={{ background: "#fff", borderRadius: 24, padding: "32px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)", textAlign: "center", marginBottom: 24 }}>
-                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
-                        <Progress
-                            type="circle"
-                            percent={gamification?.xpProgressPercent || 0}
-                            size={200}
-                            strokeWidth={10}
-                            strokeColor={{ '0%': '#0cebeb', '100%': '#20e3b2' }}
-                            format={(percent) => (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                                    <div style={{ fontSize: 44, fontWeight: 900, color: "#1c1c1e", lineHeight: 1 }}>{percent}%</div>
-                                    <div style={{ fontSize: 13, fontWeight: 600, color: "#9ca3af", marginTop: 4 }}>to Level {levelNum + 1}</div>
-                                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", marginTop: 8 }}>{new Intl.NumberFormat().format(gamification?.totalXp || 0)} XP</div>
-                                </div>
-                            )}
+                        <Button
+                            icon={<CloseOutlined style={{ fontSize: 14 }} />}
+                            type="text"
+                            style={{
+                                position: "absolute", right: -8, color: "#6b7280", padding: 0, width: 32, height: 32,
+                                borderRadius: "50%", background: "#f3f4f6",
+                                display: "flex", alignItems: "center", justifyContent: "center"
+                            }}
+                            onClick={onClose}
                         />
                     </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)" }}>
-                        {gamification?.stats?.slice(0, 3).map((s, idx) => (
-                            <div key={s.label} style={{
-                                textAlign: "center",
-                                borderRight: idx < 2 ? "1px solid #f1f3f5" : "none"
-                            }}>
-                                <div style={{ fontSize: 24, fontWeight: 900, color: "#1c1c1e" }}>{s.value}</div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af", marginTop: 4, textTransform: "capitalize" }}>{s.label}</div>
-                            </div>
-                        ))}
-                    </div>
                 </div>
 
-                <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", marginBottom: 16 }}>Achievement Badges</div>
+                <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 40px" }}>
+                    <div style={{ background: "#fff", borderRadius: 28, padding: "24px 16px 20px", boxShadow: "0 4px 24px rgba(0,0,0,0.04)", textAlign: "center", marginBottom: 24 }}>
+                        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+                            <Progress
+                                type="circle"
+                                percent={gamification?.xpProgressPercent || 0}
+                                size={140}
+                                strokeWidth={8}
+                                strokeColor={{ '0%': '#0cebeb', '100%': '#20e3b2' }}
+                                format={(percent) => (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div style={{ fontSize: 28, fontWeight: 900, color: "#1c1c1e", lineHeight: 1 }}>{percent}%</div>
+                                        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginTop: 4 }}>to Level {levelNum + 1}</div>
+                                        <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", marginTop: 6 }}>{new Intl.NumberFormat().format(gamification?.totalXp || 0)} XP</div>
+                                    </div>
+                                )}
+                            />
+                        </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                    {gamification?.badges?.map((badge, i) => {
-                        const colors = ["#fb923c", "#ef4444", "#0ea5e9", "#22c55e", "#d946ef", "#a855f7"];
-                        const bgColor = colors[i % colors.length];
-
-                        return (
-                            <div key={badge.id} style={{
-                                background: "#fff", borderRadius: 20, padding: "20px 8px", textAlign: "center",
-                                boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
-                                opacity: badge.earned ? 1 : 0.4
-                            }}>
-                                <div style={{
-                                    width: 56, height: 56, background: badge.earned ? bgColor : "#f3f4f6",
-                                    borderRadius: '50%', display: "flex", alignItems: "center", justifyContent: "center",
-                                    margin: "0 auto 12px", fontSize: 24, color: "#fff", boxShadow: badge.earned ? `0 4px 12px ${bgColor}40` : "none"
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", borderTop: "1px solid #f8f9fa", paddingTop: 16 }}>
+                            {gamification?.stats?.slice(0, 3).map((s, idx) => (
+                                <div key={s.label} style={{
+                                    textAlign: "center",
+                                    borderRight: idx < 2 ? "1px solid #f1f3f5" : "none"
                                 }}>
-                                    {getBadgeIcon(badge.key)}
+                                    <div style={{ fontSize: 28, fontWeight: 900, color: "#1c1c1e" }}>{s.value}</div>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af", marginTop: 4, textTransform: "capitalize" }}>{s.label}</div>
                                 </div>
-                                <div style={{ fontSize: 11, fontWeight: 800, color: "#1c1c1e" }}>{badge.title}</div>
-                                {badge.earned && <CheckCircleFilled style={{ color: "#22c55e", fontSize: 14, marginTop: 8 }} />}
-                            </div>
-                        );
-                    })}
+                            ))}
+                        </div>
+                    </div>
+
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", marginBottom: 16 }}>Achievement Badges</div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                        {gamification?.badges?.map((badge, i) => {
+                            const colors = ["#fb923c", "#ef4444", "#0ea5e9", "#22c55e", "#d946ef", "#a855f7"];
+                            const bgColor = colors[i % colors.length];
+
+                            return (
+                                <div key={badge.id} style={{
+                                    background: "#fff", borderRadius: 20, padding: "20px 8px", textAlign: "center",
+                                    boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
+                                    opacity: badge.earned ? 1 : 0.4
+                                }}>
+                                    <div style={{
+                                        width: 56, height: 56, background: badge.earned ? bgColor : "#f3f4f6",
+                                        borderRadius: '50%', display: "flex", alignItems: "center", justifyContent: "center",
+                                        margin: "0 auto 12px", fontSize: 24, color: "#fff", boxShadow: badge.earned ? `0 4px 12px ${bgColor}40` : "none"
+                                    }}>
+                                        {getBadgeIcon(badge.key)}
+                                    </div>
+                                    <div style={{ fontSize: 12, fontWeight: 800, color: badge.earned ? "#1c1c1e" : "#9ca3af" }}>{badge.title}</div>
+                                    {badge.earned && <div style={{ color: "#22c55e", fontSize: 16, fontWeight: 900, marginTop: 4 }}>✓</div>}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         );
@@ -571,17 +613,7 @@ const ProfileModal = ({ open, onClose, user }) => {
                 <div style={{ padding: "0 24px" }}>
                     <GrabHandle />
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, marginTop: 12 }}>
-                        <Title level={4} style={{ margin: 0, fontWeight: 800, color: "#1c1c1e", fontSize: 18 }}>Edit Profile</Title>
-                        <Button
-                            icon={<CloseOutlined style={{ fontSize: 14 }} />}
-                            type="text"
-                            style={{
-                                color: "#6b7280", padding: 0, width: 32, height: 32,
-                                borderRadius: "50%", background: "#f3f4f6",
-                                display: "flex", alignItems: "center", justifyContent: "center"
-                            }}
-                            onClick={() => setView('MAIN')}
-                        />
+                        <Title level={4} style={{ margin: 0, fontWeight: 800, color: "#1c1c1e", fontSize: 17 }}>Edit Profile</Title>
                     </div>
                 </div>
 
@@ -613,7 +645,7 @@ const ProfileModal = ({ open, onClose, user }) => {
                             <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div>
                                     <div style={{ fontSize: 10, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px" }}>EMAIL</div>
-                                    <div style={{ fontSize: 15, fontWeight: 600, color: "#1c1c1e", marginTop: 2 }}>{profile?.email || "alex@example.com"}</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1c1c1e", marginTop: 2 }}>{profile?.email || ""}</div>
                                 </div>
                                 <div style={{ background: "#e5e7eb", padding: "4px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700, color: "#6b7280" }}>Read-only</div>
                             </div>
@@ -626,7 +658,7 @@ const ProfileModal = ({ open, onClose, user }) => {
                             <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div>
                                     <div style={{ fontSize: 10, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px" }}>ACCOUNT</div>
-                                    <div style={{ fontSize: 15, fontWeight: 600, color: "#1c1c1e", marginTop: 2 }}>Member since January 2026</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1c1c1e", marginTop: 2 }}>{profile?.joinDate ? "Member since " + dayjs(profile.joinDate).format('MMMM YYYY') : "—"}</div>
                                 </div>
                                 <div style={{ background: "#e5e7eb", padding: "4px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700, color: "#6b7280" }}>Read-only</div>
                             </div>
@@ -639,7 +671,7 @@ const ProfileModal = ({ open, onClose, user }) => {
                             <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div>
                                     <div style={{ fontSize: 10, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px" }}>DISPLAY NAME</div>
-                                    <div style={{ fontSize: 15, fontWeight: 700, color: "#0096FF", marginTop: 2 }}>{profile?.displayName || profile?.firstName || "Alex"}</div>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0096FF", marginTop: 2 }}>{profile?.preferredName || profile?.firstName || profile?.displayName || "—"}</div>
                                 </div>
                                 <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af" }}>Auto-computed</div>
                             </div>
@@ -652,15 +684,16 @@ const ProfileModal = ({ open, onClose, user }) => {
                         form={form}
                         layout="vertical"
                         initialValues={{
-                            firstName: profile?.firstName || "Alex",
+                            firstName: profile?.firstName || "",
                             middleName: profile?.middleName || "",
-                            lastName: profile?.lastName || "Johnson",
+                            lastName: profile?.lastName || "",
                             preferredName: profile?.preferredName || "",
                             country: profile?.country || "",
                             birthDate: profile?.birthDate ? dayjs(profile.birthDate) : null,
                             gender: profile?.gender || ""
                         }}
                         onFinish={(v) => {
+                            // Sanitisation: Convert "" to null to prevent Backend Enum parsing/coercion errors (Fixed: JSON Parse Error 500)
                             const cleanedValues = Object.fromEntries(
                                 Object.entries(v).map(([key, val]) => [key, val === "" ? null : val])
                             );
@@ -730,7 +763,7 @@ const ProfileModal = ({ open, onClose, user }) => {
                                 <Form.Item name="birthDate" noStyle>
                                     <DatePicker
                                         format="MMMM D, YYYY"
-                                        placeholder="June 20, 1995"
+                                        placeholder="Select date"
                                         style={{ width: "100%", borderRadius: 16, height: 52, background: "#f3f4f6", border: "none", fontSize: 15, fontWeight: 600, color: "#1c1c1e", boxShadow: "none", paddingLeft: 42 }}
                                         suffixIcon={<RightOutlined style={{ color: "#9ca3af", fontSize: 12 }} />}
                                     />
@@ -936,6 +969,16 @@ const ProfileModal = ({ open, onClose, user }) => {
                             onClick={() => setView('MAIN')}
                         />
                         <Title level={4} style={{ margin: 0, fontWeight: 850, color: "#1c1c1e" }}>Preferences</Title>
+                        <Button
+                            icon={<CloseOutlined style={{ fontSize: 14 }} />}
+                            type="text"
+                            style={{
+                                position: "absolute", right: -16, top: 0, color: "#6b7280", padding: 0, width: 32, height: 32,
+                                borderRadius: "50%", background: "#f3f4f6",
+                                display: "flex", alignItems: "center", justifyContent: "center"
+                            }}
+                            onClick={onClose}
+                        />
                     </div>
                 </div>
 
@@ -1173,7 +1216,7 @@ const ProfileModal = ({ open, onClose, user }) => {
     };
 
     return (
-        <Modal open={open} onCancel={onClose} footer={null} width={480} centered closeIcon={true} styles={{ body: { padding: "0", background: "#f8f9fa" } }} style={{ borderRadius: "32px", overflow: "hidden" }}>
+        <Modal open={open} onCancel={onClose} footer={null} width={480} centered closeIcon={false} styles={{ body: { padding: "0", background: "#f8f9fa" } }} style={{ borderRadius: "32px", overflow: "hidden" }}>
             {view === 'MAIN' && <MainView />}
             {view === 'GAMIFICATION' && <GamificationView />}
             {view === 'EDIT_PROFILE' && <EditProfileView />}
