@@ -96,11 +96,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         return;
       }
 
-      // Sync backend session (GET /auth/login) and refresh token in storage.
+      // Force-refresh Firebase ID token and sync backend session (GET /auth/login).
       try {
         await context.read<AuthRepository>().restoreSession();
-      } catch (_) {
-        // Even if backend sync fails, user is verified; allow navigation and let AuthGate handle on next launch.
+      } catch (e) {
+        // If backend session cannot be synced, keep user informed and let AuthGate
+        // handle clean session resolution on next app start.
+        _showSnackBar('Session could not be synchronized. Please try again or restart the app.');
       }
 
       if (mounted) {

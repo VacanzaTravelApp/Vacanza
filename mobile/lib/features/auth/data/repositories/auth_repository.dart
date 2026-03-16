@@ -203,7 +203,9 @@ class AuthRepository {
         throw const AuthFailure('No Firebase session.');
       }
 
-      final firebaseIdToken = await _firebaseService.getIdToken();
+      // Force-refresh token during session restore so we always use
+      // the latest verification state (especially right after email verify).
+      final firebaseIdToken = await _firebaseService.getIdToken(forceRefresh: true);
       await _storage.writeAccessToken(firebaseIdToken);
 
       final auth = await _apiClient.loginSync(firebaseIdToken: firebaseIdToken);
