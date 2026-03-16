@@ -48,6 +48,9 @@ dependencies:
   geolocator: ^14.0.2
   permission_handler: ^11.3.1
 
+  # Camera for light AR Mode (UC1.11)
+  camera: ^0.11.4
+
   # External URL launcher (MOB9)
   url_launcher: ^6.2.0
 

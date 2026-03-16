@@ -30,6 +30,9 @@ class HomeMapScaffold extends StatelessWidget {
   /// Chatbot entry point
   final VoidCallback onOpenChat;
 
+  /// UC1.11 — Explore in AR entry point
+  final VoidCallback onOpenArMode;
+
   /// VACANZA-188: filter panel open
   final VoidCallback onOpenFilters;
 
@@ -55,6 +58,7 @@ class HomeMapScaffold extends StatelessWidget {
     required this.onToggleDrawing,
     required this.onOpenBooking,
     required this.onOpenChat,
+    required this.onOpenArMode,
     required this.onOpenFilters,
     this.isFiltersOpen = false,
     this.filtersPanel,
@@ -152,6 +156,7 @@ class HomeMapScaffold extends StatelessWidget {
                 onOpenBooking: onOpenBooking,
                 onOpenChat: onOpenChat,
                 onOpenFilters: onOpenFilters,
+                onOpenArMode: onOpenArMode,
               ),
             ),
 
