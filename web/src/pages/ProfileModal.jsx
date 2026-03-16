@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
     Modal, Avatar, Typography, Tag, Spin, Progress,
     Form, Input, Select, DatePicker, InputNumber, Button,
-    Row, Col, Divider, message, Empty, Badge as AntBadge
+    Row, Col, Divider, message, Empty, Checkbox, Badge as AntBadge
 } from "antd";
 import {
     TrophyOutlined,
@@ -24,7 +24,13 @@ import {
     HeartOutlined,
     ThunderboltOutlined,
     CompassOutlined,
-    LogoutOutlined
+    LogoutOutlined,
+    CloseOutlined,
+    CameraFilled,
+    SearchOutlined,
+    UpOutlined,
+    DownOutlined,
+    ControlOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
@@ -76,79 +82,117 @@ function formatDate(dateStr) {
     });
 }
 
-function formatDateTime(dateStr) {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-US", {
-        year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
-    });
-}
+// --- Reusable mini components (Mobile-Aligned) ---
 
-// --- Reusable mini components ---
-
-const SectionCard = ({ icon, iconBg, title, subtitle, onClick, extra, children, style = {} }) => (
+const AccountListItem = ({ icon, label, onClick, color = "#1c1c1e", bgColor = "#f3f4f6", isLast }) => (
     <div
-        className={onClick ? "profile-nav-card" : ""}
+        onClick={onClick}
+        style={{
+            display: "flex", alignItems: "center", gap: 14, padding: "12px 0",
+            borderBottom: isLast ? "none" : "1px solid #f8f9fa", cursor: "pointer",
+            transition: "all 0.2s ease"
+        }}
+    >
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: bgColor, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {React.cloneElement(icon, { style: { fontSize: 18, color: color } })}
+        </div>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: color === "#ff3b30" ? "#ff3b30" : "#1c1c1e" }}>{label}</span>
+        <RightOutlined style={{ fontSize: 10, color: "#d1d5db" }} />
+    </div>
+);
+
+const GrabHandle = () => (
+    <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 16px" }}>
+        <div style={{ width: 40, height: 4, background: "#e5e7eb", borderRadius: 2 }} />
+    </div>
+);
+
+const SectionCard = ({ title, subtitle, children, icon, iconBg, onClick }) => (
+    <div
         onClick={onClick}
         style={{
             background: "#fff",
             borderRadius: 24,
             padding: "20px 24px",
             marginBottom: 16,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
-            cursor: onClick ? "pointer" : "default",
-            transition: "all 0.3s ease",
-            ...style
+            boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+            position: "relative",
+            cursor: onClick ? "pointer" : "default"
         }}
     >
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: children ? 20 : 0 }}>
-            <div style={{
-                width: 48, height: 48, borderRadius: 16,
-                background: iconBg,
-                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                boxShadow: "0 4px 10px rgba(0,0,0,0.05)"
-            }}>
-                {icon}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: children ? 16 : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                {icon && (
+                    <div style={{
+                        width: 44, height: 44, borderRadius: 12,
+                        background: iconBg || "#f3f4f6",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.05)"
+                    }}>
+                        {React.cloneElement(icon, { style: { fontSize: 20, color: "#fff" } })}
+                    </div>
+                )}
+                <div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#2c3e50" }}>{title}</div>
+                    {subtitle && <div style={{ fontSize: 12, color: "#8e8e93", fontWeight: 500, marginTop: 2 }}>{subtitle}</div>}
+                </div>
             </div>
-            <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#1c1c1e", lineHeight: 1.2 }}>{title}</div>
-                {subtitle && <div style={{ fontSize: 13, color: "#8e8e93", fontWeight: 500, marginTop: 2 }}>{subtitle}</div>}
-            </div>
-            {extra && <div onClick={(e) => { e.stopPropagation(); extra.onClick(); }} style={{ fontSize: 14, fontWeight: 700, color: "#007aff", cursor: "pointer" }}>{extra.text}</div>}
-            {onClick && !extra && <RightOutlined style={{ fontSize: 12, color: "#c7c7cc" }} />}
+            {onClick && <RightOutlined style={{ fontSize: 12, color: "#c7c7cc" }} />}
         </div>
         {children}
     </div>
 );
 
-const AccountListItem = ({ icon, iconBg, label, onClick, color = "#1c1c1e", isLast = false, hasChevron = true, background = "#fff" }) => (
-    <div
-        onClick={onClick}
-        style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "16px 0",
-            cursor: "pointer",
-            borderBottom: isLast ? "none" : "1px solid #f2f2f7",
-            background: background,
-            transition: "all 0.2s ease",
-        }}
-        className="profile-list-item"
-    >
-        <div style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            background: iconBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginRight: 16,
-            flexShrink: 0
-        }}>
-            {React.cloneElement(icon, { style: { fontSize: 18, color: color === "#ff3b30" ? "#ff3b30" : "#1c1c1e" } })}
+const ProfileCharacterCard = ({ name, role, level, xp, progress, imageUrl }) => (
+    <div style={{
+        background: "rgba(0, 150, 255, 0.04)",
+        borderRadius: 24,
+        padding: "24px",
+        marginBottom: 24,
+        position: "relative",
+        border: "1px solid rgba(0, 150, 255, 0.05)"
+    }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <div style={{ position: "relative" }}>
+                <div style={{
+                    width: 72, height: 72, padding: 3, borderRadius: "50%",
+                    background: "linear-gradient(135deg, #0cebeb 0%, #20e3b2 50%, #29ffc6 100%)",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.08)"
+                }}>
+                    <div style={{
+                        width: "100%", height: "100%", borderRadius: "50%",
+                        border: "2px solid white", overflow: "hidden", background: "#f3f4f6",
+                        display: "flex", alignItems: "center", justifyContent: "center"
+                    }}>
+                        {imageUrl ? <img src={imageUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UserOutlined style={{ fontSize: 32, color: "#9ca3af" }} />}
+                    </div>
+                </div>
+                <div style={{
+                    position: "absolute", bottom: -2, right: -2,
+                    width: 24, height: 24, borderRadius: "50%",
+                    background: "#ffcc00", color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 10, fontWeight: 900, border: "2px solid white",
+                    boxShadow: "0 4px 8px rgba(0,0,0,0.1)"
+                }}>{level}</div>
+            </div>
+
+            <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 17, fontWeight: 850, color: "#2c3e50" }}>{name}</div>
+                <div style={{
+                    display: "inline-block", padding: "2px 10px", borderRadius: 20,
+                    background: "#fff", border: "1px solid #f1f3f5",
+                    fontSize: 12, color: "#5F7A8F", marginTop: 4, fontWeight: 600
+                }}>
+                    {role || "—"}
+                </div>
+                <div style={{
+                    fontSize: 12, fontWeight: 800, color: "#0096FF", marginTop: 6
+                }}>
+                    Level {level} • {new Intl.NumberFormat().format(xp)} XP
+                </div>
+            </div>
         </div>
-        <span style={{ flex: 1, fontWeight: 700, fontSize: 15, color: color }}>{label}</span>
-        {hasChevron && <RightOutlined style={{ fontSize: 12, color: "#c7c7cc" }} />}
     </div>
 );
 
@@ -172,27 +216,39 @@ const ChipRow = ({ label, items, color = "blue" }) => (
     </div>
 );
 
-const StatBox = ({ value, label, span = 1 }) => (
+const StatBox = ({ value, label }) => (
+    <div style={{ textAlign: "center", flex: 1 }}>
+        <div style={{ fontSize: 18, fontWeight: 900, color: "#1c1c1e" }}>{value}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginTop: 2, letterSpacing: "0.5px" }}>{label}</div>
+    </div>
+);
+
+const CheckinItem = ({ name, category, date }) => (
     <div style={{
-        background: "#f8f9fa", borderRadius: 16, padding: "12px 16px",
-        border: "1px solid #f1f3f5", gridColumn: span > 1 ? `span ${span}` : undefined
+        display: "flex", alignItems: "center", gap: 12, padding: "12px 0",
+        borderBottom: "1px solid #f3f4f6"
     }}>
-        <div style={{ fontSize: 22, fontWeight: 900, color: "#1c1c1e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af" }}>{label}</div>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <EnvironmentOutlined style={{ color: "#0096FF" }} />
+        </div>
+        <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#1c1c1e" }}>{name}</div>
+            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600 }}>{category}</div>
+        </div>
+        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 700 }}>
+            {formatDate(date)}
+        </div>
     </div>
 );
 
 
-// ================= MAIN COMPONENT =================
-
 const ProfileModal = ({ open, onClose, user }) => {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-
-    // View Management
     const [view, setView] = useState('MAIN');
+    const [pickerField, setPickerField] = useState(null);
+    const [preferencesForm] = Form.useForm();
 
-    // Data Sources — all from backend
     const { data: profile, isLoading: profileLoading } = useUserProfile();
     const { data: preferences, isLoading: prefsLoading } = useUserPreferences();
     const { data: stats, isLoading: statsLoading } = useUserStats();
@@ -201,14 +257,15 @@ const ProfileModal = ({ open, onClose, user }) => {
 
     const loading = gamificationLoading || profileLoading || prefsLoading || statsLoading;
 
-    // Reset view when modal closes
     useEffect(() => {
         if (!open) {
             setTimeout(() => setView('MAIN'), 300);
+        } else if (preferences) {
+            // Sync backend data to the central form
+            preferencesForm.setFieldsValue(preferences);
         }
-    }, [open]);
+    }, [open, preferences, preferencesForm]);
 
-    // --- Mutations ---
     const updateProfileMutation = useMutation({
         mutationFn: (values) => userApi.updateProfile(values),
         onSuccess: () => {
@@ -217,8 +274,7 @@ const ProfileModal = ({ open, onClose, user }) => {
             setView('MAIN');
         },
         onError: (err) => {
-            const msg = err?.friendlyMessage || err?.response?.data?.message || "Failed to update profile";
-            message.error(msg);
+            message.error(err?.friendlyMessage || "Failed to update profile");
         }
     });
 
@@ -226,692 +282,979 @@ const ProfileModal = ({ open, onClose, user }) => {
         mutationFn: (values) => userApi.updatePreferences(values),
         onSuccess: () => {
             queryClient.invalidateQueries(["user", "preferences"]);
-            message.success("Preferences updated! 🌍");
+            message.success("Preferences saved! 🌍");
             setView('MAIN');
         },
         onError: (err) => {
-            const msg = err?.friendlyMessage || err?.response?.data?.message || "Failed to update preferences";
-            message.error(msg);
+            message.error(err?.friendlyMessage || "Failed to update preferences");
         }
     });
 
-    // --- Sub Views ---
+    // --- Helpers ---
+    const formatLabel = (val) => {
+        if (!val) return "";
+        if (typeof val !== 'string') return val;
+        if (val.length <= 2) return val.toUpperCase();
+        const lower = val.toLowerCase().replace(/_/g, " ");
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+    };
 
+    const handleOpenPicker = (field) => {
+        setPickerField(field);
+        setView('PICKER');
+    };
+
+    // ================= MAIN VIEW =================
     const MainView = () => (
-        <div style={{ padding: "24px 24px 40px", maxHeight: "85vh", overflowY: "auto" }}>
-            <Title level={2} style={{ marginTop: 0, marginBottom: 24, fontWeight: 850, color: "#1c1c1e", letterSpacing: "-0.5px" }}>
-                Profile
-            </Title>
-
-            {/* ====== 1. HEADER AREA (GET /users/me/profile) ====== */}
-            <div
-                className="profile-header-area"
-                style={{
-                    background: "rgba(224, 247, 250, 0.45)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-                    border: "1px solid rgba(255, 255, 255, 0.6)", borderRadius: 28, padding: "24px",
-                    display: "flex", alignItems: "center", gap: 20, marginBottom: 20,
-                    boxShadow: "0 8px 32px rgba(31, 38, 135, 0.04)"
-                }}
-            >
-                <div style={{ position: "relative" }}>
-                    <div style={{
-                        width: 84, height: 84, borderRadius: "50%", padding: 4,
-                        background: "linear-gradient(135deg, #00acc1 0%, #4caf50 100%)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        boxShadow: "0 4px 12px rgba(0, 172, 193, 0.2)"
-                    }}>
-                        <Avatar size={76} src={profile?.profileImageUrl || user?.photoURL} icon={<UserOutlined />}
-                            style={{ border: "3px solid white", background: "#1890ff" }} />
-                    </div>
-                    <div style={{
-                        position: "absolute", bottom: -2, right: -2, background: "#ffb74d", color: "#fff",
-                        fontWeight: 900, fontSize: 13, borderRadius: "50%", width: 28, height: 28,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        border: "2px solid #fff", boxShadow: "0 4px 8px rgba(0,0,0,0.12)"
-                    }}>
-                        {gamification?.levelText?.replace(/\D/g, '') || "1"}
-                    </div>
-                </div>
-                <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: "#1c1c1e", lineHeight: 1.1 }}>
-                        {profile?.displayName || user?.displayName || "Traveler"}
-                    </div>
-                    <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 600, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-                        <MailOutlined style={{ fontSize: 11 }} /> {profile?.email || user?.email || "—"}
-                    </div>
-                    <div style={{
-                        display: "inline-block", background: "#fff", borderRadius: 12, padding: "4px 12px",
-                        fontSize: 13, fontWeight: 700, color: "#6b7280", marginTop: 8, marginBottom: 4,
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
-                    }}>
-                        {gamification?.roleText || "Explorer"}
-                    </div>
-                    {profile?.joinDate && (
-                        <div style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
-                            <CalendarOutlined style={{ fontSize: 10 }} /> {formatJoinDate(profile.joinDate)}
-                        </div>
-                    )}
+        <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff" }}>
+            <div style={{ padding: "0 24px" }}>
+                <GrabHandle />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, marginTop: 12 }}>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: "#1c1c1e" }}>Profile</div>
+                    <Button
+                        icon={<CloseOutlined style={{ fontSize: 14 }} />}
+                        type="text"
+                        style={{
+                            color: "#6b7280", padding: 0, width: 32, height: 32,
+                            borderRadius: "50%", background: "#f3f4f6",
+                            display: "flex", alignItems: "center", justifyContent: "center"
+                        }}
+                        onClick={onClose}
+                    />
                 </div>
             </div>
 
-            {/* ====== 2. BASIC INFO (GET /users/me/profile) ====== */}
-            <SectionCard
-                icon={<UserOutlined style={{ fontSize: 22, color: "#fff" }} />}
-                iconBg="linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)"
-                title="Basic Info"
-                subtitle="Personal details"
-            >
-                <div style={{ paddingLeft: 60 }}>
-                    <InfoRow label="First name" value={profile?.firstName} />
-                    {profile?.middleName && <InfoRow label="Middle name" value={profile.middleName} />}
-                    <InfoRow label="Last name" value={profile?.lastName} />
-                    {profile?.preferredName && <InfoRow label="Preferred name" value={profile.preferredName} />}
-                    <InfoRow label="Country" value={profile?.country} />
-                    <InfoRow label="Birth date" value={profile?.birthDate ? formatDate(profile.birthDate) : null} />
-                    <InfoRow label="Gender" value={profile?.gender ? profile.gender.charAt(0) + profile.gender.slice(1).toLowerCase().replace(/_/g, ' ') : null} />
-                </div>
-            </SectionCard>
+            <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 40px" }}>
+                <ProfileCharacterCard
+                    name={profile?.preferredName || profile?.firstName || profile?.displayName || "—"}
+                    role={gamification?.roleText || "—"}
+                    level={gamification?.levelText ? parseInt(gamification.levelText.replace(/\D/g, ''), 10) : 1}
+                    xp={gamification?.totalXp || 0}
+                    progress={gamification?.xpProgressPercent || 0}
+                    imageUrl={profile?.profileImageUrl}
+                />
 
-            {/* ====== 3. GAMIFICATION (GET /users/me/gamification) ====== */}
-            <SectionCard
-                icon={<TrophyOutlined style={{ fontSize: 22, color: "#fff" }} />}
-                iconBg="linear-gradient(135deg, #ffcc80 0%, #ff9800 100%)"
-                title="Gamification"
-                subtitle="XP, badges, and challenges"
-                onClick={() => { onClose(); navigate("/gamification"); }}
-            >
-                {/* XP Progress */}
-                <div style={{ padding: "0 4px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <Text style={{ fontSize: 13, fontWeight: 800, color: "#1c1c1e" }}>
-                            {gamification?.roleText || "Explorer"} • {gamification?.levelText || "Level 1"}
-                        </Text>
-                        <Text style={{ fontSize: 13, fontWeight: 800, color: "#ff9800" }}>
-                            {gamification?.totalXp || 0} XP
-                        </Text>
-                    </div>
-                    <Progress
-                        percent={gamification?.xpProgressPercent || 0}
-                        strokeColor={{ '0%': '#ffb74d', '100%': '#ff9800' }}
-                        showInfo={false}
-                        size="small"
-                    />
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-                        <Text style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af" }}>
-                            {gamification?.xpToNextLevel || 0} XP to next level
-                        </Text>
-                        <Text style={{ fontSize: 11, fontWeight: 800, color: "#1c1c1e" }}>
-                            {gamification?.xpProgressPercent || 0}%
-                        </Text>
-                    </div>
-                </div>
+                <SectionCard
+                    title="Gamification"
+                    subtitle="XP, badges, and challenges"
+                    icon={<TrophyOutlined />}
+                    iconBg="#fb923c"
+                    onClick={() => setView('GAMIFICATION')}
+                />
 
-                {/* Stat cards */}
-                {Array.isArray(gamification?.stats) && gamification.stats.length > 0 && (
-                    <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                        {gamification.stats.map((stat, idx) => (
-                            <div key={idx} style={{
-                                flex: 1, background: "#f8f9fa", borderRadius: 14,
-                                padding: "10px 12px", textAlign: "center", border: "1px solid #f1f3f5"
-                            }}>
-                                <div style={{ fontSize: 20, fontWeight: 900, color: "#1c1c1e" }}>
-                                    {stat?.value ?? "—"}
-                                </div>
-                                <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af" }}>
-                                    {stat?.label ?? "—"}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Badge grid (compact) */}
-                {Array.isArray(gamification?.badges) && gamification.badges.length > 0 && (
-                    <div style={{ marginTop: 16 }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#111827", marginBottom: 10 }}>
-                            {gamification?.badgesSectionTitle || "Achievement Badges"}
+                <SectionCard
+                    title="Travel Preferences"
+                    subtitle="Personalize recommendations"
+                    icon={<ControlOutlined />}
+                    iconBg="#0ea5e9"
+                    onClick={() => setView('EDIT_PREFERENCES')}
+                >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 12 }}>
+                        <div style={{ display: "flex" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Travel style</span>
+                            <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>{formatLabel(preferences?.travelStyle) || "—"}</span>
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 8 }}>
-                            {gamification.badges.map((badge) => (
-                                <div key={badge.id} style={{
-                                    background: badge.earned ? "#fffbe6" : "#fafafa",
-                                    borderRadius: 14, padding: "10px 6px", textAlign: "center",
-                                    border: badge.earned ? "1px solid #ffe58f" : "1px solid #f0f0f0",
-                                    opacity: badge.earned ? 1 : 0.45,
-                                    filter: badge.earned ? "none" : "grayscale(1)",
-                                    transition: "all 0.3s ease",
-                                    position: "relative"
-                                }}>
-                                    <div style={{ fontSize: 24, marginBottom: 4 }}>{getBadgeIcon(badge.key)}</div>
-                                    <div style={{ fontSize: 10, fontWeight: 700, color: "#434343", lineHeight: 1.2 }}>
-                                        {badge.title}
+
+                        <div style={{ display: "flex" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0, marginTop: 4 }}>Categories</span>
+                            <div style={{ display: "flex", gap: "8px 6px", flexWrap: "wrap", flex: 1 }}>
+                                {preferences?.favoriteCategories?.length > 0 ? preferences.favoriteCategories.slice(0, 3).map((cat, i) => (
+                                    <div key={i} style={{
+                                        padding: "4px 12px", background: "#e0f2fe", color: "#0ea5e9",
+                                        borderRadius: 14, fontSize: 12, fontWeight: 700
+                                    }}>
+                                        {formatLabel(cat)}
                                     </div>
-                                    {badge.earned && (
-                                        <CheckCircleFilled style={{ position: "absolute", top: 4, right: 4, fontSize: 12, color: "#52c41a" }} />
-                                    )}
-                                    {!badge.earned && (
-                                        <LockOutlined style={{ position: "absolute", top: 4, right: 4, fontSize: 10, color: "#d9d9d9" }} />
-                                    )}
+                                )) : (
+                                    <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>—</span>
+                                )}
+                                {(preferences?.favoriteCategories?.length > 3) && <div style={{
+                                    padding: "4px 12px", background: "#f3f4f6", color: "#6b7280",
+                                    borderRadius: 14, fontSize: 12, fontWeight: 700
+                                }}>+{preferences.favoriteCategories.length - 3}</div>}
+                            </div>
+                        </div>
+
+                        <div style={{ display: "flex" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Daily budget</span>
+                            <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>{preferences?.dailyBudget || "—"} {preferences?.budgetCurrency || 'EUR'}</span>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Dietary</span>
+                            {preferences?.dietaryRestrictions?.length > 0 ? (
+                                <div style={{
+                                    padding: "4px 10px", background: "#fee2e2", color: "#ef4444",
+                                    borderRadius: 12, fontSize: 11, fontWeight: 700
+                                }}>
+                                    {formatLabel(preferences.dietaryRestrictions[0]).charAt(0).toUpperCase() + formatLabel(preferences.dietaryRestrictions[0]).slice(1)}
+                                </div>
+                            ) : <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>—</span>}
+                        </div>
+
+                        <div style={{ display: "flex" }}>
+                            <span style={{ fontSize: 12, color: "#9ca3af", fontWeight: 600, width: 180, flexShrink: 0 }}>Language</span>
+                            <span style={{ fontSize: 14, color: "#1c1c1e", fontWeight: 700 }}>{(preferences?.preferredLanguage || 'EN').toUpperCase()}</span>
+                        </div>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    title="Travel Statistics"
+                    subtitle="Your journey so far"
+                    icon={<BarChartOutlined />}
+                    iconBg="#22c55e"
+                >
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                        <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: "#1c1c1e" }}>{stats?.visitedPoisCount || 0}</div>
+                            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>Total places visited</div>
+                        </div>
+                        <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: "#1c1c1e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{stats?.lastVisitPoiName || "—"}</div>
+                            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>{stats?.lastVisitDate ? dayjs(stats.lastVisitDate).format('MMM D, YYYY') : "—"}</div>
+                        </div>
+                        <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: "#1c1c1e", textTransform: "capitalize" }}>{stats?.favoriteCategory || "—"}</div>
+                            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>Favorite category</div>
+                        </div>
+                        <div style={{ background: "#f8f9fa", borderRadius: 20, padding: 16 }}>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: "#1c1c1e" }}>{stats?.distinctCategoriesCount || 0}</div>
+                            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, marginTop: 2 }}>Categories explored</div>
+                        </div>
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    title="Check-in History"
+                    subtitle="Places you've visited"
+                    icon={<ClockCircleOutlined />}
+                    iconBg="#fb923c"
+                >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                        {checkins?.length > 0 ? (
+                            checkins.slice(0, 3).map((item, idx) => (
+                                <CheckinItem key={item.checkInId || idx} name={item.poiName} category={item.category} date={item.checkedInAt} />
+                            ))
+                        ) : (
+                            <div style={{ textAlign: "center", padding: "16px 0", color: "#9ca3af", fontSize: 14, fontWeight: 600 }}>No check-ins yet</div>
+                        )}
+                    </div>
+                </SectionCard>
+
+                <div style={{ marginTop: 24, padding: "0 4px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px", marginBottom: 12, marginLeft: 16 }}>ACCOUNT</div>
+                    <div style={{ background: "#fff", borderRadius: 24, padding: "8px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
+                        <AccountListItem
+                            icon={<UserOutlined />}
+                            label="Edit Profile"
+                            color="#0096FF"
+                            bgColor="#e0f2fe"
+                            onClick={() => setView('EDIT_PROFILE')}
+                        />
+                        <AccountListItem
+                            icon={<SlidersOutlined />}
+                            label="Edit Preferences"
+                            color="#22c55e"
+                            bgColor="#dcfce7"
+                            onClick={() => setView('EDIT_PREFERENCES')}
+                        />
+                        <AccountListItem
+                            icon={<LogoutOutlined />}
+                            label="Logout"
+                            color="#ff3b30"
+                            bgColor="#fee2e2"
+                            isLast={true}
+                            onClick={() => {
+                                import("../firebase").then(({ auth }) => auth.signOut());
+                                onClose();
+                                navigate("/login");
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ================= GAMIFICATION VIEW =================
+    const GamificationView = () => {
+        const levelNum = gamification?.levelText ? parseInt(gamification.levelText.replace(/\D/g, ''), 10) : 1;
+
+        return (
+            <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#f8f9fa" }}>
+                <div style={{ padding: "0 24px" }}>
+                    <GrabHandle />
+                    <div style={{ display: "flex", alignItems: "center", position: "relative", marginBottom: 32, marginTop: 12 }}>
+                        <Button
+                            icon={<ArrowLeftOutlined />}
+                            type="text"
+                            style={{ position: "absolute", left: -8, fontSize: 18, color: "#1c1c1e" }}
+                            onClick={() => setView('MAIN')}
+                        />
+                        <div style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>
+                                {gamification?.roleText || "Urban Adventurer"}
+                            </div>
+                            <div style={{ fontSize: 18, fontWeight: 850, color: "#1c1c1e" }}>Level {levelNum}</div>
+                        </div>
+                        <Button
+                            icon={<CloseOutlined style={{ fontSize: 14 }} />}
+                            type="text"
+                            style={{
+                                position: "absolute", right: -8, color: "#6b7280", padding: 0, width: 32, height: 32,
+                                borderRadius: "50%", background: "#f3f4f6",
+                                display: "flex", alignItems: "center", justifyContent: "center"
+                            }}
+                            onClick={onClose}
+                        />
+                    </div>
+                </div>
+
+                <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 40px" }}>
+                    <div style={{ background: "#fff", borderRadius: 28, padding: "24px 16px 20px", boxShadow: "0 4px 24px rgba(0,0,0,0.04)", textAlign: "center", marginBottom: 24 }}>
+                        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+                            <Progress
+                                type="circle"
+                                percent={gamification?.xpProgressPercent || 0}
+                                size={140}
+                                strokeWidth={8}
+                                strokeColor={{ '0%': '#0cebeb', '100%': '#20e3b2' }}
+                                format={(percent) => (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                        <div style={{ fontSize: 28, fontWeight: 900, color: "#1c1c1e", lineHeight: 1 }}>{percent}%</div>
+                                        <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginTop: 4 }}>to Level {levelNum + 1}</div>
+                                        <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", marginTop: 6 }}>{new Intl.NumberFormat().format(gamification?.totalXp || 0)} XP</div>
+                                    </div>
+                                )}
+                            />
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", borderTop: "1px solid #f8f9fa", paddingTop: 16 }}>
+                            {gamification?.stats?.slice(0, 3).map((s, idx) => (
+                                <div key={s.label} style={{
+                                    textAlign: "center",
+                                    borderRight: idx < 2 ? "1px solid #f1f3f5" : "none"
+                                }}>
+                                    <div style={{ fontSize: 28, fontWeight: 900, color: "#1c1c1e" }}>{s.value}</div>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af", marginTop: 4, textTransform: "capitalize" }}>{s.label}</div>
                                 </div>
                             ))}
                         </div>
                     </div>
-                )}
-            </SectionCard>
 
-            {/* ====== 4. TRAVEL PREFERENCES (GET /users/me/preferences) ====== */}
-            <SectionCard
-                icon={<SlidersOutlined style={{ fontSize: 22, color: "#fff" }} />}
-                iconBg="linear-gradient(135deg, #02abfd 0%, #007aff 100%)"
-                title="Travel Preferences"
-                subtitle="Personalize recommendations"
-            >
-                <div style={{ paddingLeft: 60 }}>
-                    <InfoRow label="Travel style" value={preferences?.travelStyle} />
-                    <ChipRow label="Categories" items={preferences?.favoriteCategories} color="blue" />
-                    <InfoRow label="Activity level" value={preferences?.activityLevel} />
-                    <ChipRow label="Cuisine" items={preferences?.cuisinePreferences} color="cyan" />
-                    <ChipRow label="Dietary" items={preferences?.dietaryRestrictions} color="error" />
-                    <ChipRow label="Accessibility" items={preferences?.accessibilityNeeds} color="purple" />
-                    <InfoRow label="Trip pace" value={preferences?.tripPace} />
-                    <InfoRow label="Accommodation" value={preferences?.accommodationType} />
-                    <InfoRow label="Transport" value={preferences?.transportPreference} />
-                    <InfoRow label="Daily budget" value={
-                        preferences?.dailyBudget
-                            ? `${preferences.dailyBudget} ${preferences.budgetCurrency || "EUR"}`
-                            : null
-                    } />
-                    <InfoRow label="Language" value={preferences?.preferredLanguage} />
-                    <ChipRow label="Spoken" items={preferences?.spokenLanguages} color="green" />
-                </div>
-            </SectionCard>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1c1c1e", marginBottom: 16 }}>Achievement Badges</div>
 
-            {/* ====== 5. TRAVEL STATISTICS (GET /users/me/stats) ====== */}
-            <SectionCard
-                icon={<BarChartOutlined style={{ fontSize: 22, color: "#fff" }} />}
-                iconBg="linear-gradient(135deg, #4ade80 0%, #22c55e 100%)"
-                title="Travel Statistics"
-                subtitle="Your journey so far"
-            >
-                {loading ? (
-                    <div style={{ padding: 20, textAlign: "center" }}><Spin size="small" /></div>
-                ) : stats?.visitedPoisCount > 0 ? (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        <StatBox value={stats?.visitedPoisCount ?? 0} label="Places visited" />
-                        <StatBox value={stats?.distinctCategoriesCount ?? 0} label="Categories explored" />
-                        <StatBox value={stats?.favoriteCategory ?? "—"} label="Favorite category" />
-                        <StatBox
-                            value={stats?.lastVisitDate ? formatDate(stats.lastVisitDate) : "—"}
-                            label="Last visit"
-                        />
-                        {stats?.lastVisitPoiName && (
-                            <StatBox value={stats.lastVisitPoiName} label="Latest discovery" span={2} />
-                        )}
-                    </div>
-                ) : (
-                    <Empty
-                        description="No check-ins yet. Start exploring to see your stats!"
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        style={{ padding: "12px 0" }}
-                    />
-                )}
-            </SectionCard>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                        {gamification?.badges?.map((badge, i) => {
+                            const colors = ["#fb923c", "#ef4444", "#0ea5e9", "#22c55e", "#d946ef", "#a855f7"];
+                            const bgColor = colors[i % colors.length];
 
-            {/* ====== 6. CHECK-IN HISTORY (GET /users/me/checkins) ====== */}
-            <SectionCard
-                icon={<ClockCircleOutlined style={{ fontSize: 24, color: "#fff" }} />}
-                iconBg="linear-gradient(135deg, #ffb347 0%, #ffcc33 100%)"
-                title="Check-in History"
-                subtitle="Places you've visited"
-                extra={{ text: "See all", onClick: () => { } }} // Action for later if needed
-            >
-                {checkinsLoading ? (
-                    <div style={{ padding: 20, textAlign: "center" }}><Spin size="small" /></div>
-                ) : Array.isArray(checkins) && checkins.length > 0 ? (
-                    <div style={{ padding: "0" }}>
-                        {checkins.slice(0, 3).map((ci, idx) => ( // Show only last 3 for compactness as in screenshot
-                            <div key={ci.checkInId || idx} style={{
-                                display: "flex", alignItems: "center", gap: 14, padding: "12px 0",
-                                borderBottom: idx < Math.min(checkins.length, 3) - 1 ? "1px solid #f2f2f7" : "none",
-                                cursor: "pointer"
-                            }}>
-                                <div style={{
-                                    width: 40, height: 40, borderRadius: "50%",
-                                    background: "rgba(255, 179, 71, 0.1)",
-                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+                            return (
+                                <div key={badge.id} style={{
+                                    background: "#fff", borderRadius: 20, padding: "20px 8px", textAlign: "center",
+                                    boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
+                                    opacity: badge.earned ? 1 : 0.4
                                 }}>
-                                    <EnvironmentOutlined style={{ fontSize: 18, color: "#ffb347" }} />
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{
-                                        fontSize: 15, fontWeight: 800, color: "#1c1c1e",
-                                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                                        lineHeight: 1.2, marginBottom: 4
+                                        width: 56, height: 56, background: badge.earned ? bgColor : "#f3f4f6",
+                                        borderRadius: '50%', display: "flex", alignItems: "center", justifyContent: "center",
+                                        margin: "0 auto 12px", fontSize: 24, color: "#fff", boxShadow: badge.earned ? `0 4px 12px ${bgColor}40` : "none"
                                     }}>
-                                        {ci.poiName}
+                                        {getBadgeIcon(badge.key)}
                                     </div>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                        <Tag bordered={false} icon={<GlobalOutlined style={{ fontSize: 10 }} />} style={{
-                                            margin: 0, borderRadius: 6, fontSize: 11,
-                                            fontWeight: 700, textTransform: "capitalize",
-                                            background: "#f2f2f7", color: "#8e8e93", padding: "1px 6px"
-                                        }}>
-                                            {ci.category}
-                                        </Tag>
-                                        <span style={{ fontSize: 12, color: "#8e8e93", fontWeight: 500 }}>
-                                            {formatDate(ci.checkedInAt)}
-                                        </span>
-                                    </div>
+                                    <div style={{ fontSize: 12, fontWeight: 800, color: badge.earned ? "#1c1c1e" : "#9ca3af" }}>{badge.title}</div>
+                                    {badge.earned && <div style={{ color: "#22c55e", fontSize: 16, fontWeight: 900, marginTop: 4 }}>✓</div>}
                                 </div>
-                                <RightOutlined style={{ fontSize: 12, color: "#c7c7cc" }} />
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
-                ) : (
-                    <Empty
-                        description="No check-ins yet. Visit places to build your history!"
-                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        style={{ padding: "12px 0" }}
-                    />
-                )}
-            </SectionCard>
-
-            {/* ====== 7. ACCOUNT ACTIONS (LIST STYLE) ====== */}
-            <div style={{
-                background: "#fff",
-                borderRadius: 24,
-                padding: "16px 20px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.02)",
-                marginBottom: 20
-            }}>
-                <div style={{
-                    fontSize: 12, fontWeight: 800, color: "#8e8e93",
-                    letterSpacing: "0.5px", marginBottom: 8, paddingLeft: 4
-                }}>ACCOUNT</div>
-
-                <AccountListItem
-                    icon={<UserOutlined />}
-                    iconBg="#eef4ff"
-                    label="Edit Profile"
-                    onClick={() => setView('EDIT_PROFILE')}
-                />
-                <AccountListItem
-                    icon={<SlidersOutlined />}
-                    iconBg="#f0fdf4"
-                    label="Edit Preferences"
-                    onClick={() => setView('EDIT_PREFERENCES')}
-                />
-                <AccountListItem
-                    icon={<LogoutOutlined style={{ color: "#ff3b30" }} />}
-                    iconBg="rgba(255, 59, 48, 0.05)"
-                    label="Logout"
-                    color="#ff3b30"
-                    isLast={true}
-                    background="rgba(255, 59, 48, 0.03)"
-                    onClick={() => {
-                        import("../firebase").then(({ auth }) => auth.signOut());
-                        onClose();
-                        navigate("/login");
-                    }}
-                />
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     // ================= EDIT PROFILE VIEW =================
-    const EditProfileView = () => (
-        <div style={{ padding: "24px 24px 40px", maxHeight: "85vh", overflowY: "auto" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-                <Button icon={<ArrowLeftOutlined />} shape="circle" onClick={() => setView('MAIN')} />
-                <Title level={3} style={{ margin: 0, fontWeight: 800 }}>Edit Profile</Title>
-            </div>
+    const EditProfileView = () => {
+        const [form] = Form.useForm();
 
-            <Form
-                layout="vertical"
-                initialValues={{
-                    ...profile,
-                    birthDate: profile?.birthDate ? dayjs(profile.birthDate) : null
-                }}
-                onFinish={(v) => updateProfileMutation.mutate({
-                    ...v,
-                    birthDate: v.birthDate ? v.birthDate.format('YYYY-MM-DD') : null
+        const GenderSelector = ({ value, onChange }) => {
+            const options = [
+                { label: "Male", value: "MALE" },
+                { label: "Female", value: "FEMALE" },
+                { label: "Other", value: "OTHER" },
+                { label: "Prefer not to say", value: "PREFER_NOT_TO_SAY" }
+            ];
+            return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    {options.map(opt => {
+                        const isSelected = value === opt.value;
+                        return (
+                            <div
+                                key={opt.value}
+                                onClick={() => onChange(opt.value)}
+                                style={{
+                                    height: 48, borderRadius: 12, display: "flex", alignItems: "center", padding: "0 16px",
+                                    fontSize: 15, fontWeight: 600, cursor: "pointer", transition: "all 0.2s ease",
+                                    background: isSelected ? "#0096FF" : "#f3f4f6",
+                                    color: isSelected ? "#fff" : "#4b5563"
+                                }}
+                            >
+                                {opt.label}
+                            </div>
+                        )
+                    })}
+                </div>
+            );
+        };
+
+        return (
+            <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "32px 32px 0 0" }}>
+                <div style={{ padding: "0 24px" }}>
+                    <GrabHandle />
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, marginTop: 12 }}>
+                        <Title level={4} style={{ margin: 0, fontWeight: 800, color: "#1c1c1e", fontSize: 17 }}>Edit Profile</Title>
+                    </div>
+                </div>
+
+                <div style={{ flex: 1, padding: "0 24px 24px", overflowY: "auto" }}>
+                    {/* Avatar Area */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
+                        <div style={{ position: "relative" }}>
+                            <Avatar
+                                size={86}
+                                src={profile?.profileImageUrl}
+                                icon={!profile?.profileImageUrl && <UserOutlined />}
+                                style={{ border: "2px solid #e5e7eb", background: "#f3f4f6", color: "#9ca3af" }}
+                            />
+                            <div style={{
+                                position: "absolute", bottom: -2, right: -2, width: 32, height: 32,
+                                background: "#0096FF", borderRadius: "50%", border: "3px solid #fff",
+                                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"
+                            }}>
+                                <CameraFilled style={{ color: "#fff", fontSize: 14 }} />
+                            </div>
+                        </div>
+                        <div style={{ marginTop: 12, fontSize: 13, color: "#9ca3af", fontWeight: 600 }}>Tap camera to change photo</div>
+                    </div>
+
+                    {/* Read-only Info Card */}
+                    <div style={{ background: "#f8f9fa", borderRadius: 20, padding: "16px", marginBottom: 28 }}>
+                        <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                            <MailOutlined style={{ color: "#9ca3af", fontSize: 16, marginTop: 8 }} />
+                            <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                    <div style={{ fontSize: 10, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px" }}>EMAIL</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1c1c1e", marginTop: 2 }}>{profile?.email || ""}</div>
+                                </div>
+                                <div style={{ background: "#e5e7eb", padding: "4px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700, color: "#6b7280" }}>Read-only</div>
+                            </div>
+                        </div>
+
+                        <Divider style={{ margin: "0 0 16px 28px", borderColor: "#f3f4f6" }} />
+
+                        <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                            <CalendarOutlined style={{ color: "#9ca3af", fontSize: 16, marginTop: 8 }} />
+                            <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                    <div style={{ fontSize: 10, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px" }}>ACCOUNT</div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1c1c1e", marginTop: 2 }}>{profile?.joinDate ? "Member since " + dayjs(profile.joinDate).format('MMMM YYYY') : "—"}</div>
+                                </div>
+                                <div style={{ background: "#e5e7eb", padding: "4px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700, color: "#6b7280" }}>Read-only</div>
+                            </div>
+                        </div>
+
+                        <Divider style={{ margin: "0 0 16px 28px", borderColor: "#f3f4f6" }} />
+
+                        <div style={{ display: "flex", gap: 12 }}>
+                            <UserOutlined style={{ color: "#0096FF", fontSize: 16, marginTop: 8 }} />
+                            <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div>
+                                    <div style={{ fontSize: 10, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px" }}>DISPLAY NAME</div>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: "#0096FF", marginTop: 2 }}>{profile?.preferredName || profile?.firstName || profile?.displayName || "—"}</div>
+                                </div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af" }}>Auto-computed</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px", marginBottom: 16 }}>PERSONAL INFO</div>
+
+                    <Form
+                        form={form}
+                        layout="vertical"
+                        initialValues={{
+                            firstName: profile?.firstName || "",
+                            middleName: profile?.middleName || "",
+                            lastName: profile?.lastName || "",
+                            preferredName: profile?.preferredName || "",
+                            country: profile?.country || "",
+                            birthDate: profile?.birthDate ? dayjs(profile.birthDate) : null,
+                            gender: profile?.gender || ""
+                        }}
+                        onFinish={(v) => {
+                            // Sanitisation: Convert "" to null to prevent Backend Enum parsing/coercion errors (Fixed: JSON Parse Error 500)
+                            const cleanedValues = Object.fromEntries(
+                                Object.entries(v).map(([key, val]) => [key, val === "" ? null : val])
+                            );
+                            updateProfileMutation.mutate({
+                                ...cleanedValues,
+                                birthDate: v.birthDate ? v.birthDate.format('YYYY-MM-DD') : null
+                            });
+                        }}
+                        requiredMark={false}
+                    >
+                        <Form.Item
+                            label={<span style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>First name <span style={{ color: "#ef4444" }}>*</span></span>}
+                            name="firstName"
+                            rules={[{ required: true }]}
+                            style={{ marginBottom: 20 }}
+                        >
+                            <Input placeholder="First name" style={{ borderRadius: 16, height: 52, background: "#f3f4f6", border: "none", fontSize: 15, fontWeight: 600, color: "#1c1c1e", boxShadow: "none" }} />
+                        </Form.Item>
+
+                        <Form.Item
+                            label={<span style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>Middle name <span style={{ color: "#9ca3af", fontWeight: 500 }}>(optional)</span></span>}
+                            name="middleName"
+                            style={{ marginBottom: 20 }}
+                        >
+                            <Input placeholder="Middle name" style={{ borderRadius: 16, height: 52, background: "#f3f4f6", border: "none", fontSize: 15, fontWeight: 600, color: "#1c1c1e", boxShadow: "none" }} />
+                        </Form.Item>
+
+                        <Form.Item
+                            label={<span style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>Last name <span style={{ color: "#ef4444" }}>*</span></span>}
+                            name="lastName"
+                            rules={[{ required: true }]}
+                            style={{ marginBottom: 20 }}
+                        >
+                            <Input placeholder="Last name" style={{ borderRadius: 16, height: 52, background: "#f3f4f6", border: "none", fontSize: 15, fontWeight: 600, color: "#1c1c1e", boxShadow: "none" }} />
+                        </Form.Item>
+
+                        <Form.Item
+                            label={<span style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>Preferred name</span>}
+                            name="preferredName"
+                            style={{ marginBottom: 4 }}
+                        >
+                            <Input style={{ borderRadius: 16, height: 52, background: "#f3f4f6", border: "none", fontSize: 15, fontWeight: 600, color: "#1c1c1e", boxShadow: "none" }} />
+                        </Form.Item>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af", marginBottom: 24, paddingLeft: 4 }}>Overrides your display name across the app</div>
+
+                        <Divider style={{ margin: "24px 0 16px 0", borderColor: "#f3f4f6" }} />
+
+                        <div style={{ fontSize: 11, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px", marginBottom: 16 }}>ADDITIONAL INFO</div>
+
+                        <Form.Item
+                            label={<span style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>Country</span>}
+                            name="country"
+                            style={{ marginBottom: 20 }}
+                        >
+                            <Input
+                                prefix={<GlobalOutlined style={{ color: "#9ca3af", marginRight: 8, fontSize: 16 }} />}
+                                suffix={<RightOutlined style={{ color: "#9ca3af", fontSize: 12 }} />}
+                                placeholder="United States"
+                                style={{ borderRadius: 16, height: 52, background: "#f3f4f6", border: "none", fontSize: 15, fontWeight: 600, color: "#1c1c1e", boxShadow: "none" }}
+                            />
+                        </Form.Item>
+
+                        <div style={{ marginBottom: 20 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 8 }}>Date of birth</div>
+                            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                                <CalendarOutlined style={{ position: "absolute", left: 16, zIndex: 1, color: "#9ca3af", fontSize: 16 }} />
+                                <Form.Item name="birthDate" noStyle>
+                                    <DatePicker
+                                        format="MMMM D, YYYY"
+                                        placeholder="Select date"
+                                        style={{ width: "100%", borderRadius: 16, height: 52, background: "#f3f4f6", border: "none", fontSize: 15, fontWeight: 600, color: "#1c1c1e", boxShadow: "none", paddingLeft: 42 }}
+                                        suffixIcon={<RightOutlined style={{ color: "#9ca3af", fontSize: 12 }} />}
+                                    />
+                                </Form.Item>
+                            </div>
+                        </div>
+
+                        <Form.Item
+                            label={<span style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>Gender</span>}
+                            name="gender"
+                            style={{ marginBottom: 0 }}
+                        >
+                            <GenderSelector />
+                        </Form.Item>
+                    </Form>
+                </div>
+
+                <div style={{ padding: "16px 24px 40px", display: "flex", gap: 12 }}>
+                    <Button
+                        size="large"
+                        onClick={() => setView('MAIN')}
+                        style={{ flex: 1, height: 52, borderRadius: 16, fontWeight: 800, color: "#4b5563", background: "#f3f4f6", border: "none" }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="primary"
+                        size="large"
+                        loading={updateProfileMutation.isPending}
+                        onClick={() => form.submit()}
+                        style={{ flex: 1, height: 52, borderRadius: 16, fontWeight: 800, background: "#0096FF", border: "none" }}
+                    >
+                        Save
+                    </Button>
+                </div>
+            </div>
+        );
+    };
+
+    // ================= EDIT PREFERENCES VIEW (MOBILE REPLICA) =================
+    const EditPreferencesView = ({ onOpenPicker }) => {
+        const [showAdvanced, setShowAdvanced] = useState(false);
+        const [showMoreTravel, setShowMoreTravel] = useState(false);
+        const [showMoreAccommodation, setShowMoreAccommodation] = useState(false);
+        const [showMoreTransport, setShowMoreTransport] = useState(false);
+
+        // Sync with central form state
+        const watchCategories = Form.useWatch('favoriteCategories', preferencesForm) || [];
+        const watchCuisines = Form.useWatch('cuisinePreferences', preferencesForm) || [];
+        const watchDietary = Form.useWatch('dietaryRestrictions', preferencesForm) || [];
+        const watchAccessibility = Form.useWatch('accessibilityNeeds', preferencesForm) || [];
+        const watchLanguage = Form.useWatch('preferredLanguage', preferencesForm);
+        const watchTripPace = Form.useWatch('tripPace', preferencesForm);
+        const watchActivityLevel = Form.useWatch('activityLevel', preferencesForm);
+        const watchAccommodationType = Form.useWatch('accommodationType', preferencesForm);
+        const watchTravelStyle = Form.useWatch('travelStyle', preferencesForm);
+        const watchSpokenLanguages = Form.useWatch('spokenLanguages', preferencesForm) || [];
+        const watchTransportPreference = Form.useWatch('transportPreference', preferencesForm);
+
+        // Options
+        const optionTripPace = ["SLOW", "MODERATE", "FAST"];
+        const optionAccommodationType = ["HOTEL", "HOSTEL", "APARTMENT", "RESORT", "BOUTIQUE", "ANY"];
+        const optionTransportPreference = ["WALKING", "PUBLIC_TRANSPORT", "CAR_RENTAL", "TAXI", "ANY"];
+        const optionTravelStyle = ["RELAXATION", "ADVENTURE", "LUXURY", "BACKPACKER", "CULTURAL", "NIGHTLIFE", "FAMILY", "ROMANTIC"];
+        const optionLanguages = ["en", "tr", "de", "fr", "es", "it", "pt", "ar", "zh", "ja", "ko", "ru"];
+
+        const accentBlue = "#0096FF";
+        const accentOrange = "#F4A261";
+        const accentRed = "#FF6B6B";
+        const accentPurple = "#9C27B0";
+        const accentGreen = "#2ECC71";
+
+        const FieldLabel = ({ text, subtext, color = "#9ca3af" }) => (
+            <div style={{ marginBottom: 12, marginTop: 20 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: color, letterSpacing: "1px" }}>{text.toUpperCase()}</div>
+                {subtext && <div style={{ fontSize: 11, color: "#60a5fa", marginTop: 4, display: "flex", alignItems: "center", gap: 4, fontWeight: 600 }}>
+                    <ThunderboltOutlined style={{ fontSize: 10 }} /> {subtext}
+                </div>}
+            </div>
+        );
+
+        const MultiSelectRow = ({ label, values, color, onClick }) => {
+            const summary = !values || values.length === 0
+                ? "None selected" : values.length <= 2
+                    ? values.map(v => formatLabel(v)).join(", ")
+                    : `${values.slice(0, 2).map(v => formatLabel(v)).join(", ")} +${values.length - 2}`;
+
+            return (
+                <div
+                    onClick={onClick}
+                    style={{
+                        background: "#f3f4f6", borderRadius: 16, padding: "14px 16px",
+                        display: "flex", alignItems: "center", cursor: "pointer",
+                        transition: "all 0.2s ease", border: "none",
+                        marginBottom: 10
+                    }}
+                >
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 700 }}>{label}</div>
+                        <div style={{
+                            fontSize: 13, fontWeight: 800, marginTop: 4,
+                            color: (!values || values.length === 0) ? "#d1d5db" : color
+                        }}>
+                            {summary}
+                        </div>
+                    </div>
+                    <RightOutlined style={{ fontSize: 12, color: "#d1d5db" }} />
+                </div>
+            );
+        };
+
+        const ChipSelector = ({ options, value, onChange, color = "#0096FF", isMulti = false, maxVisible = 100, onToggleMore, isExpanded, circle = false }) => {
+            const values = isMulti ? (value || []) : [value];
+            const visibleOptions = isExpanded ? options : options.slice(0, maxVisible);
+            const hasMore = options.length > maxVisible;
+
+            return (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                    {visibleOptions.map(opt => {
+                        const isSelected = isMulti ? values.includes(opt) : value === opt;
+                        return (
+                            <div
+                                key={opt}
+                                onClick={() => onChange(opt)}
+                                style={{
+                                    padding: circle ? "0" : "8px 16px",
+                                    width: circle ? 38 : "auto",
+                                    height: circle ? 38 : "auto",
+                                    borderRadius: circle ? "50%" : 12,
+                                    fontSize: 13, fontWeight: 700,
+                                    cursor: "pointer", transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                                    background: isSelected ? color : "#f3f4f6",
+                                    color: isSelected ? "#fff" : "#6b7280",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    border: isSelected ? `1px solid ${color}` : "1px solid transparent",
+                                }}
+                            >
+                                {formatLabel(opt)}
+                            </div>
+                        );
+                    })}
+                    {isMulti && values.length > 3 && !circle && (
+                        <div style={{ padding: "8px 16px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "#f3f4f6", color: "#6b7280" }}>
+                            +{values.length - 3}
+                        </div>
+                    )}
+                    {hasMore && !isExpanded && (
+                        <div
+                            onClick={onToggleMore}
+                            style={{ padding: "8px 16px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "#f3f4f6", color: color, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                        >
+                            More... <DownOutlined style={{ fontSize: 10 }} />
+                        </div>
+                    )}
+                    {hasMore && isExpanded && (
+                        <div
+                            onClick={onToggleMore}
+                            style={{ padding: "8px 16px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "#f3f4f6", color: color, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                        >
+                            Less <UpOutlined style={{ fontSize: 10 }} />
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const SegmentedControl = ({ options, value, onChange }) => (
+            <div style={{
+                display: "flex", background: "#f3f4f6", borderRadius: 14,
+                padding: 4, gap: 4, marginBottom: 4
+            }}>
+                {options.map(opt => {
+                    const isSelected = value === opt;
+                    return (
+                        <div
+                            key={opt}
+                            onClick={() => onChange(opt)}
+                            style={{
+                                flex: 1, textAlign: "center", padding: "10px 0",
+                                borderRadius: 11, cursor: "pointer", transition: "all 0.2s ease",
+                                background: isSelected ? "#0096FF" : "transparent",
+                                color: isSelected ? "#fff" : "#6b7280",
+                                fontWeight: 700, fontSize: 13,
+                                boxShadow: isSelected ? "0 2px 8px rgba(0,0,0,0.1)" : "none"
+                            }}
+                        >
+                            {formatLabel(opt)}
+                        </div>
+                    );
                 })}
-            >
-                <Row gutter={16}>
-                    <Col xs={24} sm={12}>
-                        <Form.Item label="First Name" name="firstName" rules={[{ required: true }]}>
-                            <Input placeholder="First Name" style={{ borderRadius: 12 }} />
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                        <Form.Item label="Last Name" name="lastName" rules={[{ required: true }]}>
-                            <Input placeholder="Last Name" style={{ borderRadius: 12 }} />
-                        </Form.Item>
-                    </Col>
-                </Row>
-
-                <Form.Item label="Middle Name" name="middleName">
-                    <Input placeholder="Middle Name (optional)" style={{ borderRadius: 12 }} />
-                </Form.Item>
-
-                <Form.Item label="Preferred Name" name="preferredName">
-                    <Input placeholder="Nickname (used as display name)" style={{ borderRadius: 12 }} />
-                </Form.Item>
-
-                <Form.Item label="Country" name="country">
-                    <Input placeholder="e.g. Turkey" style={{ borderRadius: 12 }} />
-                </Form.Item>
-
-                <Row gutter={16}>
-                    <Col span={12}>
-                        <Form.Item label="Birth Date" name="birthDate">
-                            <DatePicker style={{ width: '100%', borderRadius: 12 }} />
-                        </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                        <Form.Item label="Gender" name="gender">
-                            <Select style={{ borderRadius: 12 }} allowClear placeholder="Select">
-                                <Option value="MALE">Male</Option>
-                                <Option value="FEMALE">Female</Option>
-                                <Option value="OTHER">Other</Option>
-                                <Option value="PREFER_NOT_TO_SAY">Prefer not to say</Option>
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                </Row>
-
-                <Form.Item label="Profile Image URL" name="profileImageUrl">
-                    <Input placeholder="https://..." style={{ borderRadius: 12 }} />
-                </Form.Item>
-
-                <Button
-                    type="primary"
-                    htmlType="submit"
-                    block
-                    icon={<SaveOutlined />}
-                    loading={updateProfileMutation.isPending}
-                    style={{
-                        height: 48, borderRadius: 16, marginTop: 12,
-                        background: "linear-gradient(135deg, #02abfd 0%, #007aff 100%)",
-                        border: "none", fontWeight: 700
-                    }}
-                >
-                    Save Changes
-                </Button>
-            </Form>
-        </div>
-    );
-
-    // ================= EDIT PREFERENCES VIEW (ALL FIELDS) =================
-    const EditPreferencesView = () => (
-        <div style={{ padding: "24px 24px 40px", maxHeight: "85vh", overflowY: "auto" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-                <Button icon={<ArrowLeftOutlined />} shape="circle" onClick={() => setView('MAIN')} />
-                <Title level={3} style={{ margin: 0, fontWeight: 800 }}>Travel Preferences</Title>
             </div>
+        );
 
-            <Form
-                layout="vertical"
-                initialValues={preferences}
-                onFinish={(v) => {
-                    // Clean and validate data types for backend DTO (BigDecimal for numbers, List for tags)
-                    const payload = {
-                        travelStyle: v.travelStyle || null,
-                        favoriteCategories: Array.isArray(v.favoriteCategories) ? v.favoriteCategories : [],
-                        activityLevel: v.activityLevel || null,
-                        cuisinePreferences: Array.isArray(v.cuisinePreferences) ? v.cuisinePreferences : [],
-                        preferredClimate: v.preferredClimate || null,
-                        tripPace: v.tripPace || null,
-                        accommodationType: v.accommodationType || null,
-                        transportPreference: v.transportPreference || null,
-                        dietaryRestrictions: Array.isArray(v.dietaryRestrictions) ? v.dietaryRestrictions : [],
-                        accessibilityNeeds: Array.isArray(v.accessibilityNeeds) ? v.accessibilityNeeds : [],
-                        avoidCategories: Array.isArray(v.avoidCategories) ? v.avoidCategories : [],
-                        dailyBudget: (v.dailyBudget !== undefined && v.dailyBudget !== null) ? parseFloat(v.dailyBudget) : null,
-                        budgetCurrency: v.budgetCurrency || null,
-                        splurgeCategories: Array.isArray(v.splurgeCategories) ? v.splurgeCategories : [],
-                        preferredLanguage: v.preferredLanguage || null,
-                        spokenLanguages: Array.isArray(v.spokenLanguages) ? v.spokenLanguages : []
-                    };
-                    updatePrefsMutation.mutate(payload);
-                }}
-            >
-                {/* --- Travel Style & Activity --- */}
-                <Divider orientation="left" style={{ fontSize: 13, fontWeight: 700, color: "#6b7280" }}>
-                    <CompassOutlined /> Travel Style
-                </Divider>
-                <Row gutter={16}>
-                    <Col xs={24} sm={12}>
-                        <Form.Item label="Travel Style" name="travelStyle">
-                            <Select style={{ borderRadius: 12 }} placeholder="Select" allowClear>
-                                <Option value="RELAXATION">Relaxation</Option>
-                                <Option value="ADVENTURE">Adventure</Option>
-                                <Option value="LUXURY">Luxury</Option>
-                                <Option value="BACKPACKER">Backpacker</Option>
-                                <Option value="CULTURAL">Cultural</Option>
-                                <Option value="NIGHTLIFE">Nightlife</Option>
-                                <Option value="FAMILY">Family</Option>
-                                <Option value="ROMANTIC">Romantic</Option>
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                        <Form.Item label="Activity Level" name="activityLevel">
-                            <Select style={{ borderRadius: 12 }} placeholder="Select" allowClear>
-                                <Option value="LOW">Low</Option>
-                                <Option value="MODERATE">Moderate</Option>
-                                <Option value="HIGH">High</Option>
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                </Row>
+        return (
+            <div style={{ height: "85vh", display: "flex", flexDirection: "column", background: "#fff" }}>
+                <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <GrabHandle />
+                    <div style={{ position: "relative", width: "100%", textAlign: "center", marginBottom: 24, marginTop: 12 }}>
+                        <Button
+                            icon={<ArrowLeftOutlined />}
+                            type="text"
+                            style={{ position: "absolute", left: -16, top: 0, fontSize: 18, color: "#9ca3af" }}
+                            onClick={() => setView('MAIN')}
+                        />
+                        <Title level={4} style={{ margin: 0, fontWeight: 850, color: "#1c1c1e" }}>Preferences</Title>
+                        <Button
+                            icon={<CloseOutlined style={{ fontSize: 14 }} />}
+                            type="text"
+                            style={{
+                                position: "absolute", right: -16, top: 0, color: "#6b7280", padding: 0, width: 32, height: 32,
+                                borderRadius: "50%", background: "#f3f4f6",
+                                display: "flex", alignItems: "center", justifyContent: "center"
+                            }}
+                            onClick={onClose}
+                        />
+                    </div>
+                </div>
 
-                <Form.Item label="Favorite Categories" name="favoriteCategories">
-                    <Select
-                        mode="tags"
-                        placeholder="e.g. museum, park, cafe"
-                        style={{ borderRadius: 12 }}
-                        notFoundContent={<div style={{ padding: '8px 12px', color: '#8e8e93', fontSize: 13 }}>Type and press Enter to add</div>}
-                    />
-                </Form.Item>
+                <div style={{ padding: "0 20px 40px", overflowY: "auto", flex: 1 }}>
+                    <Form form={preferencesForm} layout="vertical" onFinish={(v) => updatePrefsMutation.mutate(v)}>
+                        <Form.Item name="favoriteCategories" noStyle><input type="hidden" /></Form.Item>
+                        <Form.Item name="cuisinePreferences" noStyle><input type="hidden" /></Form.Item>
+                        <Form.Item name="dietaryRestrictions" noStyle><input type="hidden" /></Form.Item>
+                        <Form.Item name="accessibilityNeeds" noStyle><input type="hidden" /></Form.Item>
+                        <Form.Item name="spokenLanguages" noStyle><input type="hidden" /></Form.Item>
 
-                <Form.Item label="Cuisine Preferences" name="cuisinePreferences">
-                    <Select
-                        mode="tags"
-                        placeholder="e.g. turkish, italian, japanese"
-                        style={{ borderRadius: 12 }}
-                        notFoundContent={<div style={{ padding: '8px 12px', color: '#8e8e93', fontSize: 13 }}>Type and press Enter to add</div>}
-                    />
-                </Form.Item>
+                        <Form.Item name="travelStyle" noStyle><input type="hidden" /></Form.Item>
+                        <Form.Item name="tripPace" noStyle><input type="hidden" /></Form.Item>
+                        <Form.Item name="accommodationType" noStyle><input type="hidden" /></Form.Item>
+                        <Form.Item name="transportPreference" noStyle><input type="hidden" /></Form.Item>
+                        <Form.Item name="preferredLanguage" noStyle><input type="hidden" /></Form.Item>
+                        <Form.Item name="activityLevel" noStyle><input type="hidden" /></Form.Item>
 
-                {/* --- Trip Preferences --- */}
-                <Divider orientation="left" style={{ fontSize: 13, fontWeight: 700, color: "#6b7280" }}>
-                    <GlobalOutlined /> Trip Preferences
-                </Divider>
-                <Row gutter={16}>
-                    <Col xs={24} sm={12}>
-                        <Form.Item label="Preferred Climate" name="preferredClimate">
-                            <Select style={{ borderRadius: 12 }} placeholder="Select" allowClear>
-                                <Option value="TROPICAL">Tropical</Option>
-                                <Option value="TEMPERATE">Temperate</Option>
-                                <Option value="COLD">Cold</Option>
-                                <Option value="DESERT">Desert</Option>
-                                <Option value="ANY">Any</Option>
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                        <Form.Item label="Trip Pace" name="tripPace">
-                            <Select style={{ borderRadius: 12 }} placeholder="Select" allowClear>
-                                <Option value="SLOW">Slow</Option>
-                                <Option value="MODERATE">Moderate</Option>
-                                <Option value="FAST">Fast</Option>
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                </Row>
+                        <FieldLabel text="Basics" />
 
-                <Row gutter={16}>
-                    <Col xs={24} sm={12}>
-                        <Form.Item label="Accommodation" name="accommodationType">
-                            <Select style={{ borderRadius: 12 }} placeholder="Select" allowClear>
-                                <Option value="HOTEL">Hotel</Option>
-                                <Option value="HOSTEL">Hostel</Option>
-                                <Option value="APARTMENT">Apartment</Option>
-                                <Option value="RESORT">Resort</Option>
-                                <Option value="BOUTIQUE">Boutique</Option>
-                                <Option value="ANY">Any</Option>
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                        <Form.Item label="Transport" name="transportPreference">
-                            <Select style={{ borderRadius: 12 }} placeholder="Select" allowClear>
-                                <Option value="WALKING">Walking</Option>
-                                <Option value="PUBLIC_TRANSPORT">Public Transport</Option>
-                                <Option value="CAR_RENTAL">Car Rental</Option>
-                                <Option value="TAXI">Taxi</Option>
-                                <Option value="ANY">Any</Option>
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                </Row>
+                        <FieldLabel text="Travel Style" color="#9ca3af" />
+                        <ChipSelector
+                            options={optionTravelStyle}
+                            value={watchTravelStyle}
+                            onChange={v => preferencesForm.setFieldsValue({ travelStyle: v })}
+                            color={accentBlue}
+                            maxVisible={5}
+                            isExpanded={showMoreTravel}
+                            onToggleMore={() => setShowMoreTravel(!showMoreTravel)}
+                        />
 
-                {/* --- Budget --- */}
-                <Divider orientation="left" style={{ fontSize: 13, fontWeight: 700, color: "#6b7280" }}>
-                    💰 Budget
-                </Divider>
-                <Row gutter={16}>
-                    <Col xs={24} sm={14}>
-                        <Form.Item label="Daily Budget" name="dailyBudget">
-                            <InputNumber min={0} style={{ width: '100%', borderRadius: 12 }} placeholder="e.g. 150" />
-                        </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={10}>
-                        <Form.Item label="Currency" name="budgetCurrency">
-                            <Select style={{ borderRadius: 12 }} placeholder="Select" allowClear>
-                                <Option value="EUR">EUR</Option>
-                                <Option value="USD">USD</Option>
-                                <Option value="TRY">TRY</Option>
-                                <Option value="GBP">GBP</Option>
-                            </Select>
-                        </Form.Item>
-                    </Col>
-                </Row>
+                        <FieldLabel text="Favorite Categories" color="#9ca3af" />
+                        <ChipSelector options={watchCategories} value={watchCategories} isMulti={true} color={accentBlue} maxVisible={3} />
+                        <MultiSelectRow label="Select categories" values={watchCategories} color={accentBlue} onClick={() => handleOpenPicker('categories')} />
 
-                <Form.Item label="Splurge Categories" name="splurgeCategories">
-                    <Select
-                        mode="tags"
-                        placeholder="Categories you'll spend more on"
-                        style={{ borderRadius: 12 }}
-                        notFoundContent={<div style={{ padding: '8px 12px', color: '#8e8e93', fontSize: 13 }}>Type and press Enter to add</div>}
-                    />
-                </Form.Item>
+                        <FieldLabel text="Daily Budget" />
+                        <Row gutter={8}>
+                            <Col span={17}>
+                                <Form.Item name="dailyBudget" noStyle>
+                                    <InputNumber
+                                        placeholder="150"
+                                        style={{ width: '100%', borderRadius: 16, height: 52, display: 'flex', alignItems: 'center', background: "#f3f4f6", border: "none", fontSize: 16, fontWeight: 700 }}
+                                    />
+                                </Form.Item>
+                            </Col>
+                            <Col span={7}>
+                                <Form.Item name="budgetCurrency" noStyle>
+                                    <Select
+                                        variant="borderless"
+                                        style={{ width: '100%', height: 52, background: "#f3f4f6", borderRadius: 16, fontSize: 14, fontWeight: 700 }}
+                                        options={["EUR", "USD", "GBP", "TRY"].map(c => ({ label: c, value: c }))}
+                                    />
+                                </Form.Item>
+                            </Col>
+                        </Row>
 
-                {/* --- Constraints & Accessibility --- */}
-                <Divider orientation="left" style={{ fontSize: 13, fontWeight: 700, color: "#6b7280" }}>
-                    ⚠️ Constraints & Accessibility
-                </Divider>
+                        <div onClick={() => setShowAdvanced(!showAdvanced)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0", cursor: "pointer" }}>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: "#9ca3af", letterSpacing: "1px" }}>ADVANCED PREFERENCES</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#9ca3af", fontSize: 12, fontWeight: 700 }}>
+                                {showAdvanced ? "Hide" : "Show"} {showAdvanced ? <UpOutlined style={{ fontSize: 10 }} /> : <DownOutlined style={{ fontSize: 10 }} />}
+                            </div>
+                        </div>
 
-                <Form.Item label="Dietary Restrictions / Allergens" name="dietaryRestrictions">
-                    <Select
-                        mode="tags"
-                        placeholder="e.g. gluten, peanuts, vegan"
-                        style={{ borderRadius: 12 }}
-                        notFoundContent={<div style={{ padding: '8px 12px', color: '#8e8e93', fontSize: 13 }}>Type and press Enter to add</div>}
-                    />
-                </Form.Item>
+                        {showAdvanced && (
+                            <div style={{ animation: "fadeIn 0.3s ease" }}>
+                                <FieldLabel text="Activity Level" />
+                                <Form.Item name="activityLevel" noStyle>
+                                    <SegmentedControl options={["LOW", "MODERATE", "HIGH"]} value={watchActivityLevel} onChange={v => preferencesForm.setFieldsValue({ activityLevel: v })} />
+                                </Form.Item>
 
-                <Form.Item label="Accessibility Needs" name="accessibilityNeeds">
-                    <Select
-                        mode="tags"
-                        placeholder="e.g. wheelchair, elevator"
-                        style={{ borderRadius: 12 }}
-                        notFoundContent={<div style={{ padding: '8px 12px', color: '#8e8e93', fontSize: 13 }}>Type and press Enter to add</div>}
-                    />
-                </Form.Item>
+                                <FieldLabel text="Cuisine Preferences" />
+                                <ChipSelector options={watchCuisines} value={watchCuisines} isMulti={true} color={accentOrange} maxVisible={3} />
+                                <MultiSelectRow label="Select cuisines" values={watchCuisines} color={accentOrange} onClick={() => handleOpenPicker('cuisines')} />
 
-                <Form.Item label="Avoid Categories" name="avoidCategories">
-                    <Select
-                        mode="tags"
-                        placeholder="e.g. nightclub"
-                        style={{ borderRadius: 12 }}
-                        notFoundContent={<div style={{ padding: '8px 12px', color: '#8e8e93', fontSize: 13 }}>Type and press Enter to add</div>}
-                    />
-                </Form.Item>
+                                <FieldLabel text="Dietary Restrictions & Allergens" subtext="Used by AI to filter recommendations" />
+                                <ChipSelector options={watchDietary} value={watchDietary} isMulti={true} color={accentRed} maxVisible={3} />
+                                <MultiSelectRow label="Select dietary restrictions" values={watchDietary} color={accentRed} onClick={() => handleOpenPicker('dietary')} />
 
-                {/* --- Language --- */}
-                <Divider orientation="left" style={{ fontSize: 13, fontWeight: 700, color: "#6b7280" }}>
-                    🌐 Language
-                </Divider>
+                                <FieldLabel text="Accessibility Needs" />
+                                <MultiSelectRow label="Select accessibility needs" values={watchAccessibility} color={accentPurple} onClick={() => handleOpenPicker('accessibility')} />
 
-                <Form.Item label="Preferred Language" name="preferredLanguage">
-                    <Input placeholder="e.g. en" style={{ borderRadius: 12 }} />
-                </Form.Item>
+                                <FieldLabel text="Trip Pace" />
+                                <Form.Item name="tripPace" noStyle>
+                                    <SegmentedControl options={optionTripPace} value={watchTripPace} onChange={v => preferencesForm.setFieldsValue({ tripPace: v })} />
+                                </Form.Item>
 
-                <Form.Item label="Spoken Languages" name="spokenLanguages">
-                    <Select
-                        mode="tags"
-                        placeholder="e.g. tr, en, de"
-                        style={{ borderRadius: 12 }}
-                        notFoundContent={<div style={{ padding: '8px 12px', color: '#8e8e93', fontSize: 13 }}>Type and press Enter to add</div>}
-                    />
-                </Form.Item>
+                                <FieldLabel text="Accommodation Type" />
+                                <ChipSelector
+                                    options={optionAccommodationType}
+                                    value={watchAccommodationType}
+                                    onChange={v => preferencesForm.setFieldsValue({ accommodationType: v })}
+                                    color={accentBlue}
+                                    maxVisible={3}
+                                    isExpanded={showMoreAccommodation}
+                                    onToggleMore={() => setShowMoreAccommodation(!showMoreAccommodation)}
+                                />
 
-                <Button
-                    type="primary"
-                    htmlType="submit"
-                    block
-                    icon={<SaveOutlined />}
-                    loading={updatePrefsMutation.isPending}
-                    style={{
-                        height: 48, borderRadius: 16, marginTop: 12,
-                        background: "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)",
-                        border: "none", fontWeight: 700
-                    }}
-                >
-                    Save Preferences
-                </Button>
-            </Form>
-        </div>
-    );
+                                <FieldLabel text="Transport preference" />
+                                <ChipSelector
+                                    options={optionTransportPreference}
+                                    value={watchTransportPreference}
+                                    onChange={v => preferencesForm.setFieldsValue({ transportPreference: v })}
+                                    color={accentBlue}
+                                    maxVisible={3}
+                                    isExpanded={showMoreTransport}
+                                    onToggleMore={() => setShowMoreTransport(!showMoreTransport)}
+                                />
+
+                                <FieldLabel text="Preferred Language" />
+                                <ChipSelector options={optionLanguages} value={watchLanguage} onChange={v => preferencesForm.setFieldsValue({ preferredLanguage: v })} color={accentBlue} circle={true} maxVisible={7} />
+
+                                <FieldLabel text="Spoken Languages" />
+                                <ChipSelector options={watchSpokenLanguages} value={watchSpokenLanguages} isMulti={true} color={accentGreen} maxVisible={3} />
+                                <MultiSelectRow label="Select spoken languages" values={watchSpokenLanguages} color={accentGreen} onClick={() => handleOpenPicker('spokenLanguages')} />
+                            </div>
+                        )}
+                    </Form>
+                </div>
+
+                <div style={{ padding: 20, display: "flex", gap: 12 }}>
+                    <Button block size="large" onClick={() => setView('MAIN')} style={{ height: 52, borderRadius: 16, fontWeight: 800, color: "#4b5563" }}>Cancel</Button>
+                    <Button type="primary" block size="large" onClick={() => preferencesForm.submit()} style={{ height: 52, borderRadius: 16, fontWeight: 800, background: "#0096FF" }}>Save</Button>
+                </div>
+            </div>
+        );
+    };
+
+    const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeColor = "#0096FF" }) => {
+        const [search, setSearch] = useState("");
+        const [selectedValues, setSelectedValues] = useState(() => form.getFieldValue(fieldName) || []);
+
+        const filteredOptions = options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()));
+
+        const toggleSelection = (val) => {
+            const newValues = selectedValues.includes(val)
+                ? selectedValues.filter(v => v !== val)
+                : [...selectedValues, val];
+            setSelectedValues(newValues);
+        };
+
+        const handleDone = () => {
+            form.setFieldsValue({ [fieldName]: selectedValues });
+            onBack();
+        };
+
+        const CustomCheckbox = ({ checked }) => (
+            <div style={{
+                width: 22, height: 22, borderRadius: 6,
+                border: checked ? `none` : "2px solid #e5e7eb",
+                background: checked ? themeColor : "transparent",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.2s ease",
+                flexShrink: 0
+            }}>
+                {checked && (
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13.3333 4L5.99996 11.3333L2.66663 8" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                )}
+            </div>
+        );
+
+        return (
+            <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "32px 32px 0 0" }}>
+                <div style={{ padding: "0 24px" }}>
+                    <GrabHandle />
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, marginTop: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <Button
+                                icon={<ArrowLeftOutlined style={{ fontSize: 16 }} />}
+                                type="text"
+                                style={{
+                                    color: "#6b7280", padding: 0, width: 36, height: 36,
+                                    borderRadius: "50%", background: "#f3f4f6",
+                                    display: "flex", alignItems: "center", justifyContent: "center"
+                                }}
+                                onClick={handleDone}
+                            />
+                            <Title level={4} style={{ margin: 0, fontWeight: 800, color: "#1c1c1e", fontSize: 18 }}>{title}</Title>
+                        </div>
+                        <div style={{ fontSize: 13, color: "#9ca3af", fontWeight: 600 }}>{selectedValues.length} selected</div>
+                    </div>
+                </div>
+
+                <div style={{ padding: "0 24px 16px" }}>
+                    <Input prefix={<SearchOutlined style={{ color: "#9ca3af" }} />} placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ height: 48, borderRadius: 12, border: "none", background: "#f3f4f6", fontSize: 15, fontWeight: 500 }} />
+                </div>
+
+                <div style={{ flex: 1, overflowY: "auto", padding: "0 24px" }}>
+                    {filteredOptions.map(opt => {
+                        const isSelected = selectedValues.includes(opt);
+                        return (
+                            <div
+                                key={opt}
+                                onClick={() => toggleSelection(opt)}
+                                style={{
+                                    padding: "16px 0",
+                                    borderBottom: "1px solid #f8f9fa",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 16,
+                                    cursor: "pointer"
+                                }}
+                            >
+                                <CustomCheckbox checked={isSelected} />
+                                <span style={{
+                                    fontSize: 15,
+                                    fontWeight: 600,
+                                    color: "#1c1c1e",
+                                    transition: "all 0.2s ease"
+                                }}>
+                                    {formatLabel(opt)}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div style={{ padding: "24px 24px 40px" }}>
+                    <Button
+                        type="primary"
+                        block
+                        size="large"
+                        onClick={handleDone}
+                        style={{
+                            height: 52, borderRadius: 16, fontWeight: 800, fontSize: 15,
+                            background: themeColor, border: "none"
+                        }}
+                    >
+                        Done ({selectedValues.length} selected)
+                    </Button>
+                </div>
+            </div>
+        );
+    };
 
     return (
-        <Modal
-            open={open}
-            onCancel={onClose}
-            footer={null}
-            width={480}
-            centered
-            closeIcon={true}
-            styles={{ body: { padding: "0", background: "#f8f9fa" } }}
-            style={{ borderRadius: "32px", overflow: "hidden", maxWidth: "95vw" }}
-        >
+        <Modal open={open} onCancel={onClose} footer={null} width={480} centered closeIcon={false} styles={{ body: { padding: "0", background: "#f8f9fa" } }} style={{ borderRadius: "32px", overflow: "hidden" }}>
             {view === 'MAIN' && <MainView />}
+            {view === 'GAMIFICATION' && <GamificationView />}
             {view === 'EDIT_PROFILE' && <EditProfileView />}
-            {view === 'EDIT_PREFERENCES' && <EditPreferencesView />}
-
-            <style jsx="true">{`
-                .profile-nav-card:hover {
-                    background: #fdfdfd !important;
-                    transform: translateY(-2px);
-                    box-shadow: 0 8px 16px rgba(0,0,0,0.05) !important;
-                    transition: all 0.3s ease;
-                }
-                
-                @media (max-width: 480px) {
-                    .profile-header-area {
-                        flex-direction: column;
-                        text-align: center;
+            {view === 'EDIT_PREFERENCES' && <EditPreferencesView onOpenPicker={handleOpenPicker} />}
+            {view === 'PICKER' && (
+                <FullScreenPickerView
+                    title={
+                        pickerField === 'categories' ? "Favorite Categories" :
+                            pickerField === 'cuisines' ? "Cuisine Preferences" :
+                                pickerField === 'dietary' ? "Dietary Restrictions" :
+                                    pickerField === 'spokenLanguages' ? "Spoken Languages" :
+                                        "Accessibility Needs"
                     }
-                    .profile-header-meta {
-                        justify-content: center;
+                    fieldName={
+                        pickerField === 'categories' ? 'favoriteCategories' :
+                            pickerField === 'cuisines' ? 'cuisinePreferences' :
+                                pickerField === 'dietary' ? 'dietaryRestrictions' :
+                                    pickerField === 'spokenLanguages' ? 'spokenLanguages' :
+                                        'accessibilityNeeds'
                     }
-                    .profile-stat-box {
-                        padding: 10px 8px !important;
+                    themeColor={
+                        pickerField === 'categories' ? "#0096FF" :
+                            pickerField === 'cuisines' ? "#ffa26b" :
+                                pickerField === 'dietary' ? "#ff4d4f" :
+                                    pickerField === 'spokenLanguages' ? "#2ECC71" :
+                                        "#7c3aed"
                     }
-                }
-            `}</style>
+                    options={
+                        pickerField === 'categories' ? ["museum", "park", "cafe", "restaurant", "beach", "market", "gallery", "temple", "nature", "bar", "shopping", "nightclub", "landmark"] :
+                            pickerField === 'cuisines' ? ["turkish", "italian", "french", "japanese", "mexican", "indian", "greek", "thai", "chinese", "american"] :
+                                pickerField === 'dietary' ? ["gluten-free", "lactose-free", "vegan", "vegetarian", "halal", "kosher", "sugar-free", "peanut-free"] :
+                                    pickerField === 'spokenLanguages' ? ["en", "tr", "de", "fr", "es", "it", "pt", "ar", "zh", "ja", "ko", "ru"] :
+                                        ["wheelchair", "elevator", "braille", "audio-guide", "low-sensory"]
+                    }
+                    form={preferencesForm}
+                    onBack={() => setView('EDIT_PREFERENCES')}
+                />
+            )}
         </Modal>
     );
 };
