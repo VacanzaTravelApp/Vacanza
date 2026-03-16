@@ -684,7 +684,9 @@ export default function MapPage() {
   const activeWaypoints = useMemo(() => {
     if (!activeRoute) return [];
     const dayPlan = activeRoute.days?.find((d) => d.day === activeDay);
-    return (dayPlan?.waypoints || []).filter((w) => w.latitude && w.longitude);
+    return (dayPlan?.waypoints || []).filter(
+      (w) => Number.isFinite(w.latitude) && Number.isFinite(w.longitude)
+    );
   }, [activeRoute, activeDay]);
 
   const routeLineGeoJSON = useMemo(() => {
@@ -736,12 +738,31 @@ export default function MapPage() {
     if (activeWaypoints.length === 0) return;
     const map = mapRef.current?.getMap?.();
     if (!map) return;
-    const lngs = activeWaypoints.map((w) => w.longitude);
-    const lats = activeWaypoints.map((w) => w.latitude);
-    map.fitBounds(
-      [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-      { duration: 650, padding: { top: 100, left: 100, right: 100, bottom: 340 } }
-    );
+    try {
+      const lngs = activeWaypoints.map((w) => w.longitude);
+      const lats = activeWaypoints.map((w) => w.latitude);
+      // Safe padding: cap at 50% of container to prevent Mapbox NaN from overflow
+      const container = map.getContainer();
+      const maxV = Math.floor((container?.clientHeight || 600) * 0.25);
+      const maxH = Math.floor((container?.clientWidth || 800) * 0.25);
+      map.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        {
+          duration: 650,
+          padding: {
+            top: Math.min(60, maxV),
+            left: Math.min(60, maxH),
+            right: Math.min(60, maxH),
+            bottom: Math.min(200, maxV),
+          },
+        }
+      );
+    } catch (e) {
+      console.warn("[MapPage] fitBounds failed, flying to first waypoint:", e.message);
+      // Fallback: fly to the first waypoint
+      const wp = activeWaypoints[0];
+      if (wp) map.flyTo({ center: [wp.longitude, wp.latitude], zoom: 13, duration: 650 });
+    }
   }, [activeWaypoints]);
 
   // ✅ Results panel açılınca: polygon panel altında kalmasın diye fitBounds + padding
@@ -996,6 +1017,7 @@ export default function MapPage() {
                 setFilterOpen(true);
               }}
               onWaypointClick={(wp) => {
+                if (!Number.isFinite(wp.longitude) || !Number.isFinite(wp.latitude)) return;
                 mapRef.current?.getMap?.()?.flyTo({
                   center: [wp.longitude, wp.latitude],
                   zoom: 15,

@@ -2,7 +2,7 @@ package com.vacanza.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vacanza.backend.entity.User;
-import com.vacanza.backend.integration.GeoapifyClient;
+import com.vacanza.backend.integration.MapboxGeocodingClient;
 import com.vacanza.backend.integration.ai.AiChatDto;
 import com.vacanza.backend.integration.ai.AiServiceClient;
 import com.vacanza.backend.integration.ai.UserProfileForAi;
@@ -32,7 +32,7 @@ public class ChatProxyController {
         private final UserPreferencesService userPreferencesService;
         private final UserPreferenceAiService userPreferenceAiService;
         private final AiRouteService aiRouteService;
-        private final GeoapifyClient geoapifyClient;
+        private final MapboxGeocodingClient mapboxGeocodingClient;
         private final ObjectMapper objectMapper;
 
         @PostMapping("/conversations")
@@ -108,10 +108,11 @@ public class ChatProxyController {
                         AiChatDto.RouteData routeData) {
                 if (routeData.getDays() == null) return;
 
+                // Geocode ALL waypoints via Mapbox — AI sets lat/lon to null by design.
                 List<AiChatDto.RouteWaypoint> toGeocode = routeData.getDays().stream()
                                 .filter(d -> d.getWaypoints() != null)
                                 .flatMap(d -> d.getWaypoints().stream())
-                                .filter(w -> w.getLatitude() == null || w.getLongitude() == null)
+                                .filter(w -> w.getName() != null && !w.getName().isBlank())
                                 .limit(MAX_GEOCODE_WAYPOINTS)
                                 .toList();
 
@@ -119,9 +120,16 @@ public class ChatProxyController {
                         String dest = routeData.getDestination() != null
                                         ? routeData.getDestination() : "";
 
+                        // Geocode destination first → get city center (proximity bias) + country code
+                        var destResult = mapboxGeocodingClient.geocode(dest).blockOptional();
+                        Double biasLon = destResult.map(MapboxGeocodingClient.GeocodingResult::getLon).orElse(null);
+                        Double biasLat = destResult.map(MapboxGeocodingClient.GeocodingResult::getLat).orElse(null);
+                        String countryCode = destResult.map(MapboxGeocodingClient.GeocodingResult::getCountryCode).orElse(null);
+
+                        // Geocode each waypoint with proximity bias + country filter (max 4 concurrent)
                         Flux.fromIterable(toGeocode)
-                                        .flatMap(wp -> geoapifyClient
-                                                        .geocode(wp.getName() + ", " + dest)
+                                        .flatMap(wp -> mapboxGeocodingClient
+                                                        .geocode(wp.getName() + ", " + dest, biasLon, biasLat, countryCode)
                                                         .doOnNext(result -> {
                                                                 wp.setLatitude(result.getLat());
                                                                 wp.setLongitude(result.getLon());

@@ -312,17 +312,19 @@ When the user asks for a trip plan, vacation plan, itinerary, or route (e.g. "pl
 1. Write a VERY SHORT text summary: MAX 40 words, 2-3 sentences only. Do NOT list places in the text — the JSON contains them. Example: "İstanbul'da 3 günlük plan: tarihi yarımada, müzeler ve Boğaz. Aşağıda günlük program."
 2. On the next line, write exactly: ---ROUTE_JSON---
 3. On the next line, write a single valid JSON object (no markdown, no code block) with this structure:
-{"title":"...","destination":"City, Country","total_days":N,"days":[{"day":1,"title":"Day 1: ...","waypoints":[{"name":"Place Name","description":"Short description","category":"museum","day":1,"order":1,"latitude":41.0086,"longitude":28.9802,"estimated_duration_min":60,"time_slot":"morning"}]}],"notes":"Optional tips"}
+{"title":"...","destination":"City, Country","total_days":N,"days":[{"day":1,"title":"Day 1: ...","waypoints":[{"name":"Place Name","description":"Short description","category":"museum","day":1,"order":1,"latitude":null,"longitude":null,"estimated_duration_min":60,"time_slot":"morning"}]}],"notes":"Optional tips"}
 
 Route generation rules:
 - category must be one of: museum, restaurant, cafe, beach, park, monument, landmark, market, nightlife, hotel, mosque, church, palace, square, bridge, theater, zoo, aquarium, spa, sports
 - time_slot must be one of: morning, afternoon, evening
-- For well-known places, provide accurate latitude/longitude. For lesser-known places, set both to null.
+- ALWAYS set latitude and longitude to null for all waypoints. The app resolves coordinates via geocoding — do NOT guess or provide coordinates.
 - Order waypoints logically: nearby places consecutive, morning→afternoon→evening flow.
 - 3–6 waypoints per day. Do not exceed 6.
 - Use the user's preferred language for title, description, day titles, and notes.
 - Consider user profile (budget, travel_style, activity_level, cuisine preferences) when selecting places.
 - If the user does not specify the number of days, suggest a reasonable duration (2–5 days).
+- Use the OFFICIAL well-known name of each place for geocoding accuracy (e.g. "Topkapi Palace" not "Topkapı Sarayı", "Blue Mosque" not "Sultan Ahmed Camii", "Colosseum" not "Kolezyum"). Prefer the English or internationally recognized name.
+- Include district or neighborhood in the waypoint name for disambiguation (e.g. "Basilica Cistern, Sultanahmet", "Taksim Square, Beyoglu", "Shibuya Crossing, Shibuya").
 - The text summary before ---ROUTE_JSON--- must NOT contain the JSON. Keep them strictly separated.
 - If the user is NOT asking for a route/plan (regular chat), do NOT include ---ROUTE_JSON--- or any JSON. Just reply normally.
 - WARNING: Response has a token limit. Long text = JSON gets cut off = map fails. Always keep text under 40 words, then add ---ROUTE_JSON--- and the full JSON. """

@@ -94,6 +94,15 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
       if (response && response.content) {
         const routeData = response.route_data || response.routeData || null;
         const wasRouteRequest = /plan|rota|gün|tatil|itinerary|day/i.test(textToSend);
+        if (routeData) {
+          const allWps = (routeData.days || []).flatMap(d => d.waypoints || []);
+          console.log("[VacanzaChat] route_data received:", {
+            title: routeData.title,
+            destination: routeData.destination,
+            waypointCount: allWps.length,
+            waypointCoords: allWps.map(w => ({ name: w.name, lat: w.latitude, lon: w.longitude })),
+          });
+        }
         if (!routeData && wasRouteRequest) {
           console.warn("[VacanzaChat] Rota isteği gönderildi ama route_data gelmedi:", response);
         }
