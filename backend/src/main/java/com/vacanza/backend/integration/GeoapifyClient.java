@@ -27,12 +27,36 @@ public class GeoapifyClient {
      * Returns the first result or Mono.empty() if nothing found.
      */
     public Mono<GeocodeResponse.GeocodeResult> geocode(String placeName) {
+        return geocode(placeName, null, null, null);
+    }
+
+    /**
+     * Geocode a place name with optional bias and country filter for better accuracy.
+     * Bias prioritizes results near the given point (e.g. destination city center).
+     * Country filter restricts results to a specific country (ISO 3166-1 alpha-2).
+     *
+     * @param placeName   Address or place to search
+     * @param biasLon     Optional longitude for proximity bias
+     * @param biasLat     Optional latitude for proximity bias
+     * @param countryCode Optional ISO country code (e.g. "tr", "it")
+     */
+    public Mono<GeocodeResponse.GeocodeResult> geocode(String placeName,
+                                                       Double biasLon, Double biasLat,
+                                                       String countryCode) {
         return geocodeWebClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/v1/geocode/search")
-                        .queryParam("text", placeName)
-                        .queryParam("limit", 1)
-                        .build())
+                .uri(uriBuilder -> {
+                    var b = uriBuilder
+                            .path("/v1/geocode/search")
+                            .queryParam("text", placeName)
+                            .queryParam("limit", 5);
+                    if (countryCode != null && !countryCode.isBlank()) {
+                        b.queryParam("filter", "countrycode:" + countryCode.toLowerCase());
+                    }
+                    if (biasLon != null && biasLat != null) {
+                        b.queryParam("bias", "proximity:" + biasLon + "," + biasLat);
+                    }
+                    return b.build();
+                })
                 .retrieve()
                 .bodyToMono(GeocodeResponse.class)
                 .flatMap(resp -> {

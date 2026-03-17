@@ -3,6 +3,20 @@ import { aiApi } from "../../../api/aiApi";
 import { Spin, message } from "antd";
 import "../styles/vacanzaChat.css";
 
+/** Normalize route for map: ensure every waypoint has numeric latitude/longitude (backend may send either key style). */
+function normalizeRouteForMap(route) {
+  if (!route) return null;
+  const days = (route.days || []).map((d) => ({
+    ...d,
+    waypoints: (d.waypoints || []).map((w) => {
+      const lat = Number(w.latitude ?? w.lat ?? NaN);
+      const lon = Number(w.longitude ?? w.lon ?? NaN);
+      return { ...w, latitude: lat, longitude: lon };
+    }),
+  }));
+  return { ...route, days };
+}
+
 export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
@@ -94,6 +108,15 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
       if (response && response.content) {
         const routeData = response.route_data || response.routeData || null;
         const wasRouteRequest = /plan|rota|gün|tatil|itinerary|day/i.test(textToSend);
+        if (routeData) {
+          const allWps = (routeData.days || []).flatMap(d => d.waypoints || []);
+          console.log("[VacanzaChat] route_data received:", {
+            title: routeData.title,
+            destination: routeData.destination,
+            waypointCount: allWps.length,
+            waypointCoords: allWps.map(w => ({ name: w.name, lat: w.latitude, lon: w.longitude })),
+          });
+        }
         if (!routeData && wasRouteRequest) {
           console.warn("[VacanzaChat] Rota isteği gönderildi ama route_data gelmedi:", response);
         }
@@ -164,7 +187,7 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
                     <button
                       className="route-show-btn"
                       onClick={() => {
-                        if (onRouteGenerated) onRouteGenerated(msg.routeData);
+                        if (onRouteGenerated) onRouteGenerated(normalizeRouteForMap(msg.routeData));
                         onClose();
                       }}
                     >

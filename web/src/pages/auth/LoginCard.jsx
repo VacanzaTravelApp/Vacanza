@@ -11,7 +11,7 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/aut
 import { auth } from "../../firebase";
 
 // API
-import { authApi } from "../../api/authApi";
+import { authApi } from "../../api/userApi";
 
 const LoginCard = () => {
   const navigate = useNavigate();
@@ -29,9 +29,12 @@ const LoginCard = () => {
       try {
         await authApi.login();
         console.log("Backend sync successful.");
-        // eslint-disable-next-line no-unused-vars
       } catch (syncError) {
-        console.warn("Backend sync skipped: Server returned HTML, but we are logged in via Firebase.");
+        // If it's a real auth failure (401/403), re-throw to outer catch
+        if (syncError.response?.status === 401 || syncError.response?.status === 403) {
+          throw syncError;
+        }
+        console.warn("Backend sync skipped:", syncError.message);
       }
       navigate("/map");
     } catch (error) {
@@ -58,7 +61,7 @@ const LoginCard = () => {
       } else if (error?.code === "auth/too-many-requests") {
         message.error("Too many failed attempts. Please try again later or reset your password.");
       } else {
-        message.error("Login failed. Please try again.");
+        message.error(error.friendlyMessage || "Login failed. Please try again.");
       }
     } finally {
       setLoading(false);
