@@ -5,7 +5,6 @@ import json
 import logging
 import uuid
 
-import httpx
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.core.config import Settings
@@ -118,14 +117,18 @@ def _extract_json_object(text: str) -> dict | None:
         return None
 
 
-async def _execute_search_pois(settings: Settings, destination: str, categories: list[str]) -> list[dict]:
-    url = settings.backend_internal_url.rstrip("/") + "/internal/poi-search"
-    payload = {"destination": destination, "categories": categories}
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-        return data if isinstance(data, list) else []
+TOOL_RESULT_PREFIX = "__TOOL_RESULT__search_pois__"
+
+
+def _parse_tool_result_pois(user_content: str) -> list[dict] | None:
+    if not user_content or not user_content.startswith(TOOL_RESULT_PREFIX):
+        return None
+    raw = user_content[len(TOOL_RESULT_PREFIX) :].strip()
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, list) else None
+    except Exception:
+        return None
 
 
 def _format_poi_list(pois: list[dict]) -> str:
@@ -459,40 +462,29 @@ Route generation rules:
 
     llm = create_chat_model(settings)
 
-    # Agentic itinerary flow: tool-call (turn1) -> backend POI search -> itinerary build (turn2)
-    if _is_itinerary_request(user_content):
+    # Turn2: backend sends POI list as a tool result marker
+    tool_pois = _parse_tool_result_pois(user_content)
+    if tool_pois is not None:
+        # backend is orchestrating; this message is not user-visible
+        days = 2
+        travel_style = "general"
+        turn2_system = TURN2_SYSTEM.format(
+            poi_list=_format_poi_list(tool_pois),
+            days=days,
+            travel_style=travel_style,
+        )
+        turn2 = await llm.ainvoke([SystemMessage(content=turn2_system), HumanMessage(content="Build itinerary from provided POIs.")])
+        raw_ai_content = str(turn2.content)
+        ai_content, route_data = _parse_route_from_response(raw_ai_content)
+
+    # Turn1: itinerary request => tool-call JSON ONLY (backend will execute tool)
+    elif _is_itinerary_request(user_content):
         turn1 = await llm.ainvoke([SystemMessage(content=TURN1_SYSTEM), HumanMessage(content=user_content)])
-        tool_call = _extract_json_object(str(turn1.content))
+        raw_ai_content = str(turn1.content)
+        ai_content = raw_ai_content.strip()
+        route_data = None
 
-        if tool_call and tool_call.get("tool") == "search_pois":
-            destination = str(tool_call.get("destination") or "").strip()
-            days = int(tool_call.get("days") or 2)
-            travel_style = str(tool_call.get("travel_style") or "general").strip()
-            categories = tool_call.get("categories") or []
-            categories = [str(c) for c in categories if str(c).strip()]
-
-            try:
-                poi_list = await _execute_search_pois(settings, destination, categories)
-            except Exception as e:
-                logger.warning("POI tool execution failed: %s", e)
-                poi_list = []
-
-            turn2_system = TURN2_SYSTEM.format(
-                poi_list=_format_poi_list(poi_list),
-                days=days,
-                travel_style=travel_style,
-            )
-
-            turn2 = await llm.ainvoke([SystemMessage(content=turn2_system), HumanMessage(content=user_content)])
-            raw_ai_content = str(turn2.content)
-            ai_content, route_data = _parse_route_from_response(raw_ai_content)
-        else:
-            # Fall back to existing behavior if tool-call parsing fails
-            response = await llm.ainvoke(llm_messages)
-            raw_ai_content = str(response.content)
-            ai_content, route_data = _parse_route_from_response(raw_ai_content)
     else:
-        # Invoke LLM (regular chat)
         response = await llm.ainvoke(llm_messages)
         raw_ai_content = str(response.content)
         ai_content, route_data = _parse_route_from_response(raw_ai_content)
