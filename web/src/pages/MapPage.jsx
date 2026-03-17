@@ -21,6 +21,7 @@ import { CalendarOutlined } from "@ant-design/icons";
 import VacanzaChat from "../features/ai/components/VacanzaChat";
 import RoutePanel from "../features/ai/components/RoutePanel";
 import ProfileModal from "./ProfileModal";
+import http from "../api/http";
 
 import cafeImg from "../assets/poi/poi_cafe.png";
 import museumImg from "../assets/poi/poi_museum.png";
@@ -327,6 +328,7 @@ export default function MapPage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeRoute, setActiveRoute] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
+  const [routeGeometry, setRouteGeometry] = useState(null);
   // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
   useEffect(() => {
     if (resultsOpen) setFilterOpen(false);
@@ -698,7 +700,17 @@ export default function MapPage() {
   }, [activeRoute, activeDay]);
 
   const routeLineGeoJSON = useMemo(() => {
-    if (activeWaypoints.length < 2) return { type: "FeatureCollection", features: [] };
+    const coords =
+      Array.isArray(routeGeometry) && routeGeometry.length >= 2
+        ? routeGeometry.map((c) => [c.longitude, c.latitude])
+        : activeWaypoints.length >= 2
+          ? activeWaypoints.map((w) => [w.longitude, w.latitude])
+          : null;
+
+    if (!coords || coords.length < 2) {
+      return { type: "FeatureCollection", features: [] };
+    }
+
     return {
       type: "FeatureCollection",
       features: [
@@ -707,19 +719,24 @@ export default function MapPage() {
           properties: {},
           geometry: {
             type: "LineString",
-            coordinates: activeWaypoints.map((w) => [w.longitude, w.latitude]),
+            coordinates: coords,
           },
         },
       ],
     };
-  }, [activeWaypoints]);
+  }, [activeWaypoints, routeGeometry]);
 
   const routeGlowLayer = useMemo(
     () => ({
       id: "route-glow",
       type: "line",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-width": 10, "line-opacity": 0.22, "line-color": "#F97316", "line-blur": 2.2 },
+      paint: {
+        "line-width": 14,
+        "line-opacity": 0.18,
+        "line-color": "#FDBA74",
+        "line-blur": 3.5,
+      },
     }),
     []
   );
@@ -730,16 +747,75 @@ export default function MapPage() {
       type: "line",
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
-        "line-width": 4,
+        "line-width": 5,
         "line-opacity": 0.95,
         "line-gradient": [
           "interpolate", ["linear"], ["line-progress"],
-          0.0, "#F97316", 0.5, "#EF4444", 1.0, "#DC2626",
+          0.0, "#FB923C", 0.5, "#F97316", 1.0, "#EA580C",
         ],
       },
     }),
     []
   );
+
+  // Fetch road-following route geometry from backend (Mapbox Directions)
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchRouteGeometry = async () => {
+      if (activeWaypoints.length < 2) {
+        // No route for single-point days
+        setRouteGeometry(null);
+        return;
+      }
+
+      try {
+        const body = {
+          waypoints: activeWaypoints.map((w) => ({
+            latitude: w.latitude,
+            longitude: w.longitude,
+          })),
+        };
+        const res = await http.post("/routes/directions", body);
+
+        // Debug: see raw Mapbox-based geometry and inputs in browser console
+        // so we can tune routing later if needed.
+        // Not spamming: only logs when a route is actually fetched.
+        // eslint-disable-next-line no-console
+        console.log("[Vacanza][RouteGeometry] request", body, "response", res?.data);
+
+        const coords = res?.data?.coordinates;
+        if (!cancelled) {
+          if (Array.isArray(coords) && coords.length >= 2) {
+            setRouteGeometry(
+              coords
+                .map((c) => ({
+                  latitude: Number(c.latitude),
+                  longitude: Number(c.longitude),
+                }))
+                .filter(
+                  (c) =>
+                    Number.isFinite(c.latitude) && Number.isFinite(c.longitude)
+                )
+            );
+          } else {
+            setRouteGeometry(null);
+          }
+        }
+      } catch (e) {
+        console.warn("[MapPage] Failed to fetch route geometry, falling back to straight lines:", e);
+        if (!cancelled) {
+          setRouteGeometry(null);
+        }
+      }
+    };
+
+    fetchRouteGeometry();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWaypoints]);
 
   // fitBounds when route day changes
   useEffect(() => {
