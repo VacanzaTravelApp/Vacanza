@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     app_port: int = 8000
     debug: bool = False
 
+    # Backend internal tool executor (agentic POI search)
+    backend_internal_url: str = "http://localhost:8080"
+
     @computed_field
     @property
     def database_url_resolved(self) -> str:
