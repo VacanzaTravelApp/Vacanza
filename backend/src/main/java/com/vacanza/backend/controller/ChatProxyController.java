@@ -10,6 +10,7 @@ import com.vacanza.backend.integration.MapboxPoiSearchClient;
 import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.security.CurrentUserProvider;
 import com.vacanza.backend.service.AiRouteService;
+import com.vacanza.backend.service.RouteSummaryMessageService;
 import com.vacanza.backend.service.UserInfoService;
 import com.vacanza.backend.service.UserPreferenceAiService;
 import com.vacanza.backend.service.UserPreferencesService;
@@ -33,6 +34,7 @@ public class ChatProxyController {
         private final UserPreferencesService userPreferencesService;
         private final UserPreferenceAiService userPreferenceAiService;
         private final AiRouteService aiRouteService;
+        private final RouteSummaryMessageService routeSummaryMessageService;
         private final ObjectMapper objectMapper;
         private final MapboxPoiSearchClient mapboxPoiSearchClient;
 
@@ -113,6 +115,12 @@ public class ChatProxyController {
                         if (response != null && response.getRouteData() != null) {
                                 // Route data already contains coordinates (agentic POI search flow).
                                 saveRoute(user, conversationId, response.getRouteData());
+                                // Short contextual message for the user (e.g. "Müzeleri sevdiğini biliyordum...").
+                                String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
+                                        response.getRouteData(), profile);
+                                if (summaryMessage != null) {
+                                        response.setRouteSummaryMessage(summaryMessage);
+                                }
                         }
                 } catch (Exception e) {
                         log.warn("Failed to process route data (non-blocking): {}", e.getMessage());

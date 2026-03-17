@@ -120,10 +120,17 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
         if (!routeData && wasRouteRequest) {
           console.warn("[VacanzaChat] Rota isteği gönderildi ama route_data gelmedi:", response);
         }
+        // When we have a route, show backend-generated summary (e.g. "Müzeleri sevdiğini biliyordum...") instead of raw AI content
+        const routeSummaryMessage = response.route_summary_message ?? response.routeSummaryMessage;
+        const displayText =
+          routeData && routeSummaryMessage
+            ? routeSummaryMessage
+            : response.content;
+
         const aiMsg = {
           id: Date.now() + 1,
           type: "ai",
-          text: response.content,
+          text: displayText,
           routeData,
           noRouteHint: !routeData && wasRouteRequest,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
