@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { Form, Input, Button, message, Modal } from "antd";
-import { LockOutlined, MailOutlined, SendOutlined } from "@ant-design/icons";
+import { LockOutlined, MailOutlined } from "@ant-design/icons";
+import { MdFlightTakeoff } from 'react-icons/md';
 import "./RegisterCard.css";
 import { useNavigate } from "react-router-dom";
 
@@ -95,7 +96,8 @@ const LoginCard = () => {
     <div className="register-card">
       <div className="card-header">
         <span className="vacanza-logo">
-          <SendOutlined className="logo-icon" />
+          <MdFlightTakeoff className="logo-icon" />
+          Vacanza
         </span>
         <h3>Welcome Back to <span style={{ color: '#3da8c8' }}>Vacanza</span></h3>
         <p className="header-subtext">Sign in to continue your journey</p>

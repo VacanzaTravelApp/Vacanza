@@ -33,7 +33,7 @@ export default function BookingSheet({ open, onClose }) {
   }, [state.items, state.sortBy, state.searchParams.budget]);
 
   const handleSearch = async () => {
-    const { destination, origin, dates, checkOutDate, adults, budget, isRoundTrip } = state.searchParams;
+    const { destination, origin, dates, checkOutDate, adults, budget, isRoundTrip, sortBy, travelClass } = state.searchParams;
     const isHotel = state.bookingType === 'hotels';
 
     const errors = {};
@@ -57,13 +57,29 @@ export default function BookingSheet({ open, onClose }) {
       const token = await user.getIdToken();
       const endpoint = isHotel ? `/bookings/accommodations/search` : `/bookings/transportation/search`;
 
+      // SORT MAPPING: Backend SortCriteria enum: PRICE_ASC, PRICE_DESC, RATING_DESC
+      let apiSortBy = 'PRICE_ASC';
+      if (sortBy === 'high') apiSortBy = 'PRICE_DESC';
+      if (sortBy === 'rating') apiSortBy = 'RATING_DESC';
+      // 'duration' is not supported by backend enum, fallback to PRICE_ASC
+
       const payload = isHotel ? {
-        cityCode: destination, checkInDate: dates, checkOutDate: checkOutDate || dates,
-        adults: parseInt(adults) || 1, budget: budget ? parseFloat(budget) : null
+        query: destination,
+        checkInDate: dates,
+        checkOutDate: checkOutDate || dates,
+        adults: parseInt(adults) || 1,
+        budget: budget ? parseFloat(budget) : null,
+        currency: 'USD',
+        sortBy: apiSortBy
       } : {
-        origin, destination, departureDate: dates,
-        returnDate: isRoundTrip ? checkOutDate : null, adults: parseInt(adults) || 1,
-        budget: budget ? parseFloat(budget) : null
+        origin,
+        destination,
+        departureDate: dates,
+        returnDate: isRoundTrip ? checkOutDate : null,
+        adults: parseInt(adults) || 1,
+        budget: budget ? parseFloat(budget) : null,
+        currency: 'USD',
+        sortBy: apiSortBy
       };
 
       const response = await fetch(endpoint, {
@@ -83,7 +99,13 @@ export default function BookingSheet({ open, onClose }) {
 
   if (!open) return null;
 
-  const formatTime = (t) => t?.includes('T') ? t.split('T')[1].substring(0, 5) : t;
+  const formatTime = (t) => {
+    if (!t) return "";
+    if (t.includes(' ')) return t.split(' ')[1];
+    if (t.includes('T')) return t.split('T')[1].substring(0, 5);
+    return t;
+  };
+
   const formatDuration = (d) => d?.replace('PT', '').toLowerCase() || '2h 15m';
 
   const renderError = (field) => {
@@ -93,7 +115,7 @@ export default function BookingSheet({ open, onClose }) {
     return null;
   };
 
-  // ORTAK SORT COMPONENTİ (Tekrardan kurtulmak için)
+  // ORTAK SORT COMPONENTİ
   const SortField = (
     <div className="sort-container-refined">
       <label>Sort by</label>
@@ -104,7 +126,6 @@ export default function BookingSheet({ open, onClose }) {
       >
         <option value="low">Price: Low to High</option>
         <option value="high">Price: High to Low</option>
-        {state.bookingType === 'flights' && <option value="duration">Shortest Duration</option>}
       </select>
     </div>
   );
@@ -133,17 +154,23 @@ export default function BookingSheet({ open, onClose }) {
               <div className="inputs-grid-refined">
                 {state.bookingType === 'flights' && (
                   <div className="input-group-modern">
-                    <label>Origin (IATA)</label>
-                    <input type="text" placeholder="E.g. IST" maxLength="3" value={state.searchParams.origin}
+                    <label>Origin</label>
+                    <input type="text" placeholder="Airport code (e.g. IST, ESB)" maxLength="3" value={state.searchParams.origin}
                       onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { origin: e.target.value.toUpperCase() } })} />
                     {renderError('origin')}
                   </div>
                 )}
 
                 <div className="input-group-modern">
-                  <label>{state.bookingType === 'hotels' ? 'City (IATA)' : 'Destination (IATA)'}</label>
-                  <input type="text" placeholder="E.g. PAR" maxLength="3" value={state.searchParams.destination}
-                    onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { destination: e.target.value.toUpperCase() } })} />
+                  <label>{state.bookingType === 'hotels' ? 'Search location or hotel' : 'Destination'}</label>
+                  <input type="text"
+                    placeholder={state.bookingType === 'hotels' ? "Where are you going? (City or hotel)" : "Airport code (e.g. SAW, CDG)"}
+                    maxLength={state.bookingType === 'hotels' ? undefined : 3}
+                    value={state.searchParams.destination}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      dispatch({ type: "UPDATE_PARAM", payload: { destination: state.bookingType === 'hotels' ? val : val.toUpperCase() } })
+                    }} />
                   {renderError('destination')}
                 </div>
 
@@ -214,20 +241,20 @@ export default function BookingSheet({ open, onClose }) {
                 </div>
               </div>
 
-              {/* ARAMA EKRANI SORT VE BUTON */}
               {SortField}
               <button className="main-search-btn" onClick={handleSearch} disabled={state.loading}>
                 {state.loading ? "Searching..." : `Search ${state.bookingType === 'hotels' ? 'Hotels' : 'Flights'}`}
               </button>
             </div>
+
           ) : (
             <div className="results-container-mock">
               <div className="results-header-mock">
-                <h3 className="found-count-title-mock">
-                  {filteredAndSortedItems.length} {state.bookingType === 'flights' ? 'Flights' : 'Hotels'} Found
+                <h3 className="found-count-title-mock" style={{ textTransform: 'capitalize' }}>
+                  {filteredAndSortedItems.length} {state.bookingType} Found
                 </h3>
                 <p className="route-sub-detail-mock">
-                  {state.bookingType === 'flights' ? `${state.searchParams.origin} • ${state.searchParams.destination}` : state.searchParams.destination} • {state.searchParams.dates}
+                  {state.bookingType === 'flights' ? `${state.searchParams.origin} • ${state.searchParams.destination}` : state.searchParams.destination} • {state.searchParams.dates}{state.searchParams.checkOutDate ? ` – ${state.searchParams.checkOutDate}` : ""}
                 </p>
               </div>
 
@@ -235,7 +262,7 @@ export default function BookingSheet({ open, onClose }) {
                 {filteredAndSortedItems.map((item, idx) => {
                   const isHotel = state.bookingType === 'hotels';
                   if (isHotel) {
-                    const thumbUrl = item.photo || `https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=200&h=200`;
+                    const thumbUrl = item.imageUrl || `https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=200&h=200`;
                     return (
                       <div key={idx} className="premium-result-card">
                         <div className="result-card-main">
@@ -254,8 +281,9 @@ export default function BookingSheet({ open, onClose }) {
                           <div className="result-info-center">
                             <h4 className="result-title">{item.hotelName}</h4>
                             <div className="result-meta-row">
+                              {item.hotelClass && <span style={{ color: '#f59e0b', fontSize: 12, marginRight: 4 }}>{'★'.repeat(item.hotelClass)}</span>}
                               {item.rating && <><span className="result-rating">★ {item.rating}</span><span className="meta-dot">•</span></>}
-                              <span className="result-dist">{item.distance ? `${item.distance} km` : state.searchParams.destination}</span>
+                              <span className="result-dist">{item.totalReviews ? `${item.totalReviews} reviews` : item.providerName || "Google Hotels"}</span>
                             </div>
                             <div className="result-price-row">
                               <span className="price-val">${item.pricePerNight || item.price}</span>
@@ -270,20 +298,23 @@ export default function BookingSheet({ open, onClose }) {
                     );
                   }
 
-                  // FLIGHTS: Geleneksel Zaman Çizelgesi UI'ına geri dönüş
                   return (
                     <div key={idx} className="hotel-detail-card">
                       <div className="card-top-row">
-                        <span className="carrier-tag">✈️ {item.carrier || 'AIRLINE'}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {item.airlineLogo && <img src={item.airlineLogo} alt="" style={{ width: 24, height: 24, borderRadius: 4 }} />}
+                          <span className="carrier-tag">{item.carrier} {item.flightNumber && `(${item.flightNumber})`}</span>
+                        </div>
                         <span className="price-tag-blue">${item.price}</span>
                       </div>
+                      <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, padding: '0 4px 8px' }}>{item.travelClass || 'Economy'}</div>
                       <div className="flight-path-row">
                         <div className="time-node">
                           <span className="t-val">{formatTime(item.departureTime)}</span>
                           <span className="c-val">{item.origin}</span>
                         </div>
                         <div className="path-line-group">
-                          <span className="dur-val">{formatDuration(item.duration)}</span>
+                          <span className="dur-val">{item.duration || 'Auto'}</span>
                           <div className="line-bar"><div className="dot" /></div>
                           <span className="stop-badge-orange">{item.stops === 0 ? 'Direct' : `${item.stops} stop`}</span>
                         </div>
@@ -293,7 +324,7 @@ export default function BookingSheet({ open, onClose }) {
                         </div>
                       </div>
                       <button className="google-action-btn" onClick={() => window.open(item.externalBookingUrl, '_blank')}>
-                        Open in Google Flights ↗
+                        Proceed to Flight ↗
                       </button>
                     </div>
                   );
@@ -302,11 +333,10 @@ export default function BookingSheet({ open, onClose }) {
 
               <div className="results-footer-mock">
                 <div className="footer-credits">
-                  <span>Powered by Amadeus API</span>
+                  <span>Powered by SerpApi (Google Hotels & Flights)</span>
                 </div>
               </div>
 
-              {/* SONUÇ EKRANI SORT VE GERİ DÖN BUTONU */}
               <div className="results-footer-actions">
                 <div className="center-btn-wrapper">
                   <button className="retry-link-btn" onClick={() => dispatch({ type: "RETRY" })}>

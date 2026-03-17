@@ -11,7 +11,8 @@ export const initialState = {
     checkOutDate: '',
     adults: 1,
     budget: '',
-    isRoundTrip: false
+    isRoundTrip: false,
+    travelClass: 'ECONOMY'
   },
   errors: {}
 };
@@ -19,11 +20,17 @@ export const initialState = {
 export function bookingReducer(state, action) {
   switch (action.type) {
     case "UPDATE_PARAM":
-      if (action.payload.bookingType && action.payload.bookingType !== state.bookingType) {
+      // If it's a pure tab switch (only bookingType in payload), reset the form.
+      // If there are other params (like origin/destination), don't reset.
+      const isPureTypeSwitch = action.payload.bookingType &&
+        Object.keys(action.payload).length === 1 &&
+        action.payload.bookingType !== state.bookingType;
+
+      if (isPureTypeSwitch) {
         return {
           ...state,
           bookingType: action.payload.bookingType,
-          searchParams: { ...initialState.searchParams, bookingType: action.payload.bookingType },
+          searchParams: { ...initialState.searchParams },
           errors: {}
         };
       }
