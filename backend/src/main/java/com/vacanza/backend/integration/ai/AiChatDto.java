@@ -75,6 +75,10 @@ public final class AiChatDto {
 
         @JsonProperty("route_data")
         private RouteData routeData;
+
+        /** Short contextual message about the route (e.g. "Müzeleri sevdiğini biliyordum, o yüzden rotanda ağırlıklı olarak müzeler var."). */
+        @JsonProperty("route_summary_message")
+        private String routeSummaryMessage;
     }
 
     /** A single stop/place in a day's route plan. */
