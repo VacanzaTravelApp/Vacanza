@@ -38,6 +38,12 @@ Format:
                  "park", "restaurant", "neighborhood"]
 }
 
+Destination rules (CRITICAL):
+- destination MUST be the place the user asked for (city/town/region + country if provided or clearly implied).
+- NEVER default to "Rome" or any other city.
+- If the user specifies a smaller place (town/village), keep it (e.g., "Kas, Turkey", "Hallstatt, Austria").
+- If the user provides multiple places, pick the PRIMARY destination they want the itinerary for.
+
 Choose categories relevant to the user's request.
 For history trips: monument, historic_site, ruins
 For art trips: museum, art_gallery, historic_site
@@ -91,7 +97,13 @@ route_data format:
 def _is_itinerary_request(user_content: str) -> bool:
     return bool(
         user_content
-        and __import__("re").search(r"\b(plan|rota|itinerary|trip|day|gün|tatil)\b", user_content, flags=__import__("re").I)
+        # Turkish suffixes (planı/planlar/rotayı/günlük/tatilim) break strict word-boundary matches.
+        # Match common stems + optional suffixes to reliably route into the tool-call flow.
+        and __import__("re").search(
+            r"\b(plan|rota|itinerary|trip|day|gün|günlük|tatil)\w*\b",
+            user_content,
+            flags=__import__("re").I,
+        )
     )
 
 
@@ -121,14 +133,25 @@ TOOL_RESULT_PREFIX = "__TOOL_RESULT__search_pois__"
 
 
 def _parse_tool_result_pois(user_content: str) -> list[dict] | None:
-    if not user_content or not user_content.startswith(TOOL_RESULT_PREFIX):
+    if not user_content:
         return None
-    raw = user_content[len(TOOL_RESULT_PREFIX) :].strip()
+    # Backend may prepend tool_call JSON before the marker; find marker anywhere.
+    idx = user_content.find(TOOL_RESULT_PREFIX)
+    if idx == -1:
+        return None
+    raw = user_content[idx + len(TOOL_RESULT_PREFIX) :].strip()
     try:
         data = json.loads(raw)
         return data if isinstance(data, list) else None
     except Exception:
         return None
+
+
+def _parse_tool_call(content: str) -> dict | None:
+    data = _extract_json_object(content)
+    if not data or data.get("tool") != "search_pois":
+        return None
+    return data
 
 
 def _format_poi_list(pois: list[dict]) -> str:
@@ -462,12 +485,12 @@ Route generation rules:
 
     llm = create_chat_model(settings)
 
-    # Turn2: backend sends POI list as a tool result marker
+    # Turn2: backend sends POI list as a tool result marker (and may include the original tool call)
     tool_pois = _parse_tool_result_pois(user_content)
     if tool_pois is not None:
-        # backend is orchestrating; this message is not user-visible
-        days = 2
-        travel_style = "general"
+        tool_call = _parse_tool_call(user_content) or {}
+        days = int(tool_call.get("days") or 2)
+        travel_style = str(tool_call.get("travel_style") or "general").strip() or "general"
         turn2_system = TURN2_SYSTEM.format(
             poi_list=_format_poi_list(tool_pois),
             days=days,
