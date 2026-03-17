@@ -33,7 +33,7 @@ class ActionBar extends StatelessWidget {
     required this.onOpenBooking, // ✅ UC1.8-MOB1
     required this.onOpenChat, // ✅ Chatbot
     required this.onOpenFilters, // ✅ NEW
-    required this.onOpenArMode, // UC1.11 — AR Mode
+    required this.onOpenArMode, // UC1.11
   });
 
   @override

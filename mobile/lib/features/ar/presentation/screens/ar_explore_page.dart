@@ -2,10 +2,10 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-/// UC1.11 — Light AR Mode shell:
-/// - Fullscreen camera preview
-/// - Center reticle overlay
-/// - Thin permission / capability checks
+import '../../application/ar_poi_layout.dart';
+import '../../domain/models/ar_poi.dart';
+import '../widgets/ar_poi_chip.dart';
+
 class ArExplorePage extends StatefulWidget {
   const ArExplorePage({super.key});
 
@@ -23,6 +23,46 @@ class _ArExplorePageState extends State<ArExplorePage> {
   CameraController? _cameraController;
 
   _ArModeStatus _status = _ArModeStatus.checking;
+
+  double _deviceHeadingDeg = 0;
+
+  final List<ArPoi> _dummyPois = const [
+    ArPoi(
+      id: '1',
+      name: 'Local Cafe',
+      categoryKey: 'cafe',
+      distanceMeters: 120,
+      bearingDegrees: -30,
+    ),
+    ArPoi(
+      id: '2',
+      name: 'City Museum',
+      categoryKey: 'museum',
+      distanceMeters: 450,
+      bearingDegrees: 10,
+    ),
+    ArPoi(
+      id: '3',
+      name: 'Central Park',
+      categoryKey: 'parks',
+      distanceMeters: 800,
+      bearingDegrees: 60,
+    ),
+    ArPoi(
+      id: '4',
+      name: 'Old Monument',
+      categoryKey: 'monuments',
+      distanceMeters: 300,
+      bearingDegrees: -80,
+    ),
+    ArPoi(
+      id: '5',
+      name: 'Seaside Restaurant',
+      categoryKey: 'restaurant',
+      distanceMeters: 650,
+      bearingDegrees: 120,
+    ),
+  ];
 
   @override
   void initState() {
@@ -103,6 +143,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
               'Camera access is required to use AR Mode. Please enable it in system settings.',
         );
       case _ArModeStatus.ready:
+        final positioned = layoutArPois(
+          pois: _dummyPois,
+          deviceHeadingDeg: _deviceHeadingDeg,
+        );
+
         return Stack(
           children: [
             Positioned.fill(
@@ -112,25 +157,19 @@ class _ArExplorePageState extends State<ArExplorePage> {
                   : const ColoredBox(color: Colors.black),
             ),
             const _CenterReticle(),
-            // Reserved HUD area for future POI overlays / controls
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
+            Positioned.fill(
               child: IgnorePointer(
-                ignoring: true,
-                child: Container(
-                  height: 96,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withValues(alpha: 0.45),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
+                child: Stack(
+                  children: [
+                    for (final p in positioned)
+                      Align(
+                        alignment: Alignment(
+                          p.xFraction * 2 - 1,
+                          -0.6 + p.row * 0.25,
+                        ),
+                        child: ArPoiChip(poi: p.poi),
+                      ),
+                  ],
                 ),
               ),
             ),

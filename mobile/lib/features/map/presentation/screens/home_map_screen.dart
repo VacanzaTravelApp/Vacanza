@@ -42,7 +42,6 @@ import '../../../profile/data/repositories/profile_repository.dart';
 import '../../../profile/presentation/bloc/profile_bloc.dart';
 import '../../../profile/presentation/bloc/profile_event.dart';
 import '../../../ar/presentation/screens/ar_explore_page.dart';
-
 import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
@@ -56,16 +55,10 @@ class HomeMapScreen extends StatelessWidget {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<PoiSearchRepository>(
-          create: (ctx) => PoiSearchRepositoryImpl(
-            ctx.read<PoiSearchApiClient>(),
-          ),
+          create: (ctx) => PoiSearchRepositoryImpl(ctx.read<PoiSearchApiClient>()),
         ),
-        RepositoryProvider<LocationService>(
-          create: (_) => LocationService(),
-        ),
-        RepositoryProvider<CheckinApiClient>(
-          create: (ctx) => CheckinApiClient(ctx.read<Dio>()),
-        ),
+        RepositoryProvider<LocationService>(create: (_) => LocationService()),
+        RepositoryProvider<CheckinApiClient>(create: (ctx) => CheckinApiClient(ctx.read<Dio>())),
         RepositoryProvider<CheckinRepository>(
           create: (ctx) => CheckinRepository(ctx.read<CheckinApiClient>()),
         ),
@@ -75,27 +68,17 @@ class HomeMapScreen extends StatelessWidget {
           BlocProvider<MapBloc>(create: (_) => MapBloc()),
           BlocProvider<AreaQueryBloc>(create: (_) => AreaQueryBloc()),
           BlocProvider<PoiSearchBloc>(
-            create: (ctx) => PoiSearchBloc(
-              repo: ctx.read<PoiSearchRepository>(),
-            ),
+            create: (ctx) => PoiSearchBloc(repo: ctx.read<PoiSearchRepository>()),
           ),
           BlocProvider<LocationBloc>(
-            create: (ctx) => LocationBloc(
-              locationService: ctx.read<LocationService>(),
-            ),
+            create: (ctx) => LocationBloc(locationService: ctx.read<LocationService>()),
           ),
-          BlocProvider<CandidatePoiCubit>(
-            create: (_) => CandidatePoiCubit(),
-          ),
+          BlocProvider<CandidatePoiCubit>(create: (_) => CandidatePoiCubit()),
           BlocProvider<CheckinBloc>(
-            create: (ctx) => CheckinBloc(
-              repository: ctx.read<CheckinRepository>(),
-            ),
+            create: (ctx) => CheckinBloc(repository: ctx.read<CheckinRepository>()),
           ),
           BlocProvider<ProfileBloc>(
-            create: (ctx) => ProfileBloc(
-              repository: ctx.read<ProfileRepository>(),
-            ),
+            create: (ctx) => ProfileBloc(repository: ctx.read<ProfileRepository>()),
           ),
         ],
         child: const _HomeMapView(),
@@ -111,8 +94,7 @@ class _HomeMapView extends StatefulWidget {
   State<_HomeMapView> createState() => _HomeMapViewState();
 }
 
-class _HomeMapViewState extends State<_HomeMapView>
-    with WidgetsBindingObserver {
+class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver {
   bool _filtersOpen = false;
   bool _resultsOpen = false;
 
@@ -206,8 +188,7 @@ class _HomeMapViewState extends State<_HomeMapView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       // App going to background — stop GPS to save battery
       if (_locationBloc.state.status == LocationStatus.tracking) {
         _wasTracking = true;
@@ -225,26 +206,24 @@ class _HomeMapViewState extends State<_HomeMapView>
   void _showPermissionDeniedDialog(BuildContext context) {
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Location Permission Required'),
-        content: const Text(
-          'Location permission is permanently denied. '
-          'Please enable it from app settings to use check-in.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Location Permission Required'),
+            content: const Text(
+              'Location permission is permanently denied. '
+              'Please enable it from app settings to use check-in.',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Geolocator.openAppSettings();
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              Geolocator.openAppSettings();
-            },
-            child: const Text('Open Settings'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -271,30 +250,29 @@ class _HomeMapViewState extends State<_HomeMapView>
 
         // ================= Auto check-in trigger (MOB-3) =================
         BlocListener<LocationBloc, LocationState>(
-          listenWhen: (prev, next) =>
-              next.status == LocationStatus.tracking &&
-              (prev.latitude != next.latitude ||
-                  prev.longitude != next.longitude),
+          listenWhen:
+              (prev, next) =>
+                  next.status == LocationStatus.tracking &&
+                  (prev.latitude != next.latitude || prev.longitude != next.longitude),
           listener: (context, state) {
-            final candidates =
-                context.read<CandidatePoiCubit>().state.candidatePoiIds;
-            context.read<CheckinBloc>().add(TriggerAutoCheckin(
-                  latitude: state.latitude!,
-                  longitude: state.longitude!,
-                  candidatePoiIds: candidates,
-                ));
+            final candidates = context.read<CandidatePoiCubit>().state.candidatePoiIds;
+            context.read<CheckinBloc>().add(
+              TriggerAutoCheckin(
+                latitude: state.latitude!,
+                longitude: state.longitude!,
+                candidatePoiIds: candidates,
+              ),
+            );
           },
         ),
 
         // ================= New check-in feedback (MOB-5) =================
         BlocListener<CheckinBloc, CheckinState>(
-          listenWhen: (prev, next) =>
-              prev.status != next.status &&
-              next.status == CheckinStatus.newCreated,
+          listenWhen:
+              (prev, next) => prev.status != next.status && next.status == CheckinStatus.newCreated,
           listener: (context, state) {
             final poiName = state.response?.poiName;
-            final message =
-                poiName != null ? 'Checked in at $poiName' : 'Checked in!';
+            final message = poiName != null ? 'Checked in at $poiName' : 'Checked in!';
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(message),
@@ -307,14 +285,17 @@ class _HomeMapViewState extends State<_HomeMapView>
 
         // ================= Gamification refresh (MOB-12) =================
         BlocListener<CheckinBloc, CheckinState>(
-          listenWhen: (prev, next) =>
-              prev.status != next.status &&
-              next.status == CheckinStatus.newCreated &&
-              next.gamificationTriggered &&
-              prev.response?.checkInId != next.response?.checkInId,
+          listenWhen:
+              (prev, next) =>
+                  prev.status != next.status &&
+                  next.status == CheckinStatus.newCreated &&
+                  next.gamificationTriggered &&
+                  prev.response?.checkInId != next.response?.checkInId,
           listener: (context, state) {
-            log('[GAM_UI] MOB-12 refresh triggered — '
-                'checkInId=${state.response?.checkInId}');
+            log(
+              '[GAM_UI] MOB-12 refresh triggered — '
+              'checkInId=${state.response?.checkInId}',
+            );
             context.read<GamificationCubit>().refresh();
           },
         ),
@@ -327,17 +308,14 @@ class _HomeMapViewState extends State<_HomeMapView>
             // 1) Viewport -> PoiSearch viewport event + CandidatePoiCubit
             if (ctx.areaSource == AreaSource.viewport && ctx.area is BboxArea) {
               final bbox = ctx.area as BboxArea;
-              context.read<PoiSearchBloc>().add(
-                poi.ViewportChanged(bbox),
-              );
+              context.read<PoiSearchBloc>().add(poi.ViewportChanged(bbox));
               // MOB-2: forward viewport bbox to candidate cubit
               context.read<CandidatePoiCubit>().updateViewport(bbox);
               return;
             }
 
             // 2) User selection -> PoiSearch area event + filtre panelini aç
-            if (ctx.areaSource == AreaSource.userSelection &&
-                ctx.area is PolygonArea) {
+            if (ctx.areaSource == AreaSource.userSelection && ctx.area is PolygonArea) {
               context.read<PoiSearchBloc>().add(poi.AreaChanged(ctx.area));
 
               // ✅ polygon sonrası açılan filter -> blur preview ON
@@ -366,11 +344,12 @@ class _HomeMapViewState extends State<_HomeMapView>
 
         // ================= PoiSearch -> Results sheet visibility =================
         BlocListener<PoiSearchBloc, PoiSearchState>(
-          listenWhen: (prev, next) =>
-          prev.status != next.status ||
-              prev.areaSource != next.areaSource ||
-              prev.pois != next.pois ||
-              prev.selectedCategories != next.selectedCategories,
+          listenWhen:
+              (prev, next) =>
+                  prev.status != next.status ||
+                  prev.areaSource != next.areaSource ||
+                  prev.pois != next.pois ||
+                  prev.selectedCategories != next.selectedCategories,
           listener: (context, state) {
             // MOB-2: forward POI list to candidate cubit on any POI change
             context.read<CandidatePoiCubit>().updatePois(state.pois);
@@ -393,8 +372,7 @@ class _HomeMapViewState extends State<_HomeMapView>
             }
 
             // Viewport’a dönünce -> sheet kapat
-            if (state.areaSource == AreaSource.viewport &&
-                state.status == PoiSearchStatus.idle) {
+            if (state.areaSource == AreaSource.viewport && state.status == PoiSearchStatus.idle) {
               if (_resultsOpen && mounted) {
                 setState(() {
                   _resultsOpen = false;
@@ -427,8 +405,7 @@ class _HomeMapViewState extends State<_HomeMapView>
           return HomeMapScaffold(
             mode: state.viewMode,
             isDrawing: state.isDrawing,
-            onToggleMode: () =>
-                context.read<MapBloc>().add(const ToggleViewModePressed()),
+            onToggleMode: () => context.read<MapBloc>().add(const ToggleViewModePressed()),
             onRecenter: () => context.read<MapBloc>().add(const RecenterPressed()),
             onToggleDrawing: () {
               final isDrawingNow = context.read<MapBloc>().state.isDrawing;
@@ -449,11 +426,7 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // UC1.11 — Explore in AR entry point
             onOpenArMode: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ArExplorePage(),
-                ),
-              );
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ArExplorePage()));
             },
 
             // ✅ UC1.8-MOB1: booking entry point
@@ -470,20 +443,13 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ✅ Chatbot
             onOpenChat: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ChatScreen(),
-                ),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
             },
 
             // ===== Filters overlay =====
             isFiltersOpen: _filtersOpen,
             onCloseFilters: _closeFilters,
-            filtersPanel: PoiFilterPanel(
-              onClose: _closeFilters,
-            ),
+            filtersPanel: PoiFilterPanel(onClose: _closeFilters),
 
             // ===== Results sheet (normal) =====
             isResultsOpen: _resultsOpen,
