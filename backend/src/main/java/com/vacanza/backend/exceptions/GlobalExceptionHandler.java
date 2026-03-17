@@ -113,4 +113,20 @@ public class GlobalExceptionHandler {
 
         return new ResponseEntity<>(body, ex.getStatus());
     }
+
+    /**
+     * EventException: event search / Ticketmaster API errors
+     */
+    @ExceptionHandler(EventException.class)
+    public ResponseEntity<ErrorResponse> handleEventException(
+            EventException ex, HttpServletRequest request) {
+
+        ErrorResponse body = ErrorResponse.of(
+                ex.getStatus().value(),
+                ex.getStatus().getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI());
+
+        return new ResponseEntity<>(body, ex.getStatus());
+    }
 }

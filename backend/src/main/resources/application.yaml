@@ -41,3 +41,9 @@ serpapi:
   api-key: ${SERPAPI_API_KEY}
   connect-timeout: 10s
   read-timeout: 30s
+
+ticketmaster:
+  base-url: https://app.ticketmaster.com/discovery/v2
+  api-key: ${TICKETMASTER_API_KEY}
+  connect-timeout: 10s
+  read-timeout: 30s

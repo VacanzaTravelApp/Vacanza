@@ -22,7 +22,7 @@ import java.time.Duration;
 @Slf4j
 @Configuration
 @EnableConfigurationProperties({ GeoapifyProperties.class, AiServiceProperties.class,
-        SerpApiProperties.class, MapboxProperties.class })
+        SerpApiProperties.class, MapboxProperties.class, TicketmasterProperties.class })
 public class WebClientConfig {
 
     @Bean
@@ -93,6 +93,23 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .filter(log4xx5xx("[SERPAPI]"))
+                .build();
+    }
+
+    @Bean
+    @Qualifier("ticketmasterWebClient")
+    public WebClient ticketmasterWebClient(TicketmasterProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        return WebClient.builder()
+                .baseUrl(props.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(log4xx5xx("[TICKETMASTER]"))
                 .build();
     }
 
