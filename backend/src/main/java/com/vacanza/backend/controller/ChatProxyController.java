@@ -78,9 +78,15 @@ public class ChatProxyController {
                                 var toolCall = tryParseToolCall(response.getContent());
                                 if (toolCall != null && "search_pois".equalsIgnoreCase(toolCall.tool)) {
                                         var pois = executePoiSearchTool(toolCall.destination, toolCall.categories);
+                                        if (pois.isEmpty()) {
+                                                log.warn("POI tool returned empty list for destination='{}' categories={}", toolCall.destination, toolCall.categories);
+                                        }
                                         // Send tool result back to AI service (turn 2)
                                         var toolMsg = new AiChatDto.MessageSendRequest();
-                                        toolMsg.setContent("__TOOL_RESULT__search_pois__" + objectMapper.writeValueAsString(pois));
+                                        // Include tool_call JSON first (for days/travel_style), then tool result marker.
+                                        // AI service parses the marker prefix and uses POIs to build route_data.
+                                        toolMsg.setContent(objectMapper.writeValueAsString(toolCall) + "\n"
+                                                + "__TOOL_RESULT__search_pois__" + objectMapper.writeValueAsString(pois));
                                         AiChatDto.MessageSendResponse turn2 = aiServiceClient
                                                         .sendMessage(user.getUserId(), conversationId, toolMsg, profile, existingAiPrefs)
                                                         .block();
@@ -141,7 +147,7 @@ public class ChatProxyController {
                 }
         }
 
-        private record PoiToolCall(String tool, String destination, List<String> categories) {}
+        private record PoiToolCall(String tool, String destination, Integer days, String travelStyle, List<String> categories) {}
 
         private PoiToolCall tryParseToolCall(String content) {
                 try {
@@ -151,6 +157,8 @@ public class ChatProxyController {
                         if (tool == null) return null;
                         String destination = n.path("destination").asText(null);
                         if (destination == null || destination.isBlank()) return null;
+                        Integer days = n.hasNonNull("days") ? n.path("days").asInt() : null;
+                        String travelStyle = n.path("travel_style").asText(null);
                         var catsNode = n.path("categories");
                         List<String> cats = List.of();
                         if (catsNode != null && catsNode.isArray()) {
@@ -162,7 +170,7 @@ public class ChatProxyController {
                                         }
                                 }
                         }
-                        return new PoiToolCall(tool, destination, cats);
+                        return new PoiToolCall(tool, destination, days, travelStyle, cats);
                 } catch (Exception e) {
                         return null;
                 }

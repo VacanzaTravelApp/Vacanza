@@ -121,6 +121,37 @@ async def extract_preferences(
             data = {"preferences": []}
         elif not isinstance(data.get("preferences"), list):
             data = {"preferences": []}
+
+        # Normalize older/looser model outputs:
+        # Some models return items like {"destination_preference": "Tbilisi", "confidence": 0.6}
+        # instead of {"preference_key": "...", "preference_value": "...", "confidence": ...}.
+        prefs = data.get("preferences") if isinstance(data, dict) else []
+        normalized: list[dict] = []
+        if isinstance(prefs, list):
+            for item in prefs:
+                if not isinstance(item, dict):
+                    continue
+                if {"preference_key", "preference_value", "confidence"} <= set(item.keys()):
+                    normalized.append(item)
+                    continue
+
+                conf = item.get("confidence", 0.6)
+                key = item.get("preference_key")
+                val = item.get("preference_value")
+                if isinstance(key, str) and isinstance(val, str):
+                    normalized.append({"preference_key": key, "preference_value": val, "confidence": conf})
+                    continue
+
+                # If exactly one non-confidence field exists, treat it as key->value.
+                non_conf_keys = [k for k in item.keys() if k != "confidence"]
+                if len(non_conf_keys) == 1:
+                    k = non_conf_keys[0]
+                    v = item.get(k)
+                    if v is None:
+                        continue
+                    normalized.append({"preference_key": str(k), "preference_value": str(v), "confidence": conf})
+
+        data["preferences"] = normalized
         result = PreferenceExtractionResult.model_validate(data)
         if result.preferences:
             logger.info(

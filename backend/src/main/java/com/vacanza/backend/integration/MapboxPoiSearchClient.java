@@ -33,10 +33,14 @@ public class MapboxPoiSearchClient {
             Map.entry("monument", "monument"),
             Map.entry("historic_site", "historic_site"),
             Map.entry("church", "place_of_worship"),
+            Map.entry("mosque", "place_of_worship"),
+            Map.entry("palace", "historic_site"),
+            Map.entry("landmark", "landmark"),
             Map.entry("park", "park"),
             Map.entry("art_gallery", "art_gallery"),
             Map.entry("restaurant", "restaurant"),
             Map.entry("market", "market"),
+            Map.entry("cafe", "cafe"),
             Map.entry("neighborhood", "neighborhood"),
             Map.entry("ruins", "historic_site")
     );
@@ -53,7 +57,10 @@ public class MapboxPoiSearchClient {
                 .uri(uriBuilder -> uriBuilder
                         .path("/search/searchbox/v1/forward")
                         .queryParam("q", destination)
-                        .queryParam("limit", 1)
+                        // Use multiple candidates for better global matching (small towns often need fallback).
+                        .queryParam("limit", 5)
+                        // Prefer administrative place results over POIs.
+                        .queryParam("types", "place,locality,neighborhood,region,country")
                         .queryParam("language", "en")
                         .build())
                 .retrieve()
@@ -62,18 +69,31 @@ public class MapboxPoiSearchClient {
                     if (resp == null || resp.getFeatures() == null || resp.getFeatures().isEmpty()) {
                         return Mono.empty();
                     }
-                    Feature f = resp.getFeatures().get(0);
-                    if (f.getProperties() == null) return Mono.empty();
-                    List<Double> bbox = f.getProperties().getBbox();
-                    Coordinates c = f.getProperties().getCoordinates();
-                    if (bbox == null || bbox.size() != 4 || c == null
-                            || c.getLatitude() == null || c.getLongitude() == null) {
-                        return Mono.empty();
+                    // Pick the first candidate that has coordinates; bbox is optional (we can approximate).
+                    for (Feature f : resp.getFeatures()) {
+                        if (f == null || f.getProperties() == null) continue;
+                        Coordinates c = f.getProperties().getCoordinates();
+                        if (c == null || c.getLatitude() == null || c.getLongitude() == null) continue;
+
+                        List<Double> bbox = f.getProperties().getBbox();
+                        if (bbox != null && bbox.size() == 4) {
+                            return Mono.just(new DestinationGeocodeResult(
+                                    c.getLatitude(), c.getLongitude(),
+                                    bbox.get(0), bbox.get(1), bbox.get(2), bbox.get(3)
+                            ));
+                        }
+
+                        // Fallback bbox: create a small search window around the center (helps villages/localities).
+                        double lat = c.getLatitude();
+                        double lon = c.getLongitude();
+                        double dLat = 0.18d; // ~20km
+                        double dLon = 0.22d; // ~20km at mid-latitudes
+                        return Mono.just(new DestinationGeocodeResult(
+                                lat, lon,
+                                lon - dLon, lat - dLat, lon + dLon, lat + dLat
+                        ));
                     }
-                    return Mono.just(new DestinationGeocodeResult(
-                            c.getLatitude(), c.getLongitude(),
-                            bbox.get(0), bbox.get(1), bbox.get(2), bbox.get(3)
-                    ));
+                    return Mono.empty();
                 })
                 .onErrorResume(e -> Mono.empty());
     }
