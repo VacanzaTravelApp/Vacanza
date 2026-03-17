@@ -1,0 +1,176 @@
+package com.vacanza.backend.service.impl;
+
+import com.vacanza.backend.component.ApiMetricsCollector;
+import com.vacanza.backend.dto.response.AdminAnalyticsDTO;
+import com.vacanza.backend.dto.response.AdminAnalyticsDTO.*;
+import com.vacanza.backend.dto.response.SystemMonitoringDTO;
+import com.vacanza.backend.dto.response.SystemMonitoringDTO.*;
+import com.vacanza.backend.repo.CheckInRepository;
+import com.vacanza.backend.repo.UserLoginHistoryRepository;
+import com.vacanza.backend.repo.UserRepository;
+import com.vacanza.backend.service.AdminService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.boot.actuate.health.Status;
+import org.springframework.stereotype.Service;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * Admin service implementation aggregating data from repositories,
+ * API metrics collector, and Spring Actuator health endpoint.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AdminServiceImpl implements AdminService {
+
+    private final UserRepository userRepository;
+    private final CheckInRepository checkInRepository;
+    private final UserLoginHistoryRepository loginHistoryRepository;
+    private final ApiMetricsCollector apiMetricsCollector;
+    private final HealthEndpoint healthEndpoint;
+
+    // ── UC2.1: System Monitoring ────────────────────────────────
+
+    @Override
+    public SystemMonitoringDTO getSystemMonitoring() {
+        log.info("Fetching system monitoring data");
+
+        // Service statuses from Actuator health
+        List<ServiceStatus> services = buildServiceStatuses();
+
+        // Calculate overall health score
+        long upCount = services.stream()
+                .filter(s -> "UP".equals(s.getStatus()))
+                .count();
+        double systemHealth = services.isEmpty() ? 0.0
+                : Math.round(((double) upCount / services.size()) * 100.0) / 100.0;
+
+        // API usage metrics
+        List<ApiUsageMetric> apiMetrics = apiMetricsCollector.getMetrics();
+
+        // Recent logs from login history
+        List<LogEntry> logs = buildRecentLogs();
+
+        return SystemMonitoringDTO.builder()
+                .systemHealth(systemHealth)
+                .services(services)
+                .apiMetrics(apiMetrics)
+                .logs(logs)
+                .build();
+    }
+
+    private List<ServiceStatus> buildServiceStatuses() {
+        List<ServiceStatus> services = new ArrayList<>();
+
+        // Check overall system health from Actuator
+        boolean systemUp = healthEndpoint.health().getStatus().equals(Status.UP);
+
+        // We define our known services and derive their status
+        services.add(ServiceStatus.builder()
+                .name("Auth Service").status(systemUp ? "UP" : "DOWN").build());
+        services.add(ServiceStatus.builder()
+                .name("User Service").status(systemUp ? "UP" : "DOWN").build());
+        services.add(ServiceStatus.builder()
+                .name("Gamification Engine").status(systemUp ? "UP" : "DOWN").build());
+        services.add(ServiceStatus.builder()
+                .name("POI / Maps API").status(systemUp ? "UP" : "DOWN").build());
+        services.add(ServiceStatus.builder()
+                .name("Booking System").status(systemUp ? "UP" : "DOWN").build());
+        services.add(ServiceStatus.builder()
+                .name("AI Recommendation API").status(systemUp ? "UP" : "DOWN").build());
+
+        return services;
+    }
+
+    private List<LogEntry> buildRecentLogs() {
+        return loginHistoryRepository.findTop50ByOrderByLoginTimeDesc().stream()
+                .map(lh -> LogEntry.builder()
+                        .timestamp(lh.getLoginTime().toString())
+                        .level("INFO")
+                        .message("User login via " + lh.getLoginProvider()
+                                + (lh.getIpAddress() != null ? " from " + lh.getIpAddress() : ""))
+                        .source("AUTH")
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    // ── UC2.2: Analytics Report ─────────────────────────────────
+
+    @Override
+    public AdminAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
+        log.info("Fetching analytics report: startDate={}, endDate={}", startDate, endDate);
+
+        // Total users
+        long totalUsers = userRepository.count();
+
+        // Active sessions (logins within last 30 minutes)
+        long activeSessions = loginHistoryRepository
+                .countByLoginTimeAfter(Instant.now().minus(Duration.ofMinutes(30)));
+
+        // Total check-ins
+        long totalCheckins = checkInRepository.count();
+
+        // Growth trends (last 6 months)
+        List<GrowthMetric> growthTrends = buildGrowthTrends();
+
+        // Category distribution
+        List<CategoryMetric> categoryDist = checkInRepository.findCategoryDistribution().stream()
+                .map(row -> CategoryMetric.builder()
+                        .category((String) row[0])
+                        .count((Long) row[1])
+                        .build())
+                .collect(Collectors.toList());
+
+        // Top POIs (limit to 10)
+        List<TopPoiMetric> topPois = checkInRepository.findTopPois().stream()
+                .limit(10)
+                .map(row -> TopPoiMetric.builder()
+                        .name((String) row[0])
+                        .category((String) row[1])
+                        .visitCount((Long) row[2])
+                        .build())
+                .collect(Collectors.toList());
+
+        return AdminAnalyticsDTO.builder()
+                .totalUsers(totalUsers)
+                .activeSessions(activeSessions)
+                .totalCheckins(totalCheckins)
+                .growthTrends(growthTrends)
+                .categoryDistribution(categoryDist)
+                .topPois(topPois)
+                .build();
+    }
+
+    private List<GrowthMetric> buildGrowthTrends() {
+        List<GrowthMetric> trends = new ArrayList<>();
+        YearMonth current = YearMonth.now();
+
+        // Last 6 months
+        for (int i = 5; i >= 0; i--) {
+            YearMonth month = current.minusMonths(i);
+            Instant monthStart = month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            Instant monthEnd = month.atEndOfMonth().atStartOfDay().toInstant(ZoneOffset.UTC);
+
+            // Count users created after monthStart and before monthEnd
+            long totalAfterStart = userRepository.countByCreatedAtAfter(monthStart);
+            long totalAfterEnd = userRepository.countByCreatedAtAfter(monthEnd);
+            long newUsers = totalAfterStart - totalAfterEnd;
+
+            trends.add(GrowthMetric.builder()
+                    .period(month.toString())  // e.g. "2026-03"
+                    .newUsers(Math.max(0, newUsers))
+                    .build());
+        }
+        return trends;
+    }
+}
