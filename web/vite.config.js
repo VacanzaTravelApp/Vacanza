@@ -51,6 +51,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           secure: false,
         },
+        "/routes": {
+          target: backendUrl,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
     optimizeDeps: {
