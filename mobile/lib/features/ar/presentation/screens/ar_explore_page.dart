@@ -1,9 +1,17 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:mobile/features/checkin/data/services/location_service.dart';
+import 'package:mobile/features/poi_search/data/api/poi_search_api_client.dart';
+import 'package:mobile/features/poi_search/data/repositories/poi_search_repository_impl.dart';
+
 import '../../application/ar_poi_layout.dart';
+import '../../data/ar_poi_source_from_poi_search.dart';
 import '../../domain/models/ar_poi.dart';
+import '../../domain/services/ar_poi_source.dart';
 import '../widgets/ar_poi_chip.dart';
 
 class ArExplorePage extends StatefulWidget {
@@ -26,43 +34,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
 
   double _deviceHeadingDeg = 0;
 
-  final List<ArPoi> _dummyPois = const [
-    ArPoi(
-      id: '1',
-      name: 'Local Cafe',
-      categoryKey: 'cafe',
-      distanceMeters: 120,
-      bearingDegrees: -30,
-    ),
-    ArPoi(
-      id: '2',
-      name: 'City Museum',
-      categoryKey: 'museum',
-      distanceMeters: 450,
-      bearingDegrees: 10,
-    ),
-    ArPoi(
-      id: '3',
-      name: 'Central Park',
-      categoryKey: 'parks',
-      distanceMeters: 800,
-      bearingDegrees: 60,
-    ),
-    ArPoi(
-      id: '4',
-      name: 'Old Monument',
-      categoryKey: 'monuments',
-      distanceMeters: 300,
-      bearingDegrees: -80,
-    ),
-    ArPoi(
-      id: '5',
-      name: 'Seaside Restaurant',
-      categoryKey: 'restaurant',
-      distanceMeters: 650,
-      bearingDegrees: 120,
-    ),
-  ];
+  final LocationService _locationService = LocationService();
+
+  List<ArPoi> _pois = const [];
+  bool _isLoadingPois = false;
+  String? _poisError;
 
   @override
   void initState() {
@@ -101,8 +77,60 @@ class _ArExplorePageState extends State<ArExplorePage> {
         _cameraController = controller;
         _status = _ArModeStatus.ready;
       });
+
+      await _loadPoisForCurrentLocation();
     } catch (_) {
       setState(() => _status = _ArModeStatus.cameraDenied);
+    }
+  }
+
+  Future<void> _loadPoisForCurrentLocation() async {
+    setState(() {
+      _isLoadingPois = true;
+      _poisError = null;
+    });
+
+    try {
+      final perm = await _locationService.checkAndRequestPermission();
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        setState(() {
+          _pois = const [];
+          _poisError =
+              'Location permission is required to show nearby places in AR.';
+        });
+        return;
+      }
+
+      final pos = await _locationService.getCurrentPosition();
+
+      final apiClient = context.read<PoiSearchApiClient>();
+      final poiRepo = PoiSearchRepositoryImpl(apiClient);
+      final ArPoiSource source = ArPoiSourceFromPoiSearch(poiRepo);
+
+      final pois = await source.getNearbyArPois(
+        lat: pos.latitude,
+        lng: pos.longitude,
+        categories: null, // MOB-3: all categories; filtering comes later
+        radiusMeters: 600,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _pois = pois;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _pois = const [];
+        _poisError = 'Could not load nearby places for AR.';
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingPois = false;
+      });
     }
   }
 
@@ -144,7 +172,7 @@ class _ArExplorePageState extends State<ArExplorePage> {
         );
       case _ArModeStatus.ready:
         final positioned = layoutArPois(
-          pois: _dummyPois,
+          pois: _pois,
           deviceHeadingDeg: _deviceHeadingDeg,
         );
 
@@ -161,6 +189,34 @@ class _ArExplorePageState extends State<ArExplorePage> {
               child: IgnorePointer(
                 child: Stack(
                   children: [
+                    if (_isLoadingPois)
+                      const Align(
+                        alignment: Alignment(0, -0.9),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    if (!_isLoadingPois && _pois.isEmpty && _poisError == null)
+                      const Align(
+                        alignment: Alignment(0, -0.8),
+                        child: Text(
+                          'No places found around you for AR.',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    if (_poisError != null)
+                      Align(
+                        alignment: const Alignment(0, -0.8),
+                        child: Text(
+                          _poisError!,
+                          style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     for (final p in positioned)
                       Align(
                         alignment: Alignment(
