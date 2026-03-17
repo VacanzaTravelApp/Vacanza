@@ -17,27 +17,19 @@
 }
 
 .vacanza-logo {
-    font-size: 24px;
-    font-weight: 700;
-    color: #1e90ff;
+    font-size: 28px;
+    font-weight: 800;
+    color: #3da8c8;
     display: flex;
     align-items: center;
     justify-content: center;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
 }
 
 .vacanza-logo .logo-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 42px;
-    /* Smaller logo */
-    height: 42px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #3da8c8 0%, #2b8fae 100%);
-    color: #fff;
-    font-size: 18px;
-    /* Smaller icon font */
-    box-shadow: 0 4px 12px rgba(61, 168, 200, 0.3);
+    margin-right: 10px;
+    font-size: 32px;
 }
 
 .card-header h3 {
@@ -57,21 +49,23 @@
 /* Input'ların varsayılan kenar ve büyüklüğünü ayarla */
 .ant-input-affix-wrapper,
 .ant-input-password {
-    border-radius: 10px !important;
-    padding: 10px 15px !important;
-    border: 1px solid #d9d9d9 !important;
-    background-color: #fcfcfd !important;
-    /* Hafif kırık beyaz input */
-    transition: all 0.3s;
+    border-radius: 24px !important;
+    padding: 12px 20px !important;
+    border: 1.4px solid #D8E6F0 !important;
+    background-color: #ffffff !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ant-input-affix-wrapper:hover,
-.ant-input-password:hover,
+.ant-input-password:hover {
+    border-color: #1DA1F2 !important;
+}
+
 .ant-input-affix-wrapper-focused,
 .ant-input-password-focused {
-    border-color: #3da8c8 !important;
-    box-shadow: 0 0 0 3px rgba(61, 168, 200, 0.12) !important;
-    background-color: rgba(255, 255, 255, 0.95) !important;
+    border-color: #1DA1F2 !important;
+    box-shadow: 0 0 0 4px rgba(29, 161, 242, 0.15) !important;
+    background-color: #ffffff !important;
 }
 
 .auth-form .ant-form-item {
@@ -114,17 +108,24 @@
     width: 100%;
     padding: 14px;
     height: auto;
-    background-color: #1e90ff;
+    background-color: #1DA1F2;
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
+    border-radius: 24px;
+    font-weight: 700;
     font-size: 16px;
-    transition: background-color 0.3s;
+    box-shadow: 0 4px 12px rgba(29, 161, 242, 0.25);
+    transition: all 0.2s ease;
 }
 
 .cta-button.ant-btn-primary:hover,
 .cta-button.ant-btn-primary:focus {
-    background-color: #0d83e3;
+    background-color: #0d91e3;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(29, 161, 242, 0.35);
+}
+
+.cta-button.ant-btn-primary:active {
+    transform: translateY(0) scale(0.98);
 }
 
 /* Gradient Style for Login Button */

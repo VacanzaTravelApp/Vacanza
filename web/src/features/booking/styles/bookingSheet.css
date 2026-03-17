@@ -13,7 +13,7 @@
 .custom-sheet {
   background: white;
   width: 100%;
-  max-width: 420px;
+  max-width: 520px;
   border-radius: 32px 32px 0 0;
   padding: 16px 20px 20px;
   position: relative;
@@ -49,7 +49,7 @@
 .sheet-scrollable-content {
   flex: 1;
   overflow-y: auto !important;
-  padding-bottom: 40px;
+  padding-bottom: 2px;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -408,13 +408,13 @@
   transform: scale(0.98);
 }
 
-/* --- 6. Footer & Sort By (En Altta) --- */
+
 .results-footer-actions {
   width: 100%;
-  margin-top: 10px;
-  padding-bottom: 20px;
+  margin-top: 2px;
+  padding-bottom: 4px;
   border-top: 1px solid #f2f2f7;
-  padding-top: 20px;
+  padding-top: 4px;
 }
 
 .sort-container-refined {
@@ -550,19 +550,19 @@
 
 .premium-result-card {
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.04);
   border-radius: 18px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-  padding: 14px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  padding: 12px;
+  transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
 }
 
 .premium-result-card:hover {
-  transform: translateY(-3px) scale(1.01);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
-  border-color: rgba(0, 122, 255, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+  background: #fafafa;
 }
 
 .result-card-main {
@@ -572,13 +572,13 @@
 }
 
 .result-thumb-container {
-  width: 60px;
-  height: 60px;
-  border-radius: 14px;
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;
-  background: #f8f9fa;
-  border: 1px solid #f1f3f5;
+  background: #f1f3f5;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -604,11 +604,11 @@
 }
 
 .result-title {
-  font-size: 15px;
-  font-weight: 800;
-  color: #1c1c1e;
-  margin: 0;
-  letter-spacing: -0.2px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.3px;
 }
 
 .result-meta-row {
@@ -644,9 +644,9 @@
 }
 
 .price-val {
-  font-size: 17px;
-  font-weight: 850;
-  color: #34c759;
+  font-size: 20px;
+  font-weight: 700;
+  color: #22c55e;
   letter-spacing: -0.5px;
 }
 
@@ -657,32 +657,31 @@
 }
 
 .book-now-btn-green {
-  background: #34c759 !important;
+  background: #22c55e !important;
   color: white !important;
   border: none;
-  padding: 10px 18px;
-  border-radius: 14px;
+  padding: 10px 16px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(52, 199, 89, 0.15);
+  transition: all 0.2s;
+  box-shadow: 0 4px 10px rgba(34, 197, 94, 0.2);
 }
 
 .book-now-btn-green:hover {
-  background: #2db850 !important;
+  background: #16a34a !important;
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(52, 199, 89, 0.25);
 }
 
 .book-now-btn-green:active {
-  transform: translateY(0) scale(0.96);
+  transform: translateY(0) scale(0.97);
 }
 
 .results-footer-mock {
-  margin-top: 24px;
-  padding-top: 20px;
+  margin-top: 4px;
+  padding-top: 4px;
   border-top: 1px solid #f2f2f7;
   display: flex;
   justify-content: space-between;
