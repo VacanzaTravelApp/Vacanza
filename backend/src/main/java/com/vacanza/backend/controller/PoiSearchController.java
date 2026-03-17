@@ -21,7 +21,8 @@ public class PoiSearchController {
     private final MapboxPoiSearchClient mapboxPoiSearchClient;
 
     @PostMapping
-    public ResponseEntity<List<PoiResult>> searchPois(@RequestBody PoiSearchRequest request) {
+    public ResponseEntity<List<PoiResult>> searchPois(
+            @RequestBody PoiSearchRequest request) {
         if (request == null || request.getDestination() == null || request.getDestination().isBlank()) {
             return ResponseEntity.badRequest().body(List.of());
         }
