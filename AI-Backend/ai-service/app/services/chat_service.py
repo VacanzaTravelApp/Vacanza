@@ -1,9 +1,11 @@
 """Chat service with LangChain and context memory (sliding window)."""
 
 import asyncio
+import json
 import logging
 import uuid
 
+import httpx
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.core.config import Settings
@@ -22,6 +24,121 @@ MEMORY_WINDOW = 10  # Last N user+assistant pairs for context
 RAG_TOP_K = 8  # Max similar old messages (5-10 range for token limit)
 RAG_MAX_CHARS_PER_MSG = 250  # Truncate to avoid token overflow (~80 tokens/msg)
 ROUTE_JSON_SEPARATOR = "---ROUTE_JSON---"
+
+TURN1_SYSTEM = """You are a travel planning assistant.
+When the user asks for an itinerary, respond ONLY with a JSON tool call.
+Do not write anything else.
+
+Format:
+{
+  "tool": "search_pois",
+  "destination": "<city, country>",
+  "days": <number of days>,
+  "travel_style": "<art|history|food|nature|general>",
+  "categories": ["museum", "monument", "historic_site", "church",
+                 "park", "restaurant", "neighborhood"]
+}
+
+Choose categories relevant to the user's request.
+For history trips: monument, historic_site, ruins
+For art trips: museum, art_gallery, historic_site
+For food trips: restaurant, market, neighborhood
+For general trips: museum, monument, church, park, neighborhood
+"""
+
+TURN2_SYSTEM = """You are a travel planning assistant. Build a detailed itinerary
+using ONLY the POIs provided below. Do not invent new places.
+Use the exact coordinates given — do not modify them.
+
+Available POIs:
+{poi_list}
+
+Rules:
+- Select the best POIs for a {days}-day {travel_style} trip
+- Group nearby POIs on the same day
+- Order each day logically (minimize walking distance)
+- Each day: 4-6 POIs maximum
+- CRITICAL: Use latitude and longitude values exactly as provided. Do not round, modify, or recalculate.
+- Respond with your itinerary text followed by ---ROUTE_JSON---
+  and the route_data JSON
+
+route_data format:
+{{
+  "title": "...",
+  "destination": "...",
+  "total_days": {days},
+  "days": [
+    {{
+      "day": 1,
+      "title": "...",
+      "waypoints": [
+        {{
+          "name": "exact name from POI list",
+          "category": "...",
+          "day": 1,
+          "order": 1,
+          "latitude": <exact value from POI list>,
+          "longitude": <exact value from POI list>,
+          "estimated_duration_min": 60,
+          "time_slot": "morning"
+        }}
+      ]
+    }}
+  ]
+}}
+"""
+
+
+def _is_itinerary_request(user_content: str) -> bool:
+    return bool(
+        user_content
+        and __import__("re").search(r"\b(plan|rota|itinerary|trip|day|gün|tatil)\b", user_content, flags=__import__("re").I)
+    )
+
+
+def _extract_json_object(text: str) -> dict | None:
+    """Extract a JSON object from raw model output (expects object-only, but is defensive)."""
+    if not text:
+        return None
+    s = text.strip()
+    # Strip markdown fences
+    if s.startswith("```"):
+        lines = s.split("\n")
+        s = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+    # If model included extra text, attempt to locate first {...}
+    start = s.find("{")
+    end = s.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    candidate = s[start : end + 1]
+    try:
+        data = json.loads(candidate)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+async def _execute_search_pois(settings: Settings, destination: str, categories: list[str]) -> list[dict]:
+    url = settings.backend_internal_url.rstrip("/") + "/internal/poi-search"
+    payload = {"destination": destination, "categories": categories}
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(url, json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+        return data if isinstance(data, list) else []
+
+
+def _format_poi_list(pois: list[dict]) -> str:
+    lines: list[str] = []
+    for i, p in enumerate(pois, start=1):
+        name = p.get("name")
+        cat = p.get("category")
+        lat = p.get("lat")
+        lon = p.get("lon")
+        if name is None or lat is None or lon is None:
+            continue
+        lines.append(f"{i}. {name} ({cat}) — lat: {lat}, lon: {lon}")
+    return "\n".join(lines) if lines else "(no POIs returned)"
 
 
 def _parse_route_from_response(raw_content: str) -> tuple[str, RouteData | None]:
@@ -340,13 +457,45 @@ Route generation rules:
     llm_messages.extend(history)
     llm_messages.append(HumanMessage(content=user_content))
 
-    # Invoke LLM
     llm = create_chat_model(settings)
-    response = await llm.ainvoke(llm_messages)
-    raw_ai_content = str(response.content)
 
-    # Extract route data if present, strip JSON from visible content
-    ai_content, route_data = _parse_route_from_response(raw_ai_content)
+    # Agentic itinerary flow: tool-call (turn1) -> backend POI search -> itinerary build (turn2)
+    if _is_itinerary_request(user_content):
+        turn1 = await llm.ainvoke([SystemMessage(content=TURN1_SYSTEM), HumanMessage(content=user_content)])
+        tool_call = _extract_json_object(str(turn1.content))
+
+        if tool_call and tool_call.get("tool") == "search_pois":
+            destination = str(tool_call.get("destination") or "").strip()
+            days = int(tool_call.get("days") or 2)
+            travel_style = str(tool_call.get("travel_style") or "general").strip()
+            categories = tool_call.get("categories") or []
+            categories = [str(c) for c in categories if str(c).strip()]
+
+            try:
+                poi_list = await _execute_search_pois(settings, destination, categories)
+            except Exception as e:
+                logger.warning("POI tool execution failed: %s", e)
+                poi_list = []
+
+            turn2_system = TURN2_SYSTEM.format(
+                poi_list=_format_poi_list(poi_list),
+                days=days,
+                travel_style=travel_style,
+            )
+
+            turn2 = await llm.ainvoke([SystemMessage(content=turn2_system), HumanMessage(content=user_content)])
+            raw_ai_content = str(turn2.content)
+            ai_content, route_data = _parse_route_from_response(raw_ai_content)
+        else:
+            # Fall back to existing behavior if tool-call parsing fails
+            response = await llm.ainvoke(llm_messages)
+            raw_ai_content = str(response.content)
+            ai_content, route_data = _parse_route_from_response(raw_ai_content)
+    else:
+        # Invoke LLM (regular chat)
+        response = await llm.ainvoke(llm_messages)
+        raw_ai_content = str(response.content)
+        ai_content, route_data = _parse_route_from_response(raw_ai_content)
 
     # Output moderation: block harmful AI response before returning to user
     ai_flagged, ai_flagged_cats = await is_content_flagged(settings, ai_content)
