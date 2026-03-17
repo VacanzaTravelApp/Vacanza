@@ -36,4 +36,16 @@ public interface CheckInRepository extends JpaRepository<CheckIn, UUID> {
     @Query("SELECT c.pointOfInterest.category FROM CheckIn c WHERE c.user = :user " +
             "GROUP BY c.pointOfInterest.category ORDER BY COUNT(c) DESC LIMIT 1")
     java.util.Optional<String> findTopCategoryByUser(@Param("user") User user);
+
+    // ── Admin Analytics ─────────────────────────────────────────
+
+    // Category distribution for admin dashboard
+    @Query("SELECT c.pointOfInterest.category, COUNT(c) FROM CheckIn c GROUP BY c.pointOfInterest.category")
+    List<Object[]> findCategoryDistribution();
+
+    // Top 10 most visited POIs
+    @Query("SELECT c.pointOfInterest.name, c.pointOfInterest.category, COUNT(c) " +
+           "FROM CheckIn c GROUP BY c.pointOfInterest.name, c.pointOfInterest.category " +
+           "ORDER BY COUNT(c) DESC")
+    List<Object[]> findTopPois();
 }

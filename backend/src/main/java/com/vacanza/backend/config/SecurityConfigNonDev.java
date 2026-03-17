@@ -43,6 +43,7 @@ public class SecurityConfigNonDev {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/health", "/error").permitAll()
                         .requestMatchers("/pois/**").permitAll()   // POI endpoints public
+                        .requestMatchers("/admin/**").hasRole("ADMIN") // Admin panel
                         .requestMatchers("/chat/**").authenticated()
                         .requestMatchers("/api/behavior/**").authenticated()
                         .anyRequest().authenticated()

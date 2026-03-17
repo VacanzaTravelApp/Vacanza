@@ -1,5 +1,6 @@
 package com.vacanza.backend.integration.event;
 
+import com.vacanza.backend.component.ApiMetricsCollector;
 import com.vacanza.backend.config.TicketmasterProperties;
 import com.vacanza.backend.dto.request.EventSearchRequestDTO;
 import com.vacanza.backend.dto.response.EventDTO;
@@ -27,14 +28,19 @@ import java.util.List;
 @Component
 public class TicketmasterClient {
 
+    private static final String API_NAME = "Ticketmaster";
+
     private final WebClient webClient;
     private final TicketmasterProperties properties;
+    private final ApiMetricsCollector metricsCollector;
 
     public TicketmasterClient(
             @Qualifier("ticketmasterWebClient") WebClient webClient,
-            TicketmasterProperties properties) {
+            TicketmasterProperties properties,
+            ApiMetricsCollector metricsCollector) {
         this.webClient = webClient;
         this.properties = properties;
+        this.metricsCollector = metricsCollector;
     }
 
     /**
@@ -48,6 +54,7 @@ public class TicketmasterClient {
                 request.getCity(), request.getStartDate(), request.getEndDate(),
                 request.getCategory());
 
+        long startTime = System.currentTimeMillis();
         try {
             TicketmasterResponse response = webClient.get()
                     .uri(uriB -> {
@@ -93,10 +100,13 @@ public class TicketmasterClient {
 
             List<EventDTO> results = TicketmasterResponse.toEventDTOs(response);
 
+            metricsCollector.recordCall(API_NAME, System.currentTimeMillis() - startTime);
             log.info("[TICKETMASTER] Event search returned {} results", results.size());
             return results;
 
         } catch (WebClientResponseException e) {
+            metricsCollector.recordError(API_NAME);
+            metricsCollector.recordCall(API_NAME, System.currentTimeMillis() - startTime);
             log.error("[TICKETMASTER] Event search API error: {} - {}",
                     e.getStatusCode(), e.getResponseBodyAsString());
 
@@ -118,6 +128,7 @@ public class TicketmasterClient {
         } catch (EventException e) {
             throw e;
         } catch (Exception e) {
+            metricsCollector.recordError(API_NAME);
             log.error("[TICKETMASTER] Event search failed: {}", e.getMessage(), e);
             throw new EventException(
                     "Event search failed: " + e.getMessage(),
