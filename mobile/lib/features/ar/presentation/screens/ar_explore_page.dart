@@ -60,14 +60,24 @@ class _ArExplorePageState extends State<ArExplorePage> {
   }
 
   Future<void> _checkSupportAndPermissions() async {
+    debugPrint('[AR_MODE] init: requesting camera permission');
+
     final camStatus = await Permission.camera.request();
     if (!camStatus.isGranted) {
+      debugPrint('[AR_MODE] camera permission denied: $camStatus');
       setState(() => _status = _ArModeStatus.cameraDenied);
       return;
     }
 
     try {
+      debugPrint('[AR_MODE] camera permission granted, initializing camera');
       final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        debugPrint('[AR_MODE] no cameras available on device');
+        setState(() => _status = _ArModeStatus.cameraDenied);
+        return;
+      }
+
       final backCamera = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
@@ -82,13 +92,15 @@ class _ArExplorePageState extends State<ArExplorePage> {
         return;
       }
 
+      debugPrint('[AR_MODE] camera initialized successfully');
       setState(() {
         _cameraController = controller;
         _status = _ArModeStatus.ready;
       });
 
       await _loadPoisForCurrentLocation();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AR_MODE] camera initialization failed: $e');
       setState(() => _status = _ArModeStatus.cameraDenied);
     }
   }
@@ -224,11 +236,7 @@ class _ArExplorePageState extends State<ArExplorePage> {
           message: 'Checking device support and camera permission.',
         );
       case _ArModeStatus.cameraDenied:
-        return const _ArStatusMessage(
-          icon: Icons.camera_alt_outlined,
-          title: 'Camera Permission Required',
-          message: 'Camera access is required to use AR Mode. Please enable it in system settings.',
-        );
+        return _CameraDeniedMessage(onBackToMap: () => Navigator.of(context).pop());
       case _ArModeStatus.ready:
         final positioned = layoutArPois(
           pois: _pois,
@@ -678,6 +686,57 @@ class _ArStatusMessage extends StatelessWidget {
               message,
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CameraDeniedMessage extends StatelessWidget {
+  final VoidCallback onBackToMap;
+
+  const _CameraDeniedMessage({required this.onBackToMap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.camera_alt_outlined, size: 48),
+            const SizedBox(height: 16),
+            const Text(
+              'Camera not available for AR',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Camera access is required to use AR Mode. This device or emulator may not support camera for AR, or the permission was denied.',
+              style: TextStyle(fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: () {
+                    Geolocator.openAppSettings();
+                  },
+                  child: const Text('Open app settings'),
+                ),
+                ElevatedButton(
+                  onPressed: onBackToMap,
+                  child: const Text('Back to map'),
+                ),
+              ],
             ),
           ],
         ),
