@@ -17,6 +17,8 @@ class ArPoiPositioned {
 List<ArPoiPositioned> layoutArPois({
   required List<ArPoi> pois,
   required double deviceHeadingDeg,
+  int maxPerCategory = 1,
+  int maxTotal = 40,
 }) {
   if (pois.isEmpty) return const [];
 
@@ -27,9 +29,20 @@ List<ArPoiPositioned> layoutArPois({
     return a;
   }
 
+  // Limit POIs per category and in total so AR view stays readable.
+  final perCategoryCount = <String, int>{};
+  final limited = <ArPoi>[];
+  for (final poi in pois) {
+    final current = perCategoryCount[poi.categoryKey] ?? 0;
+    if (current >= maxPerCategory) continue;
+    perCategoryCount[poi.categoryKey] = current + 1;
+    limited.add(poi);
+    if (limited.length >= maxTotal) break;
+  }
+
   final positioned = <ArPoiPositioned>[];
 
-  final sorted = [...pois]
+  final sorted = [...limited]
     ..sort((a, b) => a.bearingDegrees.compareTo(b.bearingDegrees));
 
   for (var i = 0; i < sorted.length; i++) {
