@@ -6,6 +6,7 @@ import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
 import com.vacanza.backend.exceptions.BookingException;
+import com.vacanza.backend.integration.booking.SerpApiAirportSuggestion.AutocompleteResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
@@ -174,6 +175,64 @@ public class SerpApiClient {
             log.error("[SERPAPI] Flight search failed: {}", e.getMessage(), e);
             throw new BookingException(
                     "Flight search failed: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Search airports and cities by free-text query using Google Flights Autocomplete via SerpApi.
+     *
+     * <p>Returns a flat list of suggestions (IATA code + human-readable names) that the
+     * frontend can display in a type-ahead widget.  Users can then select a suggestion;
+     * the {@code iataCode} field is passed as {@code origin}/{@code destination} in the
+     * flight search request.
+     *
+     * @param query partial city or airport name (e.g. "istan", "New York", "Heathrow")
+     * @return list of airport suggestions, never null
+     */
+    public List<SerpApiAirportSuggestion> searchAirports(String query) {
+        log.info("[SERPAPI] Airport autocomplete: query='{}'", query);
+
+        try {
+            AutocompleteResponse response = webClient.get()
+                    .uri(uriB -> uriB.path("/search.json")
+                            .queryParam("engine", "google_flights_autocomplete")
+                            .queryParam("q", query)
+                            .queryParam("api_key", properties.getApiKey())
+                            .build())
+                    .retrieve()
+                    .bodyToMono(AutocompleteResponse.class)
+                    .block();
+
+            List<SerpApiAirportSuggestion> suggestions =
+                    SerpApiAirportSuggestion.fromResponse(response);
+
+            log.info("[SERPAPI] Airport autocomplete returned {} suggestions", suggestions.size());
+            return suggestions;
+
+        } catch (WebClientResponseException e) {
+            log.error("[SERPAPI] Airport autocomplete API error: {} - {}",
+                    e.getStatusCode(), e.getResponseBodyAsString());
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED
+                    || e.getStatusCode() == HttpStatus.FORBIDDEN) {
+                throw new BookingException(
+                        "SerpApi authentication failed — check SERPAPI_API_KEY",
+                        HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+            if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                throw new BookingException(
+                        "SerpApi rate limit exceeded — please try again later",
+                        HttpStatus.SERVICE_UNAVAILABLE);
+            }
+            throw new BookingException(
+                    "Airport search unavailable: " + e.getStatusCode(),
+                    HttpStatus.BAD_GATEWAY);
+        } catch (BookingException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("[SERPAPI] Airport autocomplete failed: {}", e.getMessage(), e);
+            throw new BookingException(
+                    "Airport search failed: " + e.getMessage(),
                     HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
