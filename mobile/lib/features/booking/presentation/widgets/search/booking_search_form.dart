@@ -299,12 +299,30 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     return [
       TextField(
         controller: _hotelQueryCtrl,
-        decoration: const InputDecoration(
+        cursorColor: _accent,
+        decoration: InputDecoration(
           labelText: 'Search hotels',
           hintText: 'e.g. Hotels in Paris, Bali resorts',
-          prefixIcon: Icon(Icons.search_rounded),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFFAAAAAA),
+          ),
+          filled: true,
+          fillColor: const Color(0xFFFAFAFA),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(
+              color: Color(0xFF0096FF),
+              width: 1.5,
+            ),
           ),
         ),
         textInputAction: TextInputAction.search,

@@ -38,7 +38,7 @@ String formatTime(String isoDateTime) {
 /// Null-safe rating display. Returns null when [rating] is null.
 String? formatRating(double? rating) {
   if (rating == null) return null;
-  return '★ ${rating.toStringAsFixed(1)}';
+  return rating.toStringAsFixed(1);
 }
 
 /// Stops label: 0 → "Direct", 1 → "1 stop", N → "N stops".

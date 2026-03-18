@@ -95,7 +95,7 @@ class _HotelCardState extends State<HotelCard> {
                           const SizedBox(height: 2),
                           if (hotel.hotelClass != null)
                             Text(
-                              '${hotel.hotelClass}★',
+                              'Class ${hotel.hotelClass}★',
                               style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,

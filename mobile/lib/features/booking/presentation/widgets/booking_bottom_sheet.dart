@@ -78,13 +78,17 @@ class BookingBottomSheet extends StatelessWidget {
                 Expanded(
                   child: BlocBuilder<BookingCubit, BookingState>(
                     builder: (context, state) {
-                      return SingleChildScrollView(
-                        controller: scrollController,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 24,
+                      return GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: () => FocusScope.of(context).unfocus(),
+                        child: SingleChildScrollView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 24,
+                          ),
+                          child: _buildBody(context, state),
                         ),
-                        child: _buildBody(context, state),
                       );
                     },
                   ),
