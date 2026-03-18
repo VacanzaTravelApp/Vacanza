@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 Color arPoiColorForCategory(String categoryKey) {
   switch (categoryKey.toLowerCase()) {
     case 'restaurant':
-      return const Color(0xFFE57373);
+      // Match map legend: restaurant = yellow/orange
+      return const Color(0xFFFFB74D);
     case 'cafe':
       return const Color(0xFFBA68C8);
     case 'museum':

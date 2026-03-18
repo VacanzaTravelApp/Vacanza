@@ -426,7 +426,14 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
 
             // UC1.11 — Explore in AR entry point
             onOpenArMode: () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ArExplorePage()));
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => BlocProvider.value(
+                    value: context.read<CheckinBloc>(),
+                    child: const ArExplorePage(),
+                  ),
+                ),
+              );
             },
 
             // ✅ UC1.8-MOB1: booking entry point
