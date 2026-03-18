@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -5,6 +7,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:mobile/features/checkin/data/services/location_service.dart';
+import 'package:mobile/features/checkin/presentation/bloc/checkin_bloc.dart';
+import 'package:mobile/features/checkin/presentation/bloc/checkin_event.dart';
+import 'package:mobile/features/checkin/presentation/bloc/checkin_state.dart';
 import 'package:mobile/features/poi_search/data/api/poi_search_api_client.dart';
 import 'package:mobile/features/poi_search/data/repositories/poi_search_repository_impl.dart';
 import 'package:mobile/features/poi_search/data/models/poi_categories.dart';
@@ -30,6 +35,9 @@ class _ArExplorePageState extends State<ArExplorePage> {
   _ArModeStatus _status = _ArModeStatus.checking;
 
   double _deviceHeadingDeg = 0;
+  ArPoi? _selectedPoi;
+  bool _checkinLoading = false;
+  String? _checkinMessage;
 
   final LocationService _locationService = LocationService();
 
@@ -40,10 +48,15 @@ class _ArExplorePageState extends State<ArExplorePage> {
   final Set<String> _selectedCategories = Set<String>.from(PoiCategories.defaults);
   bool _showHelp = true;
 
+  int _maxPoisPerCategory = 1;
+
+  StreamSubscription<Position>? _headingSubscription;
+
   @override
   void initState() {
     super.initState();
     _checkSupportAndPermissions();
+    _startHeadingUpdates();
   }
 
   Future<void> _checkSupportAndPermissions() async {
@@ -133,17 +146,71 @@ class _ArExplorePageState extends State<ArExplorePage> {
     }
   }
 
+  void _startHeadingUpdates() {
+    _headingSubscription?.cancel();
+    _headingSubscription = _locationService.positionStream(distanceFilter: 0).listen(
+      (Position position) {
+        if (!mounted) return;
+        final heading = position.heading;
+        if (heading >= 0 && heading <= 360) {
+          setState(() => _deviceHeadingDeg = heading);
+        }
+      },
+      onError: (_) {},
+    );
+  }
+
   @override
   void dispose() {
+    _headingSubscription?.cancel();
     _cameraController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: _buildBody()),
+    return BlocListener<CheckinBloc, CheckinState>(
+      listenWhen: (prev, next) => prev.status != next.status,
+      listener: (context, state) {
+        if (state.status == CheckinStatus.loading) {
+          setState(() {
+            _checkinLoading = true;
+            _checkinMessage = null;
+          });
+        } else if (state.status == CheckinStatus.newCreated) {
+          final poiName = state.response?.poiName;
+          setState(() {
+            _checkinLoading = false;
+            _checkinMessage =
+                poiName != null ? 'Checked in at $poiName' : 'Checked in!';
+          });
+        } else if (state.status == CheckinStatus.duplicate) {
+          setState(() {
+            _checkinLoading = false;
+            _checkinMessage = state.response?.message ??
+                'You have already checked in here.';
+          });
+        } else if (state.status == CheckinStatus.noMatch) {
+          setState(() {
+            _checkinLoading = false;
+            _checkinMessage = state.response?.message ??
+                'You are too far from this place to check in.';
+          });
+        } else if (state.status == CheckinStatus.failure) {
+          setState(() {
+            _checkinLoading = false;
+            _checkinMessage = state.errorMessage ??
+                'Check-in failed. Please try again.';
+          });
+        }
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _buildBody(),
+          ),
+        ),
       ),
     );
   }
@@ -163,7 +230,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
           message: 'Camera access is required to use AR Mode. Please enable it in system settings.',
         );
       case _ArModeStatus.ready:
-        final positioned = layoutArPois(pois: _pois, deviceHeadingDeg: _deviceHeadingDeg);
+        final positioned = layoutArPois(
+          pois: _pois,
+          deviceHeadingDeg: _deviceHeadingDeg,
+          maxPerCategory: _maxPoisPerCategory,
+        );
 
         return Stack(
           children: [
@@ -182,16 +253,139 @@ class _ArExplorePageState extends State<ArExplorePage> {
                   for (final p in positioned)
                     Align(
                       alignment: Alignment(p.xFraction * 2 - 1, -0.6 + p.row * 0.25),
-                      child: ArPoiChip(poi: p.poi),
+                      child: GestureDetector(
+                        onTap: () => _onPoiTap(p.poi),
+                        child: ArPoiChip(poi: p.poi),
+                      ),
                     ),
                 ],
               ),
             ),
             if (_showHelp) _buildHelpOverlay(),
+            if (_selectedPoi != null) _buildPoiBottomSheet(),
           ],
         );
     }
   }
+
+  void _onPoiTap(ArPoi poi) {
+    setState(() {
+      _selectedPoi = poi;
+    });
+  }
+
+  void _closePoiSheet() {
+    setState(() {
+      _selectedPoi = null;
+      _checkinLoading = false;
+      _checkinMessage = null;
+    });
+  }
+
+  Widget _buildPoiBottomSheet() {
+    final poi = _selectedPoi!;
+
+    final dist =
+        poi.distanceMeters >= 1000
+            ? '${(poi.distanceMeters / 1000).toStringAsFixed(1)} km'
+            : '${poi.distanceMeters.round()} m';
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Material(
+            color: Colors.black.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          poi.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: _closePoiSheet,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Approx. $dist away',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_checkinMessage != null) ...[
+                    Text(
+                      _checkinMessage!,
+                      style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed:
+                          _checkinLoading
+                              ? null
+                              : () async {
+                                final poi = _selectedPoi;
+                                if (poi == null) return;
+
+                                debugPrint('[AR_CHECKIN] attempt poiId=${poi.id} name=${poi.name}');
+
+                                setState(() {
+                                  _checkinLoading = true;
+                                  _checkinMessage = null;
+                                });
+
+                                final pos = await _locationService.getCurrentPosition();
+
+                                if (!mounted) return;
+
+                                context.read<CheckinBloc>().add(
+                                  TriggerAutoCheckin(
+                                    latitude: pos.latitude,
+                                    longitude: pos.longitude,
+                                    candidatePoiIds: [poi.id],
+                                  ),
+                                );
+                              },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black87,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Check in here'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTopHud() {
     return Align(
       alignment: Alignment.topCenter,
@@ -216,7 +410,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
                 const Expanded(
                   child: Text(
                     'Explore in AR',
-                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -232,6 +430,29 @@ class _ArExplorePageState extends State<ArExplorePage> {
                       ),
                     ),
                   ),
+                PopupMenuButton<int>(
+                  icon: const Icon(Icons.tune, color: Colors.white, size: 20),
+                  padding: EdgeInsets.zero,
+                  onSelected: (value) {
+                    setState(() {
+                      _maxPoisPerCategory = value;
+                    });
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 1,
+                      child: Text('1 per category'),
+                    ),
+                    PopupMenuItem(
+                      value: 2,
+                      child: Text('2 per category'),
+                    ),
+                    PopupMenuItem(
+                      value: 3,
+                      child: Text('3 per category'),
+                    ),
+                  ],
+                ),
                 IconButton(
                   icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
                   padding: EdgeInsets.zero,
@@ -334,7 +555,8 @@ class _ArExplorePageState extends State<ArExplorePage> {
                           selectedColor: Colors.white.withOpacity(0.9),
                           checkmarkColor: Colors.black87,
                           labelStyle: TextStyle(
-                            color: _selectedCategories.contains(key) ? Colors.black87 : Colors.white,
+                            color:
+                                _selectedCategories.contains(key) ? Colors.black87 : Colors.white,
                           ),
                         ),
                       ),
@@ -367,7 +589,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
                 children: [
                   const Text(
                     'How to use AR Mode',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
