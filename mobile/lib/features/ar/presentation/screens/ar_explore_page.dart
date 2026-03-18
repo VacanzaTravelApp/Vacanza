@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:mobile/features/checkin/data/services/location_service.dart';
 import 'package:mobile/features/poi_search/data/api/poi_search_api_client.dart';
 import 'package:mobile/features/poi_search/data/repositories/poi_search_repository_impl.dart';
+import 'package:mobile/features/poi_search/data/models/poi_categories.dart';
 
 import '../../application/ar_poi_layout.dart';
 import '../../data/ar_poi_source_from_poi_search.dart';
@@ -21,11 +22,7 @@ class ArExplorePage extends StatefulWidget {
   State<ArExplorePage> createState() => _ArExplorePageState();
 }
 
-enum _ArModeStatus {
-  checking,
-  cameraDenied,
-  ready,
-}
+enum _ArModeStatus { checking, cameraDenied, ready }
 
 class _ArExplorePageState extends State<ArExplorePage> {
   CameraController? _cameraController;
@@ -39,6 +36,9 @@ class _ArExplorePageState extends State<ArExplorePage> {
   List<ArPoi> _pois = const [];
   bool _isLoadingPois = false;
   String? _poisError;
+
+  final Set<String> _selectedCategories = Set<String>.from(PoiCategories.defaults);
+  bool _showHelp = true;
 
   @override
   void initState() {
@@ -60,11 +60,7 @@ class _ArExplorePageState extends State<ArExplorePage> {
         orElse: () => cameras.first,
       );
 
-      final controller = CameraController(
-        backCamera,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
+      final controller = CameraController(backCamera, ResolutionPreset.medium, enableAudio: false);
 
       await controller.initialize();
 
@@ -92,12 +88,10 @@ class _ArExplorePageState extends State<ArExplorePage> {
 
     try {
       final perm = await _locationService.checkAndRequestPermission();
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
         setState(() {
           _pois = const [];
-          _poisError =
-              'Location permission is required to show nearby places in AR.';
+          _poisError = 'Location permission is required to show nearby places in AR.';
         });
         return;
       }
@@ -108,10 +102,15 @@ class _ArExplorePageState extends State<ArExplorePage> {
       final poiRepo = PoiSearchRepositoryImpl(apiClient);
       final ArPoiSource source = ArPoiSourceFromPoiSearch(poiRepo);
 
+      final List<String>? effectiveCategories =
+          _selectedCategories.isEmpty
+              ? null
+              : _selectedCategories.map((c) => c.toLowerCase()).toList();
+
       final pois = await source.getNearbyArPois(
         lat: pos.latitude,
         lng: pos.longitude,
-        categories: null, // MOB-3: all categories; filtering comes later
+        categories: effectiveCategories,
         radiusMeters: 600,
       );
 
@@ -143,14 +142,8 @@ class _ArExplorePageState extends State<ArExplorePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Explore in AR'),
-      ),
       body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: _buildBody(),
-        ),
+        child: AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: _buildBody()),
       ),
     );
   }
@@ -167,71 +160,237 @@ class _ArExplorePageState extends State<ArExplorePage> {
         return const _ArStatusMessage(
           icon: Icons.camera_alt_outlined,
           title: 'Camera Permission Required',
-          message:
-              'Camera access is required to use AR Mode. Please enable it in system settings.',
+          message: 'Camera access is required to use AR Mode. Please enable it in system settings.',
         );
       case _ArModeStatus.ready:
-        final positioned = layoutArPois(
-          pois: _pois,
-          deviceHeadingDeg: _deviceHeadingDeg,
-        );
+        final positioned = layoutArPois(pois: _pois, deviceHeadingDeg: _deviceHeadingDeg);
 
         return Stack(
           children: [
             Positioned.fill(
-              child: _cameraController != null &&
-                      _cameraController!.value.isInitialized
-                  ? CameraPreview(_cameraController!)
-                  : const ColoredBox(color: Colors.black),
+              child:
+                  _cameraController != null && _cameraController!.value.isInitialized
+                      ? CameraPreview(_cameraController!)
+                      : const ColoredBox(color: Colors.black),
             ),
             const _CenterReticle(),
             Positioned.fill(
-              child: IgnorePointer(
-                child: Stack(
+              child: Stack(
+                children: [
+                  _buildTopHud(),
+                  _buildBottomHud(),
+                  for (final p in positioned)
+                    Align(
+                      alignment: Alignment(p.xFraction * 2 - 1, -0.6 + p.row * 0.25),
+                      child: ArPoiChip(poi: p.poi),
+                    ),
+                ],
+              ),
+            ),
+            if (_showHelp) _buildHelpOverlay(),
+          ],
+        );
+    }
+  }
+  Widget _buildTopHud() {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.45),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                  padding: EdgeInsets.zero,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(width: 4),
+                const Expanded(
+                  child: Text(
+                    'Explore in AR',
+                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (_isLoadingPois)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                  padding: EdgeInsets.zero,
+                  onPressed: _loadPoisForCurrentLocation,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.help_outline, color: Colors.white, size: 20),
+                  padding: EdgeInsets.zero,
+                  onPressed: () => setState(() => _showHelp = true),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomHud() {
+    final chips = PoiCategories.defaults;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SafeArea(
+        minimum: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_poisError != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _poisError!,
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else if (!_isLoadingPois && _pois.isEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'No places found around you for the selected categories.',
+                  style: TextStyle(color: Colors.white, fontSize: 11),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Showing ${_pois.length} places',
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                ),
+              ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_isLoadingPois)
-                      const Align(
-                        alignment: Alignment(0, -0.9),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    if (!_isLoadingPois && _pois.isEmpty && _poisError == null)
-                      const Align(
-                        alignment: Alignment(0, -0.8),
-                        child: Text(
-                          'No places found around you for AR.',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
+                    for (final key in chips)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: FilterChip(
+                          label: Text(
+                            key[0].toUpperCase() + key.substring(1),
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          selected: _selectedCategories.contains(key),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedCategories.add(key);
+                              } else {
+                                _selectedCategories.remove(key);
+                              }
+                            });
+                            _loadPoisForCurrentLocation();
+                          },
+                          backgroundColor: Colors.black.withOpacity(0.3),
+                          selectedColor: Colors.white.withOpacity(0.9),
+                          checkmarkColor: Colors.black87,
+                          labelStyle: TextStyle(
+                            color: _selectedCategories.contains(key) ? Colors.black87 : Colors.white,
                           ),
                         ),
-                      ),
-                    if (_poisError != null)
-                      Align(
-                        alignment: const Alignment(0, -0.8),
-                        child: Text(
-                          _poisError!,
-                          style: const TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 12,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    for (final p in positioned)
-                      Align(
-                        alignment: Alignment(
-                          p.xFraction * 2 - 1,
-                          -0.6 + p.row * 0.25,
-                        ),
-                        child: ArPoiChip(poi: p.poi),
                       ),
                   ],
                 ),
               ),
             ),
           ],
-        );
-    }
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHelpOverlay() {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withOpacity(0.45),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'How to use AR Mode',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '• Move your phone around to see nearby places overlaid on the camera.\n'
+                    '• Use the category buttons at the bottom to filter what you see.\n'
+                    '• Tap the refresh icon to reload nearby places.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => setState(() => _showHelp = false),
+                      child: const Text('Got it', style: TextStyle(color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -247,10 +406,7 @@ class _CenterReticle extends StatelessWidget {
           height: 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.9),
-              width: 2,
-            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 2),
             color: Colors.black.withValues(alpha: 0.15),
           ),
           child: Center(
@@ -274,11 +430,7 @@ class _ArStatusMessage extends StatelessWidget {
   final String title;
   final String message;
 
-  const _ArStatusMessage({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
+  const _ArStatusMessage({required this.icon, required this.title, required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -307,4 +459,3 @@ class _ArStatusMessage extends StatelessWidget {
     );
   }
 }
-
