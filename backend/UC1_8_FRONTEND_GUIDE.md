@@ -86,7 +86,80 @@ SerpApi (Google Hotels) sayesinde frontend'e çok daha zengin veriler dönüyor.
 
 Uçuş tarafında (Google Flights) arama parametreleri aynı kaldı ancak dönen veri formatı ve türlerinde önemli değişiklikler var.
 
-### Ne değişti?
+### 3a. Havaalanı / Şehir Adı Autocomplete (🌟 Yeni Endpoint)
+
+Artık kullanıcıların IATA kodlarını bilmesine gerek yok! Kullanıcı yazmaya başladığında bir autocomplete/type-ahead widget sunabilirsiniz.
+
+#### Endpoint
+
+```
+GET /bookings/airports/search?q={query}
+```
+
+| Parametre | Zorunlu | Açıklama |
+|-----------|---------|----------|
+| `q` | ✅ | Aranacak şehir veya havaalanı adı. **Min. 2 karakter.** |
+
+#### Örnek Request
+
+```
+GET /bookings/airports/search?q=istanbul
+```
+
+#### Örnek Response
+
+```json
+[
+  {
+    "iataCode": "IST",
+    "name": "Istanbul Airport",
+    "city": "Istanbul",
+    "country": "Turkey",
+    "kgmid": null
+  },
+  {
+    "iataCode": "SAW",
+    "name": "Istanbul Sabiha Gokcen Airport",
+    "city": "Istanbul",
+    "country": "Turkey",
+    "kgmid": null
+  },
+  {
+    "iataCode": "/m/06mkj",
+    "name": "All airports — Istanbul",
+    "city": "Istanbul",
+    "country": "Turkey",
+    "kgmid": "/m/06mkj"
+  }
+]
+```
+
+> **Not:** `kgmid` değeri doluysa, bu ID şehrin tüm havaalanlarını temsil eder. `origin`/`destination` olarak `iataCode` alanını kullanın.
+
+#### Önerilen Frontend UX Akışı
+
+```
+Kullanıcı "istan" yazmaya başlar
+    → (debounce ~300ms)
+    → GET /bookings/airports/search?q=istan
+    → Dropdown: [Istanbul Airport (IST)] [Sabiha Gokcen (SAW)] [All Istanbul airports]
+Kullanıcı "Istanbul Airport (IST)" seçer
+    → origin = "IST" (field'a otomatik dolar, kullanıcı görmez)
+Kullanıcı "Ara" butonuna basar
+    → POST /bookings/transportation/search { "origin": "IST", ... }
+```
+
+#### Hata Durumları
+
+| Status | Durum | Aksiyon |
+|--------|-------|---------|
+| 400 | `q` eksik veya < 2 karakter | Arama başlatmayın, validasyon mesajı gösterin |
+| 503 | SerpApi rate limit | "Şu an arama yapılamıyor" mesajı |
+
+---
+
+### 3b. Ne değişti? (Flight Search — Mevcut)
+
 1. Uçuş aramasında hala **IATA kodları** (`origin` ve `destination`) kullanılıyor. (Burada değişiklik yok).
 2. `departureTime` ve `arrivalTime` tipleri `LocalDateTime`'dan **`String`**'e çevrildi.
 3. UI'ı zenginleştirecek havaalanı logosu ve uçuş numarası gibi yeni alanlar eklendi.
