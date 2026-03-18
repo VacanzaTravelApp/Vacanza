@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
@@ -15,6 +16,8 @@ import 'package:mobile/features/poi_search/data/repositories/poi_search_reposito
 import 'package:mobile/features/poi_search/data/models/poi_categories.dart';
 
 import '../../application/ar_poi_layout.dart';
+import '../../data/ar_nearby_poi_api_client.dart';
+import '../../data/ar_poi_source_from_backend_nearby.dart';
 import '../../data/ar_poi_source_from_poi_search.dart';
 import '../../domain/models/ar_poi.dart';
 import '../../domain/services/ar_poi_source.dart';
@@ -125,7 +128,14 @@ class _ArExplorePageState extends State<ArExplorePage> {
 
       final apiClient = context.read<PoiSearchApiClient>();
       final poiRepo = PoiSearchRepositoryImpl(apiClient);
-      final ArPoiSource source = ArPoiSourceFromPoiSearch(poiRepo);
+      final ArPoiSource fallbackSource = ArPoiSourceFromPoiSearch(poiRepo);
+
+      final dio = context.read<Dio>();
+      final nearbyApiClient = ArNearbyPoiApiClient(dio);
+      final ArPoiSource source = ArPoiSourceFromBackendNearby(
+        apiClient: nearbyApiClient,
+        fallback: fallbackSource,
+      );
 
       final List<String>? effectiveCategories =
           _selectedCategories.isEmpty
