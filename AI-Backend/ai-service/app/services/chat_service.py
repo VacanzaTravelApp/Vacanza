@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import math
 import re
 import uuid
 
@@ -176,6 +177,86 @@ def _format_poi_list(pois: list[dict]) -> str:
             continue
         lines.append(f"{i}. {name} ({cat}) — lat: {lat}, lon: {lon}")
     return "\n".join(lines) if lines else "(no POIs returned)"
+
+
+def _haversine_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Haversine distance between two points in meters."""
+    R = 6_371_000  # Earth radius in meters
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+
+def _reorder_waypoints_by_proximity(waypoints: list[RouteWaypoint]) -> list[RouteWaypoint]:
+    """Reorder waypoints using nearest-neighbor to minimize total travel distance.
+    Skips optimization if any waypoint lacks coordinates.
+    """
+    if len(waypoints) < 2:
+        return waypoints
+    # Check all have coordinates
+    for w in waypoints:
+        if w.latitude is None or w.longitude is None:
+            return waypoints
+    # Nearest-neighbor: try each as start, pick order with minimum total distance
+    best_order: list[RouteWaypoint] = waypoints
+    best_total = float("inf")
+    for start_idx in range(len(waypoints)):
+        remaining = list(waypoints)
+        ordered: list[RouteWaypoint] = [remaining.pop(start_idx)]
+        total = 0.0
+        while remaining:
+            last = ordered[-1]
+            lat, lon = last.latitude, last.longitude
+            assert lat is not None and lon is not None
+            next_idx = min(
+                range(len(remaining)),
+                key=lambda i: _haversine_meters(lat, lon, remaining[i].latitude or 0, remaining[i].longitude or 0),
+            )
+            next_wp = remaining.pop(next_idx)
+            total += _haversine_meters(lat, lon, next_wp.latitude or 0, next_wp.longitude or 0)
+            ordered.append(next_wp)
+        if total < best_total:
+            best_total = total
+            best_order = ordered
+    # Reassign order field
+    return [
+        RouteWaypoint(
+            name=w.name,
+            description=w.description,
+            category=w.category,
+            day=w.day,
+            order=i + 1,
+            latitude=w.latitude,
+            longitude=w.longitude,
+            estimated_duration_min=w.estimated_duration_min,
+            time_slot=w.time_slot,
+        )
+        for i, w in enumerate(best_order)
+    ]
+
+
+def _optimize_route_order(route_data: RouteData) -> RouteData:
+    """Reorder each day's waypoints by geographic proximity to minimize travel distance."""
+    if not route_data.days:
+        return route_data
+    new_days: list[DayPlan] = []
+    for day in route_data.days:
+        if not day.waypoints:
+            new_days.append(day)
+            continue
+        reordered = _reorder_waypoints_by_proximity(day.waypoints)
+        new_days.append(DayPlan(day=day.day, title=day.title, waypoints=reordered))
+    return RouteData(
+        title=route_data.title,
+        destination=route_data.destination,
+        total_days=route_data.total_days,
+        days=new_days,
+        notes=route_data.notes,
+    )
 
 
 # Regex to extract waypoints from AI's formatted text (fallback when JSON is missing)
@@ -588,6 +669,8 @@ Route generation rules:
         turn2 = await llm.ainvoke([SystemMessage(content=turn2_system), HumanMessage(content="Build itinerary from provided POIs.")])
         raw_ai_content = str(turn2.content)
         ai_content, route_data = _parse_route_from_response(raw_ai_content)
+        if route_data:
+            route_data = _optimize_route_order(route_data)
 
     # Turn1: itinerary request => tool-call JSON ONLY (backend will execute tool)
     elif _is_itinerary_request(user_content):
@@ -600,6 +683,8 @@ Route generation rules:
         response = await llm.ainvoke(llm_messages)
         raw_ai_content = str(response.content)
         ai_content, route_data = _parse_route_from_response(raw_ai_content)
+        if route_data:
+            route_data = _optimize_route_order(route_data)
 
     # Output moderation: block harmful AI response before returning to user
     ai_flagged, ai_flagged_cats = await is_content_flagged(settings, ai_content)
