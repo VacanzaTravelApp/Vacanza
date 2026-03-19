@@ -148,6 +148,11 @@ def _parse_tool_result_pois(user_content: str) -> list[dict] | None:
 
 
 def _parse_tool_call(content: str) -> dict | None:
+    # If content contains tool result, only parse the part BEFORE the marker.
+    # Otherwise rfind("}") in _extract_json_object would pick the last } from
+    # the POI array (e.g. [{"name":"POI1"},{"name":"POI2"}]) and produce invalid JSON.
+    if TOOL_RESULT_PREFIX in content:
+        content = content.split(TOOL_RESULT_PREFIX)[0].strip()
     data = _extract_json_object(content)
     if not data or data.get("tool") != "search_pois":
         return None
