@@ -3,12 +3,13 @@
 import asyncio
 import json
 import logging
+import re
 import uuid
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.core.config import Settings
-from app.schemas.chat import RouteData, UserProfileForAi
+from app.schemas.chat import DayPlan, RouteData, RouteWaypoint, UserProfileForAi
 from app.schemas.preference_extraction import PreferenceExtractionResult
 from app.db.models import Message
 from app.repositories import ConversationRepository, MessageEmbeddingRepository, MessageRepository
@@ -64,8 +65,13 @@ Rules:
 - Order each day logically (minimize walking distance)
 - Each day: 4-6 POIs maximum
 - CRITICAL: Use latitude and longitude values exactly as provided. Do not round, modify, or recalculate.
-- Respond with your itinerary text followed by EXACTLY ---ROUTE_JSON--- (no spaces, no markdown)
-  and the route_data JSON
+
+OUTPUT FORMAT (MANDATORY — the map will NOT work without the JSON):
+1. Write ONE short sentence only (e.g. "Here is your Amasya itinerary."). Do NOT list places in text.
+2. On the next line: ---ROUTE_JSON---
+3. On the next line: the full route_data JSON (no markdown, no code block)
+
+Do NOT output a long formatted list with coordinates. The JSON is the ONLY format the app reads.
 
 route_data format:
 {{
@@ -172,6 +178,57 @@ def _format_poi_list(pois: list[dict]) -> str:
     return "\n".join(lines) if lines else "(no POIs returned)"
 
 
+# Regex to extract waypoints from AI's formatted text (fallback when JSON is missing)
+# Matches: "1. **Place Name** - Category: X - Latitude: X - Longitude: X - Estimated Duration: N minutes - Time Slot: X"
+_WAYPOINT_LINE_RE = re.compile(
+    r"\d+\.\s*\*\*(.+?)\*\*\s*-\s*(?:Category:\s*(\w+)\s*-\s*)?"
+    r"Latitude:\s*([\d.-]+).*?Longitude:\s*([\d.-]+)"
+    r"(?:.*?Estimated Duration:\s*(\d+)\s*minutes)?"
+    r"(?:.*?Time Slot:\s*(\w+))?",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _parse_route_from_formatted_text(raw_content: str) -> RouteData | None:
+    """Fallback: extract route from AI's formatted list when JSON block is missing."""
+    waypoints: list[tuple[str, float, float, str, int, str]] = []
+    for m in _WAYPOINT_LINE_RE.finditer(raw_content):
+        name = m.group(1).strip()
+        cat = (m.group(2) or "attraction").lower()
+        lat = float(m.group(3))
+        lon = float(m.group(4))
+        dur = int(m.group(5)) if m.group(5) else 60
+        slot = (m.group(6) or "morning").lower()
+        if "late" in slot:
+            slot = "afternoon" if "afternoon" in slot else "morning"
+        waypoints.append((name, lat, lon, cat, dur, slot))
+    if not waypoints:
+        return None
+    # Infer title/destination from first lines (e.g. "**Itinerary for Amasya Day Trip**")
+    title_match = re.search(r"\*\*(?:Itinerary for |Day Trip in )?(.+?)(?: Day Trip)?\*\*", raw_content, re.I)
+    title = title_match.group(1).strip() if title_match else "Day Trip"
+    dest = title.split()[0] + ", Turkey" if title else "Turkey"
+    day_waypoints = [
+        RouteWaypoint(
+            name=name,
+            category=cat,
+            day=1,
+            order=i + 1,
+            latitude=lat,
+            longitude=lon,
+            estimated_duration_min=dur,
+            time_slot=slot,
+        )
+        for i, (name, lat, lon, cat, dur, slot) in enumerate(waypoints)
+    ]
+    return RouteData(
+        title=f"{title} Itinerary" if "Itinerary" not in title else title,
+        destination=dest,
+        total_days=1,
+        days=[DayPlan(day=1, title="Day 1", waypoints=day_waypoints)],
+    )
+
+
 # Alternative separators AI may output (e.g. markdown bold **ROUTE_JSON** instead of ---ROUTE_JSON---)
 _ROUTE_JSON_PATTERNS = [
     ROUTE_JSON_SEPARATOR,  # ---ROUTE_JSON--- (canonical)
@@ -199,6 +256,10 @@ def _parse_route_from_response(raw_content: str) -> tuple[str, RouteData | None]
             break
 
     if not json_str:
+        # Fallback: AI may have output formatted list instead of JSON
+        route_data = _parse_route_from_formatted_text(raw_content)
+        if route_data:
+            return raw_content, route_data
         return raw_content, None
 
     # Strip markdown code block if AI wrapped JSON (e.g. ```json\n{...}\n```)
