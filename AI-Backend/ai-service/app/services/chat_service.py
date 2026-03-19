@@ -64,7 +64,7 @@ Rules:
 - Order each day logically (minimize walking distance)
 - Each day: 4-6 POIs maximum
 - CRITICAL: Use latitude and longitude values exactly as provided. Do not round, modify, or recalculate.
-- Respond with your itinerary text followed by ---ROUTE_JSON---
+- Respond with your itinerary text followed by EXACTLY ---ROUTE_JSON--- (no spaces, no markdown)
   and the route_data JSON
 
 route_data format:
@@ -172,22 +172,34 @@ def _format_poi_list(pois: list[dict]) -> str:
     return "\n".join(lines) if lines else "(no POIs returned)"
 
 
+# Alternative separators AI may output (e.g. markdown bold **ROUTE_JSON** instead of ---ROUTE_JSON---)
+_ROUTE_JSON_PATTERNS = [
+    ROUTE_JSON_SEPARATOR,  # ---ROUTE_JSON--- (canonical)
+    "--- **ROUTE_JSON**",  # AI sometimes uses markdown bold
+    "**ROUTE_JSON**",
+    "ROUTE_JSON",
+]
+
+
 def _parse_route_from_response(raw_content: str) -> tuple[str, RouteData | None]:
     """Split AI response into text content and optional route data.
 
-    If the response contains the ROUTE_JSON_SEPARATOR, the text before it
-    is returned as content and the JSON after it is parsed into RouteData.
+    If the response contains the ROUTE_JSON separator (or common variants),
+    the text before it is returned as content and the JSON after it is parsed.
     On any parse failure the full text is returned with route_data=None.
     """
-    if ROUTE_JSON_SEPARATOR not in raw_content:
-        return raw_content, None
+    text_content = raw_content
+    json_str = ""
 
-    parts = raw_content.split(ROUTE_JSON_SEPARATOR, 1)
-    text_content = parts[0].strip()
-    json_str = parts[1].strip() if len(parts) > 1 else ""
+    for sep in _ROUTE_JSON_PATTERNS:
+        if sep in raw_content:
+            parts = raw_content.split(sep, 1)
+            text_content = parts[0].strip()
+            json_str = parts[1].strip() if len(parts) > 1 else ""
+            break
 
     if not json_str:
-        return text_content, None
+        return raw_content, None
 
     # Strip markdown code block if AI wrapped JSON (e.g. ```json\n{...}\n```)
     if json_str.startswith("```"):
@@ -195,10 +207,21 @@ def _parse_route_from_response(raw_content: str) -> tuple[str, RouteData | None]
         json_str = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
         json_str = json_str.strip()
 
+    # If separator was ROUTE_JSON (no prefix), strip leading punctuation/whitespace before {
+    json_str = json_str.lstrip(": \n\t")
+
     try:
         route_data = RouteData.model_validate_json(json_str)
         return text_content, route_data
     except (ValueError, Exception) as e:
+        # Fallback: extract first {...} block (AI may add trailing text)
+        start, end = json_str.find("{"), json_str.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                route_data = RouteData.model_validate_json(json_str[start : end + 1])
+                return text_content, route_data
+            except (ValueError, Exception):
+                pass
         logger.warning("Failed to parse route JSON from AI response: %s", e)
         return text_content, None
 
@@ -432,7 +455,7 @@ Response length (STRICT — this is a chat bubble UI, not a blog):
 Formatting (chat-friendly markdown):
 - Use **bold** for place names, key terms, and emphasis.
 - Use "- " bullet points for lists. Keep each bullet to one short line.
-- Do NOT use headings (#, ##), horizontal rules (---), code blocks, or tables.
+- Do NOT use headings (#, ##), horizontal rules (---), code blocks, or tables. Exception: for route generation you MUST use the exact separator ---ROUTE_JSON--- (see below).
 - Do NOT use numbered lists (1. 2. 3.) — use bullet points instead.
 - Do NOT use emojis unless the user uses them first.
 - Keep paragraphs to 1–2 sentences max. Use line breaks between distinct points.
@@ -458,7 +481,7 @@ Vacanza app features (mention ONLY when directly relevant):
 Route generation (CRITICAL — follow exactly):
 When the user asks for a trip plan, vacation plan, itinerary, or route (e.g. "plan 3 days in Rome", "tatil planla", "rota oluştur", "3 günlük plan", "create an itinerary"), you MUST:
 1. Write a VERY SHORT text summary: MAX 40 words, 2-3 sentences only. Do NOT list places in the text — the JSON contains them. Example: "İstanbul'da 3 günlük plan: tarihi yarımada, müzeler ve Boğaz. Aşağıda günlük program."
-2. On the next line, write exactly: ---ROUTE_JSON---
+2. On the next line, write EXACTLY this separator (no spaces, no markdown, no bold): ---ROUTE_JSON---
 3. On the next line, write a single valid JSON object (no markdown, no code block) with this structure:
 {"title":"...","destination":"City, Country","total_days":N,"days":[{"day":1,"title":"Day 1: ...","waypoints":[{"name":"Place Name","description":"Short description","category":"museum","day":1,"order":1,"latitude":null,"longitude":null,"estimated_duration_min":60,"time_slot":"morning"}]}],"notes":"Optional tips"}
 
