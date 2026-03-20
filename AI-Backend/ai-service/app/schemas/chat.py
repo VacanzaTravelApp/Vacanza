@@ -3,14 +3,17 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.schemas.preference_extraction import ExtractedPreference
 
 
 class UserProfileForAi(BaseModel):
-    """User profile for AI personalization (from X-User-Profile header)."""
+    """User profile for AI (X-User-Profile). Mirrors Java UserProfileForAi (identity + UserPreferences)."""
 
+    model_config = ConfigDict(extra="ignore")
+
+    # Identity (UserInfo)
     displayName: str | None = None
     firstName: str | None = None
     middleName: str | None = None
@@ -19,9 +22,37 @@ class UserProfileForAi(BaseModel):
     country: str | None = None
     birthDate: str | None = None
     gender: str | None = None
-    budget: str | None = None
     profileImageUrl: str | None = None
     joinDate: str | None = None
+
+    # Travel style & interests
+    travelStyle: str | None = None
+    favoriteCategories: list[str] | None = None
+    activityLevel: str | None = None
+    cuisinePreferences: list[str] | None = None
+
+    # Trip preferences
+    preferredClimate: str | None = None
+    tripPace: str | None = None
+    accommodationType: str | None = None
+    transportPreference: str | None = None
+
+    # Constraints & accessibility
+    dietaryRestrictions: list[str] | None = None
+    accessibilityNeeds: list[str] | None = None
+    avoidCategories: list[str] | None = None
+
+    # Budget (Java sends dailyBudget; accept legacy key "budget")
+    dailyBudget: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("dailyBudget", "budget"),
+    )
+    budgetCurrency: str | None = None
+    splurgeCategories: list[str] | None = None
+
+    # Language
+    preferredLanguage: str | None = None
+    spokenLanguages: list[str] | None = None
 
 
 class ConversationCreateResponse(BaseModel):
