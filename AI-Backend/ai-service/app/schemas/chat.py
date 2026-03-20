@@ -133,6 +133,8 @@ class RouteData(BaseModel):
     notes: str | None = None
     # Filled by Java backend (Open-Meteo); optional in model output
     weather_forecast: list | None = None
+    # Morning/afternoon/evening planning hints; optional, set by Java backend
+    weather_day_parts: list | None = None
 
 
 class MessageSendResponse(BaseModel):
