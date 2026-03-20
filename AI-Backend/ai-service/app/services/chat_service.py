@@ -56,6 +56,13 @@ For food trips: restaurant, market, neighborhood
 For general trips: museum, monument, church, park, neighborhood
 """
 
+# Shown after TURN1_SYSTEM when user profile / AI prefs / RAG are present (tool-call turn).
+TURN1_TOOL_CONTEXT_RULES = """Tool-call context (use the User context block below):
+- Set "travel_style" and "categories" from that block — profile, learned preferences, and brief past notes — not generic defaults.
+- Align travel_style with interests: food/dining emphasis → food; museums/culture/history → art or history; outdoors → nature; otherwise general.
+- Choose categories to match pace, activity level, dietary and accessibility needs; respect avoid_categories (omit types the user dislikes).
+- If the user's current message explicitly conflicts with older notes, prioritize the current message."""
+
 TURN2_SYSTEM = """You are a travel planning assistant. Build a detailed itinerary
 using ONLY the POIs provided below. Do not invent new places.
 Use the exact coordinates given — do not modify them.
@@ -793,7 +800,9 @@ Route generation rules:
     elif _is_itinerary_request(user_content):
         turn1_system = TURN1_SYSTEM
         if itinerary_user_context:
-            turn1_system = f"{TURN1_SYSTEM}\n\n{itinerary_user_context}"
+            turn1_system = (
+                f"{TURN1_SYSTEM}\n\n{TURN1_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
+            )
         turn1 = await llm.ainvoke([SystemMessage(content=turn1_system), HumanMessage(content=user_content)])
         raw_ai_content = str(turn1.content)
         ai_content = raw_ai_content.strip()
