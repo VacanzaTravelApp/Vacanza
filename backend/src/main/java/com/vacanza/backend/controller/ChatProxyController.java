@@ -11,7 +11,7 @@ import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.security.CurrentUserProvider;
 import com.vacanza.backend.service.AiRouteService;
 import com.vacanza.backend.service.RouteSummaryMessageService;
-import com.vacanza.backend.dto.weather.DailyWeatherSummary;
+import com.vacanza.backend.dto.weather.WeatherPlanningForecast;
 import com.vacanza.backend.service.RouteTimelineService;
 import com.vacanza.backend.service.UserInfoService;
 import com.vacanza.backend.service.WeatherService;
@@ -80,7 +80,7 @@ public class ChatProxyController {
                 // Agentic itinerary flow (backend-orchestrated):
                 // If AI responded with a tool_call JSON for search_pois, we execute it here (as the authenticated backend),
                 // then call AI again with the POI tool result marker to get final route_data (with coordinates).
-                List<DailyWeatherSummary> routeWeatherForecast = null;
+                WeatherPlanningForecast routePlanningWeather = null;
                 try {
                         if (response != null && response.getContent() != null) {
                                 String toolJsonRaw = extractLeadingJsonObject(response.getContent());
@@ -89,7 +89,7 @@ public class ChatProxyController {
                                         var exec = executePoiSearchWithWeather(
                                                         toolCall.destination, toolCall.categories, toolCall.days);
                                         var pois = exec.pois();
-                                        routeWeatherForecast = exec.weatherForecast();
+                                        routePlanningWeather = exec.planningWeather();
                                         if (pois.isEmpty()) {
                                                 log.warn("POI tool returned empty list for destination='{}' categories={}", toolCall.destination, toolCall.categories);
                                         }
@@ -101,9 +101,11 @@ public class ChatProxyController {
                                         toolBody.append("__TOOL_RESULT__search_pois__")
                                                         .append(objectMapper.writeValueAsString(pois));
                                         try {
-                                                if (routeWeatherForecast != null && !routeWeatherForecast.isEmpty()) {
+                                                if (routePlanningWeather != null
+                                                                && (!routePlanningWeather.daily().isEmpty()
+                                                                                || !routePlanningWeather.dayParts().isEmpty())) {
                                                         toolBody.append("\n__WEATHER_CONTEXT__")
-                                                                        .append(objectMapper.writeValueAsString(routeWeatherForecast));
+                                                                        .append(objectMapper.writeValueAsString(routePlanningWeather));
                                                 }
                                         } catch (Exception wx) {
                                                 log.warn("Weather context omitted (serialization failed): {}", wx.getMessage());
@@ -133,8 +135,8 @@ public class ChatProxyController {
 
                 try {
                         if (response != null && response.getRouteData() != null) {
-                                if (routeWeatherForecast != null && !routeWeatherForecast.isEmpty()) {
-                                        response.getRouteData().setWeatherForecast(routeWeatherForecast);
+                                if (routePlanningWeather != null && !routePlanningWeather.daily().isEmpty()) {
+                                        response.getRouteData().setWeatherForecast(routePlanningWeather.daily());
                                 }
                                 routeTimelineService.enrichTimeline(response.getRouteData(), profile);
                                 // Route data already contains coordinates (agentic POI search flow).
@@ -244,23 +246,23 @@ public class ChatProxyController {
                 }
         }
 
-        private record PoiToolExecutionResult(List<PoiResult> pois, List<DailyWeatherSummary> weatherForecast) {}
+        private record PoiToolExecutionResult(List<PoiResult> pois, WeatherPlanningForecast planningWeather) {}
 
         /**
-         * Geocode destination, fetch Open-Meteo daily forecast for trip length, then search POIs in bbox.
+         * Geocode destination, fetch Open-Meteo daily + day-part forecast for trip length, then search POIs in bbox.
          */
         private PoiToolExecutionResult executePoiSearchWithWeather(
                         String destination, List<String> categories, Integer tripDays) {
                 int forecastDays = Math.min(Math.max(tripDays != null && tripDays > 0 ? tripDays : 7, 1), 16);
                 var destOpt = mapboxPoiSearchClient.geocodeDestination(destination).blockOptional();
                 if (destOpt.isEmpty()) {
-                        return new PoiToolExecutionResult(List.of(), List.of());
+                        return new PoiToolExecutionResult(List.of(), new WeatherPlanningForecast(List.of(), List.of()));
                 }
                 var dest = destOpt.get();
-                List<DailyWeatherSummary> weather = weatherService.getDailyForecast(
+                WeatherPlanningForecast planning = weatherService.getPlanningForecast(
                                 dest.getCenterLat(), dest.getCenterLon(), forecastDays);
                 if (categories == null || categories.isEmpty()) {
-                        return new PoiToolExecutionResult(List.of(), weather);
+                        return new PoiToolExecutionResult(List.of(), planning);
                 }
 
                 List<PoiResult> all = new java.util.ArrayList<>();
@@ -279,6 +281,6 @@ public class ChatProxyController {
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.putIfAbsent(k, p);
                 }
-                return new PoiToolExecutionResult(new java.util.ArrayList<>(dedup.values()), weather);
+                return new PoiToolExecutionResult(new java.util.ArrayList<>(dedup.values()), planning);
         }
 }
