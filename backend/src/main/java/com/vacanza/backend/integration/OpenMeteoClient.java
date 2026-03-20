@@ -20,6 +20,8 @@ public class OpenMeteoClient {
     private static final String DAILY_VARS =
             "weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max";
 
+    private static final String HOURLY_VARS = "weathercode,precipitation_probability";
+
     private final WebClient webClient;
 
     public OpenMeteoClient(@Qualifier("openMeteoWebClient") WebClient webClient) {
@@ -27,7 +29,8 @@ public class OpenMeteoClient {
     }
 
     /**
-     * Daily forecast at the given coordinates.
+     * Daily and hourly forecast at the given coordinates. Uses {@code timezone=auto} so hourly
+     * {@code time} values are in the location's local timezone (see response {@code timezone}).
      *
      * @param latitude  WGS84 latitude
      * @param longitude WGS84 longitude
@@ -43,7 +46,9 @@ public class OpenMeteoClient {
                         .queryParam("latitude", latitude)
                         .queryParam("longitude", longitude)
                         .queryParam("forecast_days", days)
+                        .queryParam("timezone", "auto")
                         .queryParam("daily", DAILY_VARS)
+                        .queryParam("hourly", HOURLY_VARS)
                         .build())
                 .retrieve()
                 .bodyToMono(OpenMeteoForecastResponse.class)
