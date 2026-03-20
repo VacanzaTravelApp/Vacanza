@@ -72,6 +72,15 @@ TURN2_TOOL_CONTEXT_RULES = """User context (use the block below when choosing PO
 - estimated_duration_min must vary by venue type (e.g. large museums 90–120, small sites 45–60, parks 40–75, quick landmarks 25–45). Do not use 60 for every stop.
 - Keep geographic efficiency; preferences override only when choosing among nearby alternatives."""
 
+TURN2_WEATHER_RULES = """Destination weather forecast (use only this data; do not invent numbers):
+{weather_json}
+
+Weather-aware planning:
+- High precipitation_probability_max_percent or WMO rain/storm codes (51–67, 80–99): favor museums, indoor galleries, churches, covered markets; shorten or defer large outdoor parks on those calendar days.
+- Clear, dry days: good for parks, neighborhoods, longer outdoor legs.
+- If the forecast differs by day, align outdoor-heavy days with drier days when possible (same POI list).
+- Mention weather briefly in "notes" only when it clearly shaped the plan (one short phrase)."""
+
 TURN2_SYSTEM = """You are a travel planning assistant. Build a detailed itinerary
 using ONLY the POIs provided below. Do not invent new places.
 Use the exact coordinates given — do not modify them.
@@ -159,6 +168,7 @@ def _extract_json_object(text: str) -> dict | None:
 
 
 TOOL_RESULT_PREFIX = "__TOOL_RESULT__search_pois__"
+WEATHER_CONTEXT_PREFIX = "__WEATHER_CONTEXT__"
 
 
 def _parse_tool_result_pois(user_content: str) -> list[dict] | None:
@@ -169,6 +179,23 @@ def _parse_tool_result_pois(user_content: str) -> list[dict] | None:
     if idx == -1:
         return None
     raw = user_content[idx + len(TOOL_RESULT_PREFIX) :].strip()
+    # POI JSON may be followed by __WEATHER_CONTEXT__ (must not parse both as one JSON value)
+    if "\n" + WEATHER_CONTEXT_PREFIX in raw:
+        raw = raw.split("\n" + WEATHER_CONTEXT_PREFIX, 1)[0].strip()
+    elif raw.startswith(WEATHER_CONTEXT_PREFIX):
+        return None
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, list) else None
+    except Exception:
+        return None
+
+
+def _parse_weather_context(user_content: str) -> list[dict] | None:
+    idx = user_content.find(WEATHER_CONTEXT_PREFIX)
+    if idx == -1:
+        return None
+    raw = user_content[idx + len(WEATHER_CONTEXT_PREFIX) :].strip()
     try:
         data = json.loads(raw)
         return data if isinstance(data, list) else None
@@ -286,6 +313,7 @@ def _optimize_route_order(route_data: RouteData) -> RouteData:
         total_days=route_data.total_days,
         days=new_days,
         notes=route_data.notes,
+        weather_forecast=route_data.weather_forecast,
     )
 
 
@@ -806,6 +834,14 @@ Route generation rules:
             days=days,
             travel_style=travel_style,
         )
+        weather_data = _parse_weather_context(user_content)
+        if weather_data:
+            turn2_system = (
+                f"{turn2_system}\n\n"
+                + TURN2_WEATHER_RULES.format(
+                    weather_json=json.dumps(weather_data, ensure_ascii=False)
+                )
+            )
         if itinerary_user_context:
             turn2_system = (
                 f"{turn2_system}\n\n{TURN2_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
