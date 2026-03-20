@@ -1,5 +1,7 @@
 import http from "./http";
 
+const asArray = (data) => (Array.isArray(data) ? data : []);
+
 export const aiApi = {
     // Create a new conversation
     createConversation: async () => {
@@ -8,11 +10,11 @@ export const aiApi = {
     },
 
     // List all conversations for the user
-    listConversations: async (limit = 10, offset = 0) => {
+    listConversations: async (limit = 50, offset = 0) => {
         const response = await http.get('/chat/conversations', {
             params: { limit, offset }
         });
-        return response.data;
+        return asArray(response.data);
     },
 
     // Send a message to a specific conversation
@@ -24,11 +26,11 @@ export const aiApi = {
     },
 
     // Get message history for a specific conversation
-    getMessages: async (conversationId, limit = 50, offset = 0) => {
+    getMessages: async (conversationId, limit = 100, offset = 0) => {
         const response = await http.get(`/chat/conversations/${conversationId}/messages`, {
             params: { limit, offset }
         });
-        return response.data;
+        return asArray(response.data);
     },
 
     getRoutes: async () => {
