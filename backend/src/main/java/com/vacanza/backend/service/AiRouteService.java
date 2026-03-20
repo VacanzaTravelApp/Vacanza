@@ -45,6 +45,11 @@ public class AiRouteService {
         return repository.findByRouteIdAndUser(routeId, user);
     }
 
+    @Transactional(readOnly = true)
+    public List<AiRoute> getRoutesForConversation(User user, UUID conversationId) {
+        return repository.findByUserAndConversationIdOrderByGeneratedAtAsc(user, conversationId);
+    }
+
     @Transactional
     public void deleteRoute(UUID routeId, User user) {
         repository.findByRouteIdAndUser(routeId, user)

@@ -26,6 +26,77 @@ function normalizeRouteForMap(route) {
   return { ...route, days };
 }
 
+/** Saved route from GET /routes/conversation/:id (routeData may be object or JSON string). */
+function routeDataFromSavedDetail(detail) {
+  if (!detail || detail.routeData == null) return null;
+  const raw = detail.routeData;
+  if (typeof raw === "string") {
+    try {
+      return normalizeRouteForMap(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  }
+  return normalizeRouteForMap(raw);
+}
+
+function routesForMessage(msg) {
+  if (msg.routeDataList?.length) return msg.routeDataList;
+  if (msg.routeData) return [msg.routeData];
+  return [];
+}
+
+/**
+ * Kayıtlı rotaları, üretim zamanına göre en uygun asistan mesajına bağlar (aynı sohbette birden çok rota).
+ */
+function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
+  const list = Array.isArray(routeDetails) ? routeDetails : [];
+  const msgs = historyRaw.map((m) => {
+    const base = mapHistoryMessage(m);
+    const role = (m.role ?? "").toLowerCase();
+    return {
+      ...base,
+      _createdAtMs: parseDate(m.created_at ?? m.createdAt)?.getTime() ?? 0,
+      _isAssistant: role !== "user",
+    };
+  });
+  const routes = list
+    .map((detail) => ({
+      data: routeDataFromSavedDetail(detail),
+      t: parseDate(detail.generatedAt ?? detail.generated_at)?.getTime() ?? 0,
+    }))
+    .filter((x) => x.data)
+    .sort((a, b) => a.t - b.t);
+
+  const byMessageId = new Map();
+  for (const rr of routes) {
+    let best = null;
+    let bestT = -1;
+    for (const msg of msgs) {
+      if (!msg._isAssistant) continue;
+      if (msg._createdAtMs <= rr.t && msg._createdAtMs >= bestT) {
+        best = msg;
+        bestT = msg._createdAtMs;
+      }
+    }
+    if (best) {
+      const arr = byMessageId.get(best.id) ?? [];
+      arr.push(rr.data);
+      byMessageId.set(best.id, arr);
+    }
+  }
+  for (const msg of msgs) {
+    const arr = byMessageId.get(msg.id);
+    if (arr?.length) {
+      msg.routeDataList = arr;
+      msg.routeData = arr[arr.length - 1];
+    }
+    delete msg._createdAtMs;
+    delete msg._isAssistant;
+  }
+  return msgs;
+}
+
 function parseDate(value) {
   if (value == null) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
@@ -131,11 +202,17 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
 
   const loadMessagesForConversation = useCallback(async (convId) => {
     const history = await aiApi.getMessages(convId);
+    let routeDetails = [];
+    try {
+      routeDetails = await aiApi.getRoutesForConversation(convId);
+    } catch {
+      /* Rota isteğe bağlı; mesajlar yine yüklensin. */
+    }
     if (!history.length) {
       const t = formatMessageTime(new Date());
       setMessages([{ ...GREETING, time: t }]);
     } else {
-      setMessages(history.map(mapHistoryMessage));
+      setMessages(mergeHistoryWithSavedRoutes(history, routeDetails));
     }
   }, []);
 
@@ -279,11 +356,13 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
         const displayText =
           routeData && routeSummaryMessage ? routeSummaryMessage : response.content;
 
+        const norm = routeData ? normalizeRouteForMap(routeData) : null;
         const aiMsg = {
           id: `local-${Date.now() + 1}`,
           type: "ai",
           text: displayText,
-          routeData,
+          routeData: norm || undefined,
+          routeDataList: norm ? [norm] : undefined,
           noRouteHint: !routeData && wasRouteRequest,
           time: formatMessageTime(new Date()),
         };
@@ -375,21 +454,23 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
           </div>
         ) : (
           <>
-            {messages.map((msg) => (
+            {messages.map((msg) => {
+              const routeList = routesForMessage(msg);
+              return (
               <div key={msg.id} className={`chat-row ${msg.type}-row`}>
                 <div className={`message-bubble ${msg.type}-bubble`}>
                   {msg.text}
                   {msg.time ? <span className="msg-time">{msg.time}</span> : null}
                 </div>
-                {msg.routeData ? (
-                  <div className="route-card">
-                    <div className="route-card-title">{msg.routeData.title}</div>
+                {routeList.map((rd, rIdx) => (
+                  <div key={`${msg.id}-route-${rIdx}`} className="route-card">
+                    <div className="route-card-title">{rd.title}</div>
                     <div className="route-card-meta">
-                      {msg.routeData.destination} &middot; {msg.routeData.total_days || msg.routeData.totalDays} gün &middot;{" "}
-                      {(msg.routeData.days || []).reduce((sum, d) => sum + (d.waypoints?.length || 0), 0)} yer
+                      {rd.destination} &middot; {rd.total_days || rd.totalDays} gün &middot;{" "}
+                      {(rd.days || []).reduce((sum, d) => sum + (d.waypoints?.length || 0), 0)} yer
                     </div>
                     <div className="route-card-days">
-                      {(msg.routeData.days || []).map((d) => (
+                      {(rd.days || []).map((d) => (
                         <div key={d.day} className="route-card-day-row">
                           <span className="route-card-day-badge">Gün {d.day}</span>
                           <span className="route-card-day-text">{(d.waypoints || []).map((w) => w.name).join(", ")}</span>
@@ -400,20 +481,22 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
                       type="button"
                       className="route-show-btn"
                       onClick={() => {
-                        if (onRouteGenerated) onRouteGenerated(normalizeRouteForMap(msg.routeData));
+                        if (onRouteGenerated) onRouteGenerated(normalizeRouteForMap(rd));
                         onClose();
                       }}
                     >
                       Rotayı Haritada Göster
                     </button>
                   </div>
-                ) : msg.type === "ai" && msg.noRouteHint ? (
+                ))}
+                {msg.type === "ai" && msg.noRouteHint && routeList.length === 0 ? (
                   <div className="route-card route-card-hint">
                     <span>Rota verisi alınamadı. Yukarıdaki hızlı butonlardan birini tekrar deneyin.</span>
                   </div>
                 ) : null}
               </div>
-            ))}
+            );
+            })}
             {loading && (
               <div className="chat-row ai-row">
                 <div className="message-bubble ai-bubble chat-typing-bubble">

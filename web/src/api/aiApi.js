@@ -43,6 +43,16 @@ export const aiApi = {
         return response.data;
     },
 
+    /** All routes saved for this conversation (oldest first). */
+    getRoutesForConversation: async (conversationId) => {
+        try {
+            const response = await http.get(`/routes/conversation/${conversationId}`);
+            return asArray(response.data);
+        } catch {
+            return [];
+        }
+    },
+
     deleteRoute: async (routeId) => {
         const response = await http.delete(`/routes/${routeId}`);
         return response.data;
