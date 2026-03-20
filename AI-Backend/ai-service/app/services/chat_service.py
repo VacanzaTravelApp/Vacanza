@@ -67,7 +67,9 @@ TURN1_TOOL_CONTEXT_RULES = """Tool-call context (use the User context block belo
 TURN2_TOOL_CONTEXT_RULES = """User context (use the block below when choosing POIs and building each day):
 - Pick POIs from the list that fit profile and learned preferences: pace, budget level, cuisine, dietary restrictions, accessibility, languages.
 - Deprioritize or skip POI types/categories the user wants to avoid; favor categories matching travel style and interests.
-- Balance days to trip pace: relaxed → fewer stops or longer estimated_duration_min; packed → more stops if sensible.
+- Balance days to trip pace: SLOW/low activity → later day_start_local and longer estimated_duration_min per stop; FAST/high activity → earlier start and slightly shorter dwell times where sensible.
+- Set day_start_local per day from trip_pace and activity (examples: SLOW ~10:00, MODERATE ~09:00, FAST ~08:30) — never default every trip to 09:00 without reason.
+- estimated_duration_min must vary by venue type (e.g. large museums 90–120, small sites 45–60, parks 40–75, quick landmarks 25–45). Do not use 60 for every stop.
 - Keep geographic efficiency; preferences override only when choosing among nearby alternatives."""
 
 TURN2_SYSTEM = """You are a travel planning assistant. Build a detailed itinerary
@@ -83,6 +85,8 @@ Rules:
 - Order each day logically (minimize walking distance)
 - Each day: 4-6 POIs maximum
 - CRITICAL: Use latitude and longitude values exactly as provided. Do not round, modify, or recalculate.
+- For each day set "day_start_local" (24h "HH:mm") when sightseeing realistically starts that day — personalize from travel_style and user context; avoid using the same time for every itinerary.
+- For each waypoint set a realistic "estimated_duration_min" (varies by category/size; not the same number for all stops).
 
 OUTPUT FORMAT (MANDATORY — the map will NOT work without the JSON):
 1. Write ONE short sentence only (e.g. "Here is your Amasya itinerary."). Do NOT list places in text.
@@ -100,6 +104,7 @@ route_data format:
     {{
       "day": 1,
       "title": "...",
+      "day_start_local": "09:30",
       "waypoints": [
         {{
           "name": "exact name from POI list",
@@ -108,7 +113,7 @@ route_data format:
           "order": 1,
           "latitude": <exact value from POI list>,
           "longitude": <exact value from POI list>,
-          "estimated_duration_min": 60,
+          "estimated_duration_min": 75,
           "time_slot": "morning"
         }}
       ]
@@ -266,7 +271,15 @@ def _optimize_route_order(route_data: RouteData) -> RouteData:
             new_days.append(day)
             continue
         reordered = _reorder_waypoints_by_proximity(day.waypoints)
-        new_days.append(DayPlan(day=day.day, title=day.title, waypoints=reordered))
+        new_days.append(
+            DayPlan(
+                day=day.day,
+                title=day.title,
+                waypoints=reordered,
+                day_start_local=day.day_start_local,
+                day_end_local=day.day_end_local,
+            )
+        )
     return RouteData(
         title=route_data.title,
         destination=route_data.destination,

@@ -107,6 +107,10 @@ class RouteWaypoint(BaseModel):
     longitude: float | None = None
     estimated_duration_min: int | None = None
     time_slot: str | None = None
+    # Filled by Java backend after generation (Mapbox walking + dwell times)
+    travel_from_previous_min: int | None = None
+    arrival_time_local: str | None = None
+    departure_time_local: str | None = None
 
 
 class DayPlan(BaseModel):
@@ -115,6 +119,8 @@ class DayPlan(BaseModel):
     day: int
     title: str
     waypoints: list[RouteWaypoint] = Field(default_factory=list)
+    day_start_local: str | None = None
+    day_end_local: str | None = None
 
 
 class RouteData(BaseModel):
