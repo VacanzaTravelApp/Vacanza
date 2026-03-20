@@ -48,6 +48,12 @@ ticketmaster:
   connect-timeout: 10s
   read-timeout: 30s
 
+# Open-Meteo: free forecast API, no API key (https://open-meteo.com/)
+open-meteo:
+  base-url: https://api.open-meteo.com/v1
+  connect-timeout: 10s
+  read-timeout: 30s
+
 management:
   endpoints:
     web:

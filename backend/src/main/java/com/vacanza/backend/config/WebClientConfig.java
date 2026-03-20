@@ -22,7 +22,8 @@ import java.time.Duration;
 @Slf4j
 @Configuration
 @EnableConfigurationProperties({ GeoapifyProperties.class, AiServiceProperties.class,
-        SerpApiProperties.class, MapboxProperties.class, TicketmasterProperties.class })
+        SerpApiProperties.class, MapboxProperties.class, TicketmasterProperties.class,
+        OpenMeteoProperties.class })
 public class WebClientConfig {
 
     @Bean
