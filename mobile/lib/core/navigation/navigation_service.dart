@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
+import 'package:mobile/features/auth/presentation/screens/verify_email_screen.dart';
 
 /// Global navigation helper.
 ///
@@ -38,6 +39,17 @@ class NavigationService {
     nav.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
           (_) => false,
+    );
+  }
+
+  /// Email verify ekranına stack temizleyerek gider.
+  static void goToVerifyEmail() {
+    final nav = navigatorKey.currentState;
+    if (nav == null) return;
+
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const VerifyEmailScreen()),
+      (_) => false,
     );
   }
 }

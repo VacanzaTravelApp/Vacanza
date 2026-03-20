@@ -1,1 +1,0 @@
-Bu kısım interface için var örnekten bakabilirsiniz

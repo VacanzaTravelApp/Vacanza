@@ -1,8 +1,9 @@
 // src/pages/auth/LoginCard.jsx
 
 import React, { useState } from "react";
-import { Form, Input, Button, message } from "antd";
-import { LockOutlined, MailOutlined, SendOutlined } from "@ant-design/icons";
+import { Form, Input, Button, message, Modal } from "antd";
+import { LockOutlined, MailOutlined } from "@ant-design/icons";
+import { MdFlightTakeoff } from 'react-icons/md';
 import "./RegisterCard.css";
 import { useNavigate } from "react-router-dom";
 
@@ -11,51 +12,83 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/aut
 import { auth } from "../../firebase";
 
 // API
-import { authApi } from "../../api/authApi";
+import { authApi } from "../../api/userApi";
 
 const LoginCard = () => {
   const navigate = useNavigate();
+  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
 
   const onFinish = async ({ email, password }) => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-  console.log("Firebase login successful.");
+      console.log("Firebase login successful.");
       try {
         await authApi.login();
         console.log("Backend sync successful.");
-      // eslint-disable-next-line no-unused-vars
       } catch (syncError) {
-        console.warn("Backend sync skipped: Server returned HTML, but we are logged in via Firebase.");
+        // If it's a real auth failure (401/403), re-throw to outer catch
+        if (syncError.response?.status === 401 || syncError.response?.status === 403) {
+          throw syncError;
+        }
+        console.warn("Backend sync skipped:", syncError.message);
       }
-   message.success("Logged in successfully!");
       navigate("/map");
     } catch (error) {
       console.error("Firebase login error:", error);
 
-      let msg = "Login failed. Please try again.";
-      if (error?.code === "auth/invalid-email") msg = "Please enter a valid email address.";
-      if (error?.code === "auth/user-not-found") msg = "No user found with this email.";
-      if (error?.code === "auth/invalid-credential" || error?.code === "auth/wrong-password")
-        msg = "Incorrect email or password.";
-
-      message.error(msg);
+      if (error?.code === "auth/invalid-email") {
+        form.setFields([
+          {
+            name: 'email',
+            errors: ['Please enter a valid email address.'],
+          },
+        ]);
+      } else if (error?.code === "auth/user-not-found" || error?.code === "auth/invalid-credential" || error?.code === "auth/wrong-password") {
+        form.setFields([
+          {
+            name: 'email',
+            errors: [' '],
+          },
+          {
+            name: 'password',
+            errors: ['We couldn\'t find an account with that email or password.'],
+          },
+        ]);
+      } else if (error?.code === "auth/too-many-requests") {
+        message.error("Too many failed attempts. Please try again later or reset your password.");
+      } else {
+        message.error(error.friendlyMessage || "Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleForgotPassword = async () => {
-    const userEmail = window.prompt("Enter your email to reset your password:");
-    if (!userEmail) return;
+  const handlePasswordReset = async () => {
+    if (!resetEmail) {
+      message.warning("Please enter your email address.");
+      return;
+    }
 
+    setResetLoading(true);
     try {
-      await sendPasswordResetEmail(auth, userEmail);
-      message.success("Password reset email sent. Please check your inbox.");
+      await sendPasswordResetEmail(auth, resetEmail);
+      message.success("A password reset link has been sent to your email!");
+      setIsResetModalOpen(false);
+      setResetEmail("");
     } catch (error) {
       console.error("Reset password error:", error);
-      message.error("Could not send reset email. Please check the email address.");
+      let msg = "Could not send reset email. Please try again.";
+      if (error?.code === "auth/invalid-email") msg = "Please enter a valid email address.";
+      if (error?.code === "auth/user-not-found") msg = "No account found with this email.";
+      message.error(msg);
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -63,14 +96,20 @@ const LoginCard = () => {
     <div className="register-card">
       <div className="card-header">
         <span className="vacanza-logo">
-          <SendOutlined className="logo-icon" />
+          <MdFlightTakeoff className="logo-icon" />
           Vacanza
         </span>
-        <h3>Welcome Back</h3>
-        <p className="header-subtext">Sign in to continue</p>
+        <h3>Welcome Back to <span style={{ color: '#3da8c8' }}>Vacanza</span></h3>
+        <p className="header-subtext">Sign in to continue your journey</p>
       </div>
 
-      <Form name="login" onFinish={onFinish} layout="vertical" className="auth-form">
+      <Form
+        form={form}
+        name="login"
+        onFinish={onFinish}
+        layout="vertical"
+        className="auth-form"
+      >
         <Form.Item
           name="email"
           rules={[
@@ -92,7 +131,7 @@ const LoginCard = () => {
 
         <div className="login-options-row">
           <span className="remember-me-placeholder" />
-          <span onClick={handleForgotPassword} className="forgot-password-link">
+          <span onClick={() => setIsResetModalOpen(true)} className="forgot-password-link">
             Forgot Password?
           </span>
         </div>
@@ -110,6 +149,27 @@ const LoginCard = () => {
           Sign Up
         </span>
       </div>
+
+      <Modal
+        title="Reset Password"
+        open={isResetModalOpen}
+        onOk={handlePasswordReset}
+        onCancel={() => setIsResetModalOpen(false)}
+        confirmLoading={resetLoading}
+        okText="Send Reset Link"
+        cancelText="Cancel"
+      >
+        <div style={{ marginBottom: 16 }}>
+          Enter the email address associated with your account and we&apos;ll send you a link to reset your password.
+        </div>
+        <Input
+          prefix={<MailOutlined />}
+          placeholder="Email address"
+          size="large"
+          value={resetEmail}
+          onChange={(e) => setResetEmail(e.target.value)}
+        />
+      </Modal>
     </div>
   );
 };

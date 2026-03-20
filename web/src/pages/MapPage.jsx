@@ -14,14 +14,27 @@ import { useNavigate } from "react-router-dom";
 import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
 
 import { auth } from "../firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
+import { useGamificationProfile } from "../gamification/useGamification";
+import BookingSheet from "../features/booking/components/BookingSheet";
+import { CalendarOutlined } from "@ant-design/icons";
+import VacanzaChat from "../features/ai/components/VacanzaChat";
+import RoutePanel from "../features/ai/components/RoutePanel";
+import ProfileModal from "./ProfileModal";
+import http from "../api/http";
+
+import cafeImg from "../assets/poi/poi_cafe.png";
+import museumImg from "../assets/poi/poi_museum.png";
+import monumentImg from "../assets/poi/poi_monument.png";
+import parkImg from "../assets/poi/poi_park.png";
+import restaurantImg from "../assets/poi/poi_restaurant.png";
 
 const { Header, Content, Footer } = Layout;
 
 const INITIAL_VIEW_STATE = {
-  longitude: 32.8597,
-  latitude: 39.9334,
-  zoom: 11,
+  longitude: 32.8200,
+  latitude: 39.8950,
+  zoom: 11.5,
   bearing: 0,
   pitch: 0,
 };
@@ -33,8 +46,6 @@ const STYLES = [
   "mapbox://styles/mapbox/satellite-streets-v12",
   "mapbox://styles/mapbox/monochrome",
 ];
-
-const BACKEND_BASE_URL = "http://165.232.69.83:9002";
 
 // Results panel haritayı kapatmasın diye padding hesabında kullanıyoruz
 const RESULTS_PANEL_APPROX_HEIGHT_DESKTOP = 320;
@@ -61,6 +72,7 @@ const UI_CATEGORIES = [
     geo: "catering.restaurant",
     aliases: ["restaurant", "restaurants", "catering.restaurant"],
     emoji: "🍽️",
+    img: restaurantImg,
     ring: "#FFB020",
     fill: "#FFF7E6",
     pill: "#FFF3E0",
@@ -71,6 +83,7 @@ const UI_CATEGORIES = [
     geo: "catering.cafe",
     aliases: ["cafe", "cafes", "catering.cafe"],
     emoji: "☕",
+    img: cafeImg,
     ring: "#6F4E37",
     fill: "#F5F5DC",
     pill: "#EFEBE9",
@@ -81,6 +94,7 @@ const UI_CATEGORIES = [
     geo: "entertainment.museum",
     aliases: ["museum", "museums", "entertainment.museum"],
     emoji: "🖼️",
+    img: museumImg,
     ring: "#9B51E0",
     fill: "#F3EBFF",
     pill: "#F3EBFF",
@@ -91,6 +105,7 @@ const UI_CATEGORIES = [
     geo: "tourism.attraction",
     aliases: ["monument", "monuments", "tourism.attraction"],
     emoji: "🏛️",
+    img: monumentImg,
     ring: "#FF7A45",
     fill: "#FFF1E8",
     pill: "#FFF1E8",
@@ -101,6 +116,7 @@ const UI_CATEGORIES = [
     geo: "leisure.park",
     aliases: ["park", "parks", "leisure.park"],
     emoji: "🌿",
+    img: parkImg,
     ring: "#27AE60",
     fill: "#E9F9EF",
     pill: "#E9F9EF",
@@ -111,7 +127,7 @@ function poiIconByCategory(category) {
   const c = normalizeCategory(category);
   const found = UI_CATEGORIES.find((x) => x.aliases.includes(c));
   if (!found) return null;
-  return { emoji: found.emoji, ring: found.ring, fill: found.fill, uiKey: found.key };
+  return { emoji: found.emoji, img: found.img, ring: found.ring, fill: found.fill, uiKey: found.key };
 }
 
 function labelByCategory(category) {
@@ -171,12 +187,6 @@ function polygonToBbox(poly) {
   return { minLat, minLng, maxLat, maxLng };
 }
 
-/**
- * GERÇEK 3D:
- * - DEM terrain
- * - Sky
- * - 3D buildings (fill-extrusion)
- */
 function ensureMapbox3D(map, enabled) {
   if (!map) return;
 
@@ -194,7 +204,7 @@ function ensureMapbox3D(map, enabled) {
   if (!enabled) {
     try {
       map.setTerrain(null);
-    // eslint-disable-next-line no-unused-vars
+      // eslint-disable-next-line no-unused-vars
     } catch (e) {
       // ignore
     }
@@ -215,7 +225,7 @@ function ensureMapbox3D(map, enabled) {
 
   try {
     map.setTerrain({ source: DEM_SOURCE_ID, exaggeration: 1.2 });
-  // eslint-disable-next-line no-unused-vars
+    // eslint-disable-next-line no-unused-vars
   } catch (e) {
     // ignore
   }
@@ -231,7 +241,7 @@ function ensureMapbox3D(map, enabled) {
           "sky-atmosphere-sun-intensity": 8,
         },
       });
-    // eslint-disable-next-line no-unused-vars
+      // eslint-disable-next-line no-unused-vars
     } catch (e) {
       // ignore
     }
@@ -260,7 +270,7 @@ function ensureMapbox3D(map, enabled) {
         },
         beforeId
       );
-    // eslint-disable-next-line no-unused-vars
+      // eslint-disable-next-line no-unused-vars
     } catch (e) {
       // ignore
     }
@@ -272,7 +282,7 @@ function ensureMapbox3D(map, enabled) {
       "space-color": "#000000",
       "star-intensity": 0.0,
     });
-  // eslint-disable-next-line no-unused-vars
+    // eslint-disable-next-line no-unused-vars
   } catch (e) {
     // ignore
   }
@@ -282,6 +292,8 @@ export default function MapPage() {
   const navigate = useNavigate();
   const mapRef = useRef(null);
   const isMobile = useIsMobile(768);
+  const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
+    useGamificationProfile();
 
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -311,7 +323,12 @@ export default function MapPage() {
 
   const [resultsOpen, setResultsOpen] = useState(false);
   const [resultsTab, setResultsTab] = useState("all");
-
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [activeRoute, setActiveRoute] = useState(null);
+  const [activeDay, setActiveDay] = useState(1);
+  const [routeGeometry, setRouteGeometry] = useState(null);
   // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
   useEffect(() => {
     if (resultsOpen) setFilterOpen(false);
@@ -412,6 +429,13 @@ export default function MapPage() {
         navigate("/login");
         return;
       }
+
+      // If email is not verified, send to verification page
+      if (!currentUser.emailVerified) {
+        navigate("/verify-email");
+        return;
+      }
+
       setUser(currentUser);
       setLoadingAuth(false);
     });
@@ -450,12 +474,14 @@ export default function MapPage() {
           limit: 200,
           sort: "RATING_DESC",
         };
-
-        const res = await fetch(`${BACKEND_BASE_URL}/pois/search-in-area`, {
+        const res = await fetch("/pois/search-in-area", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify(body),
         });
+
 
         if (!res.ok) {
           setPoisRaw([]);
@@ -657,6 +683,172 @@ export default function MapPage() {
     return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
   }, [resultsOpen, selection]);
 
+  // Normalize waypoint coords: backend may send latitude/longitude (camelCase); ensure numeric and consistent order
+  const activeWaypoints = useMemo(() => {
+    if (!activeRoute) return [];
+    const dayPlan = activeRoute.days?.find(
+      (d) => Number(d?.day) === Number(activeDay)
+    );
+    const raw = (dayPlan?.waypoints || []).map((w) => {
+      const lat = Number(w.latitude ?? w.lat ?? NaN);
+      const lon = Number(w.longitude ?? w.lon ?? NaN);
+      return { ...w, latitude: lat, longitude: lon };
+    });
+    return raw.filter(
+      (w) => Number.isFinite(w.latitude) && Number.isFinite(w.longitude)
+    );
+  }, [activeRoute, activeDay]);
+
+  const routeLineGeoJSON = useMemo(() => {
+    const coords =
+      Array.isArray(routeGeometry) && routeGeometry.length >= 2
+        ? routeGeometry.map((c) => [c.longitude, c.latitude])
+        : activeWaypoints.length >= 2
+          ? activeWaypoints.map((w) => [w.longitude, w.latitude])
+          : null;
+
+    if (!coords || coords.length < 2) {
+      return { type: "FeatureCollection", features: [] };
+    }
+
+    return {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: coords,
+          },
+        },
+      ],
+    };
+  }, [activeWaypoints, routeGeometry]);
+
+  const routeGlowLayer = useMemo(
+    () => ({
+      id: "route-glow",
+      type: "line",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-width": 14,
+        "line-opacity": 0.18,
+        "line-color": "#FDBA74",
+        "line-blur": 3.5,
+      },
+    }),
+    []
+  );
+
+  const routeMainLayer = useMemo(
+    () => ({
+      id: "route-main",
+      type: "line",
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-width": 5,
+        "line-opacity": 0.95,
+        "line-gradient": [
+          "interpolate", ["linear"], ["line-progress"],
+          0.0, "#FB923C", 0.5, "#F97316", 1.0, "#EA580C",
+        ],
+      },
+    }),
+    []
+  );
+
+  // Fetch road-following route geometry from backend (Mapbox Directions)
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchRouteGeometry = async () => {
+      if (activeWaypoints.length < 2) {
+        // No route for single-point days
+        setRouteGeometry(null);
+        return;
+      }
+
+      try {
+        const body = {
+          waypoints: activeWaypoints.map((w) => ({
+            latitude: w.latitude,
+            longitude: w.longitude,
+          })),
+        };
+        const res = await http.post("/routes/directions", body);
+
+        // Debug: see raw Mapbox-based geometry and inputs in browser console
+        // so we can tune routing later if needed.
+        // Not spamming: only logs when a route is actually fetched.
+        // eslint-disable-next-line no-console
+        console.log("[Vacanza][RouteGeometry] request", body, "response", res?.data);
+
+        const coords = res?.data?.coordinates;
+        if (!cancelled) {
+          if (Array.isArray(coords) && coords.length >= 2) {
+            setRouteGeometry(
+              coords
+                .map((c) => ({
+                  latitude: Number(c.latitude),
+                  longitude: Number(c.longitude),
+                }))
+                .filter(
+                  (c) =>
+                    Number.isFinite(c.latitude) && Number.isFinite(c.longitude)
+                )
+            );
+          } else {
+            setRouteGeometry(null);
+          }
+        }
+      } catch (e) {
+        console.warn("[MapPage] Failed to fetch route geometry, falling back to straight lines:", e);
+        if (!cancelled) {
+          setRouteGeometry(null);
+        }
+      }
+    };
+
+    fetchRouteGeometry();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWaypoints]);
+
+  // fitBounds when route day changes
+  useEffect(() => {
+    if (activeWaypoints.length === 0) return;
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    try {
+      const lngs = activeWaypoints.map((w) => w.longitude);
+      const lats = activeWaypoints.map((w) => w.latitude);
+      // Safe padding: cap at 50% of container to prevent Mapbox NaN from overflow
+      const container = map.getContainer();
+      const maxV = Math.floor((container?.clientHeight || 600) * 0.25);
+      const maxH = Math.floor((container?.clientWidth || 800) * 0.25);
+      map.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        {
+          duration: 650,
+          padding: {
+            top: Math.min(60, maxV),
+            left: Math.min(60, maxH),
+            right: Math.min(60, maxH),
+            bottom: Math.min(200, maxV),
+          },
+        }
+      );
+    } catch (e) {
+      console.warn("[MapPage] fitBounds failed, flying to first waypoint:", e.message);
+      // Fallback: fly to the first waypoint
+      const wp = activeWaypoints[0];
+      if (wp) map.flyTo({ center: [wp.longitude, wp.latitude], zoom: 13, duration: 650 });
+    }
+  }, [activeWaypoints]);
+
   // ✅ Results panel açılınca: polygon panel altında kalmasın diye fitBounds + padding
   useEffect(() => {
     if (!canShowResultsPanel) return;
@@ -724,7 +916,10 @@ export default function MapPage() {
           zIndex: 100,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+          onClick={() => window.location.reload()}
+        >
           <GlobalOutlined style={{ fontSize: isMobile ? 20 : 24, color: "#1890ff" }} />
           <span style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700 }}>Vacanza Map</span>
         </div>
@@ -786,7 +981,7 @@ export default function MapPage() {
               </>
             )}
 
-            {pois.map((p) => {
+            {!activeRoute && pois.map((p) => {
               const icon = poiIconByCategory(p.category);
               const title = getSafePoiTitle(p);
 
@@ -797,44 +992,215 @@ export default function MapPage() {
               return (
                 <Marker key={p.poiId || `${p.latitude}-${p.longitude}`} longitude={p.longitude} latitude={p.latitude} anchor="center">
                   <Tooltip title={title} placement="top">
-                    <div
-                      style={{
-                        width: isMobile ? 30 : 34,
-                        height: isMobile ? 30 : 34,
-                        borderRadius: 999,
-                        display: "grid",
-                        placeItems: "center",
-                        background: fill,
-                        border: `2px solid ${ring}`,
-                        boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <span style={{ fontSize: isMobile ? 14 : 16 }}>{emoji}</span>
-                    </div>
+                    {icon?.img ? (
+                      <div
+                        style={{
+                          width: 64,
+                          height: 64,
+                          cursor: "pointer",
+                          transition: "transform 0.2s",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "scale(1.15)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                        }}
+                        onClick={(e) => {
+                          e.originalEvent.stopPropagation();
+                        }}
+                      >
+                        <img src={icon.img} alt={title} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          background: fill,
+                          border: `2px solid ${ring}`,
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+                          transition: "transform 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "scale(1.15)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                        }}
+                        onClick={(e) => {
+                          e.originalEvent.stopPropagation();
+                        }}
+                      >
+                        <span style={{ fontSize: 14 }}>{emoji}</span>
+                      </div>
+                    )}
                   </Tooltip>
                 </Marker>
               );
             })}
+
+            {activeWaypoints.length >= 2 && (
+              <Source id="route-src" type="geojson" data={routeLineGeoJSON} lineMetrics>
+                <Layer {...routeGlowLayer} />
+                <Layer {...routeMainLayer} />
+              </Source>
+            )}
+
+            {activeWaypoints.map((wp, idx) => (
+              <Marker
+                key={`route-wp-${wp.day}-${wp.order}`}
+                longitude={wp.longitude}
+                latitude={wp.latitude}
+                anchor="center"
+              >
+                <Tooltip title={wp.name} placement="top">
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, #F97316, #EF4444)",
+                      border: "2.5px solid white",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "white",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      boxShadow: "0 2px 8px rgba(249,115,22,0.4)",
+                      cursor: "pointer",
+                      transition: "transform 0.2s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.2)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                  >
+                    {idx + 1}
+                  </div>
+                </Tooltip>
+              </Marker>
+            ))}
           </Map>
 
+          {activeRoute && (
+            <RoutePanel
+              route={activeRoute}
+              activeDay={activeDay}
+              onDayChange={setActiveDay}
+              onClose={() => {
+                setActiveRoute(null);
+                setActiveDay(1);
+                setFilterOpen(true);
+              }}
+              onWaypointClick={(wp) => {
+                if (!Number.isFinite(wp.longitude) || !Number.isFinite(wp.latitude)) return;
+                mapRef.current?.getMap?.()?.flyTo({
+                  center: [wp.longitude, wp.latitude],
+                  zoom: 15,
+                  duration: 800,
+                });
+              }}
+            />
+          )}
+
+          <Card
+            onClick={() => setProfileModalOpen(true)}
+            style={{
+              position: "fixed",
+              top: isMobile ? headerHeight + 10 : headerHeight + contentPadding + 20,
+              left: isMobile ? 12 : contentPadding + 20,
+              zIndex: 100,
+              width: isMobile ? 240 : 280,
+              borderRadius: 20,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+              cursor: "pointer",
+              background: "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(8px)",
+              transition: "transform 0.2s ease",
+              border: "none"
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
+            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <Avatar
+                size={48}
+                src={user?.photoURL}
+                icon={<UserOutlined />}
+                style={{ border: "2px solid #e6f7ff" }}
+              />
+              <div>
+                <b style={{ fontSize: 16, display: "block" }}>{user?.displayName || "Gezgin"}</b>
+                <span style={{ fontSize: 13, color: "#8c8c8c" }}>{gamification?.roleText || "Newbie"}</span>
+              </div>
+            </div>
+
+            <div style={{ background: "#f5f5f5", padding: "12px", borderRadius: "14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: "600", color: "#1890ff" }}>
+                  {gamification?.levelText || "Level 1"}
+                </span>
+              </div>
+
+              <div style={{ width: "100%", height: 6, background: "#e8e8e8", borderRadius: 10, overflow: "hidden", marginBottom: 6 }}>
+                <div style={{
+                  width: `${gamification?.xpProgressPercent || 0}%`,
+                  height: "100%",
+                  background: "linear-gradient(90deg, #1890ff, #69c0ff)",
+                  transition: "width 0.5s ease-in-out"
+                }} />
+              </div>
+
+              <div style={{ fontSize: 11, color: "#595959", textAlign: "center" }}>
+                {gamification?.totalXp || 0} XP - {gamification?.xpProgressPercent || 0}% to next level
+              </div>
+            </div>
+          </Card>
           {/* sağdaki butonlar */}
           <div
             style={{
-              position: "absolute",
-              top: isMobile ? 12 : 18,
-              right: isMobile ? 12 : 18,
+              position: "fixed",
+              top: isMobile ? headerHeight + 12 : headerHeight + contentPadding + 18,
+              right: isMobile ? 12 : contentPadding + 18,
               zIndex: 60,
               display: "flex",
               flexDirection: "column",
               gap: fabGap,
             }}
           >
+            <Tooltip title="Ask Vacanza AI" placement="left">
+              <Button
+                shape="circle"
+                onClick={() => {
+                  setIsChatOpen(true);
+                  setFilterOpen(false);
+                }}
+                style={{
+                  width: fabSize,
+                  height: fabSize,
+                  fontSize: isMobile ? "18px" : "20px",
+                  background: "linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)", // Figma'daki gibi hafif gradyan
+                  border: "none",
+                  color: "white",
+                  boxShadow: "0 4px 12px rgba(96, 165, 250, 0.4)",
+                }}
+              >
+                ✨
+              </Button>
+            </Tooltip>
+
             <Tooltip title="Draw Area" placement="left">
               <Button
                 shape="circle"
                 onClick={startFreehand}
-                disabled={poiLoading}
                 style={{
                   width: fabSize,
                   height: fabSize,
@@ -845,38 +1211,61 @@ export default function MapPage() {
               </Button>
             </Tooltip>
 
-            <Button
-              shape="circle"
-              icon={<UnorderedListOutlined />}
-              onClick={() => {
-                setResultsOpen(false);
-                setFilterOpen((v) => !v);
-              }}
-              style={{ width: fabSize, height: fabSize }}
-            />
+            <Tooltip title="Toggle Filter" placement="left">
+              <Button
+                shape="circle"
+                icon={<UnorderedListOutlined />}
+                onClick={() => {
+                  setResultsOpen(false);
+                  setFilterOpen((v) => !v);
+                }}
+                style={{ width: fabSize, height: fabSize }}
+              />
+            </Tooltip>
 
-            <Button
-              shape="circle"
-              icon={<CompassOutlined />}
-              onClick={handleToggle2D3D}
-              style={{ width: fabSize, height: fabSize, color: is3D ? "#1890ff" : "#555" }}
-            />
+            <Tooltip title={is3D ? "Switch to 2D View" : "Switch to 3D View"} placement="left">
+              <Button
+                shape="circle"
+                icon={<CompassOutlined />}
+                onClick={handleToggle2D3D}
+                style={{ width: fabSize, height: fabSize, color: is3D ? "#1890ff" : "#555" }}
+              />
+            </Tooltip>
 
-            <Button
-              shape="circle"
-              icon={<HeatMapOutlined />}
-              onClick={handleStyleChange}
-              style={{ width: fabSize, height: fabSize }}
-            />
+            <Tooltip title="Change Map Style" placement="left">
+              <Button
+                shape="circle"
+                icon={<HeatMapOutlined />}
+                onClick={handleStyleChange}
+                style={{ width: fabSize, height: fabSize }}
+              />
+            </Tooltip>
+
+            <Tooltip title="Open Bookings" placement="left">
+              <Button
+                shape="circle"
+                icon={<CalendarOutlined />}
+                onClick={() => setBookingOpen(true)}
+                style={{
+                  width: fabSize,
+                  height: fabSize,
+                  border: "none",
+                  background: bookingOpen ? "#1890ff" : "rgba(255,255,255,0.95)",
+                  color: bookingOpen ? "#fff" : "#333",
+                  backdropFilter: "blur(8px)",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+                }}
+              />
+            </Tooltip>
           </div>
 
           {/* Filter panel */}
-          {filterOpen && (
+          {filterOpen && !activeRoute && (
             <div
               style={{
-                position: "absolute",
-                top: filterPanelTop,
-                right: filterPanelRight,
+                position: "fixed",
+                top: isMobile ? headerHeight + 10 : headerHeight + contentPadding + 28,
+                right: isMobile ? 12 : 78 + contentPadding,
                 zIndex: 70,
                 width: filterPanelWidth,
                 maxHeight: isMobile ? "62vh" : "unset",
@@ -889,12 +1278,12 @@ export default function MapPage() {
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                <b style={{ fontSize: 14 }}>Filter {poiLoading ? " • Loading..." : ""}</b>
+                <b style={{ fontSize: 14 }}>Filter</b>
                 <Button type="text" icon={<CloseOutlined />} onClick={() => setFilterOpen(false)} />
               </div>
 
               <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                <Button size="small" onClick={clearSelectionOnly} disabled={poiLoading}>
+                <Button size="small" onClick={clearSelectionOnly}>
                   Reset Area
                 </Button>
               </div>
@@ -904,7 +1293,6 @@ export default function MapPage() {
                   <button
                     key={c.key}
                     onClick={() => setSelectedCats((prev) => ({ ...prev, [c.key]: !prev[c.key] }))}
-                    disabled={poiLoading}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -914,24 +1302,28 @@ export default function MapPage() {
                       borderRadius: 10,
                       border: selectedCats[c.key] ? `2px solid ${c.ring}` : "1px solid #eee",
                       background: selectedCats[c.key] ? c.pill : "#fff",
-                      cursor: poiLoading ? "not-allowed" : "pointer",
-                      opacity: poiLoading ? 0.7 : 1,
+                      cursor: "pointer",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span
-                        style={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: 12,
-                          background: c.fill,
-                          display: "grid",
-                          placeItems: "center",
-                          border: `1px solid ${c.ring}`,
-                        }}
-                      >
-                        {c.emoji}
-                      </span>
+                      {c.img ? (
+                        <img src={c.img} alt={c.label} style={{ width: 32, height: 32, objectFit: "contain" }} />
+                      ) : (
+                        <span
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 12,
+                            background: c.fill,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: `1px solid ${c.ring}`,
+                          }}
+                        >
+                          <span style={{ fontSize: 13 }}>{c.emoji}</span>
+                        </span>
+                      )}
                       <b>{c.label}</b>
                     </div>
 
@@ -948,7 +1340,7 @@ export default function MapPage() {
           {canShowResultsPanel && (
             <div
               style={{
-                position: "absolute",
+                position: "fixed",
                 left: "50%",
                 transform: "translateX(-50%)",
                 bottom: resultsBottom,
@@ -1079,42 +1471,27 @@ export default function MapPage() {
                     })
                   )}
                 </div>
+
               </Card>
             </div>
           )}
-
-          {/* User card */}
-          <Card
-            style={{
-              position: "absolute",
-              top: isMobile ? 10 : 20,
-              left: isMobile ? 10 : 20,
-              zIndex: 50,
-              width: userCardWidth,
-              borderRadius: 16,
-              background: "rgba(255,255,255,0.95)",
-              backdropFilter: "blur(6px)",
+          {/* End of User card logic */}
+          <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
+          <VacanzaChat
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            onRouteGenerated={(routeData) => {
+              setActiveRoute(routeData);
+              setActiveDay(1);
+              setIsChatOpen(false);
+              setFilterOpen(false);
             }}
-            // ✅ antd warning fix: bodyStyle -> styles.body
-            styles={{ body: { padding: isMobile ? 10 : 14 } }}
-          >
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <Avatar
-                size={isMobile ? 40 : 48}
-                icon={<UserOutlined />}
-                src={user.photoURL}
-                style={{ marginRight: 10, backgroundColor: "#1890ff" }}
-              />
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: isMobile ? 13 : 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {user.displayName || "User"}
-                </div>
-                <div style={{ fontSize: 12, color: "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {user.email}
-                </div>
-              </div>
-            </div>
-          </Card>
+          />
+          <ProfileModal
+            open={profileModalOpen}
+            onClose={() => setProfileModalOpen(false)}
+            user={user}
+          />
         </div>
       </Content>
 

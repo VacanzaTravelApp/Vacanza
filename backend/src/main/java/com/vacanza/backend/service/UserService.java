@@ -24,8 +24,8 @@ public class UserService {
     private final CurrentUserProvider currentUserProvider;
 
     public UserService(UserRepository userRepository,
-                       UserInfoRepository userInfoRepository,
-                       CurrentUserProvider currentUserProvider) {
+            UserInfoRepository userInfoRepository,
+            CurrentUserProvider currentUserProvider) {
         this.userRepository = userRepository;
         this.userInfoRepository = userInfoRepository;
         this.currentUserProvider = currentUserProvider;
@@ -44,9 +44,7 @@ public class UserService {
     }
 
     private UserLoginResponseDTO toResponse(User user) {
-        boolean profileCompleted = userInfoRepository.existsByUser(user);
-
-        //if profile exists, use displayName from UserInfo; otherwise fallback to email
+        // if profile exists, use displayName from UserInfo; otherwise fallback to email
         String displayName = user.getEmail();
         UserInfo info = userInfoRepository.findByUser(user).orElse(null);
         if (info != null) {
@@ -61,6 +59,6 @@ public class UserService {
                         .displayName(displayName)
                         .build())
                 .build();
-        //if we want to add sth in this DTO we can extend it
+        // if we want to add sth in this DTO we can extend it
     }
 }

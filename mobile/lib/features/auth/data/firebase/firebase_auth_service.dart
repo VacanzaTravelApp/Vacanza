@@ -16,7 +16,7 @@ class FirebaseAuthService {
   /// Kullanıcıyı email + şifre ile Firebase üzerinden login eder.
   Future<fb.User> login(String email, String password) async {
     final cred = await _auth.signInWithEmailAndPassword(
-      email: email,
+      email: email.trim(),
       password: password,
     );
 
@@ -35,7 +35,7 @@ class FirebaseAuthService {
   ///  - aynı anda otomatik sign-in olur (currentUser dolar)
   Future<fb.User> register(String email, String password) async {
     final cred = await _auth.createUserWithEmailAndPassword(
-      email: email,
+      email: email.trim(),
       password: password,
     );
 
@@ -57,17 +57,19 @@ class FirebaseAuthService {
 
   /// Şu an login olan kullanıcının Firebase ID Token'ını döner.
   ///
+  /// [forceRefresh] true ise Firebase'den token'ı zorla yeniler.
   /// Backend token doğrulama için bu ID token'ı kullanır.
   /// DİKKAT:
   /// bazı SDK sürümlerinde getIdToken() String? gibi davranabiliyor;
   /// bu yüzden null check ile sağlamlaştırıyoruz.
-  Future<String> getIdToken() async {
+  Future<String> getIdToken({bool forceRefresh = false}) async {
     final user = _auth.currentUser;
     if (user == null) {
       throw Exception('ID token alınamadı: currentUser null.');
     }
 
-    final token = await user.getIdToken(); // bazen String? gibi davranabiliyor
+    final token =
+        await user.getIdToken(forceRefresh); // bazen String? gibi davranabiliyor
     if (token == null) {
       throw Exception('ID token alınamadı: Firebase null token döndürdü.');
     }

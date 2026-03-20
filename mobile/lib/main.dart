@@ -16,6 +16,18 @@ import 'features/auth/data/storage/secure_storage_service.dart';
 
 import 'features/poi_search/data/api/poi_search_api_client.dart';
 
+import 'features/gamification/data/api/gamification_api_client.dart';
+import 'features/gamification/data/repositories/gamification_repository.dart';
+import 'features/gamification/presentation/cubit/gamification_cubit.dart';
+
+import 'features/booking/data/api/booking_api_client.dart';
+import 'features/booking/data/repositories/booking_repository.dart';
+
+import 'features/chat/data/api/chat_api_client.dart';
+
+import 'features/profile/data/datasources/profile_remote_data_source.dart';
+import 'features/profile/data/repositories/profile_repository.dart';
+
 import 'features/auth/presentation/bloc/register_bloc.dart';
 import 'features/auth/presentation/bloc/login_bloc.dart';
 import 'features/auth/presentation/screens/auth_gate.dart';
@@ -65,6 +77,45 @@ class VacanzaApp extends StatelessWidget {
         RepositoryProvider<PoiSearchApiClient>(
           create: (ctx) => PoiSearchApiClient(ctx.read<Dio>()),
         ),
+
+        /// Gamification API client (MOB-8)
+        RepositoryProvider<GamificationApiClient>(
+          create: (ctx) => GamificationApiClient(ctx.read<Dio>()),
+        ),
+
+        /// Gamification repository (MOB-8)
+        RepositoryProvider<GamificationRepository>(
+          create: (ctx) => GamificationRepository(
+            apiClient: ctx.read<GamificationApiClient>(),
+          ),
+        ),
+
+        /// Booking API client (UC1.8-MOB4)
+        RepositoryProvider<BookingApiClient>(
+          create: (ctx) => BookingApiClient(ctx.read<Dio>()),
+        ),
+
+        /// Booking repository (UC1.8-MOB5)
+        RepositoryProvider<BookingRepository>(
+          create: (ctx) => BookingRepository(
+            apiClient: ctx.read<BookingApiClient>(),
+          ),
+        ),
+
+        /// Chat API client (AI chatbot)
+        RepositoryProvider<ChatApiClient>(
+          create: (ctx) => ChatApiClient(ctx.read<Dio>()),
+        ),
+
+        /// Profile (MOB-9 / profile feature)
+        RepositoryProvider<ProfileRemoteDataSource>(
+          create: (ctx) => ProfileRemoteDataSource(ctx.read<Dio>()),
+        ),
+        RepositoryProvider<ProfileRepository>(
+          create: (ctx) => ProfileRepository(
+            dataSource: ctx.read<ProfileRemoteDataSource>(),
+          ),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -76,6 +127,13 @@ class VacanzaApp extends StatelessWidget {
           BlocProvider<LoginBloc>(
             create: (context) => LoginBloc(
               authRepository: context.read<AuthRepository>(),
+            ),
+          ),
+
+          /// Gamification cubit (MOB-8) — app-wide for Profile + MOB-12
+          BlocProvider<GamificationCubit>(
+            create: (context) => GamificationCubit(
+              repository: context.read<GamificationRepository>(),
             ),
           ),
         ],

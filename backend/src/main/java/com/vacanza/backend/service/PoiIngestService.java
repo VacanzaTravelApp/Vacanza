@@ -5,6 +5,7 @@ import com.vacanza.backend.integration.GeoapifyClient;
 import com.vacanza.backend.integration.GeoapifyResponse;
 import com.vacanza.backend.repo.PointOfInterestRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,75 +18,77 @@ public class PoiIngestService {
     private final GeoapifyClient geoapifyClient;
     private final PointOfInterestRepository poiRepository;
 
-    // 🔥 MULTI CATEGORY INGEST
     @Transactional
     public int ingestMultipleCategories(
             String filter,
             List<String> frontendCategories,
-            int limit
-    ) {
+            int limit) {
 
         int totalSaved = 0;
 
         for (String frontendCategory : frontendCategories) {
 
-            String geoapifyCategory =
-                    mapFrontendToGeoapify(frontendCategory);
+            String geoapifyCategory = mapFrontendToGeoapify(frontendCategory);
 
-            if (geoapifyCategory == null) continue;
+            if (geoapifyCategory == null)
+                continue;
 
             totalSaved += ingestSingleCategory(
                     filter,
                     geoapifyCategory,
                     frontendCategory,
-                    limit
-            );
+                    limit);
         }
 
         return totalSaved;
     }
 
-    // 🔥 TEK CATEGORY INGEST
     private int ingestSingleCategory(
             String filter,
             String geoapifyCategory,
             String internalCategory,
-            int limit
-    ) {
+            int limit) {
 
         GeoapifyResponse resp = geoapifyClient
                 .search(filter, List.of(geoapifyCategory), limit)
                 .block();
 
-        if (resp == null || resp.getFeatures() == null) return 0;
+        if (resp == null || resp.getFeatures() == null)
+            return 0;
 
         int saved = 0;
 
         for (GeoapifyResponse.Feature f : resp.getFeatures()) {
 
-            if (f.getProperties() == null || f.getGeometry() == null) continue;
+            if (f.getProperties() == null || f.getGeometry() == null)
+                continue;
 
             String externalId = f.getProperties().getPlace_id();
-            if (externalId == null || poiRepository.existsByExternalId(externalId)) continue;
+            if (externalId == null || poiRepository.existsByExternalId(externalId))
+                continue;
 
             var coords = f.getGeometry().getCoordinates();
-            if (coords == null || coords.size() < 2) continue;
+            if (coords == null || coords.size() < 2)
+                continue;
 
             PointOfInterest poi = new PointOfInterest();
             poi.setExternalId(externalId);
             poi.setName(
                     f.getProperties().getName() != null
                             ? f.getProperties().getName()
-                            : "Unnamed"
-            );
+                            : "Unnamed");
             poi.setLatitude(coords.get(1));
             poi.setLongitude(coords.get(0));
             poi.setCategory(internalCategory);
             poi.setRating(f.getProperties().getRating());
             poi.setPriceLevel(f.getProperties().getPrice_level());
 
-            poiRepository.save(poi);
-            saved++;
+            try {
+                poiRepository.save(poi);
+                saved++;
+            } catch (DataIntegrityViolationException e) {
+                // Race: another request may have inserted same external_id; skip and continue
+            }
         }
 
         return saved;

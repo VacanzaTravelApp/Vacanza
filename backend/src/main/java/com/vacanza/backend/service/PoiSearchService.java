@@ -6,9 +6,7 @@ import com.vacanza.backend.entity.PointOfInterest;
 import com.vacanza.backend.repo.PointOfInterestRepository;
 import com.vacanza.backend.validation.PoiAreaRequestValidator;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -34,27 +32,24 @@ public class PoiSearchService {
 
         PoiSearchInAreaRequestDTO.Bbox bbox = resolveBbox(request);
 
-        List<String> frontendCategories =
-                request.getCategories() == null
-                        ? List.of()
-                        : request.getCategories().stream()
+        List<String> frontendCategories = request.getCategories() == null
+                ? List.of()
+                : request.getCategories().stream()
                         .map(String::toLowerCase)
                         .distinct()
                         .toList();
 
         List<PointOfInterest> all = fetchByBbox(bbox, frontendCategories);
 
-        // 🔥 DB EMPTY → INGEST
+        // No results in DB — trigger ingest from Geoapify
         if (all.isEmpty()) {
 
             String geoapifyFilter = buildRectFilterFromRequest(request);
 
-
             poiIngestService.ingestMultipleCategories(
                     geoapifyFilter,
                     frontendCategories,
-                    INGEST_LIMIT
-            );
+                    INGEST_LIMIT);
 
             all = fetchByBbox(bbox, frontendCategories);
         }
@@ -66,24 +61,20 @@ public class PoiSearchService {
             all.sort(
                     Comparator.comparing(
                             PointOfInterest::getRating,
-                            Comparator.nullsLast(Double::compareTo)
-                    ).reversed()
-            );
+                            Comparator.nullsLast(Double::compareTo)).reversed());
         }
 
         Map<String, Integer> countsByCategory = all.stream()
                 .collect(Collectors.groupingBy(
                         PointOfInterest::getCategory,
-                        Collectors.summingInt(x -> 1)
-                ));
+                        Collectors.summingInt(x -> 1)));
 
         int from = Math.min(page * limit, all.size());
         int to = Math.min(from + limit, all.size());
 
-        List<PoiSearchInAreaResponseDTO.PoiSummaryDTO> pois =
-                all.subList(from, to).stream()
-                        .map(this::toSummary)
-                        .toList();
+        List<PoiSearchInAreaResponseDTO.PoiSummaryDTO> pois = all.subList(from, to).stream()
+                .map(this::toSummary)
+                .toList();
 
         return PoiSearchInAreaResponseDTO.builder()
                 .count(all.size())
@@ -96,20 +87,17 @@ public class PoiSearchService {
 
     private List<PointOfInterest> fetchByBbox(
             PoiSearchInAreaRequestDTO.Bbox b,
-            List<String> categories
-    ) {
+            List<String> categories) {
         if (categories.isEmpty()) {
             return poiRepository.findByLatitudeBetweenAndLongitudeBetween(
                     b.getMinLat(), b.getMaxLat(),
-                    b.getMinLng(), b.getMaxLng()
-            );
+                    b.getMinLng(), b.getMaxLng());
         }
 
         return poiRepository.findByLatitudeBetweenAndLongitudeBetweenAndCategoryIn(
                 b.getMinLat(), b.getMaxLat(),
                 b.getMinLng(), b.getMaxLng(),
-                categories
-        );
+                categories);
     }
 
     private PoiSearchInAreaRequestDTO.Bbox resolveBbox(PoiSearchInAreaRequestDTO r) {
@@ -120,8 +108,7 @@ public class PoiSearchService {
     }
 
     private PoiSearchInAreaRequestDTO.Bbox bboxFromPolygon(
-            List<PoiSearchInAreaRequestDTO.LatLng> poly
-    ) {
+            List<PoiSearchInAreaRequestDTO.LatLng> poly) {
         double minLat = Double.MAX_VALUE, minLng = Double.MAX_VALUE;
         double maxLat = -Double.MAX_VALUE, maxLng = -Double.MAX_VALUE;
 
@@ -137,15 +124,13 @@ public class PoiSearchService {
 
     private void sortByDistanceToCenter(
             List<PointOfInterest> pois,
-            PoiSearchInAreaRequestDTO.Bbox b
-    ) {
+            PoiSearchInAreaRequestDTO.Bbox b) {
         double cl = (b.getMinLat() + b.getMaxLat()) / 2;
         double cg = (b.getMinLng() + b.getMaxLng()) / 2;
 
         pois.sort(Comparator.comparingDouble(
                 p -> Math.pow(cl - p.getLatitude(), 2)
-                        + Math.pow(cg - p.getLongitude(), 2)
-        ));
+                        + Math.pow(cg - p.getLongitude(), 2)));
     }
 
     private PoiSearchInAreaResponseDTO.PoiSummaryDTO toSummary(PointOfInterest p) {
@@ -159,27 +144,6 @@ public class PoiSearchService {
                 .priceLevel(p.getPriceLevel())
                 .externalId(p.getExternalId())
                 .build();
-    }
-
-    private String buildGeoapifyFilter(PoiSearchInAreaRequestDTO r) {
-
-        if (r.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
-            var b = r.getBbox();
-            return String.format(
-                    Locale.US,
-                    "rect:%f,%f,%f,%f",
-                    b.getMinLng(), b.getMinLat(),
-                    b.getMaxLng(), b.getMaxLat()
-            );
-        }
-
-        StringBuilder sb = new StringBuilder("polygon:");
-        for (int i = 0; i < r.getPolygon().size(); i++) {
-            var p = r.getPolygon().get(i);
-            sb.append(p.getLng()).append(" ").append(p.getLat());
-            if (i < r.getPolygon().size() - 1) sb.append(",");
-        }
-        return sb.toString();
     }
 
     private String buildRectFilterFromRequest(PoiSearchInAreaRequestDTO r) {
@@ -207,8 +171,7 @@ public class PoiSearchService {
                 Locale.US,
                 "rect:%f,%f,%f,%f",
                 b.getMinLng(), b.getMinLat(),
-                b.getMaxLng(), b.getMaxLat()
-        );
+                b.getMaxLng(), b.getMaxLat());
     }
 
 }

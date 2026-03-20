@@ -1,69 +1,96 @@
-/* src/pages/auth/RegisterCard.css */
-
 .register-card {
-    /* Hafif Mavi/Beyaz Gradyan Arka Plan */
-    background: linear-gradient(145deg, #f9fcff, #ffffff); 
-    
+    background: rgba(246, 248, 250, 0.9);
+    /* Premium grimsı kırık beyaz */
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     padding: 40px;
-    border-radius: 20px;
-    
-    /* Yumuşak gölge */
-    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.03); 
-    
+    border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.3);
     max-width: 400px;
     width: 100%;
 }
 
 .card-header {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 12px;
+    /* Tightened header again */
 }
 
 .vacanza-logo {
-    font-size: 24px;
-    font-weight: 700;
-    color: #1e90ff; 
+    font-size: 28px;
+    font-weight: 800;
+    color: #3da8c8;
     display: flex;
     align-items: center;
     justify-content: center;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
 }
 
 .vacanza-logo .logo-icon {
-    margin-right: 8px;
-    font-size: 28px;
+    margin-right: 10px;
+    font-size: 32px;
 }
 
 .card-header h3 {
-    font-size: 22px;
+    font-size: 20px;
     color: #333;
-    margin-top: 10px;
-    margin-bottom: 5px;
+    margin-top: 8px;
+    margin-bottom: 4px;
 }
 
 .header-subtext {
-    font-size: 14px;
+    font-size: 13px;
     color: #666;
 }
 
 /* --- Ant Design Özelleştirmeleri --- */
 
 /* Input'ların varsayılan kenar ve büyüklüğünü ayarla */
-.ant-input-affix-wrapper, .ant-input-password {
-    border-radius: 8px !important;
-    padding: 10px 15px !important; 
-    border: 1px solid #e0e0e0 !important;
-    transition: border-color 0.3s, box-shadow 0.3s; /* Geçiş ekledik */
+.ant-input-affix-wrapper,
+.ant-input-password {
+    border-radius: 24px !important;
+    padding: 12px 20px !important;
+    border: 1.4px solid #D8E6F0 !important;
+    background-color: #ffffff !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* --- HATA DURUMU İÇİN YENİ STİL --- */
+.ant-input-affix-wrapper:hover,
+.ant-input-password:hover {
+    border-color: #1DA1F2 !important;
+}
+
+.ant-input-affix-wrapper-focused,
+.ant-input-password-focused {
+    border-color: #1DA1F2 !important;
+    box-shadow: 0 0 0 4px rgba(29, 161, 242, 0.15) !important;
+    background-color: #ffffff !important;
+}
+
+.auth-form .ant-form-item {
+    margin-bottom: 6px !important;
+    /* Back to tighter spacing */
+}
+
+.auth-form .ant-form-item-label {
+    padding-bottom: 2px !important;
+}
+
+.auth-form .ant-form-item-label>label {
+    font-size: 13px !important;
+    font-weight: 600;
+}
+
+/* --- NEW STYLES FOR ERROR STATES --- */
 
 .ant-form-item-has-error .ant-input-affix-wrapper:not(.ant-input-affix-wrapper-disabled) {
-    border-color: #ff4d4f !important; 
+    border-color: #ff4d4f !important;
     box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2) !important;
 }
 
 .ant-form-item-has-error .ant-input {
-    border-color: #ff4d4f !important; 
+    border-color: #ff4d4f !important;
 }
 
 .ant-form-item-has-error .ant-input-password input {
@@ -75,28 +102,35 @@
     color: #ff4d4f !important;
 }
 
-/* --- Kayıt Butonu (CTA) --- */
-/* Kayıt formu için düz mavi buton */
+/* --- Registration Button (CTA) --- */
+/* Solid blue button for the registration form */
 .cta-button.ant-btn-primary {
     width: 100%;
     padding: 14px;
-    height: auto; 
-    background-color: #1e90ff;
+    height: auto;
+    background-color: #1DA1F2;
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
+    border-radius: 24px;
+    font-weight: 700;
     font-size: 16px;
-    transition: background-color 0.3s;
+    box-shadow: 0 4px 12px rgba(29, 161, 242, 0.25);
+    transition: all 0.2s ease;
 }
 
 .cta-button.ant-btn-primary:hover,
 .cta-button.ant-btn-primary:focus {
-    background-color: #0d83e3; 
+    background-color: #0d91e3;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(29, 161, 242, 0.35);
 }
 
-/* Giriş Butonu için Gradient Stil */
+.cta-button.ant-btn-primary:active {
+    transform: translateY(0) scale(0.98);
+}
+
+/* Gradient Style for Login Button */
 .cta-button.login-gradient-button {
-    background: linear-gradient(90deg, #1e90ff, #00c6ff); 
+    background: linear-gradient(90deg, #1e90ff, #00c6ff);
     border: none;
     transition: all 0.3s;
 }
@@ -107,7 +141,7 @@
 }
 
 
-/* --- Alt Navigasyon (Özellik Butonları - Alt Kısım) --- */
+/* --- Alternative Navigation (Feature Buttons - Bottom Section) --- */
 
 .alt-nav {
     display: flex;
@@ -125,22 +159,24 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    cursor: default; /* Bunlar butondan çok bilgi göstergesi */
+    cursor: default;
+    /* Bunlar butondan çok bilgi göstergesi */
     padding: 0 10px;
 }
 
 .alt-nav-icon {
     margin-bottom: 5px;
     color: #1e90ff;
-    font-size: 20px; 
+    font-size: 20px;
 }
 
 
-/* --- Giriş Yap Yönlendirmesi --- */
+/* --- Login Redirect --- */
 
 .login-redirect {
     text-align: center;
-    margin-top: 30px;
+    margin-top: 12px;
+    /* Halved the margin to bring it closer */
     font-size: 14px;
     color: #777;
 }
@@ -157,19 +193,19 @@
 }
 
 
-/* --- Login Kartı Özel Stilleri (Forgot Password) --- */
+/* --- Special Styles for Login Card (Forgot Password) --- */
 
 .login-options-row {
     display: flex;
-    justify-content: flex-end; 
+    justify-content: flex-end;
     align-items: center;
     width: 100%;
-    margin-top: -8px; 
+    margin-top: -8px;
     margin-bottom: 5px;
 }
 
 .forgot-password-link {
-    color: #1e90ff; 
+    color: #1e90ff;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -182,14 +218,14 @@
 }
 
 .remember-me-placeholder {
-    flex-grow: 1; 
+    flex-grow: 1;
 }
 
-/* --- Password Checks (Kayıt Kartı Özel) --- */
+/* --- Password Checks (Registration Card Specific) --- */
 
 .password-checks {
-    margin-top: -5px; 
-    margin-bottom: 15px; 
+    margin-top: -5px;
+    margin-bottom: 15px;
     padding: 5px 0;
 }
 
@@ -202,64 +238,108 @@
 
 .check-item svg {
     margin-right: 5px;
-    font-size: 14px; 
+    font-size: 14px;
 }
 
 
 .password-checks-container {
     /* Genel form alanıyla aynı hizada başlaması için sola bir miktar boşluk ekler. */
-    padding-left: 5px; 
-    margin-bottom: 20px; 
+    padding-left: 5px;
+    margin-bottom: 20px;
     padding-top: 5px;
 }
 
-/* 2. HER BİR KONTROL MADDESİ */
 .password-check-item {
     font-size: 12px;
-    font-weight: 500; 
-    display: flex; 
-    align-items: center; 
+    font-weight: 500;
+    display: flex;
+    align-items: center;
     padding: 3px 0;
-    
+
     /* Geçersiz maddelerin metin rengi (Hafif gri) */
-    color: #8c8c8c; 
+    color: #8c8c8c;
 }
 
-/* 3. SİMGE GÖSTERGESİ (✅ veya ⚪) */
 .check-indicator {
-    margin-right: 8px; 
-    font-size: 14px; 
+    margin-right: 8px;
+    font-size: 14px;
 }
 
 /* 4. GEÇERLİ OLAN MADDELERİN STİLİ (Yeşil Renk) */
 .password-check-item.valid {
     /* Geçerli maddelerin metin rengi (Koyu gri/siyah) */
-    color: #434343; 
+    color: #434343;
 }
 
 /* YENİ: YEŞİL RENGİN UYGULANMASI */
 /* İkonların (check-indicator) geçerli olduğunda yeşil olmasını sağlar */
 .password-check-item.valid .check-indicator {
-    color: #52c41a !important; /* Mobil tasarımınızdaki yeşil tonu */
+    color: #52c41a !important;
+    /* Mobil tasarımınızdaki yeşil tonu */
 }
 
 /* YENİ: GEÇERSİZLERİN RENGİNİ GRİ YAPMA */
 .password-check-item .check-indicator {
     /* Geçersiz olanların simge rengini hafif gri yapar */
-    color: #bfbfbf; 
+    color: #bfbfbf;
 }
 
 .password-checks-container {
-    padding-left: 5px; /* Sağa kaydırma */
-    margin-bottom: 20px; 
+    padding-left: 5px;
+    /* Sağa kaydırma */
+    margin-bottom: 20px;
     padding-top: 5px;
 }
 
 .password-check-item {
     font-size: 12px;
-    font-weight: 500; 
-    display: flex; 
-    align-items: center; 
+    font-weight: 500;
+    display: flex;
+    align-items: center;
     padding: 3px 0;
-    color: #8c8c8c; 
+    color: #8c8c8c;
+}
+
+/* --- Preferred Name (Custom Component) --- */
+
+.preferred-name-options {
+    display: flex;
+    gap: 20px;
+    justify-content: flex-start;
+    /* Changed to match image */
+    margin-bottom: 5px;
+}
+
+.pn-option {
+    padding: 8px 24px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    min-width: 60px;
+    text-align: center;
+    color: #455A64;
+    font-size: 14px;
+    background-color: #f5f5f5;
+    /* Unselected background slightly gray */
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pn-option:hover {
+    background-color: #e8e8e8;
+}
+
+.pn-option.selected {
+    border-color: #e8f0fe;
+    color: #1a202c;
+    /* Darker text for selected */
+    background-color: #e8f0fe;
+    /* Light blue background like image */
+}
+
+/* Error state integration for custom options */
+.ant-form-item-has-error .pn-option {
+    border-color: #ff4d4f !important;
 }

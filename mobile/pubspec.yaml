@@ -43,6 +43,19 @@ dependencies:
   mapbox_maps_flutter: ^2.17.0
   # HTTP client
   dio: ^5.7.0
+
+  # GPS & permissions (MOB-1)
+  geolocator: ^14.0.2
+  permission_handler: ^11.3.1
+
+  # Camera for light AR Mode (UC1.11)
+  camera: ^0.11.4
+
+  # External URL launcher (MOB9)
+  url_launcher: ^6.2.0
+
+  # Profile photo picker (camera / gallery)
+  image_picker: ^1.0.7
 dev_dependencies:
   flutter_test:
     sdk: flutter

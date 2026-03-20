@@ -4,10 +4,10 @@ import com.vacanza.backend.dto.request.UserLoginHistoryRequestDTO;
 import com.vacanza.backend.dto.response.UserLoginHistoryResponseDTO;
 import com.vacanza.backend.entity.LoginHistory;
 import com.vacanza.backend.entity.User;
-import com.vacanza.backend.exceptions.enums.UserLoginHistoryExceptionEnum;
+import com.vacanza.backend.exceptions.UserLoginHistoryExceptionEnum;
 import com.vacanza.backend.repo.UserLoginHistoryRepository;
 import com.vacanza.backend.repo.UserRepository;
-import com.vacanza.backend.service.impl.UserLoginHistoryImpl;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,12 +16,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-public class UserLoginHistoryService implements UserLoginHistoryImpl {
+public class UserLoginHistoryService {
 
     private final UserLoginHistoryRepository userLoginHistoryRepository;
     private final UserRepository userRepository;
 
-    public UserLoginHistoryService(UserLoginHistoryRepository userLoginHistoryRepository, UserRepository userRepository) {
+    public UserLoginHistoryService(UserLoginHistoryRepository userLoginHistoryRepository,
+            UserRepository userRepository) {
         this.userLoginHistoryRepository = userLoginHistoryRepository;
         this.userRepository = userRepository;
     }
@@ -39,7 +40,6 @@ public class UserLoginHistoryService implements UserLoginHistoryImpl {
                 .collect(Collectors.toList());
     }
 
-    @Override
     public List<UserLoginHistoryResponseDTO> getMyLoginHistories() {
         return List.of();
     }
@@ -58,7 +58,6 @@ public class UserLoginHistoryService implements UserLoginHistoryImpl {
                 .collect(Collectors.toList());
     }
 
-
     public void addNewLoginHistory(UserLoginHistoryRequestDTO request) {
 
         User user = userRepository.findByUserId(request.getUserId())
@@ -66,18 +65,15 @@ public class UserLoginHistoryService implements UserLoginHistoryImpl {
 
         if (request.getIpAddress() == null) {
             throw new RuntimeException(UserLoginHistoryExceptionEnum.NullIP.getExplanation());
-        } else {
-
-            LoginHistory loginHistory = new LoginHistory();
-            loginHistory.setUser(user);
-            loginHistory.setLoginProvider("Firebase");
-            loginHistory.setIpAddress(request.getIpAddress());
-            loginHistory.setLoginTime(Instant.now());
-
-            LoginHistory savedLoginHistory = userLoginHistoryRepository.save(loginHistory);
-
         }
-    }
 
+        LoginHistory loginHistory = new LoginHistory();
+        loginHistory.setUser(user);
+        loginHistory.setLoginProvider("Firebase");
+        loginHistory.setIpAddress(request.getIpAddress());
+        loginHistory.setLoginTime(Instant.now());
+
+        userLoginHistoryRepository.save(loginHistory);
+    }
 
 }

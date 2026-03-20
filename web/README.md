@@ -11,3 +11,6 @@ npm run dev
 ## 3. Firebase için
 
 npm install firebase react-router-dom
+
+npm install lodash
+npm install @mapbox/mapbox-gl-draw

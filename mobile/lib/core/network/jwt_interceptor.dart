@@ -18,6 +18,12 @@ class JwtInterceptor extends Interceptor {
   })  : _storage = storage,
         _dio = dio;
 
+  bool _isPreferencesPath(String path) {
+    // Handles both absolute and relative paths (with or without baseUrl).
+    return path.endsWith('/users/me/preferences') ||
+        path.contains('/users/me/preferences?');
+  }
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     try {
@@ -32,8 +38,36 @@ class JwtInterceptor extends Interceptor {
       }
     } catch (_) {}
 
-    log('[JwtInterceptor] REQ path=${options.path} hasAuth=${options.headers['Authorization'] != null}');
+    final authHeader = options.headers['Authorization']?.toString();
+    final maskedAuth = authHeader != null && authHeader.startsWith('Bearer ')
+        ? 'Bearer ${authHeader.substring(7, authHeader.length.clamp(0, 13))}...'
+        : authHeader ?? 'MISSING';
+    log('[JwtInterceptor] REQ path=${options.path} auth=$maskedAuth');
+
+    if (_isPreferencesPath(options.path)) {
+      log(
+        '[PrefsHTTP] REQ method=${options.method} path=${options.path}',
+        name: 'PrefsHTTP',
+      );
+    }
+
     handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final path = response.requestOptions.path;
+    if (_isPreferencesPath(path)) {
+      final method = response.requestOptions.method;
+      final status = response.statusCode;
+      final data = response.data;
+      final bodyType = data == null ? 'null' : data.runtimeType.toString();
+      log(
+        '[PrefsHTTP] RES method=$method path=$path status=$status bodyType=$bodyType',
+        name: 'PrefsHTTP',
+      );
+    }
+    handler.next(response);
   }
 
   @override
@@ -42,6 +76,51 @@ class JwtInterceptor extends Interceptor {
     final path = err.requestOptions.path;
 
     log('[JwtInterceptor] ERROR status=$status path=$path');
+
+    // 403 on protected endpoints:
+    // - If Firebase user is NOT verified → treat as \"account not verified\" and route to verify flow.
+    // - If Firebase user IS verified → do NOT bounce back to verify screen; just surface backend error.
+    if (status == 403 && !path.startsWith('/auth')) {
+      final firebaseUser = fb.FirebaseAuth.instance.currentUser;
+      final isVerified = firebaseUser?.emailVerified ?? false;
+
+      if (!isVerified) {
+        try {
+          NavigationService.showSnackBar(
+            'Account not verified. Please verify your email first.',
+          );
+          NavigationService.goToVerifyEmail();
+        } catch (_) {
+          // ignore navigation errors
+        }
+      } else {
+        final data = err.response?.data;
+        final msg = (data is Map && data['message'] is String)
+            ? data['message'] as String
+            : 'Request forbidden (403). Please try again.';
+        try {
+          NavigationService.showSnackBar(msg);
+        } catch (_) {
+          // ignore navigation errors
+        }
+      }
+    }
+
+    if (_isPreferencesPath(path)) {
+      final method = err.requestOptions.method;
+      final data = err.response?.data;
+      final bodyType = data == null ? 'null' : data.runtimeType.toString();
+      log(
+        '[PrefsHTTP] ERROR method=$method path=$path status=$status '
+        'bodyType=$bodyType body=$data',
+        name: 'PrefsHTTP',
+      );
+    }
+
+    if (status == 401) {
+      final body = err.response?.data;
+      log('[JwtInterceptor] 401 body=$body');
+    }
 
     if (status != 401) {
       handler.next(err);

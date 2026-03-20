@@ -4,6 +4,7 @@ import com.vacanza.backend.security.FirebaseTokenFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -28,7 +29,11 @@ public class SecurityConfigDev {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/chat/**").authenticated()
+                        .requestMatchers("/api/behavior/**").authenticated()
+                        .anyRequest().permitAll())
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable())
                 // token varsa context set edebilmek için dev'de de ekliyoruz
