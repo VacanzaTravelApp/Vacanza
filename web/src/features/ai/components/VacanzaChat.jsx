@@ -46,6 +46,22 @@ function routesForMessage(msg) {
 }
 
 /**
+ * Rota kartı eklenecek asistan balonları (yemek önerisi, genel sohbet vb. hariç).
+ * Zaman eşlemesi bu havuzda yapılır; aksi halde "en yakın asistan" yanlışlıkla yemek cevabı oluyordu.
+ */
+function looksLikeItineraryRouteReply(text) {
+  const s = (text ?? "").trim();
+  if (!s) return false;
+  const lower = s.toLowerCase();
+  if (/i['']?m here to help with travel/i.test(lower)) return false;
+  if (/^i['']?m here to help\b/i.test(lower)) return false;
+  if (/here is your .+ itinerary\b/i.test(lower)) return true;
+  if (/\bitinerary\b/i.test(lower) && /here is\b/i.test(lower)) return true;
+  if (/işte|rotanız|seyahat plan|tatil planınız|günlük plan/i.test(s)) return true;
+  return false;
+}
+
+/**
  * Kayıtlı rotaları, üretim zamanına göre en uygun asistan mesajına bağlar (aynı sohbette birden çok rota).
  */
 function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
@@ -71,12 +87,16 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
     .sort((a, b) => a.t - b.t);
 
   const assistantMsgs = msgs.filter((m) => m._isAssistant);
+  const itineraryAssistants = assistantMsgs.filter((m) =>
+    looksLikeItineraryRouteReply(m.text)
+  );
+  const assistantPool = itineraryAssistants.length ? itineraryAssistants : assistantMsgs;
   const byMessageId = new Map();
   for (let i = 0; i < routes.length; i++) {
     const rr = routes[i];
     let best = null;
     let bestT = -1;
-    for (const msg of assistantMsgs) {
+    for (const msg of assistantPool) {
       if (msg._createdAtMs <= rr.t && msg._createdAtMs >= bestT) {
         best = msg;
         bestT = msg._createdAtMs;
@@ -84,7 +104,7 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
     }
     if (!best && rr.t > 0) {
       let minGap = Infinity;
-      for (const msg of assistantMsgs) {
+      for (const msg of assistantPool) {
         if (msg._createdAtMs >= rr.t) {
           const gap = msg._createdAtMs - rr.t;
           if (gap < minGap) {
@@ -96,7 +116,7 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
     }
     if (!best && rr.t > 0) {
       let minGap = Infinity;
-      for (const msg of assistantMsgs) {
+      for (const msg of assistantPool) {
         if (msg._createdAtMs < rr.t) {
           const gap = rr.t - msg._createdAtMs;
           if (gap < minGap) {
@@ -107,7 +127,7 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
       }
     }
     if (!best) {
-      best = assistantMsgs[i] ?? assistantMsgs[assistantMsgs.length - 1] ?? null;
+      best = assistantPool[i] ?? assistantPool[assistantPool.length - 1] ?? null;
     }
     if (best) {
       const arr = byMessageId.get(best.id) ?? [];
@@ -258,7 +278,7 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
   }, []);
 
   const loadMessagesForConversation = useCallback(async (convId) => {
-    const history = await aiApi.getMessages(convId);
+    const history = await aiApi.getMessages(convId, 500, 0);
     let routeDetails = [];
     try {
       routeDetails = await aiApi.getRoutesForConversation(convId);
