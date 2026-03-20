@@ -72,16 +72,26 @@ TURN2_TOOL_CONTEXT_RULES = """User context (use the block below when choosing PO
 - estimated_duration_min must vary by venue type (e.g. large museums 90–120, small sites 45–60, parks 40–75, quick landmarks 25–45). Do not use 60 for every stop.
 - Keep geographic efficiency; preferences override only when choosing among nearby alternatives."""
 
-TURN2_WEATHER_RULES = """Destination weather forecast (use only this data; do not invent numbers):
+# Shown whenever weather payload is present. Legacy list = daily rows only; object may include "daily" only or "daily" + "day_parts".
+TURN2_WEATHER_RULES_DAILY = """Destination weather forecast (use only this data; do not invent numbers):
 {weather_json}
 
-Weather-aware planning:
-- If the payload is a JSON array (legacy): each entry is one calendar day (daily summary).
-- If the payload is a JSON object with "daily" and "day_parts": use "day_parts" for time-of-day scheduling. Each day has morning, afternoon, evening slots with weather_code, precipitation_probability_max_percent, and avoid_outdoor. When avoid_outdoor is true for a slot, do not put long exposed outdoor activities (parks, squares, long neighborhood walks) in that slot; prefer indoor or covered venues. Schedule outdoor-heavy POIs in slots with avoid_outdoor false or lower precipitation.
+Weather-aware planning (daily overview):
+- Use "daily" entries when present, or each array element when the payload is a legacy list (one row per calendar day).
 - High precipitation_probability_max_percent or WMO rain/storm codes (51–67, 80–99): favor museums, indoor galleries, churches, covered markets; shorten or defer large outdoor parks on those calendar days.
 - Clear, dry days: good for parks, neighborhoods, longer outdoor legs.
 - If the forecast differs by day, align outdoor-heavy days with drier days when possible (same POI list).
 - Mention weather briefly in "notes" only when it clearly shaped the plan (one short phrase)."""
+
+# Appended only when payload is an object with non-empty "day_parts" (morning/afternoon/evening windows).
+TURN2_WEATHER_RULES_DAY_PARTS = """Time-of-day scheduling (mandatory when "day_parts" is in the forecast JSON):
+- For each calendar day, read morning, afternoon, evening. Each has weather_code, precipitation_probability_max_percent, and avoid_outdoor.
+- Map waypoints to time_slot: morning → morning window; afternoon → afternoon; evening → evening. Order stops so outdoor exposure matches the better slots.
+- When avoid_outdoor is true for a slot (or precipitation_probability_max_percent is high in that slot): do NOT assign long exposed outdoor activities to that time_slot. Avoid: park, square, neighborhood (long walks), long outdoor routing between distant points, mostly-exposed monument viewing. Prefer: museum, art_gallery, church, historic_site (interior), covered market, indoor shopping, any POI that is mostly indoors.
+- When avoid_outdoor is false and precipitation is low: place parks, squares, neighborhoods, scenic outdoor legs in that time_slot.
+- day_start_local: if the morning slot is poor (avoid_outdoor true), start the sightseeing day later (e.g. 10:00–10:30) with indoor stops first, or front-load indoor blocks before any outdoor segment. If afternoon is worse, schedule outdoor morning stops and indoor afternoon. Keep day_start_local consistent with the first planned stop's time_slot.
+- estimated_duration_min: in wet slots, prefer shorter outdoor transitions; indoor venues can keep longer dwell times.
+- If "day_parts" is missing for a day, fall back to the daily overview rules only for that day."""
 
 TURN2_SYSTEM = """You are a travel planning assistant. Build a detailed itinerary
 using ONLY the POIs provided below. Do not invent new places.
@@ -194,7 +204,7 @@ def _parse_tool_result_pois(user_content: str) -> list[dict] | None:
 
 
 def _weather_context_has_payload(data: object) -> bool:
-    """True if legacy daily list or new {{daily, day_parts}} object has usable rows."""
+    """True if legacy daily list or object with daily and/or day_parts has usable rows."""
     if data is None:
         return False
     if isinstance(data, list):
@@ -202,6 +212,11 @@ def _weather_context_has_payload(data: object) -> bool:
     if isinstance(data, dict):
         return bool(data.get("daily")) or bool(data.get("day_parts"))
     return False
+
+
+def _weather_has_day_parts(data: object) -> bool:
+    """True when backend sent non-empty day_parts (slot-level forecast)."""
+    return isinstance(data, dict) and bool(data.get("day_parts"))
 
 
 def _parse_weather_context(user_content: str) -> list[dict] | dict | None:
@@ -854,12 +869,10 @@ Route generation rules:
         )
         weather_data = _parse_weather_context(user_content)
         if _weather_context_has_payload(weather_data):
-            turn2_system = (
-                f"{turn2_system}\n\n"
-                + TURN2_WEATHER_RULES.format(
-                    weather_json=json.dumps(weather_data, ensure_ascii=False)
-                )
-            )
+            wj = json.dumps(weather_data, ensure_ascii=False)
+            turn2_system = f"{turn2_system}\n\n" + TURN2_WEATHER_RULES_DAILY.format(weather_json=wj)
+            if _weather_has_day_parts(weather_data):
+                turn2_system = f"{turn2_system}\n\n{TURN2_WEATHER_RULES_DAY_PARTS}"
         if itinerary_user_context:
             turn2_system = (
                 f"{turn2_system}\n\n{TURN2_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
