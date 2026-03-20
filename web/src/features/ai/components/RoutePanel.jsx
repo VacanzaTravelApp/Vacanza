@@ -27,11 +27,11 @@ export default function RoutePanel({
 
   const days = route.days || [];
   const dayPlan = days.find((d) => Number(d?.day) === Number(activeDay));
-  const waypoints = (dayPlan?.waypoints || []).filter((w) => {
-    const lat = Number(w.latitude ?? w.lat);
-    const lon = Number(w.longitude ?? w.lon);
-    return Number.isFinite(lat) && Number.isFinite(lon);
-  });
+  const waypoints = [...(dayPlan?.waypoints || [])].sort(
+    (a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)
+  );
+  const dayStartLocal = dayPlan?.day_start_local ?? dayPlan?.dayStartLocal;
+  const dayEndLocal = dayPlan?.day_end_local ?? dayPlan?.dayEndLocal;
   const totalDays = route.total_days ?? route.totalDays ?? days.length;
 
   return (
@@ -54,6 +54,14 @@ export default function RoutePanel({
           </div>
         </div>
       </div>
+
+      {(dayStartLocal || dayEndLocal) && (
+        <div className="route-panel-day-window" aria-label="Gün özeti">
+          {dayStartLocal && dayEndLocal
+            ? `${dayStartLocal} – ${dayEndLocal}`
+            : dayStartLocal || dayEndLocal}
+        </div>
+      )}
 
       <div className="route-panel-tabs">
         {days.map((d) => {
@@ -84,50 +92,88 @@ export default function RoutePanel({
             {waypoints.map((wp, idx) => {
               const color = getCategoryColor(wp.category);
               const isLast = idx === waypoints.length - 1;
-              const isClickable = wp.latitude != null && wp.longitude != null;
+              const lat = Number(wp.latitude ?? wp.lat);
+              const lon = Number(wp.longitude ?? wp.lon);
+              const isClickable =
+                wp.latitude != null &&
+                wp.longitude != null &&
+                Number.isFinite(lat) &&
+                Number.isFinite(lon);
+              const travelMin =
+                wp.travel_from_previous_min ?? wp.travelFromPreviousMin;
+              const arrival =
+                wp.arrival_time_local ?? wp.arrivalTimeLocal;
+              const departure =
+                wp.departure_time_local ?? wp.departureTimeLocal;
+              const dwell =
+                wp.estimated_duration_min ?? wp.estimatedDurationMin;
 
               return (
-                <li
-                  key={`${wp.day}-${wp.order}`}
-                  className={`route-panel-waypoint-row ${isLast ? "route-panel-waypoint-last" : ""}`}
-                  onClick={() => isClickable && onWaypointClick?.(wp)}
-                  role={isClickable ? "button" : undefined}
-                  tabIndex={isClickable ? 0 : undefined}
-                  onKeyDown={(e) => {
-                    if (isClickable && (e.key === "Enter" || e.key === " ")) {
-                      e.preventDefault();
-                      onWaypointClick(wp);
-                    }
-                  }}
-                >
-                  <div
-                    className="route-panel-waypoint-dot"
-                    style={{ background: color, borderColor: color, color: "#fff" }}
+                <React.Fragment key={`${wp.day}-${wp.order}-${idx}`}>
+                  {idx > 0 && travelMin != null && travelMin > 0 && (
+                    <li className="route-panel-travel-leg">
+                      <div className="route-panel-travel-line" />
+                      <span className="route-panel-travel-label">
+                        Yürüyüş ~{travelMin} dk
+                      </span>
+                    </li>
+                  )}
+                  <li
+                    className={`route-panel-waypoint-row ${isLast ? "route-panel-waypoint-last" : ""}`}
+                    onClick={() => isClickable && onWaypointClick?.(wp)}
+                    role={isClickable ? "button" : undefined}
+                    tabIndex={isClickable ? 0 : undefined}
+                    onKeyDown={(e) => {
+                      if (isClickable && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        onWaypointClick(wp);
+                      }
+                    }}
                   >
-                    {idx + 1}
-                  </div>
-                  {!isLast && <div className="route-panel-waypoint-line" />}
-                  <div className="route-panel-waypoint-content">
-                    <div className="route-panel-waypoint-main">
-                      <span className="route-panel-waypoint-name">{wp.name}</span>
-                      {(wp.estimated_duration_min ?? wp.estimatedDurationMin) != null && (
-                        <span className="route-panel-waypoint-duration">
-                          ~{wp.estimated_duration_min ?? wp.estimatedDurationMin} dk
-                        </span>
-                      )}
+                    <div
+                      className="route-panel-waypoint-dot"
+                      style={{ background: color, borderColor: color, color: "#fff" }}
+                    >
+                      {idx + 1}
                     </div>
-                    {wp.description && (
-                      <div className="route-panel-waypoint-desc">{wp.description}</div>
-                    )}
-                    <div className="route-panel-waypoint-meta">
-                      {wp.time_slot && (
-                        <span className="route-panel-waypoint-timeslot">
-                          {formatTimeSlot(wp.time_slot)}
-                        </span>
+                    {!isLast && <div className="route-panel-waypoint-line" />}
+                    <div className="route-panel-waypoint-content">
+                      {(arrival || departure) && (
+                        <div className="route-panel-waypoint-clock">
+                          {arrival && departure
+                            ? `${arrival} – ${departure}`
+                            : arrival || departure}
+                          {dwell != null && (
+                            <span className="route-panel-waypoint-dwell">
+                              {" "}
+                              (~{dwell} dk)
+                            </span>
+                          )}
+                        </div>
                       )}
+                      <div className="route-panel-waypoint-main">
+                        <span className="route-panel-waypoint-name">{wp.name}</span>
+                        {(wp.estimated_duration_min ?? wp.estimatedDurationMin) != null &&
+                          !arrival &&
+                          !departure && (
+                            <span className="route-panel-waypoint-duration">
+                              ~{wp.estimated_duration_min ?? wp.estimatedDurationMin} dk
+                            </span>
+                          )}
+                      </div>
+                      {wp.description && (
+                        <div className="route-panel-waypoint-desc">{wp.description}</div>
+                      )}
+                      <div className="route-panel-waypoint-meta">
+                        {wp.time_slot && (
+                          <span className="route-panel-waypoint-timeslot">
+                            {formatTimeSlot(wp.time_slot)}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </li>
+                  </li>
+                </React.Fragment>
               );
             })}
           </ul>

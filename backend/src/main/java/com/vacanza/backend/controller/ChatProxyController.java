@@ -11,6 +11,7 @@ import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.security.CurrentUserProvider;
 import com.vacanza.backend.service.AiRouteService;
 import com.vacanza.backend.service.RouteSummaryMessageService;
+import com.vacanza.backend.service.RouteTimelineService;
 import com.vacanza.backend.service.UserInfoService;
 import com.vacanza.backend.service.UserPreferenceAiService;
 import com.vacanza.backend.service.UserPreferencesService;
@@ -37,6 +38,7 @@ public class ChatProxyController {
         private final RouteSummaryMessageService routeSummaryMessageService;
         private final ObjectMapper objectMapper;
         private final MapboxPoiSearchClient mapboxPoiSearchClient;
+        private final RouteTimelineService routeTimelineService;
 
         @PostMapping("/conversations")
         public ResponseEntity<AiChatDto.ConversationCreateResponse> createConversation() {
@@ -113,6 +115,7 @@ public class ChatProxyController {
 
                 try {
                         if (response != null && response.getRouteData() != null) {
+                                routeTimelineService.enrichTimeline(response.getRouteData(), profile);
                                 // Route data already contains coordinates (agentic POI search flow).
                                 saveRoute(user, conversationId, response.getRouteData());
                                 // Short contextual message for the user (e.g. "Müzeleri sevdiğini biliyordum...").

@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalDouble;
 import java.util.stream.Collectors;
 
 /**
@@ -74,6 +75,23 @@ public class MapboxDirectionsService {
         }
 
         return new RouteGeometry(coordsOut, first.distance, first.duration);
+    }
+
+    /**
+     * Walking duration in seconds between two points (single leg). Empty if the API fails.
+     */
+    public OptionalDouble getWalkingDurationSeconds(double lat1, double lon1, double lat2, double lon2) {
+        try {
+            RouteGeometry g = getRouteGeometry(List.of(
+                    new Waypoint(lat1, lon1),
+                    new Waypoint(lat2, lon2)));
+            if (g.duration() > 0) {
+                return OptionalDouble.of(g.duration());
+            }
+        } catch (Exception e) {
+            log.debug("Walking duration lookup failed: {}", e.getMessage());
+        }
+        return OptionalDouble.empty();
     }
 
     // ---- DTOs / Records ----
