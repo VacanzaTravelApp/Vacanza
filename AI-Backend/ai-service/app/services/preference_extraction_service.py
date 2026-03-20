@@ -27,6 +27,7 @@ Focus on these preference categories:
 - accommodation_preference: Hotel, hostel, Airbnb, resort, camping, etc.
 - climate_preference: TROPICAL, WARM, COLD, MILD, DRY
 - cultural_interest: Museums, history, art, architecture, nightlife, etc.
+- event_interest: Music festivals, concerts, sports events, etc.
 - transport_preference: FLY, TRAIN, DRIVE, PUBLIC_TRANSIT, WALK
 - dietary_restriction: Vegan, vegetarian, halal, kosher, gluten-free, etc.
 - health_condition: Allergies (pollen, dust, sun, etc.), motion sickness, mobility issues, chronic conditions relevant to travel
@@ -46,7 +47,7 @@ Rules:
 
 CRITICAL — Merging with existing preferences:
 - If existing preferences are provided below, use them as context.
-- For ADDITIVE preferences (allergies, cuisines, interests, dietary restrictions, destinations, languages): MERGE the new value with the existing one. Example: existing "peanut allergy" + user says "I also have shellfish allergy" → return "peanut allergy, shellfish allergy" as a single combined value for the SAME key.
+- For ADDITIVE preferences (allergies, cuisines, interests, event_interest, dietary restrictions, destinations, languages): MERGE the new value with the existing one. Example: existing "peanut allergy" + user says "I also have shellfish allergy" → return "peanut allergy, shellfish allergy" as a single combined value for the SAME key.
 - For SINGLE-VALUE preferences (activity_level, budget, trip_pace, travel_style, climate): REPLACE the old value with the new one.
 - If the user REMOVES a specific item ("I no longer have peanut allergy"), return the remaining items. Example: existing "peanut allergy, shellfish allergy" + user says "peanut allergy is gone" → return "shellfish allergy".
 - If the user NEGATES everything ("I have no allergies at all"), return "none" for that key.
