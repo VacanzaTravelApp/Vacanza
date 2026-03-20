@@ -9,9 +9,13 @@ from app.schemas.preference_extraction import ExtractedPreference
 
 
 class UserProfileForAi(BaseModel):
-    """User profile for AI (X-User-Profile). Mirrors Java UserProfileForAi (identity + UserPreferences)."""
+    """User profile for AI (X-User-Profile). Mirrors Java UserProfileForAi (identity + UserPreferences).
 
-    model_config = ConfigDict(extra="ignore")
+    Budget: backend always sends ``dailyBudget`` (camelCase). We also accept legacy JSON key ``budget``;
+    both map to ``dailyBudget`` on this model.
+    """
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     # Identity (UserInfo)
     displayName: str | None = None
@@ -42,10 +46,11 @@ class UserProfileForAi(BaseModel):
     accessibilityNeeds: list[str] | None = None
     avoidCategories: list[str] | None = None
 
-    # Budget (Java sends dailyBudget; accept legacy key "budget")
+    # Budget — Java / X-User-Profile uses dailyBudget; "budget" accepted for older payloads
     dailyBudget: str | None = Field(
         default=None,
         validation_alias=AliasChoices("dailyBudget", "budget"),
+        description="Daily budget amount (string); backend field name is dailyBudget.",
     )
     budgetCurrency: str | None = None
     splurgeCategories: list[str] | None = None
