@@ -53,6 +53,19 @@ public class RouteController {
         return ResponseEntity.ok(items);
     }
 
+    /**
+     * All saved routes for this chat, oldest first (user-scoped). Restores route cards in thread order.
+     */
+    @GetMapping("/conversation/{conversationId}")
+    public ResponseEntity<List<RouteDetail>> getRoutesForConversation(
+            @PathVariable UUID conversationId) {
+        User user = currentUserProvider.getCurrentUserEntity();
+        List<RouteDetail> list = aiRouteService.getRoutesForConversation(user, conversationId).stream()
+                .map(this::toDetail)
+                .toList();
+        return ResponseEntity.ok(list);
+    }
+
     @GetMapping("/{routeId}")
     public ResponseEntity<RouteDetail> getRoute(@PathVariable UUID routeId) {
         User user = currentUserProvider.getCurrentUserEntity();

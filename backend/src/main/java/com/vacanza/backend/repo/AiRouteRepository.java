@@ -13,4 +13,6 @@ public interface AiRouteRepository extends JpaRepository<AiRoute, UUID> {
     List<AiRoute> findByUserOrderByGeneratedAtDesc(User user);
 
     Optional<AiRoute> findByRouteIdAndUser(UUID routeId, User user);
+
+    List<AiRoute> findByUserAndConversationIdOrderByGeneratedAtAsc(User user, UUID conversationId);
 }

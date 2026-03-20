@@ -78,6 +78,11 @@
   flex-shrink: 0;
 }
 
+/* Aynı cevapta birden fazla rota kartı */
+.chat-row .route-card + .route-card {
+  margin-top: 10px;
+}
+
 .chat-header-actions {
   display: flex;
   align-items: center;
