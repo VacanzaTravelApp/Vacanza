@@ -438,70 +438,84 @@ def _join_list(values: list[str] | None) -> str | None:
 
 
 def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
-    """Build user profile section for system prompt. Includes identity, travel prefs, budget, behavioral hints."""
+    """Build a short, scannable block: identity (if any), then travel prefs (budget, pace, cuisine, diet, avoid, etc.)."""
     if not profile:
         return ""
-    parts: list[str] = []
+
+    identity: list[str] = []
     if profile.displayName:
-        parts.append(f"Name: {profile.displayName}")
-    if profile.firstName and not profile.displayName:
-        parts.append(f"First name: {profile.firstName}")
+        identity.append(f"Name: {profile.displayName}")
+    elif profile.firstName:
+        identity.append(f"First name: {profile.firstName}")
     if profile.middleName:
-        parts.append(f"Middle name: {profile.middleName}")
+        identity.append(f"Middle name: {profile.middleName}")
     if profile.lastName:
-        parts.append(f"Last name: {profile.lastName}")
+        identity.append(f"Last name: {profile.lastName}")
     if profile.preferredName:
-        parts.append(f"Preferred name: {profile.preferredName}")
+        identity.append(f"Preferred name: {profile.preferredName}")
     if profile.country:
-        parts.append(f"Country: {profile.country}")
+        identity.append(f"Country: {profile.country}")
     if profile.birthDate:
-        parts.append(f"Birth date: {profile.birthDate}")
+        identity.append(f"Birth date: {profile.birthDate}")
     if profile.gender:
-        parts.append(f"Gender: {profile.gender}")
+        identity.append(f"Gender: {profile.gender}")
     if profile.joinDate:
-        parts.append(f"Join date: {profile.joinDate}")
-    if profile.travelStyle:
-        parts.append(f"Travel style: {profile.travelStyle}")
-    fc = _join_list(profile.favoriteCategories)
-    if fc:
-        parts.append(f"Favorite categories: {fc}")
-    if profile.activityLevel:
-        parts.append(f"Activity level: {profile.activityLevel}")
-    cu = _join_list(profile.cuisinePreferences)
-    if cu:
-        parts.append(f"Cuisine preferences: {cu}")
-    if profile.preferredClimate:
-        parts.append(f"Preferred climate: {profile.preferredClimate}")
-    if profile.tripPace:
-        parts.append(f"Trip pace: {profile.tripPace}")
-    if profile.accommodationType:
-        parts.append(f"Accommodation: {profile.accommodationType}")
-    if profile.transportPreference:
-        parts.append(f"Transport: {profile.transportPreference}")
-    dr = _join_list(profile.dietaryRestrictions)
-    if dr:
-        parts.append(f"Dietary restrictions: {dr}")
-    an = _join_list(profile.accessibilityNeeds)
-    if an:
-        parts.append(f"Accessibility: {an}")
-    av = _join_list(profile.avoidCategories)
-    if av:
-        parts.append(f"Avoid categories: {av}")
+        identity.append(f"Join date: {profile.joinDate}")
+
+    # Priority order for the model: budget, pace, cuisine, avoid, diet — then the rest.
+    travel: list[str] = []
     if profile.dailyBudget:
         bud = profile.dailyBudget
         if profile.budgetCurrency:
             bud = f"{bud} {profile.budgetCurrency}"
-        parts.append(f"Daily budget: {bud}")
+        travel.append(f"Budget (daily): {bud}")
+    if profile.tripPace:
+        travel.append(f"Trip pace: {profile.tripPace}")
+    cu = _join_list(profile.cuisinePreferences)
+    if cu:
+        travel.append(f"Cuisine: {cu}")
+    av = _join_list(profile.avoidCategories)
+    if av:
+        travel.append(f"Avoid categories / activities: {av}")
+    dr = _join_list(profile.dietaryRestrictions)
+    if dr:
+        travel.append(f"Dietary: {dr}")
+
+    if profile.travelStyle:
+        travel.append(f"Travel style: {profile.travelStyle}")
+    if profile.activityLevel:
+        travel.append(f"Activity level: {profile.activityLevel}")
+    fc = _join_list(profile.favoriteCategories)
+    if fc:
+        travel.append(f"Favorite categories: {fc}")
+    if profile.preferredClimate:
+        travel.append(f"Preferred climate: {profile.preferredClimate}")
+    if profile.accommodationType:
+        travel.append(f"Accommodation: {profile.accommodationType}")
+    if profile.transportPreference:
+        travel.append(f"Transport: {profile.transportPreference}")
+    an = _join_list(profile.accessibilityNeeds)
+    if an:
+        travel.append(f"Accessibility: {an}")
     sp = _join_list(profile.splurgeCategories)
     if sp:
-        parts.append(f"Splurge on: {sp}")
+        travel.append(f"Splurge categories: {sp}")
     if profile.preferredLanguage:
-        parts.append(f"Preferred language: {profile.preferredLanguage}")
+        travel.append(f"Preferred language: {profile.preferredLanguage}")
     sl = _join_list(profile.spokenLanguages)
     if sl:
-        parts.append(f"Spoken languages: {sl}")
-    if not parts:
+        travel.append(f"Spoken languages: {sl}")
+
+    if not identity and not travel:
         return ""
+
+    blocks: list[str] = []
+    if identity:
+        blocks.append("Identity:\n" + "\n".join(f"- {line}" for line in identity))
+    if travel:
+        blocks.append("Travel preferences (apply when relevant):\n" + "\n".join(f"- {line}" for line in travel))
+
+    result = "\n\n".join(blocks) + "\n"
 
     instructions: list[str] = []
     if profile.displayName or profile.preferredName or profile.firstName:
@@ -511,13 +525,14 @@ def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
             "Otherwise do not repeat greetings."
         )
     if profile.dailyBudget:
-        instructions.append(
-            "Consider daily budget in your recommendations."
-        )
+        instructions.append("Respect the stated daily budget when suggesting costs or splurges.")
+    if dr:
+        instructions.append("Respect dietary restrictions for food and dining suggestions.")
+    if av:
+        instructions.append("Do not prioritize or recommend categories the user wants to avoid.")
     if profile.country:
-        instructions.append("Use country (Country: " + profile.country + ") in your recommendations.")
+        instructions.append("Use country context when relevant (Country: " + profile.country + ").")
 
-    result = "User profile: " + ", ".join(parts) + ".\n"
     if instructions:
         result += "Rules: " + " ".join(instructions)
     return result
