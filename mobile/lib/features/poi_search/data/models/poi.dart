@@ -36,7 +36,7 @@ class Poi {
         case 'monuments':
         case 'monument':
           return 'Monument';
-        case 'restaurants':
+        case 'restaurant':
         case 'restaurant':
           return 'Restaurant';
         case 'cafe':

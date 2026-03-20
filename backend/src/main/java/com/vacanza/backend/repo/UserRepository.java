@@ -3,6 +3,7 @@ package com.vacanza.backend.repo;
 import com.vacanza.backend.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,4 +19,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmail(String email);
 
     boolean existsByFirebaseUid(String firebaseUid);
+
+    // Admin analytics: user growth trend
+    long countByCreatedAtAfter(Instant date);
 }

@@ -1,6 +1,5 @@
 package com.vacanza.backend.dto.request;
 
-import com.vacanza.backend.entity.enums.Budget;
 import com.vacanza.backend.entity.enums.Gender;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,7 +12,7 @@ import java.time.LocalDate;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-//hemprofil olusturma hem update için ayni DTO kullanılabilsin diye optional
+// hemprofil olusturma hem update için ayni DTO kullanılabilsin diye optional
 public class UserInfoRequestDTO {
 
     private String firstName;
@@ -24,8 +23,6 @@ public class UserInfoRequestDTO {
     private String country;
     private LocalDate birthDate;
     private Gender gender;
-
-    private Budget budget;
 
     private String profileImageUrl;
 }

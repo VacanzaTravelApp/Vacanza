@@ -11,8 +11,17 @@ class ActionBar extends StatelessWidget {
   final VoidCallback onRecenter;
   final VoidCallback onToggleDrawing;
 
+  // ✅ UC1.8-MOB1: Booking entry point
+  final VoidCallback onOpenBooking;
+
+  // ✅ Chatbot entry point
+  final VoidCallback onOpenChat;
+
   // ✅ NEW
   final VoidCallback onOpenFilters;
+
+  /// UC1.11 — Explore in AR entry point
+  final VoidCallback onOpenArMode;
 
   const ActionBar({
     super.key,
@@ -21,7 +30,10 @@ class ActionBar extends StatelessWidget {
     required this.onToggleMode,
     required this.onRecenter,
     required this.onToggleDrawing,
+    required this.onOpenBooking, // ✅ UC1.8-MOB1
+    required this.onOpenChat, // ✅ Chatbot
     required this.onOpenFilters, // ✅ NEW
+    required this.onOpenArMode, // UC1.11
   });
 
   @override
@@ -43,6 +55,30 @@ class ActionBar extends StatelessWidget {
           tooltip: 'Filter POIs',
           icon: Icons.layers_sharp,
           onPressed: onOpenFilters,
+        ),
+        const SizedBox(height: 16),
+
+        // UC1.11: Explore in AR
+        ActionIconButton(
+          tooltip: 'Explore in AR',
+          icon: Icons.view_in_ar_rounded,
+          onPressed: onOpenArMode,
+        ),
+        const SizedBox(height: 16),
+
+        // ✅ UC1.8-MOB1: Booking entry point
+        ActionIconButton(
+          tooltip: 'Booking',
+          icon: Icons.luggage_rounded,
+          onPressed: onOpenBooking,
+        ),
+        const SizedBox(height: 16),
+
+        // ✅ Chatbot
+        ActionIconButton(
+          tooltip: 'AI Assistant',
+          icon: Icons.chat_bubble_rounded,
+          onPressed: onOpenChat,
         ),
         const SizedBox(height: 16),
 

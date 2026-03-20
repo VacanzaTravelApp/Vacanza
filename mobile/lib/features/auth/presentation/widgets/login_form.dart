@@ -54,8 +54,25 @@ class _LoginFormState extends State<LoginForm> {
 
   /// Re-compute whether the form is eligible to submit.
   void _update() {
+    // Normalize leading whitespace: prevent starting fields with spaces.
+    final emailRaw = _email.text;
+    final emailTrimLeft = emailRaw.replaceFirst(RegExp(r'^\s+'), '');
+    if (emailTrimLeft != emailRaw) {
+      _email
+        ..text = emailTrimLeft
+        ..selection = TextSelection.collapsed(offset: emailTrimLeft.length);
+    }
+
+    final passRaw = _password.text;
+    final passTrimLeft = passRaw.replaceFirst(RegExp(r'^\s+'), '');
+    if (passTrimLeft != passRaw) {
+      _password
+        ..text = passTrimLeft
+        ..selection = TextSelection.collapsed(offset: passTrimLeft.length);
+    }
+
     final emailValid = _emailRegex.hasMatch(_email.text.trim());
-    final passValid = _password.text.isNotEmpty;
+    final passValid = _password.text.trim().isNotEmpty;
 
     setState(() {
       _formValid = emailValid && passValid;

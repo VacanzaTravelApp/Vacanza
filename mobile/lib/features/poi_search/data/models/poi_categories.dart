@@ -1,6 +1,6 @@
 class PoiCategories {
   static const List<String> defaults = <String>[
-    'restaurants',
+    'restaurant',
     'cafe',
     'museum',
     'monuments',

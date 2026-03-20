@@ -1,0 +1,259 @@
+import 'package:flutter/material.dart';
+
+import '../../../data/models/booking_utils.dart';
+import '../../../data/models/transport_option.dart';
+import '../booking_url_launcher.dart';
+
+/// Card displaying a single flight result.
+class FlightCard extends StatefulWidget {
+  final TransportOption flight;
+
+  const FlightCard({super.key, required this.flight});
+
+  @override
+  State<FlightCard> createState() => _FlightCardState();
+}
+
+class _FlightCardState extends State<FlightCard> {
+  bool _isLaunching = false;
+
+  static const _accent = Color(0xFF0096FF);
+
+  @override
+  Widget build(BuildContext context) {
+    final flight = widget.flight;
+    final depTime = formatTime(flight.departureTime);
+    final arrTime = formatTime(flight.arrivalTime);
+    final dur = formatDuration(flight.duration);
+    final stopsLabel = formatStops(flight.stops);
+    final validUrl = isValidBookingUrl(flight.externalBookingUrl);
+    final enabled = validUrl && !_isLaunching;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFF0F0F0)),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFF0F0F0)),
+                  image: flight.airlineLogo != null &&
+                          flight.airlineLogo!.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(flight.airlineLogo!),
+                          fit: BoxFit.contain,
+                        )
+                      : null,
+                ),
+                child: (flight.airlineLogo == null ||
+                        flight.airlineLogo!.isEmpty)
+                    ? Center(
+                        child: Text(
+                          flight.carrier,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF888888),
+                          ),
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$depTime – $arrTime',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    Text(
+                      [
+                        flight.carrier,
+                        if (flight.flightNumber != null &&
+                            flight.flightNumber!.isNotEmpty)
+                          flight.flightNumber!,
+                      ].join(' · '),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '\$${flight.price.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: _accent,
+                    ),
+                  ),
+                  if (flight.travelClass != null &&
+                      flight.travelClass!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          flight.travelClass!,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF1D4ED8),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(flight.origin, style: _routeLabel),
+                  Text(dur, style: _routeLabel),
+                  Text(flight.destination, style: _routeLabel),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                  if (flight.stops > 0)
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFAAAAAA),
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: flight.stops == 0
+                      ? const Color(0xFFF0FFF4)
+                      : const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  stopsLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: flight.stops == 0
+                        ? const Color(0xFF22C55E)
+                        : const Color(0xFFF97316),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: enabled
+                ? () async {
+                    setState(() => _isLaunching = true);
+                    try {
+                      await openBookingUrl(context, flight.externalBookingUrl);
+                    } finally {
+                      if (mounted) setState(() => _isLaunching = false);
+                    }
+                  }
+                : null,
+            child: Opacity(
+              opacity: enabled ? 1 : 0.5,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAFAFA),
+                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _isLaunching ? 'Opening…' : 'Open in Google Flights',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF555555),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 14,
+                      color: Color(0xFF555555),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static const _routeLabel = TextStyle(
+    fontSize: 11,
+    color: Color(0xFF999999),
+  );
+}

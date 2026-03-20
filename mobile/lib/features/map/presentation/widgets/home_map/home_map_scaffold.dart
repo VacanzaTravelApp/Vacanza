@@ -10,6 +10,9 @@ import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/mapbox/map_canvas_mapbox.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/action_bar.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/profile_badge.dart';
+import 'package:mobile/features/profile/presentation/bloc/profile_bloc.dart';
+import 'package:mobile/features/profile/presentation/bloc/profile_state.dart';
+import 'package:mobile/features/profile/presentation/screens/profile_screen.dart';
 
 import '../../../data/models/map_view_mode.dart';
 
@@ -20,6 +23,15 @@ class HomeMapScaffold extends StatelessWidget {
   final VoidCallback onToggleMode;
   final VoidCallback onRecenter;
   final VoidCallback onToggleDrawing;
+
+  /// UC1.8-MOB1: booking entry point
+  final VoidCallback onOpenBooking;
+
+  /// Chatbot entry point
+  final VoidCallback onOpenChat;
+
+  /// UC1.11 — Explore in AR entry point
+  final VoidCallback onOpenArMode;
 
   /// VACANZA-188: filter panel open
   final VoidCallback onOpenFilters;
@@ -44,6 +56,9 @@ class HomeMapScaffold extends StatelessWidget {
     required this.onToggleMode,
     required this.onRecenter,
     required this.onToggleDrawing,
+    required this.onOpenBooking,
+    required this.onOpenChat,
+    required this.onOpenArMode,
     required this.onOpenFilters,
     this.isFiltersOpen = false,
     this.filtersPanel,
@@ -83,13 +98,36 @@ class HomeMapScaffold extends StatelessWidget {
             ),
 
             // ================= PROFILE (SOL ÜST) =================
-            const Positioned(
+            Positioned(
               top: 30,
               left: 16,
-              child: ProfileBadge(
-                name: 'Serhat', // VACANZA-164
-                subtitle: 'Traveler',
-                  imagePath: 'assets/core/theme/profile/serhat.jpg'
+              child: BlocBuilder<ProfileBloc, ProfileState>(
+                buildWhen: (prev, curr) => prev.profile != curr.profile,
+                builder: (context, profileState) {
+                  final p = profileState.profile;
+                  final displayName = p != null
+                      ? (p.displayName.trim().isNotEmpty
+                          ? p.displayName
+                          : p.displayNameFallback)
+                      : '—';
+                  final profileBloc = context.read<ProfileBloc>();
+                  return ProfileBadge(
+                    name: displayName,
+                    subtitle: 'Traveler',
+                    imageUrl: p?.profileImageUrl,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BlocProvider.value(
+                            value: profileBloc,
+                            child: const ProfileScreen(),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ),
 
@@ -115,7 +153,10 @@ class HomeMapScaffold extends StatelessWidget {
                 onToggleMode: onToggleMode,
                 onRecenter: onRecenter,
                 onToggleDrawing: onToggleDrawing,
+                onOpenBooking: onOpenBooking,
+                onOpenChat: onOpenChat,
                 onOpenFilters: onOpenFilters,
+                onOpenArMode: onOpenArMode,
               ),
             ),
 

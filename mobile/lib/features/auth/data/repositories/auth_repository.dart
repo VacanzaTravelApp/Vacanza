@@ -1,6 +1,9 @@
+import 'dart:developer';
+
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 
+import 'package:mobile/core/network/backend_error_parser.dart';
 import 'package:mobile/features/auth/data/api/auth_api_client.dart';
 import 'package:mobile/features/auth/data/firebase/firebase_auth_service.dart';
 import 'package:mobile/features/auth/data/models/user_authentication_dto.dart';
@@ -48,8 +51,18 @@ class AuthRepository {
   /// - storage tokenlarını siler
   /// - firebase signOut yapar
   Future<void> logout() async {
-    await _storage.clearSession();
-    await _firebaseService.signOut();
+    try {
+      final currentUser = _firebaseService.getCurrentUser();
+      if (currentUser != null) {
+        final token = await _firebaseService.getIdToken();
+        await _apiClient.logoutSync(firebaseIdToken: token);
+      }
+    } catch (_) {
+      // Backend logout best-effort; hatalar kullanıcıyı bloklamamalı.
+    } finally {
+      await _storage.clearSession();
+      await _firebaseService.signOut();
+    }
   }
 
   /// Register akışı:
@@ -66,7 +79,26 @@ class AuthRepository {
     String? preferredName,
   }) async {
     try {
-      await _firebaseService.register(email, password);
+      final fbUser = await _firebaseService.register(email, password);
+
+      try {
+        log('[Auth] sendEmailVerification: start', name: 'Auth');
+        await fbUser.sendEmailVerification();
+        log(
+          '[Auth] sendEmailVerification: success email=${fbUser.email}',
+          name: 'Auth',
+        );
+      } on fb.FirebaseAuthException catch (e) {
+        log(
+          '[Auth] sendEmailVerification: error code=${e.code} message=${e.message}',
+          name: 'Auth',
+        );
+      } catch (e) {
+        log(
+          '[Auth] sendEmailVerification: error (non-Firebase) $e',
+          name: 'Auth',
+        );
+      }
 
       final firebaseIdToken = await _firebaseService.getIdToken();
 
@@ -101,18 +133,8 @@ class AuthRepository {
           throw AuthFailure('Firebase register hatası: ${e.code}');
       }
     } on DioException catch (e) {
-      final status = e.response?.statusCode;
-      final data = e.response?.data;
-
-      if (data is Map && data['message'] is String) {
-        throw AuthFailure(data['message'] as String);
-      }
-
-      throw AuthFailure(
-        status == null
-            ? 'Register sırasında sunucuya ulaşılamadı.'
-            : 'Register sırasında sunucu hatası: HTTP $status',
-      );
+      final message = extractBackendMessage(e);
+      throw AuthFailure(message);
     } on AuthFailure {
       rethrow;
     } catch (_) {
@@ -157,21 +179,13 @@ class AuthRepository {
       }
     } on DioException catch (e) {
       final status = e.response?.statusCode;
-      final data = e.response?.data;
-
-      if (data is Map && data['message'] is String) {
-        throw AuthFailure(data['message'] as String);
-      }
+      final message = extractBackendMessage(e);
 
       if (status == 401) {
         throw const AuthFailure('Session expired. Please login again.');
       }
 
-      throw AuthFailure(
-        status == null
-            ? 'Login sırasında sunucuya ulaşılamadı.'
-            : 'Login sırasında sunucu hatası: HTTP $status',
-      );
+      throw AuthFailure(message);
     } on AuthFailure {
       rethrow;
     } catch (_) {
@@ -189,7 +203,9 @@ class AuthRepository {
         throw const AuthFailure('No Firebase session.');
       }
 
-      final firebaseIdToken = await _firebaseService.getIdToken();
+      // Force-refresh token during session restore so we always use
+      // the latest verification state (especially right after email verify).
+      final firebaseIdToken = await _firebaseService.getIdToken(forceRefresh: true);
       await _storage.writeAccessToken(firebaseIdToken);
 
       final auth = await _apiClient.loginSync(firebaseIdToken: firebaseIdToken);
@@ -205,7 +221,8 @@ class AuthRepository {
       if (status == 401) {
         throw const AuthFailure('Session expired.');
       }
-      throw const AuthFailure('Session restore sırasında sunucu hatası oluştu.');
+      final message = extractBackendMessage(e);
+      throw AuthFailure(message);
     } catch (_) {
       throw const AuthFailure('Session restore sırasında hata oluştu.');
     }

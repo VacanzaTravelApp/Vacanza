@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Vacanza needs your location to check you into nearby places.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Vacanza uses the camera to set your profile photo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vacanza uses the photo library to set your profile photo.</string>
 </dict>
 </plist>

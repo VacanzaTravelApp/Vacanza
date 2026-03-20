@@ -1,6 +1,5 @@
 package com.vacanza.backend.entity;
 
-import com.vacanza.backend.entity.enums.Budget;
 import com.vacanza.backend.entity.enums.Gender;
 import jakarta.persistence.*;
 import lombok.*;
@@ -28,12 +27,7 @@ public class UserInfo {
     // users table'i ile 1-1 iliski (SRS dokumanina gore)
     // bir userin yalnizca 1 profil ekrani olabilir
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "user_id",
-            referencedColumnName = "user_id",
-            nullable = false,
-            unique = true
-    )
+    @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = false, unique = true)
     private User user;
 
     @Column(name = "first_name", nullable = false, length = 80)
@@ -61,15 +55,11 @@ public class UserInfo {
     private Gender gender;
 
     /*
-    buna su anlik gerek yok ama 2. dil geldiginde gerek olabilir
-    @Column(name = "preferred_language", length = 10)
-    private String preferredLanguage;
+     * buna su anlik gerek yok ama 2. dil geldiginde gerek olabilir
+     * 
+     * @Column(name = "preferred_language", length = 10)
+     * private String preferredLanguage;
      */
-
-    //budget enum eklendi
-    @Enumerated(EnumType.STRING)
-    @Column(name = "budget", length = 20)
-    private Budget budget;
 
     @Column(name = "profile_image_url")
     private String profileImageUrl;

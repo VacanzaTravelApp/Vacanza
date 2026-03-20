@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../firebase";
-import { authApi } from "../api/authApi";
+import { authApi } from "../api/userApi";
 import { AuthContext } from "./AuthContext";
 
 export default function AuthProvider({ children }) {

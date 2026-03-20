@@ -18,7 +18,47 @@ spring:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
     show-sql: true
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
 
 geoapify:
   base-url: https://api.geoapify.com/v2
   api-key: ${GEOAPIFY_API_KEY}
+
+mapbox:
+  access-token: ${MAPBOX_ACCESS_TOKEN}
+
+ai-service:
+  base-url: ${AI_SERVICE_BASE_URL}
+  connect-timeout: 15s
+  read-timeout: 120s
+
+serpapi:
+  base-url: https://serpapi.com
+  api-key: ${SERPAPI_API_KEY}
+  connect-timeout: 10s
+  read-timeout: 30s
+
+ticketmaster:
+  base-url: https://app.ticketmaster.com/discovery/v2
+  api-key: ${TICKETMASTER_API_KEY}
+  connect-timeout: 10s
+  read-timeout: 30s
+
+# Open-Meteo: free forecast API, no API key (https://open-meteo.com/)
+open-meteo:
+  base-url: https://api.open-meteo.com/v1
+  connect-timeout: 10s
+  read-timeout: 30s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always

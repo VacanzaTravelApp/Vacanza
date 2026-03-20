@@ -18,6 +18,9 @@ import '../../../bloc/map_bloc.dart';
 import '../../../bloc/map_event.dart';
 import '../../../bloc/map_state.dart';
 
+import '../../../../../checkin/presentation/bloc/location_bloc.dart';
+import '../../../../../checkin/presentation/bloc/location_state.dart';
+
 import '../drawing/map_drawing_overlay.dart';
 import '../markers/poi_markers_controller.dart';
 import '../markers/poi_markers_listener.dart';
@@ -137,16 +140,71 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
           },
         ),
 
-        // Recenter
+        // Recenter → fly to latest GPS position (MOB-6)
         BlocListener<MapBloc, MapState>(
           listenWhen: (prev, next) => prev.recenterTick != next.recenterTick,
           listener: (context, state) async {
             final map = _map;
             if (map == null) return;
 
-            log('[MapCanvas] Recenter triggered');
-            _suspendViewportFor(ms: 700);
-            await _recenter(state.viewMode);
+            final loc = context.read<LocationBloc>().state;
+
+            if (loc.latitude == null || loc.longitude == null) {
+              log('[MapCanvas] Recenter — no GPS fix yet, showing fallback message');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Location not available'),
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              return;
+            }
+
+            log('[MapCanvas] Recenter to GPS lat=${loc.latitude} lng=${loc.longitude}');
+            _suspendViewportFor(ms: 800);
+
+            await map.flyTo(
+              mb.CameraOptions(
+                center: mb.Point(
+                  coordinates: mb.Position(loc.longitude!, loc.latitude!),
+                ),
+                zoom: 15.0,
+                pitch: 0,
+                bearing: 0,
+              ),
+              mb.MapAnimationOptions(duration: 600, startDelay: 0),
+            );
+          },
+        ),
+
+        // ================= First GPS fix → center camera once (MOB-6) =================
+        BlocListener<LocationBloc, LocationState>(
+          listenWhen: (prev, next) => !prev.isFirstFix && next.isFirstFix,
+          listener: (context, state) async {
+            final map = _map;
+            if (map == null) return;
+            if (state.latitude == null || state.longitude == null) return;
+
+            log('[MapCanvas] ★ first GPS fix — flying camera to '
+                'lat=${state.latitude}, lng=${state.longitude}');
+
+            _suspendViewportFor(ms: 800);
+
+            await map.flyTo(
+              mb.CameraOptions(
+                center: mb.Point(
+                  coordinates: mb.Position(
+                    state.longitude!,
+                    state.latitude!,
+                  ),
+                ),
+                zoom: 15.0,
+                pitch: 0,
+                bearing: 0,
+              ),
+              mb.MapAnimationOptions(duration: 600, startDelay: 0),
+            );
           },
         ),
       ],
@@ -264,15 +322,4 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     return styleChanged;
   }
 
-  Future<void> _recenter(MapViewMode mode) async {
-    final map = _map;
-    if (map == null) return;
-
-    final mb.CameraOptions camera = (mode == MapViewMode.mode3D) ? MapboxConfig.camera3D : MapboxConfig.camera2D;
-
-    await map.easeTo(
-      camera,
-      mb.MapAnimationOptions(duration: 550, startDelay: 0),
-    );
-  }
 }
