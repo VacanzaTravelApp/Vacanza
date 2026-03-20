@@ -5,9 +5,8 @@ import { CloseOutlined, CompassOutlined, HistoryOutlined, PlusOutlined, SendOutl
 import "../styles/vacanzaChat.css";
 
 /**
- * Sayfa yenilenene kadar (modül yeniden yüklenene kadar) aktif konuşmayı tutar.
- * Panel kapatılınca state sıfırlanır ama bu değer kalır — tekrar açılınca aynı sohbet yüklenir.
- * Tam sayfa yenilemede modül sıfırlanır → ilk açılışta yeni sohbet.
+ * Sayfa oturumu: kullanıcı mesaj attıysa oluşturulmuş conversation id.
+ * Boş sohbet sunucuda yaratılmaz; ilk mesajda createConversation çağrılır.
  */
 let sessionConversationId = null;
 let sessionHasOpenedChatThisPageLoad = false;
@@ -232,22 +231,17 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
       try {
         if (!sessionHasOpenedChatThisPageLoad) {
           sessionHasOpenedChatThisPageLoad = true;
-          const newConv = await aiApi.createConversation();
+          sessionConversationId = null;
           if (cancelled) return;
-          const id = String(newConv.id ?? "");
-          sessionConversationId = id;
-          setConversationId(id);
+          setConversationId(null);
           const t = formatMessageTime(new Date());
           setMessages([{ ...GREETING, time: t }]);
           await refreshConversations();
         } else {
           const id = sessionConversationId;
           if (!id) {
-            const newConv = await aiApi.createConversation();
             if (cancelled) return;
-            const nid = String(newConv.id ?? "");
-            sessionConversationId = nid;
-            setConversationId(nid);
+            setConversationId(null);
             const t = formatMessageTime(new Date());
             setMessages([{ ...GREETING, time: t }]);
           } else {
@@ -301,28 +295,33 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
     }
   };
 
-  const handleNewChat = async () => {
-    try {
-      setMessagesLoading(true);
-      const newConv = await aiApi.createConversation();
-      const id = String(newConv.id ?? "");
-      sessionConversationId = id;
-      setConversationId(id);
-      const t = formatMessageTime(new Date());
-      setMessages([{ ...GREETING, time: t }]);
-      setHistoryPanelOpen(false);
-      await refreshConversations();
-    } catch (e) {
-      console.error(e);
-      message.error("Yeni sohbet başlatılamadı.");
-    } finally {
-      setMessagesLoading(false);
-    }
+  const handleNewChat = () => {
+    sessionConversationId = null;
+    setConversationId(null);
+    const t = formatMessageTime(new Date());
+    setMessages([{ ...GREETING, time: t }]);
+    setHistoryPanelOpen(false);
   };
 
   const handleSendMessage = async (customText = null) => {
     const textToSend = (customText || inputText)?.trim();
-    if (!textToSend || loading || !conversationId) return;
+    if (!textToSend || loading || messagesLoading) return;
+
+    setLoading(true);
+    let activeConvId = conversationId;
+    try {
+      if (!activeConvId) {
+        const newConv = await aiApi.createConversation();
+        activeConvId = String(newConv.id ?? "");
+        sessionConversationId = activeConvId;
+        setConversationId(activeConvId);
+      }
+    } catch (e) {
+      console.error(e);
+      message.error("Sohbet başlatılamadı.");
+      setLoading(false);
+      return;
+    }
 
     const userMsg = {
       id: `local-${Date.now()}`,
@@ -333,10 +332,9 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
 
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
-    setLoading(true);
 
     try {
-      const response = await aiApi.sendMessage(conversationId, textToSend);
+      const response = await aiApi.sendMessage(activeConvId, textToSend);
       if (response && response.content) {
         const routeData = response.route_data || response.routeData || null;
         const wasRouteRequest = /plan|rota|gün|tatil|itinerary|day/i.test(textToSend);

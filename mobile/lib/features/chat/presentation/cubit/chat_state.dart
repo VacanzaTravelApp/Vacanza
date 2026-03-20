@@ -14,13 +14,14 @@ class ChatLoading extends ChatState {
 
 class ChatLoaded extends ChatState {
   final List<ChatMessage> messages;
-  final String conversationId;
+  /// Sunucu sohbeti; kullanıcı ilk mesajı gönderene kadar null (boş sohbet oluşturulmaz).
+  final String? conversationId;
   final bool isSending;
   final String? error;
 
   const ChatLoaded({
     required this.messages,
-    required this.conversationId,
+    this.conversationId,
     this.isSending = false,
     this.error,
   });

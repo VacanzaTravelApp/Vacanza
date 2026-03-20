@@ -13,15 +13,24 @@ class ChatCubit extends Cubit<ChatState> {
 
   String? _conversationId;
 
-  /// Start or resume a conversation.
-  /// Creates new conversation if none exists, then loads history.
+  static final ChatMessage _greeting = ChatMessage(
+    id: 'greeting',
+    role: 'assistant',
+    content: 'Merhaba, ben Vacanza AI. Bugün nereyi keşfetmek istersin?',
+    createdAt: DateTime.now(),
+  );
+
+  /// Yerel karşılama; sunucuda conversation yaratılmaz ta ki ilk mesaj gönderilene kadar.
   Future<void> startConversation() async {
-    emit(const ChatLoading());
     try {
       if (_conversationId == null) {
-        final res = await _apiClient.createConversation();
-        _conversationId = res.id;
+        emit(ChatLoaded(
+          messages: [_greeting],
+          conversationId: null,
+        ));
+        return;
       }
+      emit(const ChatLoading());
       final messages = await _apiClient.getMessages(_conversationId!);
       emit(ChatLoaded(
         messages: messages,
@@ -36,12 +45,29 @@ class ChatCubit extends Cubit<ChatState> {
   /// Send a user message and get AI response.
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty) return;
-    if (_conversationId == null) return;
-
     final current = state;
     if (current is! ChatLoaded) return;
 
-    // Optimistic: add user message
+    late final String activeConvId;
+    try {
+      if (_conversationId != null) {
+        activeConvId = _conversationId!;
+      } else {
+        final res = await _apiClient.createConversation();
+        activeConvId = res.id;
+        _conversationId = activeConvId;
+      }
+    } catch (e, st) {
+      developer.log('Chat createConversation error: $e', name: 'ChatCubit', stackTrace: st);
+      emit(ChatLoaded(
+        messages: current.messages,
+        conversationId: current.conversationId,
+        isSending: false,
+        error: e.toString(),
+      ));
+      return;
+    }
+
     final userMsg = ChatMessage(
       id: 'temp-${DateTime.now().millisecondsSinceEpoch}',
       role: 'user',
@@ -50,13 +76,13 @@ class ChatCubit extends Cubit<ChatState> {
     );
     emit(ChatLoaded(
       messages: [...current.messages, userMsg],
-      conversationId: current.conversationId,
+      conversationId: activeConvId,
       isSending: true,
     ));
 
     try {
       final res = await _apiClient.sendMessage(
-        _conversationId!,
+        activeConvId,
         content.trim(),
       );
       final assistantMsg = ChatMessage(
@@ -68,15 +94,14 @@ class ChatCubit extends Cubit<ChatState> {
       final updated = [...current.messages, userMsg, assistantMsg];
       emit(ChatLoaded(
         messages: updated,
-        conversationId: current.conversationId,
+        conversationId: activeConvId,
         isSending: false,
       ));
     } catch (e, st) {
       developer.log('Chat API error: $e', name: 'ChatCubit', stackTrace: st);
-      // Keep user message, show error (don't rollback — user sees their message)
       emit(ChatLoaded(
         messages: [...current.messages, userMsg],
-        conversationId: current.conversationId,
+        conversationId: activeConvId,
         isSending: false,
         error: e.toString(),
       ));
@@ -112,10 +137,12 @@ class ChatCubit extends Cubit<ChatState> {
     }
   }
 
-  /// Start a new conversation (clears current).
+  /// Yeni sohbet (sunucuda henüz kayıt yok).
   void newConversation() {
     _conversationId = null;
-    emit(const ChatInitial());
-    startConversation();
+    emit(ChatLoaded(
+      messages: [_greeting],
+      conversationId: null,
+    ));
   }
 }
