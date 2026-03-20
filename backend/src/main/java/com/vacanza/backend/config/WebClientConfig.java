@@ -114,6 +114,22 @@ public class WebClientConfig {
                 .build();
     }
 
+    @Bean
+    @Qualifier("openMeteoWebClient")
+    public WebClient openMeteoWebClient(OpenMeteoProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        return WebClient.builder()
+                .baseUrl(props.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(log4xx5xx("[OPEN-METEO]"))
+                .build();
+    }
+
     /**
      * Automatically appends ?apiKey=... to every Geoapify request
      */
