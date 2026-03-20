@@ -46,11 +46,30 @@ function routesForMessage(msg) {
 }
 
 /**
+ * Rota kartı eklenecek asistan balonları (yemek önerisi, genel sohbet vb. hariç).
+ * Zaman eşlemesi bu havuzda yapılır; aksi halde "en yakın asistan" yanlışlıkla yemek cevabı oluyordu.
+ */
+function looksLikeItineraryRouteReply(text) {
+  const s = (text ?? "").trim();
+  if (!s) return false;
+  const lower = s.toLowerCase();
+  if (/i['']?m here to help with travel/i.test(lower)) return false;
+  if (/^i['']?m here to help\b/i.test(lower)) return false;
+  if (/here is your .+ itinerary\b/i.test(lower)) return true;
+  if (/\bitinerary\b/i.test(lower) && /here is\b/i.test(lower)) return true;
+  if (/işte|rotanız|seyahat plan|tatil planınız|günlük plan/i.test(s)) return true;
+  return false;
+}
+
+/**
  * Kayıtlı rotaları, üretim zamanına göre en uygun asistan mesajına bağlar (aynı sohbette birden çok rota).
  */
 function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
   const list = Array.isArray(routeDetails) ? routeDetails : [];
-  const msgs = historyRaw.map((m) => {
+  const visibleHistory = (historyRaw || []).filter(
+    (m) => !isSearchPoisPipelineMessage(m.content ?? "")
+  );
+  const msgs = visibleHistory.map((m) => {
     const base = mapHistoryMessage(m);
     const role = (m.role ?? "").toLowerCase();
     return {
@@ -62,21 +81,53 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
   const routes = list
     .map((detail) => ({
       data: routeDataFromSavedDetail(detail),
-      t: parseDate(detail.generatedAt ?? detail.generated_at)?.getTime() ?? 0,
+      t: routeGeneratedAtMs(detail),
     }))
     .filter((x) => x.data)
     .sort((a, b) => a.t - b.t);
 
+  const assistantMsgs = msgs.filter((m) => m._isAssistant);
+  const itineraryAssistants = assistantMsgs.filter((m) =>
+    looksLikeItineraryRouteReply(m.text)
+  );
+  const assistantPool = itineraryAssistants.length ? itineraryAssistants : assistantMsgs;
   const byMessageId = new Map();
-  for (const rr of routes) {
+  for (let i = 0; i < routes.length; i++) {
+    const rr = routes[i];
     let best = null;
     let bestT = -1;
-    for (const msg of msgs) {
-      if (!msg._isAssistant) continue;
+    for (const msg of assistantPool) {
       if (msg._createdAtMs <= rr.t && msg._createdAtMs >= bestT) {
         best = msg;
         bestT = msg._createdAtMs;
       }
+    }
+    if (!best && rr.t > 0) {
+      let minGap = Infinity;
+      for (const msg of assistantPool) {
+        if (msg._createdAtMs >= rr.t) {
+          const gap = msg._createdAtMs - rr.t;
+          if (gap < minGap) {
+            minGap = gap;
+            best = msg;
+          }
+        }
+      }
+    }
+    if (!best && rr.t > 0) {
+      let minGap = Infinity;
+      for (const msg of assistantPool) {
+        if (msg._createdAtMs < rr.t) {
+          const gap = rr.t - msg._createdAtMs;
+          if (gap < minGap) {
+            minGap = gap;
+            best = msg;
+          }
+        }
+      }
+    }
+    if (!best) {
+      best = assistantPool[i] ?? assistantPool[assistantPool.length - 1] ?? null;
     }
     if (best) {
       const arr = byMessageId.get(best.id) ?? [];
@@ -99,8 +150,21 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
 function parseDate(value) {
   if (value == null) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (Array.isArray(value) && value.length >= 3) {
+    const [y, mo, d, h = 0, mi = 0, s = 0] = value;
+    const dt = new Date(y, mo - 1, d, h, mi, s);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function routeGeneratedAtMs(detail) {
+  const raw = detail?.generatedAt ?? detail?.generated_at;
+  if (raw == null) return 0;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  const d = parseDate(raw);
+  return d ? d.getTime() : 0;
 }
 
 function formatMessageTime(value) {
@@ -142,6 +206,20 @@ function sortConversationsDesc(list) {
     const tb = parseDate(b.updatedAt)?.getTime() ?? 0;
     return tb - ta;
   });
+}
+
+/** Internal POI tool round-trip rows (saved for LLM context; not for end-user UI). */
+function isSearchPoisPipelineMessage(content) {
+  if (content == null || typeof content !== "string") return false;
+  if (content.includes("__TOOL_RESULT__search_pois__")) return true;
+  const t = content.trim();
+  if (!t.startsWith("{")) return false;
+  try {
+    const obj = JSON.parse(t);
+    return obj && obj.tool === "search_pois";
+  } catch {
+    return false;
+  }
 }
 
 function mapHistoryMessage(m) {
@@ -200,7 +278,7 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
   }, []);
 
   const loadMessagesForConversation = useCallback(async (convId) => {
-    const history = await aiApi.getMessages(convId);
+    const history = await aiApi.getMessages(convId, 500, 0);
     let routeDetails = [];
     try {
       routeDetails = await aiApi.getRoutesForConversation(convId);
@@ -295,9 +373,11 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
     }
   };
 
+  /** Yeni taslak: sunucuda sohbet oluşturulmaz; mesaj yoksa hiçbir kayıt düşmez. */
   const handleNewChat = () => {
     sessionConversationId = null;
     setConversationId(null);
+    setInputText("");
     const t = formatMessageTime(new Date());
     setMessages([{ ...GREETING, time: t }]);
     setHistoryPanelOpen(false);

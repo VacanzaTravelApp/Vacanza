@@ -31,7 +31,8 @@ class ChatCubit extends Cubit<ChatState> {
         return;
       }
       emit(const ChatLoading());
-      final messages = await _apiClient.getMessages(_conversationId!);
+      final messages =
+          filterVisibleChatMessages(await _apiClient.getMessages(_conversationId!));
       emit(ChatLoaded(
         messages: messages,
         conversationId: _conversationId!,
@@ -126,7 +127,8 @@ class ChatCubit extends Cubit<ChatState> {
     emit(const ChatLoading());
     try {
       _conversationId = conversationId;
-      final messages = await _apiClient.getMessages(conversationId);
+      final messages =
+          filterVisibleChatMessages(await _apiClient.getMessages(conversationId));
       emit(ChatLoaded(
         messages: messages,
         conversationId: conversationId,
@@ -137,7 +139,7 @@ class ChatCubit extends Cubit<ChatState> {
     }
   }
 
-  /// Yeni sohbet (sunucuda henüz kayıt yok).
+  /// Yeni taslak: API çağrısı yok; kullanıcı mesaj gönderene kadar conversation oluşturulmaz.
   void newConversation() {
     _conversationId = null;
     emit(ChatLoaded(
