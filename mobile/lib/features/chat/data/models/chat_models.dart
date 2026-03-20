@@ -1,6 +1,24 @@
+import 'dart:convert';
+
 /// Chat API models.
 ///
 /// Backend returns snake_case (from AI service).
+
+/// Internal POI tool round-trip rows (saved for LLM context; hide in UI).
+bool isSearchPoisPipelineMessage(String content) {
+  if (content.contains('__TOOL_RESULT__search_pois__')) return true;
+  final t = content.trim();
+  if (!t.startsWith('{')) return false;
+  try {
+    final dynamic j = jsonDecode(t);
+    if (j is Map && j['tool'] == 'search_pois') return true;
+  } catch (_) {}
+  return false;
+}
+
+List<ChatMessage> filterVisibleChatMessages(List<ChatMessage> messages) =>
+    messages.where((m) => !isSearchPoisPipelineMessage(m.content)).toList();
+
 class ChatMessage {
   final String id;
   final String role; // 'user' | 'assistant'
