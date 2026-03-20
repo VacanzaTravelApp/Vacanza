@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 MEMORY_WINDOW = 10  # Last N user+assistant pairs for context
 RAG_TOP_K = 8  # Max similar old messages (5-10 range for token limit)
 RAG_MAX_CHARS_PER_MSG = 250  # Truncate to avoid token overflow (~80 tokens/msg)
+# Tighter RAG for itinerary Turn1/Turn2 (same retrieval, shorter injection)
+ITINERARY_RAG_TOP_K = 4
+ITINERARY_RAG_MAX_CHARS_PER_MSG = 120
 ROUTE_JSON_SEPARATOR = "---ROUTE_JSON---"
 
 TURN1_SYSTEM = """You are a travel planning assistant.
@@ -559,6 +562,46 @@ def _build_rag_context_prompt(similar_messages: list[tuple[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def _build_itinerary_rag_prompt(similar_messages: list[tuple[str, str]]) -> str:
+    """Shorter RAG block for itinerary tool flows (Turn1/Turn2) to save tokens."""
+    if not similar_messages:
+        return ""
+    lines = [
+        "Relevant notes from past conversations (brief):",
+    ]
+    for role, content in similar_messages[:ITINERARY_RAG_TOP_K]:
+        truncated = (
+            content[:ITINERARY_RAG_MAX_CHARS_PER_MSG] + "..."
+            if len(content) > ITINERARY_RAG_MAX_CHARS_PER_MSG
+            else content
+        )
+        prefix = "User" if role == "user" else "Assistant"
+        lines.append(f"- {prefix}: {truncated}")
+    return "\n".join(lines)
+
+
+def _build_itinerary_user_context(
+    profile_prompt: str,
+    ai_prefs_prompt: str,
+    rag_prompt_short: str = "",
+) -> str:
+    """Single merged block: profile + AI-inferred prefs + optional shortened RAG. Reused in Turn1/Turn2."""
+    parts: list[str] = []
+    if profile_prompt and profile_prompt.strip():
+        parts.append(profile_prompt.strip())
+    if ai_prefs_prompt and ai_prefs_prompt.strip():
+        parts.append(ai_prefs_prompt.strip())
+    if rag_prompt_short and rag_prompt_short.strip():
+        parts.append(rag_prompt_short.strip())
+    if not parts:
+        return ""
+    body = "\n\n".join(parts)
+    return (
+        "User context (apply when choosing destination, days, travel_style, categories, and POIs):\n\n"
+        + body
+    )
+
+
 def _build_context_messages(messages: list[Message]) -> list[HumanMessage | AIMessage]:
     """Build sliding window of messages for LLM context (ConversationBufferWindowMemory logic)."""
     pairs: list[tuple[str, str]] = []
@@ -643,6 +686,12 @@ async def get_ai_response(
     profile_prompt = _build_profile_prompt(user_profile)
     ai_prefs_prompt = _build_ai_preferences_prompt(existing_preferences, include_confidence=True)
     rag_prompt = _build_rag_context_prompt(rag_messages)
+    itinerary_rag_short = _build_itinerary_rag_prompt(rag_messages)
+    itinerary_user_context = _build_itinerary_user_context(
+        profile_prompt,
+        ai_prefs_prompt,
+        itinerary_rag_short,
+    )
     # Dynamic system prompt: Vacanza definition + role + profile + AI preferences + RAG
     base_prompt = """You are VacanzaBot, the travel assistant for Vacanza, a personal app for vacation and travel planning.
 
@@ -730,7 +779,11 @@ Route generation rules:
             days=days,
             travel_style=travel_style,
         )
-        turn2 = await llm.ainvoke([SystemMessage(content=turn2_system), HumanMessage(content="Build itinerary from provided POIs.")])
+        if itinerary_user_context:
+            turn2_system = f"{turn2_system}\n\n{itinerary_user_context}"
+        turn2 = await llm.ainvoke(
+            [SystemMessage(content=turn2_system), HumanMessage(content="Build itinerary from provided POIs.")]
+        )
         raw_ai_content = str(turn2.content)
         ai_content, route_data = _parse_route_from_response(raw_ai_content)
         if route_data:
@@ -738,7 +791,10 @@ Route generation rules:
 
     # Turn1: itinerary request => tool-call JSON ONLY (backend will execute tool)
     elif _is_itinerary_request(user_content):
-        turn1 = await llm.ainvoke([SystemMessage(content=TURN1_SYSTEM), HumanMessage(content=user_content)])
+        turn1_system = TURN1_SYSTEM
+        if itinerary_user_context:
+            turn1_system = f"{TURN1_SYSTEM}\n\n{itinerary_user_context}"
+        turn1 = await llm.ainvoke([SystemMessage(content=turn1_system), HumanMessage(content=user_content)])
         raw_ai_content = str(turn1.content)
         ai_content = raw_ai_content.strip()
         route_data = None
