@@ -2,6 +2,7 @@ package com.vacanza.backend.integration.ai;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.vacanza.backend.dto.weather.DailyWeatherSummary;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -143,6 +144,10 @@ public final class AiChatDto {
 
         private List<DayPlan> days;
         private String notes;
+
+        /** Open-Meteo daily summaries; set by backend after POI+weather flow. */
+        @JsonProperty("weather_forecast")
+        private List<DailyWeatherSummary> weatherForecast;
     }
 
     /** A single preference extracted by AI from the conversation. */

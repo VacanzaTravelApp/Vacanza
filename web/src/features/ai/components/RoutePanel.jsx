@@ -16,6 +16,14 @@ function formatTimeSlot(slot) {
   return TIME_SLOT_LABELS[key] || slot;
 }
 
+function formatForecastDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(String(iso).slice(0, 10));
+  return Number.isNaN(d.getTime())
+    ? String(iso)
+    : d.toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" });
+}
+
 export default function RoutePanel({
   route,
   activeDay,
@@ -33,6 +41,7 @@ export default function RoutePanel({
   const dayStartLocal = dayPlan?.day_start_local ?? dayPlan?.dayStartLocal;
   const dayEndLocal = dayPlan?.day_end_local ?? dayPlan?.dayEndLocal;
   const totalDays = route.total_days ?? route.totalDays ?? days.length;
+  const weatherForecast = route.weather_forecast ?? route.weatherForecast ?? null;
 
   return (
     <div className="route-panel">
@@ -54,6 +63,38 @@ export default function RoutePanel({
           </div>
         </div>
       </div>
+
+      {Array.isArray(weatherForecast) && weatherForecast.length > 0 && (
+        <div className="route-panel-weather" aria-label="Hava tahmini">
+          <div className="route-panel-weather-title">Hava tahmini (rota hedefi)</div>
+          <ul className="route-panel-weather-days">
+            {weatherForecast.map((row, i) => {
+              const date = row.date;
+              const tMax = row.temp_max_celsius ?? row.tempMaxCelsius;
+              const tMin = row.temp_min_celsius ?? row.tempMinCelsius;
+              const precip =
+                row.precipitation_probability_max_percent ??
+                row.precipitationProbabilityMaxPercent;
+              return (
+                <li key={i} className="route-panel-weather-day">
+                  <span className="route-panel-weather-date">{formatForecastDate(date)}</span>
+                  <span className="route-panel-weather-temps">
+                    {tMax != null && tMin != null
+                      ? `${Math.round(tMax)}° / ${Math.round(tMin)}°`
+                      : "—"}
+                  </span>
+                  {precip != null && (
+                    <span className="route-panel-weather-rain">Yağış %{Math.round(precip)}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="route-panel-weather-hint">
+            Bu özet, rota için seçilen bölgeye göre günlük tahmindir; program buna göre uyarlanır.
+          </p>
+        </div>
+      )}
 
       {(dayStartLocal || dayEndLocal) && (
         <div className="route-panel-day-window" aria-label="Gün özeti">

@@ -75,6 +75,66 @@
   background: rgba(0, 0, 0, 0.04);
 }
 
+.route-panel-weather {
+  padding: 0 16px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  flex-shrink: 0;
+}
+
+.route-panel-weather-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0284c7;
+  margin-bottom: 8px;
+}
+
+.route-panel-weather-days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.route-panel-weather-day {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(224, 242, 254, 0.65), rgba(255, 255, 255, 0.9));
+  border: 1px solid rgba(14, 165, 233, 0.22);
+  min-width: 92px;
+}
+
+.route-panel-weather-date {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0c4a6e;
+}
+
+.route-panel-weather-temps {
+  font-size: 13px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.route-panel-weather-rain {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.route-panel-weather-hint {
+  font-size: 10px;
+  color: #94a3b8;
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
 .route-panel-day-window {
   padding: 0 16px 10px;
   font-size: 12px;

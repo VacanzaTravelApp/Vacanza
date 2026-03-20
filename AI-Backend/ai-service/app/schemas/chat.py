@@ -131,6 +131,8 @@ class RouteData(BaseModel):
     total_days: int
     days: list[DayPlan] = Field(default_factory=list)
     notes: str | None = None
+    # Filled by Java backend (Open-Meteo); optional in model output
+    weather_forecast: list | None = None
 
 
 class MessageSendResponse(BaseModel):
