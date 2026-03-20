@@ -24,6 +24,50 @@ function formatForecastDate(iso) {
     : d.toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" });
 }
 
+/** Match day_parts row to active day (by date from daily row, else index). */
+function pickDayPartForActiveDay(dayParts, weatherForecast, activeDay) {
+  if (!Array.isArray(dayParts) || dayParts.length === 0) return null;
+  const idx = Number(activeDay) - 1;
+  const wf = Array.isArray(weatherForecast) ? weatherForecast[idx] : null;
+  const wfDate = wf?.date;
+  if (wfDate != null) {
+    const s = String(wfDate).slice(0, 10);
+    const hit = dayParts.find((row) => {
+      const d = row?.date;
+      if (d == null) return false;
+      return String(d).slice(0, 10) === s;
+    });
+    if (hit) return hit;
+  }
+  return dayParts[idx] ?? null;
+}
+
+/** Up to 2 short Turkish lines when avoid_outdoor is true for a slot. */
+function formatDayPartHintLines(dayRow) {
+  if (!dayRow) return [];
+  const slots = [
+    { prop: "morning", label: "Sabah" },
+    { prop: "afternoon", label: "Öğleden sonra" },
+    { prop: "evening", label: "Akşam" },
+  ];
+  const lines = [];
+  for (const { prop, label } of slots) {
+    const s = dayRow[prop];
+    if (!s) continue;
+    const avoid = s.avoid_outdoor ?? s.avoidOutdoor;
+    if (!avoid) continue;
+    const precip =
+      s.precipitation_probability_max_percent ?? s.precipitationProbabilityMaxPercent;
+    const pct =
+      precip != null && Number.isFinite(Number(precip))
+        ? ` (~%${Math.round(Number(precip))} yağış olasılığı)`
+        : "";
+    lines.push(`${label}${pct}: dış mekânda uzun süre önerilmez.`);
+    if (lines.length >= 2) break;
+  }
+  return lines;
+}
+
 export default function RoutePanel({
   route,
   activeDay,
@@ -42,6 +86,16 @@ export default function RoutePanel({
   const dayEndLocal = dayPlan?.day_end_local ?? dayPlan?.dayEndLocal;
   const totalDays = route.total_days ?? route.totalDays ?? days.length;
   const weatherForecast = route.weather_forecast ?? route.weatherForecast ?? null;
+  const weatherDayParts = route.weather_day_parts ?? route.weatherDayParts ?? null;
+  const dayPartRow = pickDayPartForActiveDay(
+    weatherDayParts,
+    weatherForecast,
+    activeDay
+  );
+  const dayPartHintLines = formatDayPartHintLines(dayPartRow);
+  const showWeatherBlock =
+    (Array.isArray(weatherForecast) && weatherForecast.length > 0) ||
+    (Array.isArray(weatherDayParts) && weatherDayParts.length > 0);
 
   return (
     <div className="route-panel">
@@ -64,32 +118,46 @@ export default function RoutePanel({
         </div>
       </div>
 
-      {Array.isArray(weatherForecast) && weatherForecast.length > 0 && (
+      {showWeatherBlock && (
         <div className="route-panel-weather" aria-label="Hava tahmini">
           <div className="route-panel-weather-title">Hava tahmini (rota hedefi)</div>
-          <ul className="route-panel-weather-days">
-            {weatherForecast.map((row, i) => {
-              const date = row.date;
-              const tMax = row.temp_max_celsius ?? row.tempMaxCelsius;
-              const tMin = row.temp_min_celsius ?? row.tempMinCelsius;
-              const precip =
-                row.precipitation_probability_max_percent ??
-                row.precipitationProbabilityMaxPercent;
-              return (
-                <li key={i} className="route-panel-weather-day">
-                  <span className="route-panel-weather-date">{formatForecastDate(date)}</span>
-                  <span className="route-panel-weather-temps">
-                    {tMax != null && tMin != null
-                      ? `${Math.round(tMax)}° / ${Math.round(tMin)}°`
-                      : "—"}
-                  </span>
-                  {precip != null && (
-                    <span className="route-panel-weather-rain">Yağış %{Math.round(precip)}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          {Array.isArray(weatherForecast) && weatherForecast.length > 0 && (
+            <ul className="route-panel-weather-days">
+              {weatherForecast.map((row, i) => {
+                const date = row.date;
+                const tMax = row.temp_max_celsius ?? row.tempMaxCelsius;
+                const tMin = row.temp_min_celsius ?? row.tempMinCelsius;
+                const precip =
+                  row.precipitation_probability_max_percent ??
+                  row.precipitationProbabilityMaxPercent;
+                return (
+                  <li key={i} className="route-panel-weather-day">
+                    <span className="route-panel-weather-date">{formatForecastDate(date)}</span>
+                    <span className="route-panel-weather-temps">
+                      {tMax != null && tMin != null
+                        ? `${Math.round(tMax)}° / ${Math.round(tMin)}°`
+                        : "—"}
+                    </span>
+                    {precip != null && (
+                      <span className="route-panel-weather-rain">Yağış %{Math.round(precip)}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {dayPartHintLines.length > 0 && (
+            <div
+              className="route-panel-weather-dayparts"
+              aria-label="Seçili gün için gün içi hava ipucu"
+            >
+              {dayPartHintLines.map((line, i) => (
+                <p key={i} className="route-panel-weather-dayparts-line">
+                  {line}
+                </p>
+              ))}
+            </div>
+          )}
           <p className="route-panel-weather-hint">
             Bu özet, rota için seçilen bölgeye göre günlük tahmindir; program buna göre uyarlanır.
           </p>

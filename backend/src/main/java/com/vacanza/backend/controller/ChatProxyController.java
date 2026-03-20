@@ -138,6 +138,9 @@ public class ChatProxyController {
                                 if (routePlanningWeather != null && !routePlanningWeather.daily().isEmpty()) {
                                         response.getRouteData().setWeatherForecast(routePlanningWeather.daily());
                                 }
+                                if (routePlanningWeather != null && !routePlanningWeather.dayParts().isEmpty()) {
+                                        response.getRouteData().setWeatherDayParts(routePlanningWeather.dayParts());
+                                }
                                 routeTimelineService.enrichTimeline(response.getRouteData(), profile);
                                 // Route data already contains coordinates (agentic POI search flow).
                                 saveRoute(user, conversationId, response.getRouteData());

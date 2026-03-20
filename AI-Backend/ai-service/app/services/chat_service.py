@@ -347,6 +347,7 @@ def _optimize_route_order(route_data: RouteData) -> RouteData:
         days=new_days,
         notes=route_data.notes,
         weather_forecast=route_data.weather_forecast,
+        weather_day_parts=route_data.weather_day_parts,
     )
 
 
