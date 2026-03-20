@@ -76,6 +76,8 @@ TURN2_WEATHER_RULES = """Destination weather forecast (use only this data; do no
 {weather_json}
 
 Weather-aware planning:
+- If the payload is a JSON array (legacy): each entry is one calendar day (daily summary).
+- If the payload is a JSON object with "daily" and "day_parts": use "day_parts" for time-of-day scheduling. Each day has morning, afternoon, evening slots with weather_code, precipitation_probability_max_percent, and avoid_outdoor. When avoid_outdoor is true for a slot, do not put long exposed outdoor activities (parks, squares, long neighborhood walks) in that slot; prefer indoor or covered venues. Schedule outdoor-heavy POIs in slots with avoid_outdoor false or lower precipitation.
 - High precipitation_probability_max_percent or WMO rain/storm codes (51–67, 80–99): favor museums, indoor galleries, churches, covered markets; shorten or defer large outdoor parks on those calendar days.
 - Clear, dry days: good for parks, neighborhoods, longer outdoor legs.
 - If the forecast differs by day, align outdoor-heavy days with drier days when possible (same POI list).
@@ -191,14 +193,30 @@ def _parse_tool_result_pois(user_content: str) -> list[dict] | None:
         return None
 
 
-def _parse_weather_context(user_content: str) -> list[dict] | None:
+def _weather_context_has_payload(data: object) -> bool:
+    """True if legacy daily list or new {{daily, day_parts}} object has usable rows."""
+    if data is None:
+        return False
+    if isinstance(data, list):
+        return len(data) > 0
+    if isinstance(data, dict):
+        return bool(data.get("daily")) or bool(data.get("day_parts"))
+    return False
+
+
+def _parse_weather_context(user_content: str) -> list[dict] | dict | None:
+    """Legacy: JSON array of daily rows. New: JSON object with keys daily and day_parts."""
     idx = user_content.find(WEATHER_CONTEXT_PREFIX)
     if idx == -1:
         return None
     raw = user_content[idx + len(WEATHER_CONTEXT_PREFIX) :].strip()
     try:
         data = json.loads(raw)
-        return data if isinstance(data, list) else None
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return data
+        return None
     except Exception:
         return None
 
@@ -835,7 +853,7 @@ Route generation rules:
             travel_style=travel_style,
         )
         weather_data = _parse_weather_context(user_content)
-        if weather_data:
+        if _weather_context_has_payload(weather_data):
             turn2_system = (
                 f"{turn2_system}\n\n"
                 + TURN2_WEATHER_RULES.format(
