@@ -428,8 +428,17 @@ def _build_ai_preferences_prompt(
     return "\n".join(lines)
 
 
+def _join_list(values: list[str] | None) -> str | None:
+    if not values:
+        return None
+    cleaned = [v for v in values if v and str(v).strip()]
+    if not cleaned:
+        return None
+    return ", ".join(cleaned)
+
+
 def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
-    """Build user profile section for system prompt. Includes name, country, budget and behavioral instructions."""
+    """Build user profile section for system prompt. Includes identity, travel prefs, budget, behavioral hints."""
     if not profile:
         return ""
     parts: list[str] = []
@@ -449,10 +458,48 @@ def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
         parts.append(f"Birth date: {profile.birthDate}")
     if profile.gender:
         parts.append(f"Gender: {profile.gender}")
-    if profile.budget:
-        parts.append(f"Budget: {profile.budget}")
     if profile.joinDate:
         parts.append(f"Join date: {profile.joinDate}")
+    if profile.travelStyle:
+        parts.append(f"Travel style: {profile.travelStyle}")
+    fc = _join_list(profile.favoriteCategories)
+    if fc:
+        parts.append(f"Favorite categories: {fc}")
+    if profile.activityLevel:
+        parts.append(f"Activity level: {profile.activityLevel}")
+    cu = _join_list(profile.cuisinePreferences)
+    if cu:
+        parts.append(f"Cuisine preferences: {cu}")
+    if profile.preferredClimate:
+        parts.append(f"Preferred climate: {profile.preferredClimate}")
+    if profile.tripPace:
+        parts.append(f"Trip pace: {profile.tripPace}")
+    if profile.accommodationType:
+        parts.append(f"Accommodation: {profile.accommodationType}")
+    if profile.transportPreference:
+        parts.append(f"Transport: {profile.transportPreference}")
+    dr = _join_list(profile.dietaryRestrictions)
+    if dr:
+        parts.append(f"Dietary restrictions: {dr}")
+    an = _join_list(profile.accessibilityNeeds)
+    if an:
+        parts.append(f"Accessibility: {an}")
+    av = _join_list(profile.avoidCategories)
+    if av:
+        parts.append(f"Avoid categories: {av}")
+    if profile.dailyBudget:
+        bud = profile.dailyBudget
+        if profile.budgetCurrency:
+            bud = f"{bud} {profile.budgetCurrency}"
+        parts.append(f"Daily budget: {bud}")
+    sp = _join_list(profile.splurgeCategories)
+    if sp:
+        parts.append(f"Splurge on: {sp}")
+    if profile.preferredLanguage:
+        parts.append(f"Preferred language: {profile.preferredLanguage}")
+    sl = _join_list(profile.spokenLanguages)
+    if sl:
+        parts.append(f"Spoken languages: {sl}")
     if not parts:
         return ""
 
@@ -463,8 +510,10 @@ def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
             f"If this is the first message in the conversation, greet by name ({name}). "
             "Otherwise do not repeat greetings."
         )
-    if profile.budget:
-        instructions.append("Consider budget (Budget: " + profile.budget + ") in your recommendations.")
+    if profile.dailyBudget:
+        instructions.append(
+            "Consider daily budget in your recommendations."
+        )
     if profile.country:
         instructions.append("Use country (Country: " + profile.country + ") in your recommendations.")
 
