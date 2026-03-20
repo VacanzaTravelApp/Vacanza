@@ -63,6 +63,13 @@ TURN1_TOOL_CONTEXT_RULES = """Tool-call context (use the User context block belo
 - Choose categories to match pace, activity level, dietary and accessibility needs; respect avoid_categories (omit types the user dislikes).
 - If the user's current message explicitly conflicts with older notes, prioritize the current message."""
 
+# Shown after TURN2_SYSTEM when user profile / AI prefs / RAG are present (POI → route JSON turn).
+TURN2_TOOL_CONTEXT_RULES = """User context (use the block below when choosing POIs and building each day):
+- Pick POIs from the list that fit profile and learned preferences: pace, budget level, cuisine, dietary restrictions, accessibility, languages.
+- Deprioritize or skip POI types/categories the user wants to avoid; favor categories matching travel style and interests.
+- Balance days to trip pace: relaxed → fewer stops or longer estimated_duration_min; packed → more stops if sensible.
+- Keep geographic efficiency; preferences override only when choosing among nearby alternatives."""
+
 TURN2_SYSTEM = """You are a travel planning assistant. Build a detailed itinerary
 using ONLY the POIs provided below. Do not invent new places.
 Use the exact coordinates given — do not modify them.
@@ -787,7 +794,9 @@ Route generation rules:
             travel_style=travel_style,
         )
         if itinerary_user_context:
-            turn2_system = f"{turn2_system}\n\n{itinerary_user_context}"
+            turn2_system = (
+                f"{turn2_system}\n\n{TURN2_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
+            )
         turn2 = await llm.ainvoke(
             [SystemMessage(content=turn2_system), HumanMessage(content="Build itinerary from provided POIs.")]
         )
