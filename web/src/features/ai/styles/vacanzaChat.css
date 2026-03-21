@@ -79,8 +79,7 @@
 }
 
 /* Aynı cevapta birden fazla rota kartı */
-.chat-row .route-card + .route-card,
-.chat-row .route-card-outer + .route-card-outer {
+.chat-row .route-card + .route-card {
   margin-top: 10px;
 }
 
@@ -345,82 +344,6 @@
 .chat-send-icon:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.route-card-outer {
-  margin-top: 8px;
-  max-width: 92%;
-  align-self: flex-start;
-}
-
-.route-card-outer .route-card {
-  margin-top: 0;
-  max-width: 100%;
-}
-
-.route-card-preface {
-  margin-bottom: 8px;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, rgba(61, 168, 200, 0.08), rgba(234, 88, 12, 0.06));
-  border: 1px dashed var(--vc-primary);
-  border-radius: 12px;
-}
-
-.route-card-preface-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.route-card-preface-label {
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--vc-primary);
-}
-
-.route-card-preface-copy {
-  margin: 8px 0 0;
-  font-size: 11px;
-  line-height: 1.45;
-  color: var(--vc-text-secondary);
-}
-
-.route-card-preface-copy strong {
-  color: var(--vc-text);
-  font-weight: 700;
-}
-
-/* Aynı balonda ardışık rota kartları: üstteki tam metin, alttakiler biraz sıkı */
-.route-card-preface--stacked {
-  padding: 8px 10px;
-  margin-bottom: 6px;
-}
-
-.route-card-preface--stacked .route-card-preface-copy {
-  display: none;
-}
-
-.route-draw-edit-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--vc-primary);
-  background: var(--vc-white);
-  color: var(--vc-primary);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-
-.route-draw-edit-btn:hover {
-  background: var(--vc-primary-soft-strong);
 }
 
 .route-card {

@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -41,14 +42,31 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ChatProxyController {
 
-        /** Default POI categories when the client sends none (aligned with general itinerary tool flow). */
+        /**
+         * Default POI categories for polygon / replan-day route search. Food & drink are intentionally omitted;
+         * they will be supplied by a dedicated API when integrated with the itinerary.
+         */
         private static final List<String> DEFAULT_POLYGON_CATEGORIES = List.of(
-                        "museum", "monument", "historic_site", "church", "park", "restaurant", "neighborhood");
+                        "museum", "monument", "historic_site", "church", "park", "neighborhood");
+
+        /**
+         * Excluded from Mapbox POI fetch for AI-generated routes (chat tool + drawn polygon).
+         */
+        private static final Set<String> EXCLUDED_ROUTE_POI_CATEGORIES = Set.of(
+                        "restaurant",
+                        "cafe",
+                        "pub",
+                        "bar",
+                        "brewery",
+                        "wine",
+                        "nightlife",
+                        "fast_food",
+                        "food");
 
         /** Minimum distinct POIs inside the polygon after search + dedup. */
         private static final int MIN_POIS_IN_POLYGON = 3;
 
-        /** Single-day replan can use a smaller drawn area. */
+        /** Single-day replan can succeed with fewer POIs than a full multi-day polygon route. */
         private static final int MIN_POIS_REPLAN_DAY = 2;
 
         private final AiServiceClient aiServiceClient;
@@ -258,7 +276,6 @@ public class ChatProxyController {
 
         /**
          * Replace one day of the conversation's latest saved route using POIs inside a user-drawn polygon.
-         * Keeps the same chat thread; persists the updated route like other map/chat flows.
          */
         @PostMapping("/routes/replan-day-from-polygon")
         public ResponseEntity<?> replanDayFromPolygon(@RequestBody ReplanDayFromPolygonRequest body) {
@@ -546,8 +563,13 @@ public class ChatProxyController {
                         return new PoiToolExecutionResult(List.of(), planning);
                 }
 
+                List<String> effectiveCats = filterCategoriesForRoutePois(categories);
+                if (effectiveCats.isEmpty()) {
+                        return new PoiToolExecutionResult(List.of(), planning);
+                }
+
                 List<PoiResult> all = new java.util.ArrayList<>();
-                for (String c : categories) {
+                for (String c : effectiveCats) {
                         if (c == null || c.isBlank()) continue;
                         var pois = mapboxPoiSearchClient
                                         .searchByCategory(c, dest.getMinLon(), dest.getMinLat(), dest.getMaxLon(), dest.getMaxLat())
@@ -578,8 +600,9 @@ public class ChatProxyController {
                 double[] c = PolygonRouteGeometry.centroid(ring);
                 WeatherPlanningForecast planning = weatherService.getPlanningForecast(c[1], c[0], forecastDays);
 
+                List<String> effectiveCats = filterCategoriesForRoutePois(categories);
                 List<PoiResult> all = new ArrayList<>();
-                for (String cat : categories) {
+                for (String cat : effectiveCats) {
                         if (cat == null || cat.isBlank()) {
                                 continue;
                         }
@@ -603,5 +626,24 @@ public class ChatProxyController {
                         dedup.putIfAbsent(k, p);
                 }
                 return new PoiToolExecutionResult(new java.util.ArrayList<>(dedup.values()), planning);
+        }
+
+        /** Drops food/drink Mapbox categories; those POIs will come from a future dedicated API. */
+        private static List<String> filterCategoriesForRoutePois(List<String> categories) {
+                if (categories == null || categories.isEmpty()) {
+                        return List.of();
+                }
+                List<String> out = new ArrayList<>();
+                for (String c : categories) {
+                        if (c == null || c.isBlank()) {
+                                continue;
+                        }
+                        String n = c.toLowerCase(Locale.ROOT).trim();
+                        if (EXCLUDED_ROUTE_POI_CATEGORIES.contains(n)) {
+                                continue;
+                        }
+                        out.add(c);
+                }
+                return out;
         }
 }

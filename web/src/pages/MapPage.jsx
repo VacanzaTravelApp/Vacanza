@@ -18,10 +18,7 @@ import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/aut
 import { useGamificationProfile } from "../gamification/useGamification";
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
-import VacanzaChat, {
-  getSessionConversationId,
-  linkPolygonRouteConversation,
-} from "../features/ai/components/VacanzaChat";
+import VacanzaChat, { linkPolygonRouteConversation } from "../features/ai/components/VacanzaChat";
 import RoutePanel from "../features/ai/components/RoutePanel";
 import ProfileModal from "./ProfileModal";
 import http from "../api/http";
@@ -351,9 +348,6 @@ export default function MapPage() {
   const [polygonRouteSubmitting, setPolygonRouteSubmitting] = useState(false);
   const [polygonRouteForm] = Form.useForm();
   const [chatConversationRefreshNonce, setChatConversationRefreshNonce] = useState(0);
-  /** Sohbet–harita bağlantısı (replan gün); VacanzaChat onConversationIdChange ile güncellenir. */
-  const [mapChatConversationId, setMapChatConversationId] = useState(null);
-  const [replanDaySubmitting, setReplanDaySubmitting] = useState(false);
   // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
   useEffect(() => {
     if (resultsOpen) setFilterOpen(false);
@@ -692,7 +686,6 @@ export default function MapPage() {
           const convId = res.conversation_id || res.conversationId;
           if (convId) {
             linkPolygonRouteConversation(convId);
-            setMapChatConversationId(String(convId));
             setChatConversationRefreshNonce((n) => n + 1);
           }
           const summary = res.route_summary_message || res.routeSummaryMessage;
@@ -715,74 +708,6 @@ export default function MapPage() {
     [selection, selectedBackendCats]
   );
 
-  const handleRequestDrawToEditFromChat = useCallback(() => {
-    setIsChatOpen(false);
-    setMode("SELECTION");
-    setFreehandEnabled(true);
-    message.info({
-      content:
-        "Haritada alan çiz → sağdaki rota panelinden gün seç → üstteki turuncu banttan o günü güncelle.",
-      duration: 8,
-    });
-  }, []);
-
-  const submitReplanDayFromPolygon = useCallback(async () => {
-    if (!selection?.polygon || selection.polygon.length < 3) {
-      message.error("Geçerli bir alan çizin.");
-      return;
-    }
-    const convId = mapChatConversationId || getSessionConversationId();
-    if (!convId) {
-      message.error("Önce sohbetten bir rota açın veya haritadan oluşturulan rotaya bağlı sohbeti seçin.");
-      return;
-    }
-    if (!activeRoute?.days?.length) {
-      message.error("Yeniden planlanacak rota yok.");
-      return;
-    }
-    const td = Number(activeRoute.total_days || activeRoute.totalDays || activeRoute.days.length);
-    if (!Number.isFinite(activeDay) || activeDay < 1 || activeDay > td) {
-      message.error("Geçerli bir gün seçin.");
-      return;
-    }
-    const ring = selection.polygon.map((p) => [p.lng, p.lat]);
-    const categories = selectedBackendCats.map((k) => UI_KEY_TO_BACKEND_CATEGORY[k]).filter(Boolean);
-    setReplanDaySubmitting(true);
-    try {
-      const body = {
-        conversationId: convId,
-        day: activeDay,
-        coordinates: ring,
-        travelStyle: "general",
-      };
-      if (categories.length) body.categories = categories;
-      const res = await aiApi.replanDayFromPolygon(body);
-      const routeData = res.route_data || res.routeData;
-      if (routeData) {
-        setActiveRoute(normalizeRouteForMap(routeData));
-        setActiveDay(activeDay);
-        setFilterOpen(false);
-        setIsChatOpen(true);
-        linkPolygonRouteConversation(convId);
-        setChatConversationRefreshNonce((n) => n + 1);
-        const summary = res.route_summary_message || res.routeSummaryMessage;
-        if (summary) message.success(summary);
-        else message.success(`Gün ${activeDay} çizime göre güncellendi. Sohbete bakabilirsin.`);
-      } else {
-        message.warning("Rota verisi alınamadı.");
-      }
-    } catch (e) {
-      const msg =
-        e?.response?.data?.message ||
-        e?.friendlyMessage ||
-        e?.message ||
-        "Gün yeniden planlanamadı.";
-      message.error(msg);
-    } finally {
-      setReplanDaySubmitting(false);
-    }
-  }, [selection, mapChatConversationId, activeRoute, activeDay, selectedBackendCats]);
-
   /** Band kapatıldı + sonuç paneli kapalıyken küçük yedek CTA */
   const showCompactPolygonRouteCta = useMemo(
     () =>
@@ -795,18 +720,6 @@ export default function MapPage() {
           !resultsOpen
       ),
     [user, selection, activeRoute, polygonRouteBannerDismissed, resultsOpen]
-  );
-
-  /** Rota açıkken çizilen alanla tek günü yeniden planlama (sohbet + kayıtlı rota gerekir). */
-  const showReplanDayBanner = useMemo(
-    () =>
-      Boolean(
-        user &&
-          activeRoute &&
-          selection?.mode === "polygon" &&
-          (selection.polygon?.length ?? 0) >= 3
-      ),
-    [user, activeRoute, selection]
   );
 
   // 3D toggle: pitch + gerçek 3D layerlar
@@ -1185,56 +1098,6 @@ export default function MapPage() {
               </div>
             )}
 
-          {showReplanDayBanner && (
-            <div
-              style={{
-                position: "absolute",
-                top: 12,
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 25,
-                width: "min(560px, calc(100% - 24px))",
-                pointerEvents: "auto",
-              }}
-            >
-              <Card
-                size="small"
-                styles={{ body: { padding: "10px 12px" } }}
-                style={{
-                  borderRadius: 12,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                  background: "rgba(255,248,240,0.98)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(249,115,22,0.35)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span style={{ fontSize: 13, color: "#333", lineHeight: 1.45, flex: "1 1 200px" }}>
-                    <b>Gün {activeDay}</b> için rotayı, haritada çizdiğin alandaki mekânlara göre yeniden
-                    düzenleyebilirsin. Sohbetten gelen veya harita rotasına bağlı bir konuşma gerekir.
-                  </span>
-                  <Button
-                    type="primary"
-                    size="small"
-                    loading={replanDaySubmitting}
-                    onClick={submitReplanDayFromPolygon}
-                    style={{ background: "#ea580c", borderColor: "#c2410c" }}
-                  >
-                    Günü çizime göre yenile
-                  </Button>
-                </div>
-              </Card>
-            </div>
-          )}
-
           <Map
             ref={mapRef}
             {...viewState}
@@ -1408,7 +1271,6 @@ export default function MapPage() {
               onClose={() => {
                 setActiveRoute(null);
                 setActiveDay(1);
-                setMapChatConversationId(null);
                 setFilterOpen(true);
               }}
               onWaypointClick={(wp) => {
@@ -1854,12 +1716,9 @@ export default function MapPage() {
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
             externalConversationRefreshNonce={chatConversationRefreshNonce}
-            onConversationIdChange={(id) => setMapChatConversationId(id)}
-            onRequestDrawToEdit={handleRequestDrawToEditFromChat}
-            onRouteGenerated={(routeData, meta) => {
+            onRouteGenerated={(routeData) => {
               setActiveRoute(routeData);
               setActiveDay(1);
-              if (meta?.conversationId) setMapChatConversationId(String(meta.conversationId));
               setIsChatOpen(false);
               setFilterOpen(false);
             }}

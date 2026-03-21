@@ -1,14 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { aiApi } from "../../../api/aiApi";
 import { Spin, message } from "antd";
-import {
-  CloseOutlined,
-  CompassOutlined,
-  EditOutlined,
-  HistoryOutlined,
-  PlusOutlined,
-  SendOutlined,
-} from "@ant-design/icons";
+import { CloseOutlined, CompassOutlined, HistoryOutlined, PlusOutlined, SendOutlined } from "@ant-design/icons";
 import "../styles/vacanzaChat.css";
 import { normalizeRouteForMap } from "../utils/routeMap";
 
@@ -18,11 +11,6 @@ import { normalizeRouteForMap } from "../utils/routeMap";
  */
 let sessionConversationId = null;
 let sessionHasOpenedChatThisPageLoad = false;
-
-/** Harita / ebeveyn: aktif sohbet kimliği (replan vb.). */
-export function getSessionConversationId() {
-  return sessionConversationId;
-}
 
 /** Haritadan üretilen rotanın sohbet kaydına bağlanması (geçmiş listesinde görünsün). */
 export function linkPolygonRouteConversation(conversationId) {
@@ -66,22 +54,8 @@ function looksLikeItineraryRouteReply(text) {
   return false;
 }
 
-/** Harita replan / gün güncelleme gibi kısa asistan cevapları — rota kartı bu balonlara bağlanmalı. */
-function looksLikeRouteRelatedReply(text) {
-  if (looksLikeItineraryRouteReply(text)) return true;
-  const s = (text ?? "").trim();
-  if (!s) return false;
-  const lower = s.toLowerCase();
-  if (/day\s+\d+\s+is\s+updated\b/i.test(s)) return true;
-  if (/updated\s+for\s+your\s+map\s+area/i.test(lower)) return true;
-  if (/---\s*route_json\s*---/i.test(s)) return true;
-  if (/işte\s+(güncellenmiş\s+)?rotan|gün\s+\d+.*(güncell|yenil)/i.test(s)) return true;
-  return false;
-}
-
 /**
  * Kayıtlı rotaları, üretim zamanına göre en uygun asistan mesajına bağlar (aynı sohbette birden çok rota).
- * Her rotayı mümkünse ayrı asistan balonuna verir; aksi halde tüm “rota ile ilgili” balonlar havuza alınır.
  */
 function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
   const list = Array.isArray(routeDetails) ? routeDetails : [];
@@ -105,42 +79,50 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
     .filter((x) => x.data)
     .sort((a, b) => a.t - b.t);
 
-  const assistantMsgs = msgs.filter((m) => m._isAssistant).sort((a, b) => a._createdAtMs - b._createdAtMs);
-  let assistantPool = assistantMsgs.filter((m) => looksLikeRouteRelatedReply(m.text));
-  if (assistantPool.length === 0) {
-    assistantPool = assistantMsgs;
-  }
-
+  const assistantMsgs = msgs.filter((m) => m._isAssistant);
+  const itineraryAssistants = assistantMsgs.filter((m) =>
+    looksLikeItineraryRouteReply(m.text)
+  );
+  const assistantPool = itineraryAssistants.length ? itineraryAssistants : assistantMsgs;
   const byMessageId = new Map();
-  const usedAssistantIds = new Set();
-
-  function pickAssistantForRoute(rr) {
-    const candidates = assistantPool.filter((m) => !usedAssistantIds.has(m.id));
-    if (candidates.length === 0) {
-      return null;
-    }
-    let best = null;
-    let bestScore = Infinity;
-    for (const msg of candidates) {
-      const dt = Math.abs(msg._createdAtMs - rr.t);
-      const latePenalty = msg._createdAtMs + 1500 < rr.t ? 60000 : 0;
-      const score = dt + latePenalty;
-      if (score < bestScore) {
-        bestScore = score;
-        best = msg;
-      }
-    }
-    return best;
-  }
-
   for (let i = 0; i < routes.length; i++) {
     const rr = routes[i];
-    let best = pickAssistantForRoute(rr);
-    if (!best && assistantPool.length) {
-      best = assistantPool[assistantPool.length - 1];
+    let best = null;
+    let bestT = -1;
+    for (const msg of assistantPool) {
+      if (msg._createdAtMs <= rr.t && msg._createdAtMs >= bestT) {
+        best = msg;
+        bestT = msg._createdAtMs;
+      }
+    }
+    if (!best && rr.t > 0) {
+      let minGap = Infinity;
+      for (const msg of assistantPool) {
+        if (msg._createdAtMs >= rr.t) {
+          const gap = msg._createdAtMs - rr.t;
+          if (gap < minGap) {
+            minGap = gap;
+            best = msg;
+          }
+        }
+      }
+    }
+    if (!best && rr.t > 0) {
+      let minGap = Infinity;
+      for (const msg of assistantPool) {
+        if (msg._createdAtMs < rr.t) {
+          const gap = rr.t - msg._createdAtMs;
+          if (gap < minGap) {
+            minGap = gap;
+            best = msg;
+          }
+        }
+      }
+    }
+    if (!best) {
+      best = assistantPool[i] ?? assistantPool[assistantPool.length - 1] ?? null;
     }
     if (best) {
-      usedAssistantIds.add(best.id);
       const arr = byMessageId.get(best.id) ?? [];
       arr.push(rr.data);
       byMessageId.set(best.id, arr);
@@ -224,18 +206,10 @@ function isPolygonMapRouteUserMessage(content) {
   return typeof content === "string" && content.trim().startsWith("[Polygon route request]");
 }
 
-/** Günü çizim alanına göre yeniden planlama (arka uç pipeline mesajı). */
-function isReplanDayMapUserMessage(content) {
-  return typeof content === "string" && content.trim().startsWith("[Replan day request]");
-}
-
 /** Internal POI tool round-trip rows (saved for LLM context; not for end-user UI). */
 function isSearchPoisPipelineMessage(content) {
   if (content == null || typeof content !== "string") return false;
   if (isPolygonMapRouteUserMessage(content) && content.includes("__TOOL_RESULT__search_pois__")) {
-    return false;
-  }
-  if (isReplanDayMapUserMessage(content) && content.includes("__TOOL_RESULT__search_pois__")) {
     return false;
   }
   if (content.includes("__TOOL_RESULT__search_pois__")) return true;
@@ -255,9 +229,6 @@ function mapHistoryMessage(m) {
   let text = m.content ?? "";
   if (type === "user" && isPolygonMapRouteUserMessage(text)) {
     text = "Haritada çizilen alandan rota oluşturuldu.";
-  }
-  if (type === "user" && isReplanDayMapUserMessage(text)) {
-    text = "Haritada çizilen alana göre seçili gün yeniden planlandı.";
   }
   return {
     id: String(m.id ?? `${Date.now()}-${Math.random()}`),
@@ -282,10 +253,6 @@ export default function VacanzaChat({
   onRouteGenerated,
   /** Haritadan rota kaydı sonrası artırın; geçmiş sohbet listesi yenilensin. */
   externalConversationRefreshNonce = 0,
-  /** Sohbet değişince haritada conversationId senkronu (replan gün). */
-  onConversationIdChange,
-  /** Haritada serbest çizim modunu aç (rota kartı “çizerek düzenle”). */
-  onRequestDrawToEdit,
 }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
@@ -412,10 +379,6 @@ export default function VacanzaChat({
     if (!externalConversationRefreshNonce) return;
     void refreshConversations();
   }, [externalConversationRefreshNonce, refreshConversations]);
-
-  useEffect(() => {
-    onConversationIdChange?.(conversationId);
-  }, [conversationId, onConversationIdChange]);
 
   const handleSelectConversation = async (id) => {
     if (id === conversationId) {
@@ -604,33 +567,7 @@ export default function VacanzaChat({
                   {msg.time ? <span className="msg-time">{msg.time}</span> : null}
                 </div>
                 {routeList.map((rd, rIdx) => (
-                  <div key={`${msg.id}-route-${rIdx}`} className="route-card-outer">
-                    {onRequestDrawToEdit ? (
-                      <div
-                        className={`route-card-preface ${rIdx > 0 ? "route-card-preface--stacked" : ""}`}
-                        role="note"
-                      >
-                        <div className="route-card-preface-row">
-                          <span className="route-card-preface-label">Haritada düzenle</span>
-                          <button
-                            type="button"
-                            className="route-draw-edit-btn"
-                            onClick={() => {
-                              onRequestDrawToEdit();
-                              onClose();
-                            }}
-                          >
-                            <EditOutlined aria-hidden />
-                            Çizime geç
-                          </button>
-                        </div>
-                        <p className="route-card-preface-copy">
-                          Rotayı haritada aç, alan çiz, panelden günü seç; üstteki turuncu banttan o günü çizime göre
-                          <strong> yeniler</strong> (mevcut gün planı yerine yeni duraklar).
-                        </p>
-                      </div>
-                    ) : null}
-                    <div className="route-card">
+                  <div key={`${msg.id}-route-${rIdx}`} className="route-card">
                     <div className="route-card-title">{rd.title}</div>
                     <div className="route-card-meta">
                       {rd.destination} &middot; {rd.total_days || rd.totalDays} gün &middot;{" "}
@@ -648,17 +585,12 @@ export default function VacanzaChat({
                       type="button"
                       className="route-show-btn"
                       onClick={() => {
-                        if (onRouteGenerated) {
-                          onRouteGenerated(normalizeRouteForMap(rd), {
-                            conversationId: conversationId ?? undefined,
-                          });
-                        }
+                        if (onRouteGenerated) onRouteGenerated(normalizeRouteForMap(rd));
                         onClose();
                       }}
                     >
                       Rotayı Haritada Göster
                     </button>
-                    </div>
                   </div>
                 ))}
                 {msg.type === "ai" && msg.noRouteHint && routeList.length === 0 ? (
