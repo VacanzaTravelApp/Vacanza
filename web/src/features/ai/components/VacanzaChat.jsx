@@ -284,7 +284,7 @@ export default function VacanzaChat({
   externalConversationRefreshNonce = 0,
   /** Sohbet değişince haritada conversationId senkronu (replan gün). */
   onConversationIdChange,
-  /** Haritada serbest çizim modunu aç (rota kartı “çizerek düzenle”). */
+  /** Haritada serbest çizim modunu aç (rota kartı üstü “Yeniden çiz”). */
   onRequestDrawToEdit,
 }) {
   const [messages, setMessages] = useState([]);
@@ -611,22 +611,23 @@ export default function VacanzaChat({
                         role="note"
                       >
                         <div className="route-card-preface-row">
-                          <span className="route-card-preface-label">Haritada düzenle</span>
+                          <span className="route-card-preface-label">Yeniden çiz</span>
                           <button
                             type="button"
                             className="route-draw-edit-btn"
+                            aria-label="Haritada alan çizerek günü yeniden planla"
                             onClick={() => {
                               onRequestDrawToEdit();
                               onClose();
                             }}
                           >
                             <EditOutlined aria-hidden />
-                            Çizime geç
+                            Haritada çiz
                           </button>
                         </div>
                         <p className="route-card-preface-copy">
-                          Rotayı haritada aç, alan çiz, panelden günü seç; üstteki turuncu banttan o günü çizime göre
-                          <strong> yeniler</strong> (mevcut gün planı yerine yeni duraklar).
+                          Haritada alan çiz, sağ panelden günü seç; turuncu banttan o günü seçtiğin alana göre
+                          <strong> yenilersin</strong>.
                         </p>
                       </div>
                     ) : null}
