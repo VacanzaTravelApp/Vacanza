@@ -2,6 +2,8 @@ package com.vacanza.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.vacanza.backend.dto.PolygonRouteErrorResponse;
+import com.vacanza.backend.dto.PolygonRouteRequest;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.integration.ai.AiChatDto;
 import com.vacanza.backend.integration.ai.AiServiceClient;
@@ -9,6 +11,7 @@ import com.vacanza.backend.integration.ai.UserProfileForAi;
 import com.vacanza.backend.integration.MapboxPoiSearchClient;
 import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.security.CurrentUserProvider;
+import com.vacanza.backend.util.PolygonRouteGeometry;
 import com.vacanza.backend.service.AiRouteService;
 import com.vacanza.backend.service.RouteSummaryMessageService;
 import com.vacanza.backend.dto.weather.WeatherPlanningForecast;
@@ -19,10 +22,15 @@ import com.vacanza.backend.service.UserPreferenceAiService;
 import com.vacanza.backend.service.UserPreferencesService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -30,6 +38,13 @@ import java.util.UUID;
 @RequestMapping("/chat")
 @RequiredArgsConstructor
 public class ChatProxyController {
+
+        /** Default POI categories when the client sends none (aligned with general itinerary tool flow). */
+        private static final List<String> DEFAULT_POLYGON_CATEGORIES = List.of(
+                        "museum", "monument", "historic_site", "church", "park", "restaurant", "neighborhood");
+
+        /** Minimum distinct POIs inside the polygon after search + dedup. */
+        private static final int MIN_POIS_IN_POLYGON = 3;
 
         private final AiServiceClient aiServiceClient;
         private final CurrentUserProvider currentUserProvider;
@@ -123,6 +138,119 @@ public class ChatProxyController {
                         log.warn("Agentic POI flow failed (fallback to normal): {}", e.toString(), e);
                 }
 
+                saveExtractedPreferencesIfAny(user, response);
+                applyRouteEnrichmentAndSave(user, conversationId, response, routePlanningWeather, profile);
+
+                return ResponseEntity.ok(response);
+        }
+
+        /**
+         * Generate an itinerary from a user-drawn map polygon (web). Validates geometry, searches POIs inside the
+         * polygon (Mapbox bbox + point-in-polygon filter), then runs the same AI “Turn 2” flow as the chat tool.
+         */
+        @PostMapping("/routes/from-polygon")
+        public ResponseEntity<?> createRouteFromPolygon(@RequestBody PolygonRouteRequest body) {
+                User user = currentUserProvider.getCurrentUserEntity();
+                List<double[]> ring;
+                try {
+                        ring = PolygonRouteGeometry.normalizeRing(body.getCoordinates());
+                } catch (IllegalArgumentException ex) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse("INVALID_POLYGON", ex.getMessage()));
+                }
+                double bboxKm2 = PolygonRouteGeometry.bboxAreaKm2(ring);
+                if (bboxKm2 > PolygonRouteGeometry.MAX_BBOX_AREA_KM2 || !Double.isFinite(bboxKm2)) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse(
+                                                        "POLYGON_TOO_LARGE",
+                                                        "Selected area is too large (max bounding area ~"
+                                                                        + (int) PolygonRouteGeometry.MAX_BBOX_AREA_KM2
+                                                                        + " km²). Draw a smaller region."));
+                }
+
+                int totalDays = body.getTotalDays() != null ? body.getTotalDays() : 3;
+                totalDays = Math.min(Math.max(totalDays, 1), 16);
+                String travelStyle = body.getTravelStyle() != null && !body.getTravelStyle().isBlank()
+                                ? body.getTravelStyle().trim()
+                                : "general";
+                List<String> categories = body.getCategories() != null && !body.getCategories().isEmpty()
+                                ? body.getCategories()
+                                : DEFAULT_POLYGON_CATEGORIES;
+
+                PoiToolExecutionResult exec = executePoiSearchForPolygon(ring, categories, totalDays);
+                if (exec.pois().size() < MIN_POIS_IN_POLYGON) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse(
+                                                        "INSUFFICIENT_POIS_IN_AREA",
+                                                        "Not enough places found inside the drawn area. Try a larger area or different categories."));
+                }
+
+                double[] c = PolygonRouteGeometry.centroid(ring);
+                String destinationLabel = String.format(Locale.US, "Map area (%.4f, %.4f)", c[1], c[0]);
+
+                String toolJsonRaw;
+                try {
+                        Map<String, Object> tool = new LinkedHashMap<>();
+                        tool.put("tool", "search_pois");
+                        tool.put("destination", destinationLabel);
+                        tool.put("days", totalDays);
+                        tool.put("travel_style", travelStyle);
+                        tool.put("categories", categories);
+                        toolJsonRaw = objectMapper.writeValueAsString(tool);
+                } catch (Exception e) {
+                        log.warn("Failed to build tool JSON for polygon route: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(new PolygonRouteErrorResponse("INTERNAL_ERROR", "Could not build route request."));
+                }
+
+                AiChatDto.ConversationCreateResponse conv = aiServiceClient.createConversation(user.getUserId()).block();
+                if (conv == null || conv.getId() == null) {
+                        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                                        .body(new PolygonRouteErrorResponse("CONVERSATION_CREATE_FAILED", "Could not start conversation."));
+                }
+                UUID conversationId = conv.getId();
+
+                var infoDto = userInfoService.getUserInfoByUser(user).orElse(null);
+                var prefsDto = userPreferencesService.getPreferencesByUser(user).orElse(null);
+                UserProfileForAi profile = UserProfileForAi.from(infoDto, prefsDto);
+                var existingAiPrefs = userPreferenceAiService.getExistingPreferences(user);
+
+                StringBuilder toolBody = new StringBuilder();
+                toolBody.append("[Polygon route request]\n");
+                toolBody.append(toolJsonRaw).append("\n");
+                try {
+                        toolBody.append("__TOOL_RESULT__search_pois__")
+                                        .append(objectMapper.writeValueAsString(exec.pois()));
+                        if (exec.planningWeather() != null
+                                        && (!exec.planningWeather().daily().isEmpty()
+                                                        || !exec.planningWeather().dayParts().isEmpty())) {
+                                toolBody.append("\n__WEATHER_CONTEXT__")
+                                                .append(objectMapper.writeValueAsString(exec.planningWeather()));
+                        }
+                } catch (Exception e) {
+                        log.warn("Polygon route tool body serialization failed: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(new PolygonRouteErrorResponse("INTERNAL_ERROR", "Could not build AI request."));
+                }
+
+                AiChatDto.MessageSendRequest toolMsg = new AiChatDto.MessageSendRequest();
+                toolMsg.setContent(toolBody.toString());
+                AiChatDto.MessageSendResponse response = aiServiceClient
+                                .sendMessage(user.getUserId(), conversationId, toolMsg, profile, existingAiPrefs)
+                                .block();
+
+                if (response == null) {
+                        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                                        .body(new PolygonRouteErrorResponse("AI_UNAVAILABLE", "No response from AI service."));
+                }
+
+                saveExtractedPreferencesIfAny(user, response);
+                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile);
+
+                return ResponseEntity.ok(response);
+        }
+
+        private void saveExtractedPreferencesIfAny(User user, AiChatDto.MessageSendResponse response) {
                 try {
                         if (response != null && response.getExtractedPreferences() != null
                                         && !response.getExtractedPreferences().isEmpty()) {
@@ -132,7 +260,14 @@ public class ChatProxyController {
                 } catch (Exception e) {
                         log.warn("Failed to save extracted preferences (non-blocking): {}", e.getMessage());
                 }
+        }
 
+        private void applyRouteEnrichmentAndSave(
+                        User user,
+                        UUID conversationId,
+                        AiChatDto.MessageSendResponse response,
+                        WeatherPlanningForecast routePlanningWeather,
+                        UserProfileForAi profile) {
                 try {
                         if (response != null && response.getRouteData() != null) {
                                 if (routePlanningWeather != null && !routePlanningWeather.daily().isEmpty()) {
@@ -142,11 +277,9 @@ public class ChatProxyController {
                                         response.getRouteData().setWeatherDayParts(routePlanningWeather.dayParts());
                                 }
                                 routeTimelineService.enrichTimeline(response.getRouteData(), profile);
-                                // Route data already contains coordinates (agentic POI search flow).
                                 saveRoute(user, conversationId, response.getRouteData());
-                                // Short contextual message for the user (e.g. "Müzeleri sevdiğini biliyordum...").
                                 String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
-                                        response.getRouteData(), profile);
+                                                response.getRouteData(), profile);
                                 if (summaryMessage != null) {
                                         response.setRouteSummaryMessage(summaryMessage);
                                 }
@@ -154,8 +287,6 @@ public class ChatProxyController {
                 } catch (Exception e) {
                         log.warn("Failed to process route data (non-blocking): {}", e.getMessage());
                 }
-
-                return ResponseEntity.ok(response);
         }
 
         @GetMapping("/conversations/{conversationId}/messages")
@@ -281,6 +412,46 @@ public class ChatProxyController {
                 java.util.Map<String, PoiResult> dedup = new java.util.LinkedHashMap<>();
                 for (PoiResult p : all) {
                         if (p == null || p.getName() == null || p.getName().isBlank()) continue;
+                        String k = p.getName().toLowerCase(java.util.Locale.ROOT);
+                        dedup.putIfAbsent(k, p);
+                }
+                return new PoiToolExecutionResult(new java.util.ArrayList<>(dedup.values()), planning);
+        }
+
+        /**
+         * Search Mapbox categories in the polygon bounding box, keep POIs whose coordinates fall inside the ring.
+         */
+        private PoiToolExecutionResult executePoiSearchForPolygon(
+                        List<double[]> ring, List<String> categories, int tripDays) {
+                int forecastDays = Math.min(Math.max(tripDays, 1), 16);
+                double minLon = PolygonRouteGeometry.minLon(ring);
+                double maxLon = PolygonRouteGeometry.maxLon(ring);
+                double minLat = PolygonRouteGeometry.minLat(ring);
+                double maxLat = PolygonRouteGeometry.maxLat(ring);
+                double[] c = PolygonRouteGeometry.centroid(ring);
+                WeatherPlanningForecast planning = weatherService.getPlanningForecast(c[1], c[0], forecastDays);
+
+                List<PoiResult> all = new ArrayList<>();
+                for (String cat : categories) {
+                        if (cat == null || cat.isBlank()) {
+                                continue;
+                        }
+                        var batch = mapboxPoiSearchClient
+                                        .searchByCategory(cat, minLon, minLat, maxLon, maxLat)
+                                        .blockOptional()
+                                        .orElse(List.of());
+                        for (PoiResult p : batch) {
+                                if (p == null || p.getName() == null || p.getName().isBlank()) {
+                                        continue;
+                                }
+                                if (PolygonRouteGeometry.pointInPolygon(p.getLon(), p.getLat(), ring)) {
+                                        all.add(p);
+                                }
+                        }
+                }
+
+                java.util.Map<String, PoiResult> dedup = new java.util.LinkedHashMap<>();
+                for (PoiResult p : all) {
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.putIfAbsent(k, p);
                 }
