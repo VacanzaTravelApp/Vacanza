@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.vacanza.backend.dto.PolygonRouteErrorResponse;
 import com.vacanza.backend.dto.PolygonRouteRequest;
+import com.vacanza.backend.dto.ReplanDayFromPolygonRequest;
+import com.vacanza.backend.entity.AiRoute;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.integration.ai.AiChatDto;
 import com.vacanza.backend.integration.ai.AiServiceClient;
@@ -45,6 +47,9 @@ public class ChatProxyController {
 
         /** Minimum distinct POIs inside the polygon after search + dedup. */
         private static final int MIN_POIS_IN_POLYGON = 3;
+
+        /** Single-day replan can use a smaller drawn area. */
+        private static final int MIN_POIS_REPLAN_DAY = 2;
 
         private final AiServiceClient aiServiceClient;
         private final CurrentUserProvider currentUserProvider;
@@ -232,6 +237,147 @@ public class ChatProxyController {
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                                         .body(new PolygonRouteErrorResponse("INTERNAL_ERROR", "Could not build AI request."));
                 }
+
+                AiChatDto.MessageSendRequest toolMsg = new AiChatDto.MessageSendRequest();
+                toolMsg.setContent(toolBody.toString());
+                AiChatDto.MessageSendResponse response = aiServiceClient
+                                .sendMessage(user.getUserId(), conversationId, toolMsg, profile, existingAiPrefs)
+                                .block();
+
+                if (response == null) {
+                        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                                        .body(new PolygonRouteErrorResponse("AI_UNAVAILABLE", "No response from AI service."));
+                }
+
+                saveExtractedPreferencesIfAny(user, response);
+                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile);
+
+                response.setConversationId(conversationId);
+                return ResponseEntity.ok(response);
+        }
+
+        /**
+         * Replace one day of the conversation's latest saved route using POIs inside a user-drawn polygon.
+         * Keeps the same chat thread; persists the updated route like other map/chat flows.
+         */
+        @PostMapping("/routes/replan-day-from-polygon")
+        public ResponseEntity<?> replanDayFromPolygon(@RequestBody ReplanDayFromPolygonRequest body) {
+                User user = currentUserProvider.getCurrentUserEntity();
+                if (body == null || body.getConversationId() == null) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse("INVALID_REQUEST", "conversationId is required."));
+                }
+                if (body.getDay() == null || body.getDay() < 1) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse("INVALID_DAY", "day must be >= 1."));
+                }
+                List<double[]> ring;
+                try {
+                        ring = PolygonRouteGeometry.normalizeRing(body.getCoordinates());
+                } catch (IllegalArgumentException ex) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse("INVALID_POLYGON", ex.getMessage()));
+                }
+                double bboxKm2 = PolygonRouteGeometry.bboxAreaKm2(ring);
+                if (bboxKm2 > PolygonRouteGeometry.MAX_BBOX_AREA_KM2 || !Double.isFinite(bboxKm2)) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse(
+                                                        "POLYGON_TOO_LARGE",
+                                                        "Selected area is too large (max bounding area ~"
+                                                                        + (int) PolygonRouteGeometry.MAX_BBOX_AREA_KM2
+                                                                        + " km²). Draw a smaller region."));
+                }
+
+                UUID conversationId = body.getConversationId();
+                List<AiRoute> existingRoutes = aiRouteService.getRoutesForConversation(user, conversationId);
+                if (existingRoutes.isEmpty()) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse(
+                                                        "NO_SAVED_ROUTE",
+                                                        "This conversation has no saved route yet. Create a route in chat or from the map first."));
+                }
+                AiRoute latest = existingRoutes.get(existingRoutes.size() - 1);
+                AiChatDto.RouteData existingRouteData;
+                try {
+                        existingRouteData = objectMapper.readValue(latest.getRouteJson(), AiChatDto.RouteData.class);
+                } catch (Exception e) {
+                        log.warn("Failed to parse saved route JSON for replan: {}", e.getMessage());
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse("INVALID_SAVED_ROUTE", "Could not read saved route."));
+                }
+                int totalDays = existingRouteData.getTotalDays();
+                if (body.getDay() > totalDays) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse(
+                                                        "DAY_OUT_OF_RANGE",
+                                                        "day must be between 1 and " + totalDays + " for this route."));
+                }
+
+                String travelStyle = body.getTravelStyle() != null && !body.getTravelStyle().isBlank()
+                                ? body.getTravelStyle().trim()
+                                : "general";
+                List<String> categories = body.getCategories() != null && !body.getCategories().isEmpty()
+                                ? body.getCategories()
+                                : DEFAULT_POLYGON_CATEGORIES;
+
+                PoiToolExecutionResult exec = executePoiSearchForPolygon(ring, categories, totalDays);
+                if (exec.pois().size() < MIN_POIS_REPLAN_DAY) {
+                        return ResponseEntity.badRequest()
+                                        .body(new PolygonRouteErrorResponse(
+                                                        "INSUFFICIENT_POIS_IN_AREA",
+                                                        "Not enough places found inside the drawn area. Try a larger area or different categories."));
+                }
+
+                String existingRouteCanonical;
+                try {
+                        existingRouteCanonical = objectMapper.writeValueAsString(existingRouteData);
+                } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(new PolygonRouteErrorResponse("INTERNAL_ERROR", "Could not serialize route."));
+                }
+
+                String toolJsonRaw;
+                try {
+                        double[] c = PolygonRouteGeometry.centroid(ring);
+                        String destinationLabel = String.format(Locale.US, "Map area (%.4f, %.4f)", c[1], c[0]);
+                        Map<String, Object> tool = new LinkedHashMap<>();
+                        tool.put("tool", "search_pois");
+                        tool.put("destination", destinationLabel);
+                        tool.put("days", totalDays);
+                        tool.put("travel_style", travelStyle);
+                        tool.put("categories", categories);
+                        toolJsonRaw = objectMapper.writeValueAsString(tool);
+                } catch (Exception e) {
+                        log.warn("Failed to build tool JSON for replan-day: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(new PolygonRouteErrorResponse("INTERNAL_ERROR", "Could not build route request."));
+                }
+
+                var infoDto = userInfoService.getUserInfoByUser(user).orElse(null);
+                var prefsDto = userPreferencesService.getPreferencesByUser(user).orElse(null);
+                UserProfileForAi profile = UserProfileForAi.from(infoDto, prefsDto);
+                var existingAiPrefs = userPreferenceAiService.getExistingPreferences(user);
+
+                StringBuilder toolBody = new StringBuilder();
+                toolBody.append("[Replan day request]\n");
+                toolBody.append("Day: ").append(body.getDay().intValue()).append("\n");
+                toolBody.append(toolJsonRaw).append("\n");
+                try {
+                        toolBody.append("__TOOL_RESULT__search_pois__")
+                                        .append(objectMapper.writeValueAsString(exec.pois()));
+                        if (exec.planningWeather() != null
+                                        && (!exec.planningWeather().daily().isEmpty()
+                                                        || !exec.planningWeather().dayParts().isEmpty())) {
+                                toolBody.append("\n__WEATHER_CONTEXT__")
+                                                .append(objectMapper.writeValueAsString(exec.planningWeather()));
+                        }
+                } catch (Exception e) {
+                        log.warn("Replan-day tool body serialization failed: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                        .body(new PolygonRouteErrorResponse("INTERNAL_ERROR", "Could not build AI request."));
+                }
+                toolBody.append("\n__EXISTING_ROUTE__\n");
+                toolBody.append(existingRouteCanonical);
 
                 AiChatDto.MessageSendRequest toolMsg = new AiChatDto.MessageSendRequest();
                 toolMsg.setContent(toolBody.toString());
