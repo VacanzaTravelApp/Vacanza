@@ -81,6 +81,13 @@ public final class AiChatDto {
         /** Short contextual message about the route (e.g. "Müzeleri sevdiğini biliyordum, o yüzden rotanda ağırlıklı olarak müzeler var."). */
         @JsonProperty("route_summary_message")
         private String routeSummaryMessage;
+
+        /**
+         * Set by Java when the response is tied to a known conversation (e.g. map polygon route flow).
+         * Not returned by the Python AI service for normal chat sends.
+         */
+        @JsonProperty("conversation_id")
+        private UUID conversationId;
     }
 
     /** A single stop/place in a day's route plan. */

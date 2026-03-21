@@ -931,7 +931,20 @@ Route generation rules:
     # Set conversation title from first user message (for session list display)
     if not messages and conversation and not conversation.title:
         raw = user_content.strip()
-        title = (raw[:50].rstrip() + ("..." if len(raw) > 50 else "")) if raw else "New conversation"
+        if raw.startswith("[Polygon route request]"):
+            dest = ""
+            if route_data is not None:
+                d = getattr(route_data, "destination", None)
+                if d is not None:
+                    dest = str(d).strip()
+            if dest:
+                title = f"Haritadan rota · {dest}"
+                if len(title) > 80:
+                    title = title[:77] + "..."
+            else:
+                title = "Haritadan rota"
+        else:
+            title = (raw[:50].rstrip() + ("..." if len(raw) > 50 else "")) if raw else "New conversation"
         conversation_repo.update_title(conversation_id, title)
 
     embedding_user_task = _save_embedding_for_message(

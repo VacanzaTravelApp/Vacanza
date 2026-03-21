@@ -12,6 +12,12 @@ import { normalizeRouteForMap } from "../utils/routeMap";
 let sessionConversationId = null;
 let sessionHasOpenedChatThisPageLoad = false;
 
+/** Haritadan üretilen rotanın sohbet kaydına bağlanması (geçmiş listesinde görünsün). */
+export function linkPolygonRouteConversation(conversationId) {
+  if (conversationId == null || String(conversationId).trim() === "") return;
+  sessionConversationId = String(conversationId).trim();
+}
+
 /** Saved route from GET /routes/conversation/:id (routeData may be object or JSON string). */
 function routeDataFromSavedDetail(detail) {
   if (!detail || detail.routeData == null) return null;
@@ -195,9 +201,17 @@ function sortConversationsDesc(list) {
   });
 }
 
+/** Harita polygon → rota: kullanıcıya gösterilecek (içerik maskelenir). */
+function isPolygonMapRouteUserMessage(content) {
+  return typeof content === "string" && content.trim().startsWith("[Polygon route request]");
+}
+
 /** Internal POI tool round-trip rows (saved for LLM context; not for end-user UI). */
 function isSearchPoisPipelineMessage(content) {
   if (content == null || typeof content !== "string") return false;
+  if (isPolygonMapRouteUserMessage(content) && content.includes("__TOOL_RESULT__search_pois__")) {
+    return false;
+  }
   if (content.includes("__TOOL_RESULT__search_pois__")) return true;
   const t = content.trim();
   if (!t.startsWith("{")) return false;
@@ -212,10 +226,14 @@ function isSearchPoisPipelineMessage(content) {
 function mapHistoryMessage(m) {
   const role = (m.role ?? "").toLowerCase();
   const type = role === "user" ? "user" : "ai";
+  let text = m.content ?? "";
+  if (type === "user" && isPolygonMapRouteUserMessage(text)) {
+    text = "Haritada çizilen alandan rota oluşturuldu.";
+  }
   return {
     id: String(m.id ?? `${Date.now()}-${Math.random()}`),
     type,
-    text: m.content ?? "",
+    text,
     time: formatMessageTime(m.created_at ?? m.createdAt),
     routeData: undefined,
     noRouteHint: false,
@@ -229,7 +247,13 @@ const GREETING = {
   time: "",
 };
 
-export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
+export default function VacanzaChat({
+  isOpen,
+  onClose,
+  onRouteGenerated,
+  /** Haritadan rota kaydı sonrası artırın; geçmiş sohbet listesi yenilensin. */
+  externalConversationRefreshNonce = 0,
+}) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -296,11 +320,21 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
       try {
         if (!sessionHasOpenedChatThisPageLoad) {
           sessionHasOpenedChatThisPageLoad = true;
-          sessionConversationId = null;
-          if (cancelled) return;
-          setConversationId(null);
-          const t = formatMessageTime(new Date());
-          setMessages([{ ...GREETING, time: t }]);
+          const linkedFromMap = sessionConversationId;
+          if (!linkedFromMap) {
+            if (cancelled) return;
+            setConversationId(null);
+            const t = formatMessageTime(new Date());
+            setMessages([{ ...GREETING, time: t }]);
+          } else {
+            setConversationId(linkedFromMap);
+            setMessagesLoading(true);
+            try {
+              await loadMessagesForConversation(linkedFromMap);
+            } finally {
+              if (!cancelled) setMessagesLoading(false);
+            }
+          }
           await refreshConversations();
         } else {
           const id = sessionConversationId;
@@ -340,6 +374,11 @@ export default function VacanzaChat({ isOpen, onClose, onRouteGenerated }) {
       cancelled = true;
     };
   }, [isOpen, loadMessagesForConversation, refreshConversations]);
+
+  useEffect(() => {
+    if (!externalConversationRefreshNonce) return;
+    void refreshConversations();
+  }, [externalConversationRefreshNonce, refreshConversations]);
 
   const handleSelectConversation = async (id) => {
     if (id === conversationId) {
