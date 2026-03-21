@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip } from "antd";
+import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, Spin } from "antd";
 import {
   LogoutOutlined,
   UserOutlined,
@@ -22,6 +22,8 @@ import VacanzaChat from "../features/ai/components/VacanzaChat";
 import RoutePanel from "../features/ai/components/RoutePanel";
 import ProfileModal from "./ProfileModal";
 import http from "../api/http";
+import { aiApi } from "../api/aiApi";
+import { normalizeRouteForMap } from "../features/ai/utils/routeMap";
 
 import cafeImg from "../assets/poi/poi_cafe.png";
 import museumImg from "../assets/poi/poi_museum.png";
@@ -64,6 +66,15 @@ function useIsMobile(breakpoint = 768) {
 function normalizeCategory(raw) {
   return String(raw || "").trim().toLowerCase();
 }
+
+/** Map filter keys → backend /chat/routes/from-polygon category strings (MapboxPoiSearchClient). */
+const UI_KEY_TO_BACKEND_CATEGORY = {
+  restaurant: "restaurant",
+  cafe: "cafe",
+  museum: "museum",
+  monuments: "monument",
+  parks: "park",
+};
 
 const UI_CATEGORIES = [
   {
@@ -329,6 +340,13 @@ export default function MapPage() {
   const [activeRoute, setActiveRoute] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
   const [routeGeometry, setRouteGeometry] = useState(null);
+
+  /** Parametre modalı (sadece API göndermeden önce) */
+  const [polygonRouteParamsOpen, setPolygonRouteParamsOpen] = useState(false);
+  /** Üstteki rota isteği bandı kapatıldıysa; sonuç panelinde yedek CTA kalır */
+  const [polygonRouteBannerDismissed, setPolygonRouteBannerDismissed] = useState(false);
+  const [polygonRouteSubmitting, setPolygonRouteSubmitting] = useState(false);
+  const [polygonRouteForm] = Form.useForm();
   // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
   useEffect(() => {
     if (resultsOpen) setFilterOpen(false);
@@ -542,6 +560,8 @@ export default function MapPage() {
   }, [selectedBackendCats, MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
 
   const startFreehand = useCallback(() => {
+    setPolygonRouteParamsOpen(false);
+    setPolygonRouteBannerDismissed(false);
     setMode("SELECTION");
     setFreehandEnabled(true);
     setFilterOpen(false);
@@ -553,6 +573,8 @@ export default function MapPage() {
   }, []);
 
   const clearSelectionOnly = useCallback(async () => {
+    setPolygonRouteParamsOpen(false);
+    setPolygonRouteBannerDismissed(false);
     setFreehandEnabled(false);
     setPreviewLine(null);
     setSelection({ mode: null, polygon: [] });
@@ -620,7 +642,79 @@ export default function MapPage() {
 
     setResultsOpen(true);
     setResultsTab("all");
-  }, [freehandEnabled, fetchPois]);
+
+    if (user) {
+      setPolygonRouteBannerDismissed(false);
+    }
+  }, [freehandEnabled, fetchPois, user]);
+
+  const openPolygonRouteParams = useCallback(() => {
+    polygonRouteForm.resetFields();
+    polygonRouteForm.setFieldsValue({ totalDays: 3, travelStyle: "general" });
+    setPolygonRouteParamsOpen(true);
+  }, [polygonRouteForm]);
+
+  const submitPolygonRoute = useCallback(
+    async (values) => {
+      if (!selection?.polygon || selection.polygon.length < 3) {
+        message.error("Geçerli bir alan seçin.");
+        return;
+      }
+      const ring = selection.polygon.map((p) => [p.lng, p.lat]);
+      const categories = selectedBackendCats
+        .map((k) => UI_KEY_TO_BACKEND_CATEGORY[k])
+        .filter(Boolean);
+      setPolygonRouteSubmitting(true);
+      try {
+        const body = {
+          coordinates: ring,
+          totalDays: values.totalDays,
+          travelStyle: values.travelStyle,
+        };
+        if (categories.length) body.categories = categories;
+        const res = await aiApi.createRouteFromPolygon(body);
+        const routeData = res.route_data || res.routeData;
+        if (routeData) {
+          setActiveRoute(normalizeRouteForMap(routeData));
+          setActiveDay(1);
+          setPolygonRouteParamsOpen(false);
+          setPolygonRouteBannerDismissed(false);
+          setResultsOpen(false);
+          setFilterOpen(false);
+          setIsChatOpen(false);
+          const summary = res.route_summary_message || res.routeSummaryMessage;
+          if (summary) message.success(summary);
+          else message.success("Rota haritada gösteriliyor.");
+        } else {
+          message.warning("Rota verisi alınamadı.");
+        }
+      } catch (e) {
+        const msg =
+          e?.response?.data?.message ||
+          e?.friendlyMessage ||
+          e?.message ||
+          "Rota oluşturulamadı.";
+        message.error(msg);
+      } finally {
+        setPolygonRouteSubmitting(false);
+      }
+    },
+    [selection, selectedBackendCats]
+  );
+
+  /** Band kapatıldı + sonuç paneli kapalıyken küçük yedek CTA */
+  const showCompactPolygonRouteCta = useMemo(
+    () =>
+      Boolean(
+        user &&
+          selection?.mode === "polygon" &&
+          (selection.polygon?.length ?? 0) >= 3 &&
+          !activeRoute &&
+          polygonRouteBannerDismissed &&
+          !resultsOpen
+      ),
+    [user, selection, activeRoute, polygonRouteBannerDismissed, resultsOpen]
+  );
 
   // 3D toggle: pitch + gerçek 3D layerlar
   const handleToggle2D3D = useCallback(() => {
@@ -940,6 +1034,64 @@ export default function MapPage() {
             position: "relative",
           }}
         >
+          {user &&
+            selection?.mode === "polygon" &&
+            selection.polygon.length >= 3 &&
+            !activeRoute &&
+            !polygonRouteBannerDismissed && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  zIndex: 25,
+                  width: "min(560px, calc(100% - 24px))",
+                  pointerEvents: "auto",
+                }}
+              >
+                <Card
+                  size="small"
+                  styles={{ body: { padding: "10px 12px" } }}
+                  style={{
+                    borderRadius: 12,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                    background: "rgba(255,255,255,0.96)",
+                    backdropFilter: "blur(8px)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span style={{ fontSize: 13, color: "#333", lineHeight: 1.45, flex: "1 1 200px" }}>
+                      Bu alan için rota oluşturabilirsin. Önce haritayı ve sonuçları inceleyebilirsin; hazır olunca{" "}
+                      <b>Rota oluştur</b> ile devam et.
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                      <Button type="primary" size="small" onClick={openPolygonRouteParams}>
+                        Rota oluştur
+                      </Button>
+                      <Tooltip title="Bandı gizle (alan aynı kalır; rota için sonuç panelindeki düğmeyi kullan)">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<CloseOutlined />}
+                          onClick={() => setPolygonRouteBannerDismissed(true)}
+                          aria-label="Rota isteğini gizle"
+                        />
+                      </Tooltip>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
+
           <Map
             ref={mapRef}
             {...viewState}
@@ -1089,6 +1241,21 @@ export default function MapPage() {
               </Marker>
             ))}
           </Map>
+
+          {showCompactPolygonRouteCta && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: 20,
+                left: 12,
+                zIndex: 24,
+              }}
+            >
+              <Button type="primary" size="middle" onClick={openPolygonRouteParams}>
+                Rota oluştur
+              </Button>
+            </div>
+          )}
 
           {activeRoute && (
             <RoutePanel
@@ -1367,6 +1534,12 @@ export default function MapPage() {
                     </div>
                   </div>
 
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    {user && !activeRoute && (
+                      <Button type="primary" size="small" onClick={openPolygonRouteParams}>
+                        Rota oluştur
+                      </Button>
+                    )}
                   <Button
                     type="text"
                     icon={<CloseOutlined />}
@@ -1386,6 +1559,7 @@ export default function MapPage() {
                     }}
                     aria-label="Close results"
                   />
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 6 }}>
@@ -1476,6 +1650,61 @@ export default function MapPage() {
             </div>
           )}
           {/* End of User card logic */}
+          <Modal
+            title="Rota ayarları"
+            open={polygonRouteParamsOpen}
+            onCancel={() => {
+              if (!polygonRouteSubmitting) setPolygonRouteParamsOpen(false);
+            }}
+            footer={null}
+            destroyOnClose
+            maskClosable={!polygonRouteSubmitting}
+            zIndex={1100}
+          >
+            <Spin spinning={polygonRouteSubmitting}>
+              <Form
+                form={polygonRouteForm}
+                layout="vertical"
+                onFinish={submitPolygonRoute}
+                initialValues={{ totalDays: 3, travelStyle: "general" }}
+              >
+                <Form.Item
+                  name="totalDays"
+                  label="Gün sayısı"
+                  rules={[{ required: true, message: "Gün sayısı gerekli" }]}
+                >
+                  <InputNumber min={1} max={16} style={{ width: "100%" }} />
+                </Form.Item>
+                <Form.Item
+                  name="travelStyle"
+                  label="Stil"
+                  rules={[{ required: true, message: "Stil seçin" }]}
+                >
+                  <Select
+                    options={[
+                      { value: "general", label: "Genel" },
+                      { value: "history", label: "Tarih / kültür" },
+                      { value: "food", label: "Yemek" },
+                      { value: "nature", label: "Doğa" },
+                      { value: "art", label: "Sanat" },
+                    ]}
+                  />
+                </Form.Item>
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
+                  Kategoriler, sağdaki filtrede seçili olanlarla gönderilir.
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <Button onClick={() => setPolygonRouteParamsOpen(false)} disabled={polygonRouteSubmitting}>
+                    İptal
+                  </Button>
+                  <Button type="primary" htmlType="submit" loading={polygonRouteSubmitting}>
+                    Rota oluştur
+                  </Button>
+                </div>
+              </Form>
+            </Spin>
+          </Modal>
+
           <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
           <VacanzaChat
             isOpen={isChatOpen}

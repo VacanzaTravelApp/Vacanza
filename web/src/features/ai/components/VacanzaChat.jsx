@@ -3,6 +3,7 @@ import { aiApi } from "../../../api/aiApi";
 import { Spin, message } from "antd";
 import { CloseOutlined, CompassOutlined, HistoryOutlined, PlusOutlined, SendOutlined } from "@ant-design/icons";
 import "../styles/vacanzaChat.css";
+import { normalizeRouteForMap } from "../utils/routeMap";
 
 /**
  * Sayfa oturumu: kullanıcı mesaj attıysa oluşturulmuş conversation id.
@@ -10,20 +11,6 @@ import "../styles/vacanzaChat.css";
  */
 let sessionConversationId = null;
 let sessionHasOpenedChatThisPageLoad = false;
-
-/** Normalize route for map: ensure every waypoint has numeric latitude/longitude (backend may send either key style). */
-function normalizeRouteForMap(route) {
-  if (!route) return null;
-  const days = (route.days || []).map((d) => ({
-    ...d,
-    waypoints: (d.waypoints || []).map((w) => {
-      const lat = Number(w.latitude ?? w.lat ?? NaN);
-      const lon = Number(w.longitude ?? w.lon ?? NaN);
-      return { ...w, latitude: lat, longitude: lon };
-    }),
-  }));
-  return { ...route, days };
-}
 
 /** Saved route from GET /routes/conversation/:id (routeData may be object or JSON string). */
 function routeDataFromSavedDetail(detail) {

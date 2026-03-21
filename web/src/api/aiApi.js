@@ -56,7 +56,16 @@ export const aiApi = {
     deleteRoute: async (routeId) => {
         const response = await http.delete(`/routes/${routeId}`);
         return response.data;
-    }
+    },
+
+    /**
+     * Polygon-based itinerary (Task 1). Body: { coordinates, totalDays?, travelStyle?, categories? }
+     * coordinates: outer ring [[lon, lat], ...]
+     */
+    createRouteFromPolygon: async (body) => {
+        const response = await http.post('/chat/routes/from-polygon', body);
+        return response.data;
+    },
 };
 
 export default aiApi;
