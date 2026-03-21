@@ -18,7 +18,7 @@ import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/aut
 import { useGamificationProfile } from "../gamification/useGamification";
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
-import VacanzaChat from "../features/ai/components/VacanzaChat";
+import VacanzaChat, { linkPolygonRouteConversation } from "../features/ai/components/VacanzaChat";
 import RoutePanel from "../features/ai/components/RoutePanel";
 import ProfileModal from "./ProfileModal";
 import http from "../api/http";
@@ -347,6 +347,7 @@ export default function MapPage() {
   const [polygonRouteBannerDismissed, setPolygonRouteBannerDismissed] = useState(false);
   const [polygonRouteSubmitting, setPolygonRouteSubmitting] = useState(false);
   const [polygonRouteForm] = Form.useForm();
+  const [chatConversationRefreshNonce, setChatConversationRefreshNonce] = useState(0);
   // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
   useEffect(() => {
     if (resultsOpen) setFilterOpen(false);
@@ -682,6 +683,11 @@ export default function MapPage() {
           setResultsOpen(false);
           setFilterOpen(false);
           setIsChatOpen(false);
+          const convId = res.conversation_id || res.conversationId;
+          if (convId) {
+            linkPolygonRouteConversation(convId);
+            setChatConversationRefreshNonce((n) => n + 1);
+          }
           const summary = res.route_summary_message || res.routeSummaryMessage;
           if (summary) message.success(summary);
           else message.success("Rota haritada gösteriliyor.");
@@ -1709,6 +1715,7 @@ export default function MapPage() {
           <VacanzaChat
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
+            externalConversationRefreshNonce={chatConversationRefreshNonce}
             onRouteGenerated={(routeData) => {
               setActiveRoute(routeData);
               setActiveDay(1);

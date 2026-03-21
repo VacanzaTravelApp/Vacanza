@@ -247,6 +247,7 @@ public class ChatProxyController {
                 saveExtractedPreferencesIfAny(user, response);
                 applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile);
 
+                response.setConversationId(conversationId);
                 return ResponseEntity.ok(response);
         }
 
