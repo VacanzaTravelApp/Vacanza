@@ -5,6 +5,8 @@ import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
 import com.vacanza.backend.entity.enums.SortCriteria;
+import com.vacanza.backend.exceptions.BookingException;
+import com.vacanza.backend.integration.booking.SerpApiAirportSuggestion;
 import com.vacanza.backend.integration.booking.SerpApiClient;
 import com.vacanza.backend.service.impl.BookingServiceImpl;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +22,8 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -189,5 +193,35 @@ class BookingServiceTest {
                 List<TransportOptionDTO> results = bookingService.searchTransportation(request);
 
                 assertThat(results).isEmpty();
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // Airport autocomplete
+        // ──────────────────────────────────────────────────────────────
+
+        @Test
+        @DisplayName("Should throw BookingException when airport query is blank")
+        void searchAirports_BlankQuery_ThrowsException() {
+                assertThatThrownBy(() -> bookingService.searchAirports("   "))
+                                .isInstanceOf(BookingException.class)
+                                .hasMessageContaining("must not be blank");
+        }
+
+        @Test
+        @DisplayName("Should delegate to SerpApiClient and return suggestions")
+        void searchAirports_ValidQuery_ReturnsSuggestions() {
+                SerpApiAirportSuggestion ist = new SerpApiAirportSuggestion();
+                ist.setIataCode("IST");
+                ist.setName("Istanbul Airport");
+                ist.setCity("Istanbul");
+                ist.setCountry("Turkey");
+
+                when(serpApiClient.searchAirports(anyString())).thenReturn(List.of(ist));
+
+                List<SerpApiAirportSuggestion> results = bookingService.searchAirports("istanbul");
+
+                assertThat(results).hasSize(1);
+                assertThat(results.get(0).getIataCode()).isEqualTo("IST");
+                assertThat(results.get(0).getName()).isEqualTo("Istanbul Airport");
         }
 }

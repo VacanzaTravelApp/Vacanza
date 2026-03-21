@@ -5,6 +5,8 @@ import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
 import com.vacanza.backend.entity.enums.SortCriteria;
+import com.vacanza.backend.exceptions.BookingException;
+import com.vacanza.backend.integration.booking.SerpApiAirportSuggestion;
 import com.vacanza.backend.integration.booking.SerpApiClient;
 import com.vacanza.backend.service.BookingService;
 import lombok.RequiredArgsConstructor;
@@ -101,5 +103,16 @@ public class BookingServiceImpl implements BookingService {
                 };
 
                 return results.stream().sorted(comparator).collect(Collectors.toList());
+        }
+
+        @Override
+        public List<SerpApiAirportSuggestion> searchAirports(String query) {
+                if (query == null || query.isBlank()) {
+                        throw new BookingException(
+                                "Airport search query must not be blank",
+                                org.springframework.http.HttpStatus.BAD_REQUEST);
+                }
+                log.info("Searching airports: query='{}'", query);
+                return serpApiClient.searchAirports(query);
         }
 }
