@@ -143,6 +143,80 @@ route_data format:
 }}
 """
 
+REPLAN_PREFIX = "[Replan day request]"
+EXISTING_ROUTE_MARKER = "__EXISTING_ROUTE__"
+
+
+def _extract_first_json_object_str(s: str) -> str | None:
+    """Return the first top-level JSON object substring."""
+    if not s:
+        return None
+    start = s.find("{")
+    if start == -1:
+        return None
+    try:
+        _obj, end = json.JSONDecoder().raw_decode(s[start:])
+    except json.JSONDecodeError:
+        return None
+    return s[start : start + end]
+
+
+def _parse_replan_day_context(user_content: str) -> tuple[int, RouteData] | None:
+    """Parse map 'replan this day from polygon' pipeline (Java prepends markers)."""
+    if not user_content or not user_content.strip().startswith(REPLAN_PREFIX):
+        return None
+    m = re.search(r"^Day:\s*(\d+)\s*$", user_content, re.MULTILINE)
+    if not m:
+        return None
+    day_num = int(m.group(1))
+    idx = user_content.find(EXISTING_ROUTE_MARKER)
+    if idx == -1:
+        return None
+    raw = user_content[idx + len(EXISTING_ROUTE_MARKER) :].strip()
+    json_str = _extract_first_json_object_str(raw)
+    if not json_str:
+        return None
+    try:
+        route_data = RouteData.model_validate_json(json_str)
+    except Exception:
+        logger.warning("Failed to parse __EXISTING_ROUTE__ JSON for replan", exc_info=True)
+        return None
+    if day_num < 1 or day_num > route_data.total_days:
+        return None
+    return (day_num, route_data)
+
+
+def _build_replan_turn2_system(
+    existing_route: RouteData,
+    day_num: int,
+    poi_list: str,
+    travel_style: str,
+) -> str:
+    """Turn2 system prompt: replace one day using polygon POIs; keep other days identical."""
+    er = json.dumps(existing_route.model_dump(exclude_none=True), ensure_ascii=False)
+    td = existing_route.total_days
+    return f"""You are a travel planning assistant. The user drew a region on the map and wants to replace ONLY day {day_num} of their existing trip.
+
+EXISTING ROUTE (JSON — you MUST output the full route again with the same structure):
+{er}
+
+RULES:
+- Replace ONLY day {day_num}. Build new waypoints for that day using ONLY the POIs listed below.
+- Copy every other day unchanged (same day title, day_start_local, waypoints, order).
+- Keep the same "title", "destination", and "total_days" ({td}) as the existing route unless there is an obvious inconsistency to fix.
+- Use 3–6 stops on day {day_num} when enough POIs exist; otherwise use at least 2 stops.
+- CRITICAL: For the replaced day, latitude and longitude must match the POI list exactly — do not invent coordinates.
+- Order waypoints geographically (minimize walking). Set realistic estimated_duration_min and time_slot (morning/afternoon/evening).
+- travel_style for the new day: {travel_style}
+
+AVAILABLE POIs (inside the drawn area):
+{poi_list}
+
+OUTPUT FORMAT (MANDATORY):
+1. One short sentence only (e.g. "Day {day_num} is updated for your map area.").
+2. Next line: ---ROUTE_JSON---
+3. Next line: the complete route_data JSON (no markdown, no code block)."""
+
 
 def _is_itinerary_request(user_content: str) -> bool:
     return bool(
@@ -863,24 +937,52 @@ Route generation rules:
         tool_call = _parse_tool_call(user_content) or {}
         days = int(tool_call.get("days") or 2)
         travel_style = str(tool_call.get("travel_style") or "general").strip() or "general"
-        turn2_system = TURN2_SYSTEM.format(
-            poi_list=_format_poi_list(tool_pois),
-            days=days,
-            travel_style=travel_style,
-        )
-        weather_data = _parse_weather_context(user_content)
-        if _weather_context_has_payload(weather_data):
-            wj = json.dumps(weather_data, ensure_ascii=False)
-            turn2_system = f"{turn2_system}\n\n" + TURN2_WEATHER_RULES_DAILY.format(weather_json=wj)
-            if _weather_has_day_parts(weather_data):
-                turn2_system = f"{turn2_system}\n\n{TURN2_WEATHER_RULES_DAY_PARTS}"
-        if itinerary_user_context:
-            turn2_system = (
-                f"{turn2_system}\n\n{TURN2_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
+        replan_ctx = _parse_replan_day_context(user_content)
+        if replan_ctx is not None:
+            _day_n, existing_rd = replan_ctx
+            turn2_system = _build_replan_turn2_system(
+                existing_rd,
+                _day_n,
+                _format_poi_list(tool_pois),
+                travel_style,
             )
-        turn2 = await llm.ainvoke(
-            [SystemMessage(content=turn2_system), HumanMessage(content="Build itinerary from provided POIs.")]
-        )
+            weather_data = _parse_weather_context(user_content)
+            if _weather_context_has_payload(weather_data):
+                wj = json.dumps(weather_data, ensure_ascii=False)
+                turn2_system = f"{turn2_system}\n\n" + TURN2_WEATHER_RULES_DAILY.format(weather_json=wj)
+                if _weather_has_day_parts(weather_data):
+                    turn2_system = f"{turn2_system}\n\n{TURN2_WEATHER_RULES_DAY_PARTS}"
+            if itinerary_user_context:
+                turn2_system = (
+                    f"{turn2_system}\n\n{TURN2_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
+                )
+            turn2 = await llm.ainvoke(
+                [
+                    SystemMessage(content=turn2_system),
+                    HumanMessage(
+                        content=f"Replace only day {_day_n} using the polygon POIs; keep all other days identical."
+                    ),
+                ]
+            )
+        else:
+            turn2_system = TURN2_SYSTEM.format(
+                poi_list=_format_poi_list(tool_pois),
+                days=days,
+                travel_style=travel_style,
+            )
+            weather_data = _parse_weather_context(user_content)
+            if _weather_context_has_payload(weather_data):
+                wj = json.dumps(weather_data, ensure_ascii=False)
+                turn2_system = f"{turn2_system}\n\n" + TURN2_WEATHER_RULES_DAILY.format(weather_json=wj)
+                if _weather_has_day_parts(weather_data):
+                    turn2_system = f"{turn2_system}\n\n{TURN2_WEATHER_RULES_DAY_PARTS}"
+            if itinerary_user_context:
+                turn2_system = (
+                    f"{turn2_system}\n\n{TURN2_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
+                )
+            turn2 = await llm.ainvoke(
+                [SystemMessage(content=turn2_system), HumanMessage(content="Build itinerary from provided POIs.")]
+            )
         raw_ai_content = str(turn2.content)
         ai_content, route_data = _parse_route_from_response(raw_ai_content)
         if route_data:
@@ -943,6 +1045,11 @@ Route generation rules:
                     title = title[:77] + "..."
             else:
                 title = "Haritadan rota"
+        elif raw.startswith(REPLAN_PREFIX):
+            dm = re.search(r"^Day:\s*(\d+)\s*$", raw, re.MULTILINE)
+            title = f"Gün {dm.group(1)} harita ile güncellendi" if dm else "Haritadan gün güncelleme"
+            if len(title) > 80:
+                title = title[:77] + "..."
         else:
             title = (raw[:50].rstrip() + ("..." if len(raw) > 50 else "")) if raw else "New conversation"
         conversation_repo.update_title(conversation_id, title)

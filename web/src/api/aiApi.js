@@ -66,6 +66,15 @@ export const aiApi = {
         const response = await http.post('/chat/routes/from-polygon', body);
         return response.data;
     },
+
+    /**
+     * Kayıtlı sohbet rotasında tek günü, harita polygon'undaki POI'lara göre yeniden üretir.
+     * Body: { conversationId, day, coordinates, travelStyle?, categories? }
+     */
+    replanDayFromPolygon: async (body) => {
+        const response = await http.post('/chat/routes/replan-day-from-polygon', body);
+        return response.data;
+    },
 };
 
 export default aiApi;
