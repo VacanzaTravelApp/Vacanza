@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -41,9 +42,46 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ChatProxyController {
 
-        /** Default POI categories when the client sends none (aligned with general itinerary tool flow). */
+        /**
+         * Default POI categories when the client sends none (aligned with general itinerary tool flow).
+         * Dining categories (restaurant/cafe/market) excluded until a dedicated dining API is integrated.
+         */
         private static final List<String> DEFAULT_POLYGON_CATEGORIES = List.of(
-                        "museum", "monument", "historic_site", "church", "park", "restaurant", "neighborhood");
+                        "museum", "monument", "historic_site", "church", "park", "neighborhood");
+
+        /** Strip dining-related Mapbox/AI category keys so routes stay non-food for now. */
+        private static final Set<String> EXCLUDED_DINING_POI_CATEGORIES = Set.of(
+                        "restaurant", "cafe", "market", "bar", "food", "nightlife");
+
+        private static List<String> withoutDiningCategories(List<String> categories) {
+                if (categories == null || categories.isEmpty()) {
+                        return categories == null ? List.of() : categories;
+                }
+                List<String> out = new ArrayList<>();
+                for (String c : categories) {
+                        if (c == null || c.isBlank()) {
+                                continue;
+                        }
+                        String key = c.trim().toLowerCase(Locale.ROOT);
+                        if (EXCLUDED_DINING_POI_CATEGORIES.contains(key)) {
+                                continue;
+                        }
+                        out.add(c.trim());
+                }
+                return out;
+        }
+
+        /** Categories for polygon map search + tool JSON (no dining until dedicated API). */
+        private List<String> resolveSearchCategories(List<String> fromRequest) {
+                List<String> base = fromRequest != null && !fromRequest.isEmpty()
+                                ? new ArrayList<>(fromRequest)
+                                : new ArrayList<>(DEFAULT_POLYGON_CATEGORIES);
+                List<String> filtered = new ArrayList<>(withoutDiningCategories(base));
+                if (filtered.isEmpty()) {
+                        return new ArrayList<>(DEFAULT_POLYGON_CATEGORIES);
+                }
+                return filtered;
+        }
 
         /** Minimum distinct POIs inside the polygon after search + dedup. */
         private static final int MIN_POIS_IN_POLYGON = 3;
@@ -178,9 +216,7 @@ public class ChatProxyController {
                 String travelStyle = body.getTravelStyle() != null && !body.getTravelStyle().isBlank()
                                 ? body.getTravelStyle().trim()
                                 : "general";
-                List<String> categories = body.getCategories() != null && !body.getCategories().isEmpty()
-                                ? body.getCategories()
-                                : DEFAULT_POLYGON_CATEGORIES;
+                List<String> categories = resolveSearchCategories(body.getCategories());
 
                 PoiToolExecutionResult exec = executePoiSearchForPolygon(ring, categories, totalDays);
                 if (exec.pois().size() < MIN_POIS_IN_POLYGON) {
@@ -316,9 +352,7 @@ public class ChatProxyController {
                 String travelStyle = body.getTravelStyle() != null && !body.getTravelStyle().isBlank()
                                 ? body.getTravelStyle().trim()
                                 : "general";
-                List<String> categories = body.getCategories() != null && !body.getCategories().isEmpty()
-                                ? body.getCategories()
-                                : DEFAULT_POLYGON_CATEGORIES;
+                List<String> categories = resolveSearchCategories(body.getCategories());
 
                 PoiToolExecutionResult exec = executePoiSearchForPolygon(ring, categories, totalDays);
                 if (exec.pois().size() < MIN_POIS_REPLAN_DAY) {
@@ -542,12 +576,16 @@ public class ChatProxyController {
                 var dest = destOpt.get();
                 WeatherPlanningForecast planning = weatherService.getPlanningForecast(
                                 dest.getCenterLat(), dest.getCenterLon(), forecastDays);
-                if (categories == null || categories.isEmpty()) {
+                List<String> cats = withoutDiningCategories(categories);
+                if (cats.isEmpty()) {
+                        cats = new ArrayList<>(DEFAULT_POLYGON_CATEGORIES);
+                }
+                if (cats.isEmpty()) {
                         return new PoiToolExecutionResult(List.of(), planning);
                 }
 
                 List<PoiResult> all = new java.util.ArrayList<>();
-                for (String c : categories) {
+                for (String c : cats) {
                         if (c == null || c.isBlank()) continue;
                         var pois = mapboxPoiSearchClient
                                         .searchByCategory(c, dest.getMinLon(), dest.getMinLat(), dest.getMaxLon(), dest.getMaxLat())
