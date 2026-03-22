@@ -1136,13 +1136,16 @@ export default function MapPage() {
                 style={{
                   position: "absolute",
                   top: 12,
-                  left: "50%",
-                  transform: "translateX(-50%)",
+                  left: 12,
+                  right: 12,
                   zIndex: 25,
-                  width: "min(560px, calc(100% - 24px))",
-                  pointerEvents: "auto",
+                  display: "flex",
+                  justifyContent: "center",
+                  pointerEvents: "none",
+                  boxSizing: "border-box",
                 }}
               >
+                <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
                 <Card
                   size="small"
                   styles={{ body: { padding: "10px 12px" } }}
@@ -1156,17 +1159,34 @@ export default function MapPage() {
                   <div
                     style={{
                       display: "flex",
-                      alignItems: "center",
+                      flexDirection: isMobile ? "column" : "row",
+                      alignItems: isMobile ? "stretch" : "flex-start",
                       justifyContent: "space-between",
                       gap: 10,
-                      flexWrap: "wrap",
                     }}
                   >
-                    <span style={{ fontSize: 13, color: "#333", lineHeight: 1.45, flex: "1 1 200px" }}>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        color: "#333",
+                        lineHeight: 1.45,
+                        flex: isMobile ? "none" : "1 1 0",
+                        minWidth: 0,
+                        wordBreak: "break-word",
+                      }}
+                    >
                       Bu alan için rota oluşturabilirsin. Önce haritayı ve sonuçları inceleyebilirsin; hazır olunca{" "}
                       <b>Rota oluştur</b> ile devam et.
                     </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        flexShrink: 0,
+                        alignSelf: isMobile ? "stretch" : "auto",
+                      }}
+                    >
                       <Button type="primary" size="small" onClick={openPolygonRouteParams}>
                         Rota oluştur
                       </Button>
@@ -1182,6 +1202,7 @@ export default function MapPage() {
                     </div>
                   </div>
                 </Card>
+                </div>
               </div>
             )}
 
@@ -1190,13 +1211,16 @@ export default function MapPage() {
               style={{
                 position: "absolute",
                 top: 12,
-                left: "50%",
-                transform: "translateX(-50%)",
+                left: 12,
+                right: 12,
                 zIndex: 25,
-                width: "min(560px, calc(100% - 24px))",
-                pointerEvents: "auto",
+                display: "flex",
+                justifyContent: "center",
+                pointerEvents: "none",
+                boxSizing: "border-box",
               }}
             >
+              <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
               <Card
                 size="small"
                 styles={{ body: { padding: "10px 12px" } }}
@@ -1211,27 +1235,43 @@ export default function MapPage() {
                 <div
                   style={{
                     display: "flex",
-                    alignItems: "center",
+                    flexDirection: isMobile ? "column" : "row",
+                    alignItems: isMobile ? "stretch" : "flex-start",
                     justifyContent: "space-between",
                     gap: 10,
-                    flexWrap: "wrap",
                   }}
                 >
-                  <span style={{ fontSize: 13, color: "#333", lineHeight: 1.45, flex: "1 1 200px" }}>
-                    <b>Gün {activeDay}</b> için rotayı, haritada çizdiğin alandaki mekânlara göre yeniden
-                    düzenleyebilirsin. Sohbetten gelen veya harita rotasına bağlı bir konuşma gerekir.
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "#333",
+                      lineHeight: 1.45,
+                      flex: isMobile ? "none" : "1 1 0",
+                      minWidth: 0,
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    <b>Gün {activeDay}</b> — Haritada çizdiğin alandaki mekânlara göre durakları güncelle. Bunun için
+                    sohbet veya harita rotasına bağlı bir oturum gerekir.
                   </span>
                   <Button
                     type="primary"
                     size="small"
                     loading={replanDaySubmitting}
                     onClick={submitReplanDayFromPolygon}
-                    style={{ background: "#ea580c", borderColor: "#c2410c" }}
+                    style={{
+                      background: "#ea580c",
+                      borderColor: "#c2410c",
+                      flexShrink: 0,
+                      alignSelf: isMobile ? "stretch" : "flex-start",
+                      whiteSpace: isMobile ? "normal" : "nowrap",
+                    }}
                   >
-                    Günü çizime göre yenile
+                    {isMobile ? "Çizime göre güncelle" : "Günü çizime göre yenile"}
                   </Button>
                 </div>
               </Card>
+              </div>
             </div>
           )}
 
@@ -1487,25 +1527,25 @@ export default function MapPage() {
               gap: fabGap,
             }}
           >
-            <Tooltip title="Ask Vacanza AI" placement="left">
+            <Tooltip title="Vacanza AI ile sohbet" placement="left">
               <Button
                 shape="circle"
+                icon={<CompassOutlined />}
                 onClick={() => {
                   setIsChatOpen(true);
                   setFilterOpen(false);
                 }}
+                aria-label="Vacanza AI sohbetini aç"
                 style={{
                   width: fabSize,
                   height: fabSize,
-                  fontSize: isMobile ? "18px" : "20px",
-                  background: "linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)", // Figma'daki gibi hafif gradyan
+                  fontSize: isMobile ? "17px" : "18px",
+                  background: "linear-gradient(145deg, #3da8c8 0%, #2c9eb8 55%, #2563eb 100%)",
                   border: "none",
                   color: "white",
-                  boxShadow: "0 4px 12px rgba(96, 165, 250, 0.4)",
+                  boxShadow: "0 4px 14px rgba(61, 168, 200, 0.45)",
                 }}
-              >
-                ✨
-              </Button>
+              />
             </Tooltip>
 
             <Tooltip title="Draw Area" placement="left">

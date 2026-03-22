@@ -1,32 +1,41 @@
 .route-panel {
+  --vc-route-teal: #3da8c8;
+  --vc-route-teal-soft: rgba(61, 168, 200, 0.14);
   position: fixed;
-  bottom: 18px;
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 200;
   max-width: 800px;
   width: calc(100vw - 32px);
   border-radius: 18px;
-  background: radial-gradient(circle at top left, rgba(254, 249, 195, 0.9), rgba(255, 255, 255, 0.96));
+  border: 1px solid rgba(61, 168, 200, 0.22);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(61, 168, 200, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at top left, rgba(254, 249, 195, 0.88), rgba(255, 255, 255, 0.97));
   backdrop-filter: blur(16px);
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.35);
+  box-shadow:
+    0 18px 44px rgba(15, 23, 42, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: min(420px, 55vh);
+  /* Daha fazla yükseklik: POI listesi yukarıda kalsın, scroll daha az */
+  max-height: min(520px, 72vh);
 }
 
 @media (max-width: 768px) {
   .route-panel {
     width: calc(100vw - 24px);
-    bottom: 70px;
-    max-height: min(380px, 50vh);
+    bottom: max(70px, env(safe-area-inset-bottom, 0px));
+    max-height: min(460px, 65vh);
   }
 }
 
 .route-panel-header {
-  padding: 14px 16px 10px;
+  padding: 10px 14px 8px;
   flex-shrink: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .route-panel-title-row {
@@ -38,7 +47,7 @@
 
 .route-panel-title {
   font-weight: 800;
-  font-size: 16px;
+  font-size: 15px;
   color: #1a1a2e;
   line-height: 1.2;
 }
@@ -67,27 +76,32 @@
 
 .route-panel-close {
   border-radius: 12px;
-  color: #666;
+  color: #64748b;
 }
 
 .route-panel-close:hover {
-  color: #333;
-  background: rgba(0, 0, 0, 0.04);
+  color: var(--vc-route-teal);
+  background: var(--vc-route-teal-soft);
+}
+
+.route-panel-close:focus-visible {
+  outline: 2px solid var(--vc-route-teal);
+  outline-offset: 2px;
 }
 
 .route-panel-weather {
-  padding: 0 16px 12px;
+  padding: 6px 12px 8px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   flex-shrink: 0;
 }
 
 .route-panel-weather-title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #0284c7;
-  margin-bottom: 8px;
+  letter-spacing: 0.05em;
+  color: #0e7490;
+  margin-bottom: 4px;
 }
 
 .route-panel-weather-days {
@@ -96,68 +110,70 @@
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .route-panel-weather-day {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: linear-gradient(145deg, rgba(224, 242, 254, 0.65), rgba(255, 255, 255, 0.9));
-  border: 1px solid rgba(14, 165, 233, 0.22);
-  min-width: 92px;
+  gap: 1px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(224, 242, 254, 0.55), rgba(255, 255, 255, 0.92));
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  min-width: 76px;
 }
 
 .route-panel-weather-date {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #0c4a6e;
+  line-height: 1.2;
 }
 
 .route-panel-weather-temps {
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
   color: #1e293b;
+  letter-spacing: -0.02em;
 }
 
 .route-panel-weather-rain {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   color: #64748b;
 }
 
 .route-panel-weather-dayparts {
-  margin-top: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(254, 243, 199, 0.45);
-  border: 1px solid rgba(245, 158, 11, 0.28);
+  margin-top: 5px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(254, 243, 199, 0.4);
+  border: 1px solid rgba(245, 158, 11, 0.22);
 }
 
 .route-panel-weather-dayparts-line {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: #92400e;
   margin: 0;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .route-panel-weather-dayparts-line + .route-panel-weather-dayparts-line {
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .route-panel-weather-hint {
-  font-size: 10px;
+  font-size: 9px;
   color: #94a3b8;
-  margin: 8px 0 0;
-  line-height: 1.4;
+  margin: 4px 0 0;
+  line-height: 1.35;
 }
 
 .route-panel-day-window {
-  padding: 0 16px 10px;
-  font-size: 12px;
+  padding: 4px 12px 6px;
+  font-size: 11px;
   font-weight: 700;
   color: #475569;
   letter-spacing: 0.02em;
@@ -165,8 +181,8 @@
 
 .route-panel-tabs {
   display: flex;
-  gap: 8px;
-  padding: 0 16px 12px;
+  gap: 6px;
+  padding: 0 12px 8px;
   overflow-x: auto;
   flex-shrink: 0;
   scrollbar-width: thin;
@@ -186,30 +202,36 @@
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
-  padding: 8px 14px;
+  gap: 1px;
+  padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid #e6e6e6;
   background: #fff;
   cursor: pointer;
   font-weight: 500;
-  font-size: 13px;
+  font-size: 12px;
   color: #444;
-  transition: all 0.2s ease;
-  min-width: 72px;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  min-width: 68px;
 }
 
 .route-panel-tab:hover {
-  border-color: #F97316;
-  background: rgba(249, 115, 22, 0.06);
-  color: #333;
+  border-color: rgba(61, 168, 200, 0.45);
+  background: var(--vc-route-teal-soft);
+  color: #1e293b;
+}
+
+.route-panel-tab:focus-visible {
+  outline: 2px solid var(--vc-route-teal);
+  outline-offset: 2px;
 }
 
 .route-panel-tab-active {
-  border: 1px solid #F97316;
-  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid #f97316;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.14), rgba(61, 168, 200, 0.1));
   font-weight: 700;
-  color: #EA580C;
+  color: #c2410c;
+  box-shadow: 0 1px 0 rgba(249, 115, 22, 0.2);
 }
 
 .route-panel-tab-label {
@@ -217,7 +239,7 @@
 }
 
 .route-panel-tab-sublabel {
-  font-size: 10px;
+  font-size: 9px;
   color: #888;
   max-width: 140px;
   overflow: hidden;
@@ -227,9 +249,21 @@
 
 .route-panel-waypoints {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 0 16px 14px;
-  padding-right: 20px;
+  padding: 2px 12px 10px;
+  padding-right: 18px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(61, 168, 200, 0.35) transparent;
+}
+
+.route-panel-waypoints::-webkit-scrollbar {
+  width: 6px;
+}
+
+.route-panel-waypoints::-webkit-scrollbar-thumb {
+  background: rgba(61, 168, 200, 0.35);
+  border-radius: 6px;
 }
 
 .route-panel-empty {
@@ -280,8 +314,8 @@
 .route-panel-waypoint-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 10px;
+  padding: 8px 0;
   position: relative;
   cursor: pointer;
   border-radius: 12px;
