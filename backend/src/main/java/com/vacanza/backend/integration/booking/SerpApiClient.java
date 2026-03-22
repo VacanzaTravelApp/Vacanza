@@ -1,5 +1,6 @@
 package com.vacanza.backend.integration.booking;
 
+import com.vacanza.backend.component.ApiMetricsCollector;
 import com.vacanza.backend.config.SerpApiProperties;
 import com.vacanza.backend.dto.request.AccommodationSearchRequestDTO;
 import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
@@ -29,14 +30,19 @@ import java.util.List;
 @Component
 public class SerpApiClient {
 
+    private static final String API_NAME = "SerpApi";
+
     private final WebClient webClient;
     private final SerpApiProperties properties;
+    private final ApiMetricsCollector metricsCollector;
 
     public SerpApiClient(
             @Qualifier("serpApiWebClient") WebClient webClient,
-            SerpApiProperties properties) {
+            SerpApiProperties properties,
+            ApiMetricsCollector metricsCollector) {
         this.webClient = webClient;
         this.properties = properties;
+        this.metricsCollector = metricsCollector;
     }
 
     /**
@@ -49,6 +55,7 @@ public class SerpApiClient {
         log.info("[SERPAPI] Searching hotels: query={}, dates={}/{}",
                 request.getQuery(), request.getCheckInDate(), request.getCheckOutDate());
 
+        long startTime = System.currentTimeMillis();
         try {
             var uriBuilder = webClient.get()
                     .uri(uriB -> {
@@ -78,10 +85,13 @@ public class SerpApiClient {
             List<AccommodationOptionDTO> results = SerpApiHotelResponse.toAccommodationOptions(response,
                     request.getCurrency());
 
+            metricsCollector.recordCall(API_NAME, System.currentTimeMillis() - startTime);
             log.info("[SERPAPI] Hotel search returned {} results", results.size());
             return results;
 
         } catch (WebClientResponseException e) {
+            metricsCollector.recordError(API_NAME);
+            metricsCollector.recordCall(API_NAME, System.currentTimeMillis() - startTime);
             log.error("[SERPAPI] Hotel search API error: {} - {}",
                     e.getStatusCode(), e.getResponseBodyAsString());
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED
@@ -101,6 +111,7 @@ public class SerpApiClient {
         } catch (BookingException e) {
             throw e;
         } catch (Exception e) {
+            metricsCollector.recordError(API_NAME);
             log.error("[SERPAPI] Hotel search failed: {}", e.getMessage(), e);
             throw new BookingException(
                     "Hotel search failed: " + e.getMessage(),
@@ -118,6 +129,7 @@ public class SerpApiClient {
         log.info("[SERPAPI] Searching flights: {}->{}, date={}",
                 request.getOrigin(), request.getDestination(), request.getDepartureDate());
 
+        long startTime = System.currentTimeMillis();
         try {
             // Determine flight type
             String type = request.getReturnDate() != null ? "1" : "2"; // 1=Round trip, 2=One way
@@ -149,10 +161,13 @@ public class SerpApiClient {
             List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response,
                     request.getCurrency());
 
+            metricsCollector.recordCall(API_NAME, System.currentTimeMillis() - startTime);
             log.info("[SERPAPI] Flight search returned {} results", results.size());
             return results;
 
         } catch (WebClientResponseException e) {
+            metricsCollector.recordError(API_NAME);
+            metricsCollector.recordCall(API_NAME, System.currentTimeMillis() - startTime);
             log.error("[SERPAPI] Flight search API error: {} - {}",
                     e.getStatusCode(), e.getResponseBodyAsString());
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED
@@ -172,6 +187,7 @@ public class SerpApiClient {
         } catch (BookingException e) {
             throw e;
         } catch (Exception e) {
+            metricsCollector.recordError(API_NAME);
             log.error("[SERPAPI] Flight search failed: {}", e.getMessage(), e);
             throw new BookingException(
                     "Flight search failed: " + e.getMessage(),
@@ -193,6 +209,7 @@ public class SerpApiClient {
     public List<SerpApiAirportSuggestion> searchAirports(String query) {
         log.info("[SERPAPI] Airport autocomplete: query='{}'", query);
 
+        long startTime = System.currentTimeMillis();
         try {
             AutocompleteResponse response = webClient.get()
                     .uri(uriB -> uriB.path("/search.json")
@@ -207,10 +224,13 @@ public class SerpApiClient {
             List<SerpApiAirportSuggestion> suggestions =
                     SerpApiAirportSuggestion.fromResponse(response);
 
+            metricsCollector.recordCall(API_NAME, System.currentTimeMillis() - startTime);
             log.info("[SERPAPI] Airport autocomplete returned {} suggestions", suggestions.size());
             return suggestions;
 
         } catch (WebClientResponseException e) {
+            metricsCollector.recordError(API_NAME);
+            metricsCollector.recordCall(API_NAME, System.currentTimeMillis() - startTime);
             log.error("[SERPAPI] Airport autocomplete API error: {} - {}",
                     e.getStatusCode(), e.getResponseBodyAsString());
             if (e.getStatusCode() == HttpStatus.UNAUTHORIZED
@@ -230,6 +250,7 @@ public class SerpApiClient {
         } catch (BookingException e) {
             throw e;
         } catch (Exception e) {
+            metricsCollector.recordError(API_NAME);
             log.error("[SERPAPI] Airport autocomplete failed: {}", e.getMessage(), e);
             throw new BookingException(
                     "Airport search failed: " + e.getMessage(),
