@@ -20,7 +20,8 @@ import java.util.OptionalInt;
  * Deterministic filters: closed weekdays (when {@link PoiResult#getClosedWeekdays()} is populated) and
  * budget vs {@link PoiResult#getPriceLevel()} ordinal. When data is missing, behavior is neutral (no-op).
  * <p>
- * Intended order in the pipeline: {@code enrich → score → this → diversify}.
+ * Intended order in the pipeline: {@code enrich → avoid (DROP) → score → this → diversify} via
+ * {@link PersonalizedPoiSelector}.
  */
 @Component
 @RequiredArgsConstructor
