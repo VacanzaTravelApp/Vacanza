@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Button, message } from "antd";
 import { LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled } from "@ant-design/icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../context/useAuth";
 import { postPoiFeedbackEvent } from "../../../api/feedbackApi";
 import { getWaypointCategory } from "../utils/routeMap";
+import { deriveRouteVote } from "../utils/feedbackVoteUtils";
+import { useFeedbackAffinity } from "../../../hooks/useFeedbackAffinity";
 
 /** Tüm günlerdeki waypoint kategorilerinden benzersiz anahtarlar (backend ile uyumlu). */
 export function collectRouteCategoryKeys(route) {
@@ -24,11 +27,17 @@ export function collectRouteCategoryKeys(route) {
  */
 export default function RouteCardFeedback({ route }) {
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  const { data: affinity } = useFeedbackAffinity();
   const [sending, setSending] = useState(false);
-  const [vote, setVote] = useState(null);
 
-  const categoryKeys = collectRouteCategoryKeys(route);
+  const categoryKeys = useMemo(() => collectRouteCategoryKeys(route), [route]);
   const canSend = isAuthenticated && categoryKeys.length > 0;
+
+  const vote = useMemo(
+    () => deriveRouteVote(affinity, categoryKeys),
+    [affinity, categoryKeys]
+  );
 
   if (!canSend) {
     return null;
@@ -44,7 +53,7 @@ export default function RouteCardFeedback({ route }) {
         foursquareId: null,
         categoryKeys,
       });
-      setVote(eventType === "THUMBS_UP" ? "up" : "down");
+      await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
       message.success("Teşekkürler, rota tercihin kaydedildi.");
     } catch (e) {
       message.error(e?.friendlyMessage || "Geri bildirim gönderilemedi.");

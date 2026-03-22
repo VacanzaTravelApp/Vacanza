@@ -7,3 +7,9 @@ import http from "./http";
 export async function postPoiFeedbackEvent(body) {
   await http.post("/api/feedback/poi-events", body);
 }
+
+/** GET /api/feedback/affinity — current user's aggregated scores (for thumb state). */
+export async function fetchFeedbackAffinity() {
+  const { data } = await http.get("/api/feedback/affinity");
+  return data;
+}

@@ -1,6 +1,7 @@
 package com.vacanza.backend.controller;
 
 import com.vacanza.backend.dto.enums.PoiFeedbackEventType;
+import com.vacanza.backend.dto.internal.PoiFeedbackContext;
 import com.vacanza.backend.dto.request.PoiFeedbackEventRequestDTO;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.security.CurrentUserProvider;
@@ -8,10 +9,13 @@ import com.vacanza.backend.service.UserFeedbackService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/feedback")
@@ -20,6 +24,18 @@ public class PoiFeedbackController {
 
     private final CurrentUserProvider currentUserProvider;
     private final UserFeedbackService userFeedbackService;
+
+    /**
+     * Current user's aggregated POI and category affinity scores (for UI thumb state after refresh).
+     */
+    @GetMapping("/affinity")
+    public ResponseEntity<Map<String, Map<String, Double>>> getAffinity() {
+        User user = currentUserProvider.getCurrentUserEntity();
+        PoiFeedbackContext ctx = userFeedbackService.buildContext(user.getUserId());
+        return ResponseEntity.ok(Map.of(
+                "poiScores", ctx.poiScores(),
+                "categoryScores", ctx.categoryScores()));
+    }
 
     @PostMapping("/poi-events")
     public ResponseEntity<Void> recordPoiEvent(@RequestBody PoiFeedbackEventRequestDTO body) {

@@ -1,24 +1,20 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Button, message } from "antd";
 import { LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled } from "@ant-design/icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../context/useAuth";
 import { postPoiFeedbackEvent } from "../../../api/feedbackApi";
 import { getWaypointCategory } from "../utils/routeMap";
+import { deriveWaypointVote, pickWaypointIds } from "../utils/feedbackVoteUtils";
+import { useFeedbackAffinity } from "../../../hooks/useFeedbackAffinity";
 
 function normalizeCategoryKeys(category) {
   if (category == null || String(category).trim() === "") return [];
   return [String(category).toLowerCase().trim().replace(/-/g, "_")];
 }
 
-function pickIds(wp) {
-  const mapboxId = wp.mapbox_id ?? wp.mapboxId ?? null;
-  const foursquareId =
-    wp.foursquare_id ?? wp.foursquareId ?? wp.external_id ?? wp.externalId ?? null;
-  return { mapboxId, foursquareId };
-}
-
 function canSendFeedback(wp) {
-  const { mapboxId, foursquareId } = pickIds(wp);
+  const { mapboxId, foursquareId } = pickWaypointIds(wp);
   const cats = normalizeCategoryKeys(getWaypointCategory(wp));
   return !!(mapboxId || foursquareId || cats.length);
 }
@@ -28,15 +24,17 @@ function canSendFeedback(wp) {
  */
 export default function WaypointFeedback({ waypoint }) {
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  const { data: affinity } = useFeedbackAffinity();
   const [sending, setSending] = useState(false);
-  /** 'up' | 'down' | null — son başarılı oylama */
-  const [vote, setVote] = useState(null);
+
+  const vote = useMemo(() => deriveWaypointVote(affinity, waypoint), [affinity, waypoint]);
 
   if (!isAuthenticated || !waypoint || !canSendFeedback(waypoint)) {
     return null;
   }
 
-  const { mapboxId, foursquareId } = pickIds(waypoint);
+  const { mapboxId, foursquareId } = pickWaypointIds(waypoint);
   const categoryKeys = normalizeCategoryKeys(getWaypointCategory(waypoint));
   const payloadBase = {
     mapboxId: mapboxId || null,
@@ -49,7 +47,7 @@ export default function WaypointFeedback({ waypoint }) {
     setSending(true);
     try {
       await postPoiFeedbackEvent({ eventType, ...payloadBase });
-      setVote(eventType === "THUMBS_UP" ? "up" : "down");
+      await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
       message.success("Teşekkürler, tercihin kaydedildi.");
     } catch (e) {
       message.error(e?.friendlyMessage || "Geri bildirim gönderilemedi.");
