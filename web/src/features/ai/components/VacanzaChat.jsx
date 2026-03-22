@@ -11,6 +11,7 @@ import {
 } from "@ant-design/icons";
 import "../styles/vacanzaChat.css";
 import { normalizeRouteForMap } from "../utils/routeMap";
+import RouteCardFeedback from "./RouteCardFeedback";
 
 /**
  * Sayfa oturumu: kullanıcı mesaj attıysa oluşturulmuş conversation id.
@@ -645,6 +646,7 @@ export default function VacanzaChat({
                         </div>
                       ))}
                     </div>
+                    <RouteCardFeedback route={rd} />
                     <button
                       type="button"
                       className="route-show-btn"

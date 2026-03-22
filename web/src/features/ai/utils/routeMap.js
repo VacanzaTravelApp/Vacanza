@@ -1,4 +1,20 @@
 /**
+ * Category on waypoints may come as category, poi_category, or mixed casing from AI/JSON.
+ */
+export function getWaypointCategory(wp) {
+  if (!wp || typeof wp !== "object") return null;
+  const raw =
+    wp.category ??
+    wp.Category ??
+    wp.poi_category ??
+    wp.poiCategory ??
+    wp.poi_category_id ??
+    null;
+  if (raw == null || String(raw).trim() === "") return null;
+  return String(raw).trim();
+}
+
+/**
  * Normalize route for map: ensure every waypoint has numeric latitude/longitude (backend may send either key style).
  */
 export function normalizeRouteForMap(route) {

@@ -338,9 +338,50 @@
 
 .route-panel-waypoint-main {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.route-panel-waypoint-title-block {
+  display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.waypoint-feedback {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.waypoint-feedback-btn {
+  color: #64748b !important;
+  padding: 0 4px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  border-radius: 8px !important;
+}
+
+.waypoint-feedback-btn:hover {
+  color: #ea580c !important;
+  background: rgba(234, 88, 12, 0.08) !important;
+}
+
+.waypoint-feedback-btn--active-up {
+  color: #ea580c !important;
+  background: rgba(234, 88, 12, 0.14) !important;
+}
+
+.waypoint-feedback-btn--active-down {
+  color: #475569 !important;
+  background: rgba(71, 85, 105, 0.12) !important;
 }
 
 .route-panel-waypoint-name {

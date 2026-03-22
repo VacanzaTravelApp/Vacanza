@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
 import { getCategoryColor } from "../../../constants/categoryColors";
+import WaypointFeedback from "./WaypointFeedback";
 import "../styles/routePanel.css";
 
 const TIME_SLOT_LABELS = {
@@ -261,14 +262,17 @@ export default function RoutePanel({
                         </div>
                       )}
                       <div className="route-panel-waypoint-main">
-                        <span className="route-panel-waypoint-name">{wp.name}</span>
-                        {(wp.estimated_duration_min ?? wp.estimatedDurationMin) != null &&
-                          !arrival &&
-                          !departure && (
-                            <span className="route-panel-waypoint-duration">
-                              ~{wp.estimated_duration_min ?? wp.estimatedDurationMin} dk
-                            </span>
-                          )}
+                        <div className="route-panel-waypoint-title-block">
+                          <span className="route-panel-waypoint-name">{wp.name}</span>
+                          {(wp.estimated_duration_min ?? wp.estimatedDurationMin) != null &&
+                            !arrival &&
+                            !departure && (
+                              <span className="route-panel-waypoint-duration">
+                                ~{wp.estimated_duration_min ?? wp.estimatedDurationMin} dk
+                              </span>
+                            )}
+                        </div>
+                        <WaypointFeedback waypoint={wp} />
                       </div>
                       {wp.description && (
                         <div className="route-panel-waypoint-desc">{wp.description}</div>
