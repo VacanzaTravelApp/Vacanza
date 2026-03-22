@@ -63,6 +63,13 @@ vacanza:
     avoid-penalty: 50.0
     neutral-rating-prior: 0.5
     avoid-mode: DROP
+  poi-diversity:
+    enabled: true
+    target-count: 60
+    pool-size: 120
+    mode: MMR
+    mmr-lambda: 0.72
+    max-per-family: 4
 
 management:
   endpoints:
