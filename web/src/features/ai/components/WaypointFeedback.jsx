@@ -1,12 +1,24 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button, message } from "antd";
 import { LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../context/useAuth";
 import { postPoiFeedbackEvent } from "../../../api/feedbackApi";
 import { getWaypointCategory } from "../utils/routeMap";
-import { deriveWaypointVote, pickWaypointIds } from "../utils/feedbackVoteUtils";
+import { deriveWaypointVote, hasPoiFeedbackKeys, pickWaypointIds } from "../utils/feedbackVoteUtils";
 import { useFeedbackAffinity } from "../../../hooks/useFeedbackAffinity";
+
+const WP_STORAGE_PREFIX = "vacanzaWpVote:v2:";
+
+function readWaypointStoredVote(storageKey) {
+  if (!storageKey || typeof sessionStorage === "undefined") return null;
+  try {
+    const v = sessionStorage.getItem(WP_STORAGE_PREFIX + storageKey);
+    return v === "up" || v === "down" ? v : null;
+  } catch {
+    return null;
+  }
+}
 
 function normalizeCategoryKeys(category) {
   if (category == null || String(category).trim() === "") return [];
@@ -21,16 +33,28 @@ function canSendFeedback(wp) {
 
 /**
  * Thumbs for a single route waypoint; stops click propagation so map focus does not fire.
+ * @param storageKey unique per row (e.g. day+index) — category-only feedback uses sessionStorage so rows don't share UI state.
  */
-export default function WaypointFeedback({ waypoint }) {
+export default function WaypointFeedback({ waypoint, storageKey }) {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const { data: affinity } = useFeedbackAffinity();
   const [sending, setSending] = useState(false);
+  const [localVote, setLocalVote] = useState(() => readWaypointStoredVote(storageKey));
 
-  const vote = useMemo(() => deriveWaypointVote(affinity, waypoint), [affinity, waypoint]);
+  const hasPoiKeys = useMemo(() => hasPoiFeedbackKeys(waypoint), [waypoint]);
+  const serverVote = useMemo(() => {
+    if (!hasPoiKeys) return null;
+    return deriveWaypointVote(affinity, waypoint);
+  }, [affinity, waypoint, hasPoiKeys]);
 
-  if (!isAuthenticated || !waypoint || !canSendFeedback(waypoint)) {
+  useEffect(() => {
+    setLocalVote(readWaypointStoredVote(storageKey));
+  }, [storageKey]);
+
+  const vote = hasPoiKeys ? serverVote : localVote;
+
+  if (!isAuthenticated || !waypoint || !canSendFeedback(waypoint) || !storageKey) {
     return null;
   }
 
@@ -47,7 +71,17 @@ export default function WaypointFeedback({ waypoint }) {
     setSending(true);
     try {
       await postPoiFeedbackEvent({ eventType, ...payloadBase });
-      await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
+      const v = eventType === "THUMBS_UP" ? "up" : "down";
+      if (!hasPoiKeys) {
+        try {
+          sessionStorage.setItem(WP_STORAGE_PREFIX + storageKey, v);
+        } catch {
+          /* ignore */
+        }
+        setLocalVote(v);
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
+      }
       message.success("Teşekkürler, tercihin kaydedildi.");
     } catch (e) {
       message.error(e?.friendlyMessage || "Geri bildirim gönderilemedi.");

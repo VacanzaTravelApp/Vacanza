@@ -646,7 +646,7 @@ export default function VacanzaChat({
                         </div>
                       ))}
                     </div>
-                    <RouteCardFeedback route={rd} />
+                    <RouteCardFeedback route={rd} storageKey={`${msg.id}-r${rIdx}`} />
                     <button
                       type="button"
                       className="route-show-btn"

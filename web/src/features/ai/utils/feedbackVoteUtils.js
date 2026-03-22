@@ -11,6 +11,11 @@ export function pickWaypointIds(wp) {
   return { mapboxId, foursquareId };
 }
 
+/** True when feedback can be tied to a specific POI row in DB (not shared category-only). */
+export function hasPoiFeedbackKeys(wp) {
+  return poiKeysForWaypoint(wp).length > 0;
+}
+
 /** Keys aligned with backend {@code PoiFeedbackKeyUtil}. */
 export function poiKeysForWaypoint(wp) {
   const keys = [];
@@ -53,24 +58,3 @@ export function deriveWaypointVote(affinity, wp) {
   return null;
 }
 
-/**
- * @param categoryKeys normalized keys (same as collectRouteCategoryKeys output)
- */
-export function deriveRouteVote(affinity, categoryKeys) {
-  if (!affinity || !categoryKeys?.length) return null;
-  const cs = affinity.categoryScores || {};
-  let sum = 0;
-  let n = 0;
-  for (const k of categoryKeys) {
-    const v = cs[k];
-    if (v != null && Number.isFinite(Number(v))) {
-      sum += Number(v);
-      n++;
-    }
-  }
-  if (n === 0) return null;
-  const avg = sum / n;
-  if (avg > 0.01) return "up";
-  if (avg < -0.01) return "down";
-  return null;
-}

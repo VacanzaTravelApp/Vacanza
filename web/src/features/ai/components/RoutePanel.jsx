@@ -272,7 +272,10 @@ export default function RoutePanel({
                               </span>
                             )}
                         </div>
-                        <WaypointFeedback waypoint={wp} />
+                        <WaypointFeedback
+                          waypoint={wp}
+                          storageKey={`d${activeDay}-i${idx}-o${wp.order ?? idx}-${String(wp.name || "").slice(0, 48)}`}
+                        />
                       </div>
                       {wp.description && (
                         <div className="route-panel-waypoint-desc">{wp.description}</div>
