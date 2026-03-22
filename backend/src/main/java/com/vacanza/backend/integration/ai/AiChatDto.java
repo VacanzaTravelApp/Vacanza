@@ -83,6 +83,12 @@ public final class AiChatDto {
         private String routeSummaryMessage;
 
         /**
+         * Persisted {@code ai_routes.route_id} after this turn saved route JSON (Java-only).
+         */
+        @JsonProperty("route_id")
+        private UUID routeId;
+
+        /**
          * Set by Java when the response is tied to a known conversation (e.g. map polygon route flow).
          * Not returned by the Python AI service for normal chat sends.
          */

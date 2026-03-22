@@ -80,6 +80,19 @@ vacanza:
     tier-2-max-budget: 95
     tier-3-max-budget: 190
     closed-day-enabled: true
+  poi-feedback:
+    enabled: true
+    poi-score-multiplier: 0.35
+    category-score-multiplier: 0.25
+    category-drop-threshold: -12
+    category-drop-enabled: true
+    max-stored-affinity: 24
+    delta-thumbs-up-poi: 2
+    delta-thumbs-down-poi: -2
+    delta-remove-poi: -5
+    delta-thumbs-up-category: 1
+    delta-thumbs-down-category: -1
+    delta-remove-category: -2
 
 management:
   endpoints:

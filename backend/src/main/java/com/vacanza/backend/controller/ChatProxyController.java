@@ -148,7 +148,11 @@ public class ChatProxyController {
                                 var toolCall = parseToolCallFromJson(toolJsonRaw);
                                 if (toolCall != null && "search_pois".equalsIgnoreCase(toolCall.tool)) {
                                         var exec = executePoiSearchWithWeather(
-                                                        toolCall.destination, toolCall.categories, toolCall.days, profile);
+                                                        toolCall.destination,
+                                                        toolCall.categories,
+                                                        toolCall.days,
+                                                        profile,
+                                                        user.getUserId());
                                         var pois = exec.pois();
                                         routePlanningWeather = exec.planningWeather();
                                         if (pois.isEmpty()) {
@@ -225,7 +229,8 @@ public class ChatProxyController {
                 var prefsDtoPoly = userPreferencesService.getPreferencesByUser(user).orElse(null);
                 UserProfileForAi profilePoly = UserProfileForAi.from(infoDtoPoly, prefsDtoPoly);
 
-                PoiToolExecutionResult exec = executePoiSearchForPolygon(ring, categories, totalDays, profilePoly);
+                PoiToolExecutionResult exec = executePoiSearchForPolygon(
+                                ring, categories, totalDays, profilePoly, user.getUserId());
                 if (exec.pois().size() < MIN_POIS_IN_POLYGON) {
                         return ResponseEntity.badRequest()
                                         .body(new PolygonRouteErrorResponse(
@@ -363,7 +368,8 @@ public class ChatProxyController {
                 var prefsDtoReplan = userPreferencesService.getPreferencesByUser(user).orElse(null);
                 UserProfileForAi profile = UserProfileForAi.from(infoDtoReplan, prefsDtoReplan);
 
-                PoiToolExecutionResult exec = executePoiSearchForPolygon(ring, categories, totalDays, profile);
+                PoiToolExecutionResult exec = executePoiSearchForPolygon(
+                                ring, categories, totalDays, profile, user.getUserId());
                 if (exec.pois().size() < MIN_POIS_REPLAN_DAY) {
                         return ResponseEntity.badRequest()
                                         .body(new PolygonRouteErrorResponse(
@@ -464,7 +470,10 @@ public class ChatProxyController {
                                         response.getRouteData().setWeatherDayParts(routePlanningWeather.dayParts());
                                 }
                                 routeTimelineService.enrichTimeline(response.getRouteData(), profile);
-                                saveRoute(user, conversationId, response.getRouteData());
+                                UUID savedRouteId = saveRoute(user, conversationId, response.getRouteData());
+                                if (savedRouteId != null) {
+                                        response.setRouteId(savedRouteId);
+                                }
                                 String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
                                                 response.getRouteData(), profile);
                                 if (summaryMessage != null) {
@@ -488,17 +497,19 @@ public class ChatProxyController {
                 return ResponseEntity.ok(list);
         }
 
-        private void saveRoute(User user, UUID conversationId, AiChatDto.RouteData routeData) {
+        private UUID saveRoute(User user, UUID conversationId, AiChatDto.RouteData routeData) {
                 try {
                         String routeJson = objectMapper.writeValueAsString(routeData);
-                        aiRouteService.saveRoute(
+                        AiRoute saved = aiRouteService.saveRoute(
                                         user, conversationId,
                                         routeData.getTitle(),
                                         routeData.getDestination(),
                                         routeData.getTotalDays(),
                                         routeJson);
+                        return saved.getRouteId();
                 } catch (Exception e) {
                         log.warn("Failed to save route to DB: {}", e.getMessage());
+                        return null;
                 }
         }
 
@@ -573,7 +584,11 @@ public class ChatProxyController {
          * Geocode destination, fetch Open-Meteo daily + day-part forecast for trip length, then search POIs in bbox.
          */
         private PoiToolExecutionResult executePoiSearchWithWeather(
-                        String destination, List<String> categories, Integer tripDays, UserProfileForAi profile) {
+                        String destination,
+                        List<String> categories,
+                        Integer tripDays,
+                        UserProfileForAi profile,
+                        java.util.UUID userId) {
                 int forecastDays = Math.min(Math.max(tripDays != null && tripDays > 0 ? tripDays : 7, 1), 16);
                 var destOpt = mapboxPoiSearchClient.geocodeDestination(destination).blockOptional();
                 if (destOpt.isEmpty()) {
@@ -607,7 +622,9 @@ public class ChatProxyController {
                         dedup.putIfAbsent(k, p);
                 }
                 List<PoiResult> merged = personalizedPoiSelector.select(
-                                new java.util.ArrayList<>(dedup.values()), profile, PersonalizedPoiParams.defaults());
+                                new java.util.ArrayList<>(dedup.values()),
+                                profile,
+                                PersonalizedPoiParams.forUser(userId));
                 return new PoiToolExecutionResult(merged, planning);
         }
 
@@ -615,7 +632,11 @@ public class ChatProxyController {
          * Search Mapbox categories in the polygon bounding box, keep POIs whose coordinates fall inside the ring.
          */
         private PoiToolExecutionResult executePoiSearchForPolygon(
-                        List<double[]> ring, List<String> categories, int tripDays, UserProfileForAi profile) {
+                        List<double[]> ring,
+                        List<String> categories,
+                        int tripDays,
+                        UserProfileForAi profile,
+                        java.util.UUID userId) {
                 int forecastDays = Math.min(Math.max(tripDays, 1), 16);
                 double minLon = PolygonRouteGeometry.minLon(ring);
                 double maxLon = PolygonRouteGeometry.maxLon(ring);
@@ -649,7 +670,9 @@ public class ChatProxyController {
                         dedup.putIfAbsent(k, p);
                 }
                 List<PoiResult> merged = personalizedPoiSelector.select(
-                                new java.util.ArrayList<>(dedup.values()), profile, PersonalizedPoiParams.defaults());
+                                new java.util.ArrayList<>(dedup.values()),
+                                profile,
+                                PersonalizedPoiParams.forUser(userId));
                 return new PoiToolExecutionResult(merged, planning);
         }
 }

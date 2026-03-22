@@ -33,6 +33,7 @@ public class SecurityConfigDev {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/chat/**").authenticated()
                         .requestMatchers("/api/behavior/**").authenticated()
+                        .requestMatchers("/api/feedback/**").authenticated()
                         .anyRequest().permitAll())
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable())

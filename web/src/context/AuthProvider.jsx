@@ -60,7 +60,8 @@ export default function AuthProvider({ children }) {
       value={{
         loading,
         authDto,
-        isAuthenticated: !!authDto?.authenticated,
+        // Backend UserAuthenticationDTO has userId (no "authenticated" flag)
+        isAuthenticated: !!authDto?.userId,
         user: authDto?.user ?? null,
         logout,
       }}

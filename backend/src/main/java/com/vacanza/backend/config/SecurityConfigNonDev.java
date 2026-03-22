@@ -46,6 +46,7 @@ public class SecurityConfigNonDev {
                         .requestMatchers("/admin/**").hasRole("ADMIN") // Admin panel
                         .requestMatchers("/chat/**").authenticated()
                         .requestMatchers("/api/behavior/**").authenticated()
+                        .requestMatchers("/api/feedback/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class);
