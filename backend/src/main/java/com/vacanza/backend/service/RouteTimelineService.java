@@ -31,6 +31,7 @@ public class RouteTimelineService {
     private static final double MINUTES_PER_KM_WALK = 12.0;
 
     private final MapboxDirectionsService mapboxDirectionsService;
+    private final DwellRulesService dwellRulesService;
 
     public void enrichTimeline(AiChatDto.RouteData routeData) {
         enrichTimeline(routeData, null);
@@ -139,39 +140,7 @@ public class RouteTimelineService {
         if (e != null && e > 0) {
             return e;
         }
-        return categoryFallbackDwell(wp.getCategory(), profile);
-    }
-
-    private static int categoryFallbackDwell(String category, UserProfileForAi profile) {
-        String c = category == null ? "" : category.toLowerCase(Locale.ROOT);
-        int base;
-        if (c.contains("museum") || c.contains("art_gallery") || c.contains("gallery")) {
-            base = 95;
-        } else if (c.contains("historic") || c.contains("monument") || c.contains("palace")
-                || c.contains("ruins") || c.contains("landmark")) {
-            base = 70;
-        } else if (c.contains("park") || c.contains("neighborhood")) {
-            base = 55;
-        } else if (c.contains("restaurant") || c.contains("food") || c.contains("market")) {
-            base = 75;
-        } else if (c.contains("cafe") || c.contains("coffee")) {
-            base = 40;
-        } else if (c.contains("church") || c.contains("mosque") || c.contains("worship")) {
-            base = 45;
-        } else {
-            base = 55;
-        }
-
-        double mult = 1.0;
-        if (profile != null && profile.getTripPace() != null) {
-            switch (profile.getTripPace().trim().toUpperCase(Locale.ROOT)) {
-                case "SLOW" -> mult = 1.12;
-                case "FAST" -> mult = 0.88;
-                default -> {
-                }
-            }
-        }
-        return Math.max(25, (int) Math.round(base * mult));
+        return dwellRulesService.resolveDwellMinutes(wp.getCategory(), profile);
     }
 
     private int travelMinutesBetween(double lat1, double lon1, double lat2, double lon2) {
