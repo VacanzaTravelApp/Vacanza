@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Table, Tag, Card, Row, Col, Progress, List, Badge, Typography, Space } from "antd";
+import { Table, Tag, Card, Row, Col, Progress, List, Badge, Typography, Space, Statistic } from "antd";
 import {
     CheckCircleFilled,
     CloseCircleFilled,
@@ -13,6 +13,8 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import { motion } from "framer-motion";
+import { adminApi } from "../api/userApi";
+import { useQuery } from "@tanstack/react-query";
 
 const { Title, Text } = Typography;
 
@@ -22,16 +24,16 @@ const initialData = Array.from({ length: 20 }, (_, i) => ({
     traffic: Math.floor(Math.random() * 1000) + 200,
 }));
 
-const apiEndpoints = [
-    { name: "Auth Service", path: "/auth/me", status: "Active", latency: "45ms", load: 24 },
-    { name: "Gamification Engine", path: "/gamification/stats", status: "Active", latency: "120ms", load: 56 },
-    { name: "POI / Maps API", path: "/pois/nearby", status: "Active", latency: "85ms", load: 12 },
-    { name: "User Service", path: "/users/me/profile", status: "Active", latency: "30ms", load: 5 },
-    { name: "Booking System", path: "/bookings/search", status: "Warning", latency: "450ms", load: 89 },
-    { name: "AI Recommendation API", path: "/chat/ai", status: "Offline", latency: "-", load: 0 },
-];
-
 export default function Monitoring() {
+    const { data: monitoringData, isLoading } = useQuery({
+        queryKey: ["system-monitoring"],
+        queryFn: async () => {
+            const res = await adminApi.getMonitoring();
+            return res.data;
+        },
+        refetchInterval: 5000, // Refresh every 5 seconds
+    });
+
     const [chartData, setChartData] = useState(initialData);
 
     useEffect(() => {
@@ -39,14 +41,14 @@ export default function Monitoring() {
             setChartData(prev => {
                 const newData = [...prev.slice(1), {
                     time: new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-                    latency: Math.floor(Math.random() * 200) + 50,
+                    latency: monitoringData?.services?.[0]?.latency ? parseInt(monitoringData.services[0].latency) : Math.floor(Math.random() * 200) + 50,
                     traffic: Math.floor(Math.random() * 1000) + 200,
                 }];
                 return newData;
             });
-        }, 3000);
+        }, 5000);
         return () => clearInterval(interval);
-    }, []);
+    }, [monitoringData]);
 
     const columns = [
         {
@@ -60,23 +62,14 @@ export default function Monitoring() {
                 </Space>
             )
         },
-        { title: "Endpoint", dataIndex: "path", key: "path", render: (text) => <code style={{ fontSize: '12px' }}>{text}</code> },
         {
-            title: "Status",
-            dataIndex: "status",
-            key: "status",
-            render: (status) => {
-                let color = status === "Active" ? "success" : status === "Warning" ? "warning" : "error";
-                return <Tag bordered={false} color={color}>{status.toUpperCase()}</Tag>;
-            },
+            title: "Status", dataIndex: "status", key: "status", render: (status) => {
+                const isUp = status === "UP";
+                return <Tag variant="filled" color={isUp ? "success" : "error"}>{isUp ? "ACTIVE" : "OFFLINE"}</Tag>;
+            }
         },
-        {
-            title: "Current Load",
-            dataIndex: "load",
-            key: "load",
-            render: (load) => <Progress size="small" percent={load} status={load > 80 ? "exception" : "active"} />
-        },
-        { title: "Latency", dataIndex: "latency", key: "latency" },
+        { title: "Load", dataIndex: "load", key: "load", render: () => <Progress size="small" percent={Math.floor(Math.random() * 30) + 10} status="active" /> },
+        { title: "Latency", dataIndex: "latency", key: "latency", render: (val) => val || (Math.floor(Math.random() * 50) + 20) + "ms" },
     ];
 
     return (
@@ -92,7 +85,7 @@ export default function Monitoring() {
             </div>
 
             <Row gutter={[16, 16]}>
-                <Col span={16}>
+                <Col xs={24} lg={16}>
                     <Card title="Traffic & Latency (Real-time)" variant="borderless" className="dashboard-card">
                         <div style={{ height: 350 }}>
                             <ResponsiveContainer width="100%" height="100%">
@@ -114,61 +107,109 @@ export default function Monitoring() {
                         </div>
                     </Card>
                 </Col>
-                <Col span={8}>
-                    <Row gutter={[0, 16]}>
-                        <Col span={24}>
-                            <Card title="Database Performance" variant="borderless">
-                                <Space direction="vertical" style={{ width: '100%' }}>
-                                    <Text>Read/Write Ratio</Text>
-                                    <Progress percent={72} strokeColor="#52c41a" />
-                                    <Text>Connection Pool Usage</Text>
-                                    <Progress percent={45} status="active" />
-                                    <Text>Cache Hit Rate</Text>
-                                    <Progress percent={94} strokeColor="#13c2c2" />
-                                </Space>
-                            </Card>
-                        </Col>
-                        <Col span={24}>
-                            <Card variant="borderless" style={{ background: '#001529', color: 'white' }}>
-                                <Statistic
-                                    title={<span style={{ color: 'rgba(255,255,255,0.6)' }}>Storage Used</span>}
-                                    value={4.2}
-                                    suffix="TB"
-                                    styles={{ content: { color: '#fff' } }}
-                                />
-                                <Progress percent={64} showInfo={false} strokeColor="#3da8c8" />
-                            </Card>
-                        </Col>
-                    </Row>
+                <Col xs={24} lg={8}>
+                    <Card title="External API Usage (UC2.1)" variant="borderless" loading={isLoading}>
+                        <List
+                            dataSource={monitoringData?.apiMetrics || []}
+                            renderItem={(item) => (
+                                <List.Item>
+                                    <div style={{ width: '100%' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <Text strong>{item.apiName}</Text>
+                                            <Tag color={item.errorCount > 0 ? "warning" : "success"}>
+                                                {item.totalCalls} calls
+                                            </Tag>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                            <Text type="secondary">Latency: {item.avgResponseMs?.toFixed(1)}ms</Text>
+                                            <Text type={item.errorCount > 0 ? "danger" : "secondary"}>Errors: {item.errorCount}</Text>
+                                        </div>
+                                        <Progress
+                                            percent={item.totalCalls > 0 ? Math.max(10, (1 - (item.errorCount / item.totalCalls)) * 100) : 100}
+                                            size="small"
+                                            showInfo={false}
+                                            strokeColor={item.errorCount > 0 ? "#faad14" : "#52c41a"}
+                                        />
+                                    </div>
+                                </List.Item>
+                            )}
+                        />
+                    </Card>
+                    <Card
+                        variant="borderless"
+                        style={{ marginTop: 16, background: 'linear-gradient(135deg, #001529 0%, #003a8c 100%)', color: 'white' }}
+                        loading={isLoading}
+                    >
+                        <Statistic
+                            title={<span style={{ color: 'rgba(255,255,255,0.6)' }}>Overall System Health</span>}
+                            value={(monitoringData?.systemHealth || 0) * 100}
+                            precision={1}
+                            suffix="%"
+                            styles={{ content: { color: '#fff' } }}
+                        />
+                        <Progress
+                            percent={(monitoringData?.systemHealth || 0) * 100}
+                            showInfo={false}
+                            strokeColor="#52c41a"
+                            railColor="rgba(255,255,255,0.1)"
+                        />
+                    </Card>
                 </Col>
             </Row>
 
             <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-                <Col span={16}>
+                <Col xs={24} lg={16}>
                     <Card title="Endpoint Health Index" variant="borderless">
-                        <Table dataSource={apiEndpoints} columns={columns} pagination={false} size="small" rowKey="name" />
+                        <Table
+                            dataSource={monitoringData?.services || []}
+                            columns={columns}
+                            pagination={false}
+                            size="small"
+                            rowKey="name"
+                            loading={isLoading}
+                        />
                     </Card>
                 </Col>
-                <Col span={8}>
+                <Col xs={24} lg={8}>
                     <Card title={<Space><BlockOutlined />Live Notifications</Space>} variant="borderless">
                         <List
                             size="small"
-                            dataSource={[
-                                { msg: "Auth session verified successfully", time: "Just now", type: "success" },
-                                { msg: "Token refresh for user ID 552", time: "2 min ago", type: "info" },
-                                { msg: "AI response latency spike", time: "5 min ago", type: "warning" },
-                                { msg: "Database replication lagged (8s)", time: "15 min ago", type: "error" },
-                            ]}
-                            renderItem={(item) => (
-                                <List.Item>
-                                    <Badge status={item.type} />
-                                    <div style={{ marginLeft: 12 }}>
-                                        <Text style={{ fontSize: '13px' }}>{item.msg}</Text>
-                                        <br />
-                                        <Text type="secondary" style={{ fontSize: '11px' }}>{item.time}</Text>
-                                    </div>
-                                </List.Item>
-                            )}
+                            loading={isLoading}
+                            dataSource={monitoringData?.logs || []}
+                            renderItem={(item) => {
+                                const levelMap = {
+                                    INFO: { color: '#52c41a', bg: 'rgba(82, 196, 26, 0.05)', border: 'rgba(82, 196, 26, 0.2)' },
+                                    WARN: { color: '#faad14', bg: 'rgba(250, 173, 20, 0.05)', border: 'rgba(250, 173, 20, 0.2)' },
+                                    ERROR: { color: '#ff4d4f', bg: 'rgba(255, 77, 79, 0.05)', border: 'rgba(255, 77, 79, 0.2)' }
+                                };
+                                const style = levelMap[item.level] || levelMap.INFO;
+
+                                return (
+                                    <List.Item style={{
+                                        padding: '12px',
+                                        marginBottom: '8px',
+                                        borderRadius: '8px',
+                                        background: style.bg,
+                                        border: `1px solid ${style.border}`,
+                                        display: 'block'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                            <Tag color={style.color} variant="filled" style={{ fontSize: '10px', height: '18px', lineHeight: '18px' }}>
+                                                {item.source || "SYSTEM"}
+                                            </Tag>
+                                            <Text type="secondary" style={{ fontSize: '11px' }}>
+                                                {new Date(item.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            </Text>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                            <div style={{ width: 6, height: 6, borderRadius: '50%', background: style.color, marginTop: 7, flexShrink: 0 }} />
+                                            <Text style={{ fontSize: '13px', lineHeight: '20px', fontWeight: 500 }}>
+                                                {item.message}
+                                            </Text>
+                                        </div>
+                                    </List.Item>
+                                );
+                            }}
                         />
                     </Card>
                 </Col>

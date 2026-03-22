@@ -1,5 +1,6 @@
 import React from "react";
-import { Table, Tag, Card, Button, Input, Space, message } from "antd";
+import { Table, Tag, Card, Button, Input, Space, Typography, message } from "antd";
+const { Text } = Typography;
 import { SearchOutlined, UserOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { userApi } from "../api/userApi";
@@ -31,6 +32,22 @@ export default function UserManagement() {
             title: "Email",
             dataIndex: ["user", "email"],
             key: "email",
+        },
+        {
+            title: "Role",
+            dataIndex: ["user", "role"],
+            key: "role",
+            render: (role) => <Tag color={role === "ADMIN" ? "gold" : "blue"}>{role}</Tag>
+        },
+        {
+            title: "Registered Date",
+            dataIndex: ["user", "createdAt"],
+            key: "createdAt",
+            render: (date) => (
+                <Text type="secondary" style={{ fontSize: '13px' }}>
+                    {date ? new Date(date).toLocaleDateString() : "N/A"}
+                </Text>
+            )
         },
         {
             title: "Authenticated",
