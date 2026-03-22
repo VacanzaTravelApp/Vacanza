@@ -113,7 +113,7 @@ export default function RoutePanel({
               icon={<CloseOutlined />}
               onClick={onClose}
               className="route-panel-close"
-              aria-label="Close route"
+              aria-label="Rotayı kapat"
             />
           </div>
         </div>
@@ -160,7 +160,7 @@ export default function RoutePanel({
             </div>
           )}
           <p className="route-panel-weather-hint">
-            Bu özet, rota için seçilen bölgeye göre günlük tahmindir; program buna göre uyarlanır.
+            Tahmin, rotanın hedef bölgesine göredir.
           </p>
         </div>
       )}

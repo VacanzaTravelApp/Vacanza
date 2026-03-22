@@ -306,9 +306,9 @@ export default function VacanzaChat({
   const scrollContainerRef = useRef(null);
 
   const scrollToBottom = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
-    }
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   };
 
   const activeTitle = useMemo(() => {
@@ -521,7 +521,7 @@ export default function VacanzaChat({
       }
       await refreshConversations();
     } catch {
-      message.error("AI service is busy. Please try again in a moment.");
+      message.error("Şu an yoğunuz. Birkaç saniye sonra tekrar deneyin.");
     } finally {
       setLoading(false);
     }
@@ -532,7 +532,11 @@ export default function VacanzaChat({
   const showMessageSpinner = initialLoading || messagesLoading;
 
   return (
-    <div className={`ai-chat-container vacanza-chat ${isOpen ? "active" : ""}`}>
+    <div
+      className={`ai-chat-container vacanza-chat ${isOpen ? "active" : ""}`}
+      role="region"
+      aria-label="Vacanza AI sohbet"
+    >
       <div className="chat-header-refined">
         <div className="ai-info">
           <div className="ai-brand-avatar" aria-hidden>
@@ -550,6 +554,8 @@ export default function VacanzaChat({
             type="button"
             className={`chat-header-icon-btn ${historyPanelOpen ? "chat-header-icon-btn-active" : ""}`}
             title="Geçmiş sohbetler"
+            aria-expanded={historyPanelOpen}
+            aria-controls="vacanza-chat-history"
             onClick={() => {
               setHistoryPanelOpen((o) => {
                 const next = !o;
@@ -570,11 +576,24 @@ export default function VacanzaChat({
       </div>
 
       {historyPanelOpen ? (
-        <div className="chat-history-full" role="region" aria-label="Geçmiş sohbetler">
+        <div
+          id="vacanza-chat-history"
+          className="chat-history-full"
+          role="region"
+          aria-label="Geçmiş sohbetler"
+        >
           <div className="chat-history-full-scroll">
             <div className="chat-history-full-heading">Geçmiş sohbetler</div>
             {!conversations.length ? (
-              <div className="chat-history-full-empty">Henüz başka sohbet yok.</div>
+              <div className="chat-history-full-empty">
+                <span className="chat-history-full-empty-icon" aria-hidden>
+                  💬
+                </span>
+                <p className="chat-history-full-empty-title">Henüz kayıtlı sohbet yok</p>
+                <p className="chat-history-full-empty-hint">
+                  Aşağıdan bir rota isteği yazın; geçmiş burada listelenecek.
+                </p>
+              </div>
             ) : (
               <ul className="chat-conv-list chat-conv-list-full">
                 {conversations.map((c) => {
@@ -598,7 +617,13 @@ export default function VacanzaChat({
         </div>
       ) : (
         <>
-      <div className="chat-content-scroll" ref={scrollContainerRef}>
+      <div
+        className="chat-content-scroll"
+        ref={scrollContainerRef}
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions"
+      >
         {showMessageSpinner ? (
           <div className="chat-loading-center">
             <Spin tip="Yükleniyor..." />
@@ -610,7 +635,7 @@ export default function VacanzaChat({
               return (
               <div key={msg.id} className={`chat-row ${msg.type}-row`}>
                 <div className={`message-bubble ${msg.type}-bubble`}>
-                  {msg.text}
+                  <div className="msg-text">{msg.text}</div>
                   {msg.time ? <span className="msg-time">{msg.time}</span> : null}
                 </div>
                 {routeList.map((rd, rIdx) => (

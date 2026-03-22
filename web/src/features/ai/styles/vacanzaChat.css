@@ -35,6 +35,7 @@
   overflow: hidden;
   animation: chatOpen 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: bottom right;
+  outline: none;
 }
 
 @keyframes chatOpen {
@@ -53,9 +54,9 @@
   .ai-chat-container {
     right: 15px;
     left: 15px;
-    bottom: 80px;
+    bottom: max(80px, env(safe-area-inset-bottom, 0px));
     width: auto;
-    height: 70vh;
+    height: min(70vh, calc(100dvh - 120px));
     border-radius: 16px;
     transform-origin: bottom center;
   }
@@ -108,6 +109,11 @@
 .chat-header-icon-btn:hover {
   background: var(--vc-primary-soft);
   color: var(--vc-primary);
+}
+
+.chat-header-icon-btn:focus-visible {
+  outline: 2px solid var(--vc-primary);
+  outline-offset: 2px;
 }
 
 .chat-header-icon-btn-active {
@@ -177,7 +183,24 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: var(--vc-surface);
+  background:
+    linear-gradient(180deg, rgba(61, 168, 200, 0.06) 0%, transparent 52%),
+    var(--vc-surface);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(61, 168, 200, 0.45) transparent;
+}
+
+.chat-content-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-content-scroll::-webkit-scrollbar-thumb {
+  background: rgba(61, 168, 200, 0.35);
+  border-radius: 6px;
+}
+
+.chat-content-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .chat-row {
@@ -199,6 +222,12 @@
   line-height: 1.45;
   position: relative;
   color: var(--vc-text);
+}
+
+.msg-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .msg-time {
@@ -247,7 +276,7 @@
 }
 
 .chat-footer-refined {
-  padding: 12px 14px 14px;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
   background: var(--vc-white);
   border-top: 1px solid var(--vc-border);
   flex-shrink: 0;
@@ -287,6 +316,11 @@
   border-color: var(--vc-primary);
   color: var(--vc-primary);
   background: var(--vc-primary-soft);
+}
+
+.chat-quick-chip:focus-visible {
+  outline: 2px solid var(--vc-primary);
+  outline-offset: 2px;
 }
 
 .chat-quick-chip:disabled {
@@ -345,6 +379,11 @@
 .chat-send-icon:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.chat-send-icon:focus-visible {
+  outline: 2px solid var(--vc-primary);
+  outline-offset: 2px;
 }
 
 .route-card-outer {
@@ -423,6 +462,11 @@
   background: var(--vc-primary-soft-strong);
 }
 
+.route-draw-edit-btn:focus-visible {
+  outline: 2px solid var(--vc-primary);
+  outline-offset: 2px;
+}
+
 .route-card {
   margin-top: 8px;
   padding: 14px 16px;
@@ -478,7 +522,11 @@
   color: var(--vc-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  white-space: normal;
 }
 
 .route-card-feedback {
@@ -539,6 +587,11 @@
   background: var(--vc-primary-hover);
 }
 
+.route-show-btn:focus-visible {
+  outline: 2px solid var(--vc-primary);
+  outline-offset: 2px;
+}
+
 .route-card-hint {
   background: #fffbeb;
   border-color: #fde68a;
@@ -566,6 +619,17 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(61, 168, 200, 0.35) transparent;
+}
+
+.chat-history-full-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-history-full-scroll::-webkit-scrollbar-thumb {
+  background: rgba(61, 168, 200, 0.35);
+  border-radius: 6px;
 }
 
 .chat-history-full-heading {
@@ -582,12 +646,34 @@
 }
 
 .chat-history-full-empty {
-  padding: 40px 20px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--vc-text-secondary);
+  padding: 36px 20px 48px;
   text-align: center;
   line-height: 1.5;
+}
+
+.chat-history-full-empty-icon {
+  display: inline-block;
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+
+.chat-history-full-empty-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--vc-text);
+}
+
+.chat-history-full-empty-hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vc-text-secondary);
+  max-width: 240px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .chat-conv-list {
@@ -624,6 +710,11 @@
 .chat-conv-row-active {
   border-color: var(--vc-primary);
   box-shadow: 0 0 0 1px var(--vc-primary-soft-strong);
+}
+
+.chat-conv-row:focus-visible {
+  outline: 2px solid var(--vc-primary);
+  outline-offset: 2px;
 }
 
 .chat-conv-row-title {
