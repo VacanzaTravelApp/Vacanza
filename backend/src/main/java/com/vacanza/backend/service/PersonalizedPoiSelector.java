@@ -3,6 +3,7 @@ package com.vacanza.backend.service;
 import com.vacanza.backend.config.PoiDiversityProperties;
 import com.vacanza.backend.config.PoiScoringProperties;
 import com.vacanza.backend.dto.internal.PoiCategoryFamily;
+import com.vacanza.backend.dto.internal.PoiFeedbackContext;
 import com.vacanza.backend.dto.internal.PersonalizedPoiParams;
 import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.dto.internal.PoiRetrievalContext;
@@ -33,6 +34,7 @@ public class PersonalizedPoiSelector {
     private final PoiConstraintFilter constraintFilter;
     private final PoiDiversitySelector diversitySelector;
     private final PoiDiversityProperties diversityProperties;
+    private final UserFeedbackService userFeedbackService;
     private final ObjectProvider<MeterRegistry> meterRegistry;
 
     /**
@@ -44,7 +46,8 @@ public class PersonalizedPoiSelector {
 
         List<PoiResult> enriched = enrichmentService.enrichAll(rawPois == null ? List.of() : new ArrayList<>(rawPois));
         List<PoiResult> afterAvoid = filterAvoidDrop(enriched, profile);
-        List<PoiResult> scored = listScoringService.scoreSortAndFilter(afterAvoid, profile);
+        PoiFeedbackContext feedback = userFeedbackService.buildContext(p.userId());
+        List<PoiResult> scored = listScoringService.scoreSortAndFilter(afterAvoid, profile, feedback);
         List<PoiResult> constrained = constraintFilter.apply(scored, profile, ctx);
         List<PoiResult> diversified = diversitySelector.diversify(constrained);
         int cap = Math.max(1, p.maxForLlm() != null ? p.maxForLlm() : diversityProperties.getTargetCount());
