@@ -54,6 +54,16 @@ open-meteo:
   connect-timeout: 10s
   read-timeout: 30s
 
+# POI retrieval scoring (PoiScoreCalculator). avoid-mode: DROP | PENALTY
+vacanza:
+  poi-scoring:
+    weight-rating: 2.0
+    weight-popularity: 1.0
+    favorite-bonus: 3.0
+    avoid-penalty: 50.0
+    neutral-rating-prior: 0.5
+    avoid-mode: DROP
+
 management:
   endpoints:
     web:

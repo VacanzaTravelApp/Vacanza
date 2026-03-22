@@ -62,6 +62,11 @@ public class PoiResult {
     private PoiCategoryFamily categoryFamily;
 
     /**
+     * Profile-based relevance after {@link com.vacanza.backend.service.PoiListScoringService} (Faz B); null before scoring.
+     */
+    private Double relevanceScore;
+
+    /**
      * Minimal constructor used by Mapbox client; optional fields default to unknown opening hours.
      */
     public PoiResult(String name, String category, double lat, double lon) {
