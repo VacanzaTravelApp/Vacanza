@@ -17,11 +17,8 @@ import com.vacanza.backend.util.PolygonRouteGeometry;
 import com.vacanza.backend.service.AiRouteService;
 import com.vacanza.backend.service.RouteSummaryMessageService;
 import com.vacanza.backend.dto.weather.WeatherPlanningForecast;
-import com.vacanza.backend.dto.internal.PoiRetrievalContext;
-import com.vacanza.backend.service.PoiConstraintFilter;
-import com.vacanza.backend.service.PoiDiversitySelector;
-import com.vacanza.backend.service.PoiListScoringService;
-import com.vacanza.backend.service.PoiResultEnrichmentService;
+import com.vacanza.backend.dto.internal.PersonalizedPoiParams;
+import com.vacanza.backend.service.PersonalizedPoiSelector;
 import com.vacanza.backend.service.RouteTimelineService;
 import com.vacanza.backend.service.UserInfoService;
 import com.vacanza.backend.service.WeatherService;
@@ -105,10 +102,7 @@ public class ChatProxyController {
         private final MapboxPoiSearchClient mapboxPoiSearchClient;
         private final RouteTimelineService routeTimelineService;
         private final WeatherService weatherService;
-        private final PoiResultEnrichmentService poiResultEnrichmentService;
-        private final PoiListScoringService poiListScoringService;
-        private final PoiConstraintFilter poiConstraintFilter;
-        private final PoiDiversitySelector poiDiversitySelector;
+        private final PersonalizedPoiSelector personalizedPoiSelector;
 
         @PostMapping("/conversations")
         public ResponseEntity<AiChatDto.ConversationCreateResponse> createConversation() {
@@ -612,10 +606,8 @@ public class ChatProxyController {
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.putIfAbsent(k, p);
                 }
-                List<PoiResult> merged = poiResultEnrichmentService.enrichAll(new java.util.ArrayList<>(dedup.values()));
-                merged = poiListScoringService.scoreSortAndFilter(merged, profile);
-                merged = poiConstraintFilter.apply(merged, profile, PoiRetrievalContext.empty());
-                merged = poiDiversitySelector.diversify(merged);
+                List<PoiResult> merged = personalizedPoiSelector.select(
+                                new java.util.ArrayList<>(dedup.values()), profile, PersonalizedPoiParams.defaults());
                 return new PoiToolExecutionResult(merged, planning);
         }
 
@@ -656,10 +648,8 @@ public class ChatProxyController {
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.putIfAbsent(k, p);
                 }
-                List<PoiResult> merged = poiResultEnrichmentService.enrichAll(new java.util.ArrayList<>(dedup.values()));
-                merged = poiListScoringService.scoreSortAndFilter(merged, profile);
-                merged = poiConstraintFilter.apply(merged, profile, PoiRetrievalContext.empty());
-                merged = poiDiversitySelector.diversify(merged);
+                List<PoiResult> merged = personalizedPoiSelector.select(
+                                new java.util.ArrayList<>(dedup.values()), profile, PersonalizedPoiParams.defaults());
                 return new PoiToolExecutionResult(merged, planning);
         }
 }
