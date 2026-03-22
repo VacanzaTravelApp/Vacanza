@@ -17,6 +17,7 @@ import com.vacanza.backend.util.PolygonRouteGeometry;
 import com.vacanza.backend.service.AiRouteService;
 import com.vacanza.backend.service.RouteSummaryMessageService;
 import com.vacanza.backend.dto.weather.WeatherPlanningForecast;
+import com.vacanza.backend.service.PoiResultEnrichmentService;
 import com.vacanza.backend.service.RouteTimelineService;
 import com.vacanza.backend.service.UserInfoService;
 import com.vacanza.backend.service.WeatherService;
@@ -100,6 +101,7 @@ public class ChatProxyController {
         private final MapboxPoiSearchClient mapboxPoiSearchClient;
         private final RouteTimelineService routeTimelineService;
         private final WeatherService weatherService;
+        private final PoiResultEnrichmentService poiResultEnrichmentService;
 
         @PostMapping("/conversations")
         public ResponseEntity<AiChatDto.ConversationCreateResponse> createConversation() {
@@ -600,7 +602,8 @@ public class ChatProxyController {
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.putIfAbsent(k, p);
                 }
-                return new PoiToolExecutionResult(new java.util.ArrayList<>(dedup.values()), planning);
+                List<PoiResult> merged = poiResultEnrichmentService.enrichAll(new java.util.ArrayList<>(dedup.values()));
+                return new PoiToolExecutionResult(merged, planning);
         }
 
         /**
@@ -640,6 +643,7 @@ public class ChatProxyController {
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.putIfAbsent(k, p);
                 }
-                return new PoiToolExecutionResult(new java.util.ArrayList<>(dedup.values()), planning);
+                List<PoiResult> merged = poiResultEnrichmentService.enrichAll(new java.util.ArrayList<>(dedup.values()));
+                return new PoiToolExecutionResult(merged, planning);
         }
 }
