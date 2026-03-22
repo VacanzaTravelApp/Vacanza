@@ -28,6 +28,12 @@ public class PoiResult {
     private String priceLevel;
 
     /**
+     * ISO-8601 weekday names (e.g. {@code MONDAY}) when the POI is closed; empty/null means unknown (neutral for closed-day filter).
+     * Populated when DB or upstream provides weekly closure data (future / Faz A follow-up).
+     */
+    private List<String> closedWeekdays;
+
+    /**
      * Mapbox Search Box stable feature id (see {@code properties.mapbox_id} in category response).
      */
     private String mapboxId;

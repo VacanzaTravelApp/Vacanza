@@ -70,6 +70,16 @@ vacanza:
     mode: MMR
     mmr-lambda: 0.72
     max-per-family: 4
+  poi-constraints:
+    budget-enabled: true
+    budget-currency-strict: true
+    expected-budget-currency: USD
+    budget-mode: DROP
+    budget-penalty: 25
+    tier-1-max-budget: 45
+    tier-2-max-budget: 95
+    tier-3-max-budget: 190
+    closed-day-enabled: true
 
 management:
   endpoints:
