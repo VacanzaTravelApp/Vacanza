@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Button, message } from "antd";
 import { LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled } from "@ant-design/icons";
 import { useAuth } from "../../../context/useAuth";
-import { postPoiFeedbackEvent } from "../../../api/feedbackApi";
+import { postPoiFeedbackEvent, postRouteFeedback } from "../../../api/feedbackApi";
 import { getWaypointCategory } from "../utils/routeMap";
 
 const STORAGE_PREFIX = "vacanzaRouteVote:v2:";
@@ -15,6 +15,12 @@ function readStoredVote(storageKey) {
   } catch {
     return null;
   }
+}
+
+function dbVoteToUi(v) {
+  if (v === "UP" || v === "up") return "up";
+  if (v === "DOWN" || v === "down") return "down";
+  return null;
 }
 
 /** Tüm günlerdeki waypoint kategorilerinden benzersiz anahtarlar (backend ile uyumlu). */
@@ -32,20 +38,28 @@ export function collectRouteCategoryKeys(route) {
 }
 
 /**
- * Sohbetteki genel rota kartı — kategori skoru kullanıcıya global olduğu için
- * dolu thumb durumu sadece bu karta özel sessionStorage ile tutulur (chatteki diğer kartlara sıçramaz).
+ * Sohbetteki genel rota kartı — kayıtlı rota varsa oylar DB'de (user_route_feedback);
+ * aksi halde kategori geri bildirimi + sessionStorage.
  */
-export default function RouteCardFeedback({ route, storageKey }) {
+export default function RouteCardFeedback({ route, storageKey, routeId, initialDbVote }) {
   const { isAuthenticated } = useAuth();
   const [sending, setSending] = useState(false);
-  const [vote, setVote] = useState(() => readStoredVote(storageKey));
+  const [vote, setVote] = useState(() => {
+    const fromDb = dbVoteToUi(initialDbVote);
+    return fromDb ?? readStoredVote(storageKey);
+  });
 
   const categoryKeys = useMemo(() => collectRouteCategoryKeys(route), [route]);
-  const canSend = isAuthenticated && categoryKeys.length > 0 && !!storageKey;
+  const hasSavedRoute = !!routeId;
+  const canSend =
+    isAuthenticated &&
+    !!storageKey &&
+    (hasSavedRoute || categoryKeys.length > 0);
 
   useEffect(() => {
-    setVote(readStoredVote(storageKey));
-  }, [storageKey]);
+    const fromDb = dbVoteToUi(initialDbVote);
+    setVote(fromDb ?? readStoredVote(storageKey));
+  }, [storageKey, initialDbVote]);
 
   if (!canSend) {
     return null;
@@ -55,12 +69,16 @@ export default function RouteCardFeedback({ route, storageKey }) {
     if (sending) return;
     setSending(true);
     try {
-      await postPoiFeedbackEvent({
-        eventType,
-        mapboxId: null,
-        foursquareId: null,
-        categoryKeys,
-      });
+      if (routeId) {
+        await postRouteFeedback({ routeId, eventType });
+      } else {
+        await postPoiFeedbackEvent({
+          eventType,
+          mapboxId: null,
+          foursquareId: null,
+          categoryKeys,
+        });
+      }
       const v = eventType === "THUMBS_UP" ? "up" : "down";
       try {
         sessionStorage.setItem(STORAGE_PREFIX + storageKey, v);

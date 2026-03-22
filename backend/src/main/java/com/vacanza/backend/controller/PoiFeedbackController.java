@@ -3,9 +3,11 @@ package com.vacanza.backend.controller;
 import com.vacanza.backend.dto.enums.PoiFeedbackEventType;
 import com.vacanza.backend.dto.internal.PoiFeedbackContext;
 import com.vacanza.backend.dto.request.PoiFeedbackEventRequestDTO;
+import com.vacanza.backend.dto.request.RouteFeedbackRequestDTO;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.security.CurrentUserProvider;
 import com.vacanza.backend.service.UserFeedbackService;
+import com.vacanza.backend.service.UserRouteFeedbackService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ public class PoiFeedbackController {
 
     private final CurrentUserProvider currentUserProvider;
     private final UserFeedbackService userFeedbackService;
+    private final UserRouteFeedbackService userRouteFeedbackService;
 
     /**
      * Current user's aggregated POI and category affinity scores (for UI thumb state after refresh).
@@ -35,6 +38,27 @@ public class PoiFeedbackController {
         return ResponseEntity.ok(Map.of(
                 "poiScores", ctx.poiScores(),
                 "categoryScores", ctx.categoryScores()));
+    }
+
+    /**
+     * Thumbs up/down on a saved {@link com.vacanza.backend.entity.AiRoute} row (user-scoped).
+     */
+    @PostMapping("/route")
+    public ResponseEntity<Void> recordRouteFeedback(@RequestBody RouteFeedbackRequestDTO body) {
+        User user = currentUserProvider.getCurrentUserEntity();
+        if (body == null || body.routeId() == null || body.eventType() == null || body.eventType().isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+        PoiFeedbackEventType type = PoiFeedbackEventType.fromApi(body.eventType());
+        if (type != PoiFeedbackEventType.THUMBS_UP && type != PoiFeedbackEventType.THUMBS_DOWN) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+        try {
+            userRouteFeedbackService.upsertFromThumbs(user, body.routeId(), type);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        return ResponseEntity.accepted().build();
     }
 
     @PostMapping("/poi-events")

@@ -101,6 +101,8 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
   const routes = list
     .map((detail) => ({
       data: routeDataFromSavedDetail(detail),
+      routeId: detail.routeId ?? detail.route_id ?? null,
+      userFeedback: detail.userFeedback ?? detail.user_feedback ?? null,
       t: routeGeneratedAtMs(detail),
     }))
     .filter((x) => x.data)
@@ -142,16 +144,20 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
     }
     if (best) {
       usedAssistantIds.add(best.id);
-      const arr = byMessageId.get(best.id) ?? [];
-      arr.push(rr.data);
-      byMessageId.set(best.id, arr);
+      const bundle = byMessageId.get(best.id) ?? { data: [], routeIds: [], feedbacks: [] };
+      bundle.data.push(rr.data);
+      bundle.routeIds.push(rr.routeId);
+      bundle.feedbacks.push(rr.userFeedback);
+      byMessageId.set(best.id, bundle);
     }
   }
   for (const msg of msgs) {
-    const arr = byMessageId.get(msg.id);
-    if (arr?.length) {
-      msg.routeDataList = arr;
-      msg.routeData = arr[arr.length - 1];
+    const bundle = byMessageId.get(msg.id);
+    if (bundle?.data?.length) {
+      msg.routeDataList = bundle.data;
+      msg.routeData = bundle.data[bundle.data.length - 1];
+      msg.routeIdList = bundle.routeIds;
+      msg.routeFeedbackList = bundle.feedbacks;
     }
     delete msg._createdAtMs;
     delete msg._isAssistant;
@@ -499,12 +505,15 @@ export default function VacanzaChat({
           routeData && routeSummaryMessage ? routeSummaryMessage : response.content;
 
         const norm = routeData ? normalizeRouteForMap(routeData) : null;
+        const routeIdFromResponse = response.route_id ?? response.routeId ?? null;
         const aiMsg = {
           id: `local-${Date.now() + 1}`,
           type: "ai",
           text: displayText,
           routeData: norm || undefined,
           routeDataList: norm ? [norm] : undefined,
+          routeIdList: norm ? [routeIdFromResponse ?? null] : undefined,
+          routeFeedbackList: norm ? [null] : undefined,
           noRouteHint: !routeData && wasRouteRequest,
           time: formatMessageTime(new Date()),
         };
@@ -646,7 +655,12 @@ export default function VacanzaChat({
                         </div>
                       ))}
                     </div>
-                    <RouteCardFeedback route={rd} storageKey={`${msg.id}-r${rIdx}`} />
+                    <RouteCardFeedback
+                      route={rd}
+                      storageKey={`${msg.id}-r${rIdx}`}
+                      routeId={msg.routeIdList?.[rIdx] ?? null}
+                      initialDbVote={msg.routeFeedbackList?.[rIdx] ?? null}
+                    />
                     <button
                       type="button"
                       className="route-show-btn"

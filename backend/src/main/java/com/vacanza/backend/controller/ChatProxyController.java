@@ -470,7 +470,10 @@ public class ChatProxyController {
                                         response.getRouteData().setWeatherDayParts(routePlanningWeather.dayParts());
                                 }
                                 routeTimelineService.enrichTimeline(response.getRouteData(), profile);
-                                saveRoute(user, conversationId, response.getRouteData());
+                                UUID savedRouteId = saveRoute(user, conversationId, response.getRouteData());
+                                if (savedRouteId != null) {
+                                        response.setRouteId(savedRouteId);
+                                }
                                 String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
                                                 response.getRouteData(), profile);
                                 if (summaryMessage != null) {
@@ -494,17 +497,19 @@ public class ChatProxyController {
                 return ResponseEntity.ok(list);
         }
 
-        private void saveRoute(User user, UUID conversationId, AiChatDto.RouteData routeData) {
+        private UUID saveRoute(User user, UUID conversationId, AiChatDto.RouteData routeData) {
                 try {
                         String routeJson = objectMapper.writeValueAsString(routeData);
-                        aiRouteService.saveRoute(
+                        AiRoute saved = aiRouteService.saveRoute(
                                         user, conversationId,
                                         routeData.getTitle(),
                                         routeData.getDestination(),
                                         routeData.getTotalDays(),
                                         routeJson);
+                        return saved.getRouteId();
                 } catch (Exception e) {
                         log.warn("Failed to save route to DB: {}", e.getMessage());
+                        return null;
                 }
         }
 
