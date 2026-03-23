@@ -16,3 +16,8 @@ export const userApi = {
     getStats: () => http.get("/users/me/stats"),
     autoCheckIn: (coords) => http.post("/users/me/checkins/auto", coords),
 };
+
+export const adminApi = {
+    getAnalytics: (params) => http.get("/admin/analytics", { params }),
+    getSystemMonitoring: () => http.get("/admin/monitoring"),
+};

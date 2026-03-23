@@ -4,7 +4,6 @@ import AdminLayout from "./components/AdminLayout";
 import Home from "./pages/Home";
 import Monitoring from "./pages/Monitoring";
 import Analytics from "./pages/Analytics";
-import UserManagement from "./pages/UserManagement";
 import Login from "./pages/Login";
 import { useAuth } from "./context/useAuth";
 import { ConfigProvider, Spin, App as AntApp } from "antd";
@@ -44,7 +43,6 @@ function App() {
                             <Route index element={<Home />} />
                             <Route path="monitoring" element={<Monitoring />} />
                             <Route path="analytics" element={<Analytics />} />
-                            <Route path="users" element={<UserManagement />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Route>
                     </Routes>

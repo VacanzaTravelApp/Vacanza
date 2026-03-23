@@ -44,11 +44,6 @@ export default function AdminLayout() {
             icon: <PieChartOutlined />,
             label: "Analytics (UC2.2)",
         },
-        {
-            key: "/users",
-            icon: <UserOutlined />,
-            label: "User Management",
-        },
     ];
 
     const userMenuItems = {
@@ -89,13 +84,10 @@ export default function AdminLayout() {
                         style={{ fontSize: "16px", width: 44, height: 44 }}
                     />
                     <Space size="large">
-                        <Badge dot status="error" offset={[-4, 4]}>
-                            <Button type="text" icon={<BellOutlined />} style={{ fontSize: '18px' }} />
-                        </Badge>
                         <Dropdown menu={userMenuItems} placement="bottomRight">
                             <Space style={{ cursor: "pointer", padding: '4px 8px', borderRadius: 8, transition: 'background 0.3s' }} className="user-dropdown-trigger">
                                 <Avatar shape="square" icon={<UserOutlined />} style={{ background: '#1677ff', borderRadius: 6 }} />
-                                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+                                <div className="hide-on-mobile" style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
                                     <span style={{ fontSize: '14px', fontWeight: 600 }}>
                                         {user?.displayName || user?.preferredName || user?.email || "Admin User"}
                                     </span>
@@ -118,7 +110,7 @@ export default function AdminLayout() {
                         </motion.div>
                     </AnimatePresence>
                 </Content>
-                <Footer style={{ textAlign: "center", background: 'transparent', color: 'rgba(0,0,0,0.45)' }}>Vacanza Admin Panel • Operational Control Center v2.4.1</Footer>
+                <Footer style={{ textAlign: "center", background: 'transparent', color: 'rgba(0,0,0,0.45)' }}>Vacanza Admin Panel • Operational Control Center</Footer>
             </Layout>
         </Layout>
     );

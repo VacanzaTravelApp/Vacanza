@@ -37,7 +37,7 @@ export default function Login() {
     return (
         <Layout style={{ minHeight: "100vh", background: "#f0f2f5", display: "flex", justifyContent: "center", alignItems: "center" }}>
             <Content style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%" }}>
-                <Card style={{ width: 400, borderRadius: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+                <Card style={{ width: "100%", maxWidth: 400, margin: "0 16px", borderRadius: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
                     <div style={{ textAlign: "center", marginBottom: 30 }}>
                         <div style={{ background: "#1677ff", width: 60, height: 60, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                             <MdFlightTakeoff style={{ color: "white", fontSize: 32 }} />

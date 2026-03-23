@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Table, Tag, Card, Row, Col, Progress, List, Badge, Typography, Space } from "antd";
+import { Table, Tag, Card, Row, Col, Progress, List, Badge, Typography, Space, Statistic, Spin, Button } from "antd";
 import {
     CheckCircleFilled,
     CloseCircleFilled,
@@ -13,46 +13,47 @@ import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import { motion } from "framer-motion";
+import { MdFlightTakeoff } from "react-icons/md";
+import { adminApi } from "../api/userApi";
+import { useQuery } from "@tanstack/react-query";
 
 const { Title, Text } = Typography;
 
-const initialData = Array.from({ length: 20 }, (_, i) => ({
-    time: `${i}:00`,
-    latency: Math.floor(Math.random() * 200) + 50,
-    traffic: Math.floor(Math.random() * 1000) + 200,
-}));
-
-const apiEndpoints = [
-    { name: "Auth Service", path: "/auth/me", status: "Active", latency: "45ms", load: 24 },
-    { name: "Gamification Engine", path: "/gamification/stats", status: "Active", latency: "120ms", load: 56 },
-    { name: "POI / Maps API", path: "/pois/nearby", status: "Active", latency: "85ms", load: 12 },
-    { name: "User Service", path: "/users/me/profile", status: "Active", latency: "30ms", load: 5 },
-    { name: "Booking System", path: "/bookings/search", status: "Warning", latency: "450ms", load: 89 },
-    { name: "AI Recommendation API", path: "/chat/ai", status: "Offline", latency: "-", load: 0 },
-];
-
 export default function Monitoring() {
-    const [chartData, setChartData] = useState(initialData);
+    const [chartData, setChartData] = useState([]);
+
+    const { data: monitoring, isLoading, isFetching, refetch } = useQuery({
+        queryKey: ['admin-monitoring'],
+        queryFn: async () => {
+            const res = await adminApi.getSystemMonitoring();
+            return res.data;
+        }
+    });
 
     useEffect(() => {
-        const interval = setInterval(() => {
+        if (monitoring) {
             setChartData(prev => {
-                const newData = [...prev.slice(1), {
-                    time: new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-                    latency: Math.floor(Math.random() * 200) + 50,
-                    traffic: Math.floor(Math.random() * 1000) + 200,
-                }];
-                return newData;
+                const now = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                // Calculate average latency from API metrics
+                const avgLatency = monitoring.apiMetrics?.length
+                    ? monitoring.apiMetrics.reduce((sum, m) => sum + m.averageLatency, 0) / monitoring.apiMetrics.length
+                    : Math.floor(Math.random() * 20) + 10;
+
+                const totalReq = monitoring.apiMetrics?.length
+                    ? monitoring.apiMetrics.reduce((sum, m) => sum + m.requestCount, 0)
+                    : Math.floor(Math.random() * 100);
+
+                const newData = [...prev, { time: now, latency: avgLatency, traffic: totalReq }];
+                return newData.length > 20 ? newData.slice(1) : newData;
             });
-        }, 3000);
-        return () => clearInterval(interval);
-    }, []);
+        }
+    }, [monitoring]);
 
     const columns = [
         {
             title: "Service Name",
-            dataIndex: "name",
-            key: "name",
+            dataIndex: "serviceName",
+            key: "serviceName",
             render: (text) => (
                 <Space>
                     <ApiOutlined style={{ color: '#1677ff' }} />
@@ -60,24 +61,29 @@ export default function Monitoring() {
                 </Space>
             )
         },
-        { title: "Endpoint", dataIndex: "path", key: "path", render: (text) => <code style={{ fontSize: '12px' }}>{text}</code> },
         {
-            title: "Status",
-            dataIndex: "status",
-            key: "status",
-            render: (status) => {
-                let color = status === "Active" ? "success" : status === "Warning" ? "warning" : "error";
-                return <Tag bordered={false} color={color}>{status.toUpperCase()}</Tag>;
-            },
+            title: "Request Count",
+            dataIndex: "requestCount",
+            key: "requestCount",
+            render: (val) => <Tag color="blue">{val} reqs</Tag>
         },
         {
-            title: "Current Load",
-            dataIndex: "load",
-            key: "load",
-            render: (load) => <Progress size="small" percent={load} status={load > 80 ? "exception" : "active"} />
+            title: "Latency (avg)",
+            dataIndex: "averageLatency",
+            key: "averageLatency",
+            render: (val) => <Text>{val.toFixed(2)} ms</Text>
         },
-        { title: "Latency", dataIndex: "latency", key: "latency" },
+        {
+            title: "Error Rate",
+            dataIndex: "errorRate",
+            key: "errorRate",
+            render: (val) => <Progress size="small" percent={Number((val * 100).toFixed(1))} status={val > 0.05 ? "exception" : "active"} />
+        }
     ];
+
+    if (isLoading && !monitoring) {
+        return <div style={{ textAlign: "center", padding: "100px" }}><Spin size="large" /></div>;
+    }
 
     return (
         <motion.div
@@ -86,14 +92,24 @@ export default function Monitoring() {
             transition={{ duration: 0.5 }}
             style={{ padding: "12px" }}
         >
-            <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <ThunderboltOutlined style={{ fontSize: 32, color: '#faad14' }} />
-                <Title level={2} style={{ margin: 0 }}>Monitor System & API Status (UC2.1)</Title>
+            <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <ThunderboltOutlined style={{ fontSize: 32, color: '#faad14' }} />
+                    <Title level={2} style={{ margin: 0 }}>Monitor System & API Status (UC2.1)</Title>
+                </div>
+                <Button
+                    type="primary"
+                    icon={<MdFlightTakeoff />}
+                    onClick={() => refetch()}
+                    loading={isFetching}
+                >
+                    Sync Live Data
+                </Button>
             </div>
 
             <Row gutter={[16, 16]}>
-                <Col span={16}>
-                    <Card title="Traffic & Latency (Real-time)" variant="borderless" className="dashboard-card">
+                <Col xs={24} lg={16}>
+                    <Card title="Traffic & Latency (Real-time)" variant="borderless" className="dashboard-card" loading={isLoading}>
                         <div style={{ height: 350 }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={chartData}>
@@ -114,29 +130,31 @@ export default function Monitoring() {
                         </div>
                     </Card>
                 </Col>
-                <Col span={8}>
+                <Col xs={24} lg={8}>
                     <Row gutter={[0, 16]}>
                         <Col span={24}>
-                            <Card title="Database Performance" variant="borderless">
-                                <Space direction="vertical" style={{ width: '100%' }}>
-                                    <Text>Read/Write Ratio</Text>
-                                    <Progress percent={72} strokeColor="#52c41a" />
-                                    <Text>Connection Pool Usage</Text>
-                                    <Progress percent={45} status="active" />
-                                    <Text>Cache Hit Rate</Text>
-                                    <Progress percent={94} strokeColor="#13c2c2" />
-                                </Space>
+                            <Card title="Backend Services Health" variant="borderless" loading={isLoading}>
+                                <List
+                                    size="small"
+                                    dataSource={monitoring?.services || []}
+                                    renderItem={(srv) => (
+                                        <List.Item>
+                                            <Text>{srv.name}</Text>
+                                            <Tag color={srv.status === "UP" ? "success" : "error"}>{srv.status}</Tag>
+                                        </List.Item>
+                                    )}
+                                />
                             </Card>
                         </Col>
                         <Col span={24}>
-                            <Card variant="borderless" style={{ background: '#001529', color: 'white' }}>
+                            <Card variant="borderless" style={{ background: monitoring?.systemHealth === 1.0 ? '#001529' : '#5c0011', color: 'white' }}>
                                 <Statistic
-                                    title={<span style={{ color: 'rgba(255,255,255,0.6)' }}>Storage Used</span>}
-                                    value={4.2}
-                                    suffix="TB"
+                                    title={<span style={{ color: 'rgba(255,255,255,0.6)' }}>Health Index Score</span>}
+                                    value={(monitoring?.systemHealth || 0) * 100}
+                                    suffix="%"
                                     styles={{ content: { color: '#fff' } }}
                                 />
-                                <Progress percent={64} showInfo={false} strokeColor="#3da8c8" />
+                                <Progress percent={(monitoring?.systemHealth || 0) * 100} showInfo={false} strokeColor={monitoring?.systemHealth === 1.0 ? "#52c41a" : "#f5222d"} />
                             </Card>
                         </Col>
                     </Row>
@@ -144,32 +162,36 @@ export default function Monitoring() {
             </Row>
 
             <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
-                <Col span={16}>
-                    <Card title="Endpoint Health Index" variant="borderless">
-                        <Table dataSource={apiEndpoints} columns={columns} pagination={false} size="small" rowKey="name" />
+                <Col xs={24} lg={16}>
+                    <Card title="External API Usage Metrics" variant="borderless" loading={isLoading}>
+                        <Table dataSource={monitoring?.apiMetrics} columns={columns} pagination={false} size="small" rowKey="serviceName" />
                     </Card>
                 </Col>
-                <Col span={8}>
-                    <Card title={<Space><BlockOutlined />Live Notifications</Space>} variant="borderless">
-                        <List
-                            size="small"
-                            dataSource={[
-                                { msg: "Auth session verified successfully", time: "Just now", type: "success" },
-                                { msg: "Token refresh for user ID 552", time: "2 min ago", type: "info" },
-                                { msg: "AI response latency spike", time: "5 min ago", type: "warning" },
-                                { msg: "Database replication lagged (8s)", time: "15 min ago", type: "error" },
-                            ]}
-                            renderItem={(item) => (
-                                <List.Item>
-                                    <Badge status={item.type} />
-                                    <div style={{ marginLeft: 12 }}>
-                                        <Text style={{ fontSize: '13px' }}>{item.msg}</Text>
-                                        <br />
-                                        <Text type="secondary" style={{ fontSize: '11px' }}>{item.time}</Text>
-                                    </div>
-                                </List.Item>
-                            )}
-                        />
+                <Col xs={24} lg={8}>
+                    <Card title={<Space><BlockOutlined />Live Notifications</Space>} variant="borderless" loading={isLoading}>
+                        {monitoring?.logs?.length > 0 ? (
+                            <List
+                                size="small"
+                                dataSource={monitoring.logs}
+                                renderItem={(item) => (
+                                    <List.Item style={{ padding: '12px 0' }}>
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+                                            <Badge status={item.level === "ERROR" ? "error" : item.level === "WARN" ? "warning" : "success"} style={{ marginTop: 4 }} />
+                                            <div style={{ marginLeft: 12, textAlign: 'left' }}>
+                                                <div style={{ lineHeight: '1.2' }}>
+                                                    <Text style={{ fontSize: '13px' }}>{item.message}</Text>
+                                                </div>
+                                                <div style={{ marginTop: 4 }}>
+                                                    <Text type="secondary" style={{ fontSize: '11px' }}>{new Date(item.timestamp).toLocaleTimeString()}</Text>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </List.Item>
+                                )}
+                            />
+                        ) : (
+                            <Text type="secondary">No recent logs.</Text>
+                        )}
                     </Card>
                 </Col>
             </Row>

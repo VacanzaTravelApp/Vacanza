@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Row, Col, Statistic, Alert, Typography, Timeline, Progress, Button, Space } from "antd";
+import { Card, Row, Col, Statistic, Alert, Typography, Timeline, Progress, Button, Spin, Space } from "antd";
 import {
     SmileOutlined,
     ThunderboltOutlined,
@@ -9,16 +9,47 @@ import {
     ArrowRightOutlined,
     RocketOutlined,
     SecurityScanOutlined,
-    LineChartOutlined
+    LineChartOutlined,
+    UserOutlined,
+    TeamOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MdFlightTakeoff } from "react-icons/md";
+import { useQuery } from "@tanstack/react-query";
+import { adminApi } from "../api/userApi";
 
 const { Title, Paragraph, Text } = Typography;
 
 export default function Home() {
     const navigate = useNavigate();
+
+    const { data: monitoring, isLoading: isMonLoading } = useQuery({
+        queryKey: ['admin-monitoring'],
+        queryFn: async () => {
+            const res = await adminApi.getSystemMonitoring();
+            return res.data;
+        },
+        refetchInterval: 15000
+    });
+
+    const { data: analytics, isLoading: isAnaLoading } = useQuery({
+        queryKey: ['admin-analytics'],
+        queryFn: async () => {
+            const res = await adminApi.getAnalytics({});
+            return res.data;
+        },
+        refetchInterval: 30000
+    });
+
+    const getTimelineColor = (level) => {
+        switch (level) {
+            case 'ERROR': return 'red';
+            case 'WARN': return 'gold';
+            case 'INFO': return 'blue';
+            default: return 'green';
+        }
+    };
 
     return (
         <motion.div
@@ -28,9 +59,9 @@ export default function Home() {
             style={{ padding: "12px" }}
         >
             <Alert
-                title={<Text strong>System Health Check: ALL SYSTEMS OPERATIONAL</Text>}
-                description="Last verified performance audit was completed 10 minutes ago."
-                type="success"
+                title={<Text strong>{monitoring?.systemHealth === 1 ? "System Health Check: ALL SYSTEMS OPERATIONAL" : "System Health Check: SUB-OPTIMAL PERFOMANCE"}</Text>}
+                description={`Last verified performance audit was completed recently. System Health Index: ${(monitoring?.systemHealth || 0) * 100}%`}
+                type={monitoring?.systemHealth === 1.0 ? "success" : "warning"}
                 showIcon
                 closable
                 style={{ marginBottom: "24px", borderRadius: 8 }}
@@ -42,8 +73,8 @@ export default function Home() {
             </div>
 
             <Row gutter={[24, 24]}>
-                <Col span={16}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                <Col xs={24} lg={16}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
                         <Card
                             hoverable
                             className="action-card"
@@ -81,61 +112,41 @@ export default function Home() {
                         </Card>
                     </div>
 
-                    <Card title="Engagement Overview" style={{ marginTop: 24, borderRadius: 12 }} variant="borderless">
+                    <Card title="Engagement Overview (Live)" style={{ marginTop: 24, borderRadius: 12 }} variant="borderless" loading={isAnaLoading}>
                         <Row gutter={16}>
-                            <Col span={12}>
-                                <Statistic title="Session Retention" value={92} suffix="%" styles={{ content: { color: '#52c41a' } }} />
-                                <div style={{ marginTop: 12 }}>
-                                    <Progress percent={92} size="small" strokeColor="#52c41a" />
-                                </div>
+                            <Col xs={24} sm={12}>
+                                <Statistic title="Total Users" value={analytics?.totalUsers} prefix={<TeamOutlined />} styles={{ content: { color: '#52c41a' } }} />
                             </Col>
-                            <Col span={12}>
-                                <Statistic title="Peak Concurrency" value={8420} styles={{ content: { color: '#1677ff' } }} />
-                                <div style={{ marginTop: 12 }}>
-                                    <Progress percent={64} size="small" status="active" />
-                                </div>
+                            <Col xs={24} sm={12}>
+                                <Statistic title="Active Sessions" value={analytics?.activeSessions} prefix={<UserOutlined />} styles={{ content: { color: '#1677ff' } }} />
+                            </Col>
+                        </Row>
+                        <Row gutter={16} style={{ marginTop: 24 }}>
+                            <Col xs={24} sm={12}>
+                                <Statistic title="Total Check-ins" value={analytics?.totalCheckins} styles={{ content: { color: '#faad14' } }} />
                             </Col>
                         </Row>
                     </Card>
                 </Col>
 
-                <Col span={8}>
-                    <Card title="System Timeline" style={{ borderRadius: 12, height: '100%' }} variant="borderless">
-                        <Timeline
-                            items={[
-                                {
-                                    color: 'green',
+                <Col xs={24} lg={8}>
+                    <Card title="System Timeline" style={{ borderRadius: 12, height: '100%' }} variant="borderless" loading={isMonLoading}>
+                        {monitoring?.logs?.length > 0 ? (
+                            <Timeline
+                                items={monitoring.logs.slice(0, 5).map((log, idx) => ({
+                                    color: getTimelineColor(log.level),
                                     content: (
                                         <>
-                                            <Text strong>UC2.1 Monitoring Active</Text>
-                                            <p style={{ fontSize: 12, color: 'gray' }}>Continuous health check enabled at 09:00 AM</p>
+                                            <Text strong>{log.source || 'SYSTEM'}</Text>
+                                            <p style={{ fontSize: 13 }}>{log.message}</p>
+                                            <p style={{ fontSize: 11, color: 'gray', margin: 0 }}>{new Date(log.timestamp).toLocaleString()}</p>
                                         </>
-                                    ),
-                                },
-                                {
-                                    color: 'blue',
-                                    content: (
-                                        <>
-                                            <Text strong>UC2.2 Report Generated</Text>
-                                            <p style={{ fontSize: 12, color: 'gray' }}>Weekly POI analysis exported to PDF</p>
-                                        </>
-                                    ),
-                                },
-                                {
-                                    color: 'gold',
-                                    content: (
-                                        <>
-                                            <Text strong>Maintenance Warning</Text>
-                                            <p style={{ fontSize: 12, color: 'gray' }}>Database optimization scheduled for 02:00 AM</p>
-                                        </>
-                                    ),
-                                },
-                                {
-                                    color: 'red',
-                                    content: 'Critical: AI Service Outage Detected',
-                                },
-                            ]}
-                        />
+                                    )
+                                }))}
+                            />
+                        ) : (
+                            <Text type="secondary">No recent logs.</Text>
+                        )}
                     </Card>
                 </Col>
             </Row>
