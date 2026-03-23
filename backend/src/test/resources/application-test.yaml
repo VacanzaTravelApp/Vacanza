@@ -1,0 +1,22 @@
+# Test overrides — real credentials not needed for context load tests.
+# Unit tests mock all external clients directly.
+
+foursquare:
+  api-key: test-foursquare-key-placeholder
+
+# Disable Foursquare calls during Spring context load tests
+# (other placeholders that were already working via env in CI are preserved)
+mapbox:
+  access-token: test-mapbox-token
+
+ticketmaster:
+  api-key: test-ticketmaster-key
+
+ai-service:
+  base-url: http://localhost:9999
+
+geoapify:
+  api-key: test-geoapify-key
+
+serpapi:
+  api-key: test-serpapi-key
