@@ -499,22 +499,8 @@ export default function MapPage() {
           limit: 200,
           sort: "RATING_DESC",
         };
-        const res = await fetch("/pois/search-in-area", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-
-
-        if (!res.ok) {
-          setPoisRaw([]);
-          return;
-        }
-
-        const data = await res.json();
-        setPoisRaw(Array.isArray(data?.pois) ? data.pois : []);
+        const res = await http.post("/pois/search-in-area", body);
+        setPoisRaw(Array.isArray(res.data?.pois) ? res.data.pois : []);
       } catch (e) {
         console.error(e);
         setPoisRaw([]);
@@ -788,11 +774,11 @@ export default function MapPage() {
     () =>
       Boolean(
         user &&
-          selection?.mode === "polygon" &&
-          (selection.polygon?.length ?? 0) >= 3 &&
-          !activeRoute &&
-          polygonRouteBannerDismissed &&
-          !resultsOpen
+        selection?.mode === "polygon" &&
+        (selection.polygon?.length ?? 0) >= 3 &&
+        !activeRoute &&
+        polygonRouteBannerDismissed &&
+        !resultsOpen
       ),
     [user, selection, activeRoute, polygonRouteBannerDismissed, resultsOpen]
   );
@@ -802,9 +788,9 @@ export default function MapPage() {
     () =>
       Boolean(
         user &&
-          activeRoute &&
-          selection?.mode === "polygon" &&
-          (selection.polygon?.length ?? 0) >= 3
+        activeRoute &&
+        selection?.mode === "polygon" &&
+        (selection.polygon?.length ?? 0) >= 3
       ),
     [user, activeRoute, selection]
   );
@@ -1146,14 +1132,90 @@ export default function MapPage() {
                 }}
               >
                 <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
+                  <Card
+                    size="small"
+                    styles={{ body: { padding: "10px 12px" } }}
+                    style={{
+                      borderRadius: 12,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                      background: "rgba(255,255,255,0.96)",
+                      backdropFilter: "blur(8px)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: isMobile ? "column" : "row",
+                        alignItems: isMobile ? "stretch" : "flex-start",
+                        justifyContent: "space-between",
+                        gap: 10,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 13,
+                          color: "#333",
+                          lineHeight: 1.45,
+                          flex: isMobile ? "none" : "1 1 0",
+                          minWidth: 0,
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        Bu alan için rota oluşturabilirsin. Önce haritayı ve sonuçları inceleyebilirsin; hazır olunca{" "}
+                        <b>Rota oluştur</b> ile devam et.
+                      </span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          flexShrink: 0,
+                          alignSelf: isMobile ? "stretch" : "auto",
+                        }}
+                      >
+                        <Button type="primary" size="small" onClick={openPolygonRouteParams}>
+                          Rota oluştur
+                        </Button>
+                        <Tooltip title="Bandı gizle (alan aynı kalır; rota için sonuç panelindeki düğmeyi kullan)">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<CloseOutlined />}
+                            onClick={() => setPolygonRouteBannerDismissed(true)}
+                            aria-label="Rota isteğini gizle"
+                          />
+                        </Tooltip>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+          {showReplanDayBanner && (
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                right: 12,
+                zIndex: 25,
+                display: "flex",
+                justifyContent: "center",
+                pointerEvents: "none",
+                boxSizing: "border-box",
+              }}
+            >
+              <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
                 <Card
                   size="small"
                   styles={{ body: { padding: "10px 12px" } }}
                   style={{
                     borderRadius: 12,
                     boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                    background: "rgba(255,255,255,0.96)",
+                    background: "rgba(255,248,240,0.98)",
                     backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(249,115,22,0.35)",
                   }}
                 >
                   <div
@@ -1175,102 +1237,26 @@ export default function MapPage() {
                         wordBreak: "break-word",
                       }}
                     >
-                      Bu alan için rota oluşturabilirsin. Önce haritayı ve sonuçları inceleyebilirsin; hazır olunca{" "}
-                      <b>Rota oluştur</b> ile devam et.
+                      <b>Gün {activeDay}</b> — Haritada çizdiğin alandaki mekânlara göre durakları güncelle. Bunun için
+                      sohbet veya harita rotasına bağlı bir oturum gerekir.
                     </span>
-                    <div
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={replanDaySubmitting}
+                      onClick={submitReplanDayFromPolygon}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
+                        background: "#ea580c",
+                        borderColor: "#c2410c",
                         flexShrink: 0,
-                        alignSelf: isMobile ? "stretch" : "auto",
+                        alignSelf: isMobile ? "stretch" : "flex-start",
+                        whiteSpace: isMobile ? "normal" : "nowrap",
                       }}
                     >
-                      <Button type="primary" size="small" onClick={openPolygonRouteParams}>
-                        Rota oluştur
-                      </Button>
-                      <Tooltip title="Bandı gizle (alan aynı kalır; rota için sonuç panelindeki düğmeyi kullan)">
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<CloseOutlined />}
-                          onClick={() => setPolygonRouteBannerDismissed(true)}
-                          aria-label="Rota isteğini gizle"
-                        />
-                      </Tooltip>
-                    </div>
+                      {isMobile ? "Çizime göre güncelle" : "Günü çizime göre yenile"}
+                    </Button>
                   </div>
                 </Card>
-                </div>
-              </div>
-            )}
-
-          {showReplanDayBanner && (
-            <div
-              style={{
-                position: "absolute",
-                top: 12,
-                left: 12,
-                right: 12,
-                zIndex: 25,
-                display: "flex",
-                justifyContent: "center",
-                pointerEvents: "none",
-                boxSizing: "border-box",
-              }}
-            >
-              <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
-              <Card
-                size="small"
-                styles={{ body: { padding: "10px 12px" } }}
-                style={{
-                  borderRadius: 12,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                  background: "rgba(255,248,240,0.98)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(249,115,22,0.35)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: isMobile ? "column" : "row",
-                    alignItems: isMobile ? "stretch" : "flex-start",
-                    justifyContent: "space-between",
-                    gap: 10,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: "#333",
-                      lineHeight: 1.45,
-                      flex: isMobile ? "none" : "1 1 0",
-                      minWidth: 0,
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    <b>Gün {activeDay}</b> — Haritada çizdiğin alandaki mekânlara göre durakları güncelle. Bunun için
-                    sohbet veya harita rotasına bağlı bir oturum gerekir.
-                  </span>
-                  <Button
-                    type="primary"
-                    size="small"
-                    loading={replanDaySubmitting}
-                    onClick={submitReplanDayFromPolygon}
-                    style={{
-                      background: "#ea580c",
-                      borderColor: "#c2410c",
-                      flexShrink: 0,
-                      alignSelf: isMobile ? "stretch" : "flex-start",
-                      whiteSpace: isMobile ? "normal" : "nowrap",
-                    }}
-                  >
-                    {isMobile ? "Çizime göre güncelle" : "Günü çizime göre yenile"}
-                  </Button>
-                </div>
-              </Card>
               </div>
             </div>
           )}
@@ -1724,25 +1710,25 @@ export default function MapPage() {
                         Rota oluştur
                       </Button>
                     )}
-                  <Button
-                    type="text"
-                    icon={<CloseOutlined />}
-                    onClick={async () => {
-                      // ✅ alanı sil + VIEWPORT'a dön + tüm POI'leri getir
-                      setResultsOpen(false);
-                      setResultsTab("all");
-                      setSelection({ mode: null, polygon: [] });
-                      setMode("VIEWPORT");
+                    <Button
+                      type="text"
+                      icon={<CloseOutlined />}
+                      onClick={async () => {
+                        // ✅ alanı sil + VIEWPORT'a dön + tüm POI'leri getir
+                        setResultsOpen(false);
+                        setResultsTab("all");
+                        setSelection({ mode: null, polygon: [] });
+                        setMode("VIEWPORT");
 
-                      const bbox = getViewportBbox();
-                      if (bbox) {
-                        await fetchPois({ selectionType: "BBOX", bbox, categoriesOverride: [] });
-                      }
+                        const bbox = getViewportBbox();
+                        if (bbox) {
+                          await fetchPois({ selectionType: "BBOX", bbox, categoriesOverride: [] });
+                        }
 
-                      setFilterOpen(true);
-                    }}
-                    aria-label="Close results"
-                  />
+                        setFilterOpen(true);
+                      }}
+                      aria-label="Close results"
+                    />
                   </div>
                 </div>
 

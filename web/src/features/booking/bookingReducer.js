@@ -14,7 +14,8 @@ export const initialState = {
     isRoundTrip: false,
     travelClass: 'ECONOMY'
   },
-  errors: {}
+  errors: {},
+  generalError: null
 };
 
 export function bookingReducer(state, action) {
@@ -46,6 +47,7 @@ export function bookingReducer(state, action) {
 
       return {
         ...state,
+        generalError: null,
         sortBy: action.payload.sortBy !== undefined ? action.payload.sortBy : state.sortBy,
         bookingType: action.payload.bookingType || state.bookingType,
         searchParams: {
@@ -61,7 +63,7 @@ export function bookingReducer(state, action) {
     case "SEARCH_SUCCESS":
       return { ...state, loading: false, items: action.payload, view: 'results' };
     case "SEARCH_ERROR":
-      return { ...state, loading: false };
+      return { ...state, loading: false, generalError: action.payload || "Search failed." };
     case "RETRY":
       return { ...state, view: 'search', items: [], sortBy: 'low' };
     case "RESET_STATE":
