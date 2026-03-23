@@ -62,4 +62,12 @@ public class PointOfInterest {
         @Column(name = "external_id", unique = true, nullable = true, length = 255)
         private String externalId; // Foursquare ID (Optional for user-created places)
 
+        /**
+         * Human-readable cuisine or place type derived from Foursquare categories.
+         * Examples: "Café", "Turkish Restaurant", "Rooftop Bar", "Bakery".
+         * Used as context for AI route generation and personalization scoring.
+         */
+        @Column(name = "cuisine_type", nullable = true, length = 100)
+        private String cuisineType;
+
 }
