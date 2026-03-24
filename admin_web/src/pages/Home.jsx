@@ -27,14 +27,6 @@ export default function Home() {
             transition={{ duration: 0.8 }}
             style={{ padding: "12px" }}
         >
-            <Alert
-                title={<Text strong>System Health Check: ALL SYSTEMS OPERATIONAL</Text>}
-                description="Last verified performance audit was completed 10 minutes ago."
-                type="success"
-                showIcon
-                closable
-                style={{ marginBottom: "24px", borderRadius: 8 }}
-            />
 
             <div style={{ marginBottom: 32 }}>
                 <Title level={2}><MdFlightTakeoff style={{ color: '#1677ff', marginRight: 8 }} /> Vacanza Admin Dashboard</Title>
@@ -42,54 +34,57 @@ export default function Home() {
             </div>
 
             <Row gutter={[24, 24]}>
-                <Col span={16}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                        <Card
-                            hoverable
-                            className="action-card"
-                            onClick={() => navigate('/monitoring')}
-                            style={{ borderLeft: '4px solid #faad14', borderRadius: 12 }}
-                            cover={
-                                <div style={{ padding: '24px 24px 0', fontSize: 32, color: '#faad14' }}>
-                                    <SecurityScanOutlined />
+                <Col xs={24} lg={16}>
+                    <Row gutter={[24, 24]}>
+                        <Col xs={24} md={12}>
+                            <Card
+                                hoverable
+                                className="action-card"
+                                onClick={() => navigate('/monitoring')}
+                                style={{ borderLeft: '4px solid #faad14', borderRadius: 12 }}
+                                cover={
+                                    <div style={{ padding: '24px 24px 0', fontSize: 32, color: '#faad14' }}>
+                                        <SecurityScanOutlined />
+                                    </div>
+                                }
+                            >
+                                <Title level={4}>UC2.1: Monitoring</Title>
+                                <Text type="secondary">Live API latency, database status, and health metrics.</Text>
+                                <div style={{ marginTop: 16 }}>
+                                    <Button type="link" style={{ padding: 0 }}>Launch Monitor <ArrowRightOutlined /></Button>
                                 </div>
-                            }
-                        >
-                            <Title level={4}>UC2.1: Monitoring</Title>
-                            <Text type="secondary">Live API latency, database status, and health metrics.</Text>
-                            <div style={{ marginTop: 16 }}>
-                                <Button type="link" style={{ padding: 0 }}>Launch Monitor <ArrowRightOutlined /></Button>
-                            </div>
-                        </Card>
-
-                        <Card
-                            hoverable
-                            className="action-card"
-                            onClick={() => navigate('/analytics')}
-                            style={{ borderLeft: '4px solid #1677ff', borderRadius: 12 }}
-                            cover={
-                                <div style={{ padding: '24px 24px 0', fontSize: 32, color: '#1677ff' }}>
-                                    <LineChartOutlined />
+                            </Card>
+                        </Col>
+                        <Col xs={24} md={12}>
+                            <Card
+                                hoverable
+                                className="action-card"
+                                onClick={() => navigate('/analytics')}
+                                style={{ borderLeft: '4px solid #1677ff', borderRadius: 12 }}
+                                cover={
+                                    <div style={{ padding: '24px 24px 0', fontSize: 32, color: '#1677ff' }}>
+                                        <LineChartOutlined />
+                                    </div>
+                                }
+                            >
+                                <Title level={4}>UC2.2: Analytics</Title>
+                                <Text type="secondary">Generate comprehensive reports on user growth and POI engagement.</Text>
+                                <div style={{ marginTop: 16 }}>
+                                    <Button type="link" style={{ padding: 0 }}>View Reports <ArrowRightOutlined /></Button>
                                 </div>
-                            }
-                        >
-                            <Title level={4}>UC2.2: Analytics</Title>
-                            <Text type="secondary">Generate comprehensive reports on user growth and POI engagement.</Text>
-                            <div style={{ marginTop: 16 }}>
-                                <Button type="link" style={{ padding: 0 }}>View Reports <ArrowRightOutlined /></Button>
-                            </div>
-                        </Card>
-                    </div>
+                            </Card>
+                        </Col>
+                    </Row>
 
                     <Card title="Engagement Overview" style={{ marginTop: 24, borderRadius: 12 }} variant="borderless">
-                        <Row gutter={16}>
-                            <Col span={12}>
+                        <Row gutter={[16, 16]}>
+                            <Col xs={12} sm={12}>
                                 <Statistic title="Session Retention" value={92} suffix="%" styles={{ content: { color: '#52c41a' } }} />
                                 <div style={{ marginTop: 12 }}>
                                     <Progress percent={92} size="small" strokeColor="#52c41a" />
                                 </div>
                             </Col>
-                            <Col span={12}>
+                            <Col xs={12} sm={12}>
                                 <Statistic title="Peak Concurrency" value={8420} styles={{ content: { color: '#1677ff' } }} />
                                 <div style={{ marginTop: 12 }}>
                                     <Progress percent={64} size="small" status="active" />
@@ -99,7 +94,7 @@ export default function Home() {
                     </Card>
                 </Col>
 
-                <Col span={8}>
+                <Col xs={24} lg={8}>
                     <Card title="System Timeline" style={{ borderRadius: 12, height: '100%' }} variant="borderless">
                         <Timeline
                             items={[

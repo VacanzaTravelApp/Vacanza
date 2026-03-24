@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Form, Input, Button, Card, Typography, message, Layout } from "antd";
+import { Form, Input, Button, Card, Typography, App as AntApp, Layout } from "antd";
 import { LockOutlined, UserOutlined, SendOutlined } from "@ant-design/icons";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
@@ -11,6 +11,7 @@ const { Title, Text } = Typography;
 const { Content } = Layout;
 
 export default function Login() {
+    const { message } = AntApp.useApp();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
 
