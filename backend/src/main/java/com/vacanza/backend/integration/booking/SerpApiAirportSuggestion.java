@@ -47,7 +47,7 @@ public class SerpApiAirportSuggestion {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AutocompleteResponse {
 
-        @JsonProperty("suggested_locations")
+        @JsonProperty("suggestions")
         private List<AirportEntry> airports;
     }
 
