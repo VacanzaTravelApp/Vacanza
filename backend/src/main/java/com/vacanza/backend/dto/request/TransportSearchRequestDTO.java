@@ -18,12 +18,16 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class TransportSearchRequestDTO {
 
-    @NotBlank(message = "Origin is required (e.g. IST)")
-    @Pattern(regexp = "^[A-Z]{3}$", message = "Origin must be a valid 3-letter IATA code")
+    @NotBlank(message = "Origin is required (e.g. IST or /m/...)")
+    @Pattern(
+            regexp = "^([A-Z]{3}|/m/.+)$",
+            message = "Origin must be a 3-letter IATA code (e.g. IST) or a Google kgmid (e.g. /m/04jpl)")
     private String origin;
 
-    @NotBlank(message = "Destination is required (e.g. PAR)")
-    @Pattern(regexp = "^[A-Z]{3}$", message = "Destination must be a valid 3-letter IATA code")
+    @NotBlank(message = "Destination is required (e.g. PAR or /m/...)")
+    @Pattern(
+            regexp = "^([A-Z]{3}|/m/.+)$",
+            message = "Destination must be a 3-letter IATA code (e.g. PAR) or a Google kgmid (e.g. /m/0d6lp)")
     private String destination;
 
     @NotNull(message = "Departure date is required")
