@@ -17,6 +17,7 @@ import 'package:mobile/features/poi_search/data/models/poi_categories.dart';
 
 import '../../application/ar_poi_layout.dart';
 import '../../data/ar_nearby_poi_api_client.dart';
+import '../../data/device_heading_service.dart';
 import '../../data/ar_poi_source_from_backend_nearby.dart';
 import '../../data/ar_poi_source_from_poi_search.dart';
 import '../../domain/models/ar_poi.dart';
@@ -43,17 +44,20 @@ class _ArExplorePageState extends State<ArExplorePage> {
   String? _checkinMessage;
 
   final LocationService _locationService = LocationService();
+  final DeviceHeadingService _headingService = const DeviceHeadingService();
 
   List<ArPoi> _pois = const [];
   bool _isLoadingPois = false;
   String? _poisError;
 
-  final Set<String> _selectedCategories = Set<String>.from(PoiCategories.defaults);
+  final Set<String> _selectedCategories = Set<String>.from(
+    PoiCategories.defaults,
+  );
   bool _showHelp = true;
 
   int _maxPoisPerCategory = 1;
 
-  StreamSubscription<Position>? _headingSubscription;
+  StreamSubscription<double>? _headingSubscription;
 
   @override
   void initState() {
@@ -86,7 +90,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
         orElse: () => cameras.first,
       );
 
-      final controller = CameraController(backCamera, ResolutionPreset.medium, enableAudio: false);
+      final controller = CameraController(
+        backCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
 
       await controller.initialize();
 
@@ -116,10 +124,12 @@ class _ArExplorePageState extends State<ArExplorePage> {
 
     try {
       final perm = await _locationService.checkAndRequestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
         setState(() {
           _pois = const [];
-          _poisError = 'Location permission is required to show nearby places in AR.';
+          _poisError =
+              'Location permission is required to show nearby places in AR.';
         });
         return;
       }
@@ -170,16 +180,12 @@ class _ArExplorePageState extends State<ArExplorePage> {
 
   void _startHeadingUpdates() {
     _headingSubscription?.cancel();
-    _headingSubscription = _locationService.positionStream(distanceFilter: 0).listen(
-      (Position position) {
-        if (!mounted) return;
-        final heading = position.heading;
-        if (heading >= 0 && heading <= 360) {
-          setState(() => _deviceHeadingDeg = heading);
-        }
-      },
-      onError: (_) {},
-    );
+    _headingSubscription = _headingService.headingStream().listen((
+      double heading,
+    ) {
+      if (!mounted) return;
+      setState(() => _deviceHeadingDeg = heading);
+    }, onError: (_) {});
   }
 
   @override
@@ -209,20 +215,21 @@ class _ArExplorePageState extends State<ArExplorePage> {
         } else if (state.status == CheckinStatus.duplicate) {
           setState(() {
             _checkinLoading = false;
-            _checkinMessage = state.response?.message ??
-                'You have already checked in here.';
+            _checkinMessage =
+                state.response?.message ?? 'You have already checked in here.';
           });
         } else if (state.status == CheckinStatus.noMatch) {
           setState(() {
             _checkinLoading = false;
-            _checkinMessage = state.response?.message ??
+            _checkinMessage =
+                state.response?.message ??
                 'You are too far from this place to check in.';
           });
         } else if (state.status == CheckinStatus.failure) {
           setState(() {
             _checkinLoading = false;
-            _checkinMessage = state.errorMessage ??
-                'Check-in failed. Please try again.';
+            _checkinMessage =
+                state.errorMessage ?? 'Check-in failed. Please try again.';
           });
         }
       },
@@ -246,7 +253,9 @@ class _ArExplorePageState extends State<ArExplorePage> {
           message: 'Checking device support and camera permission.',
         );
       case _ArModeStatus.cameraDenied:
-        return _CameraDeniedMessage(onBackToMap: () => Navigator.of(context).pop());
+        return _CameraDeniedMessage(
+          onBackToMap: () => Navigator.of(context).pop(),
+        );
       case _ArModeStatus.ready:
         final positioned = layoutArPois(
           pois: _pois,
@@ -258,7 +267,8 @@ class _ArExplorePageState extends State<ArExplorePage> {
           children: [
             Positioned.fill(
               child:
-                  _cameraController != null && _cameraController!.value.isInitialized
+                  _cameraController != null &&
+                          _cameraController!.value.isInitialized
                       ? CameraPreview(_cameraController!)
                       : const ColoredBox(color: Colors.black),
             ),
@@ -270,7 +280,10 @@ class _ArExplorePageState extends State<ArExplorePage> {
                   _buildBottomHud(),
                   for (final p in positioned)
                     Align(
-                      alignment: Alignment(p.xFraction * 2 - 1, -0.6 + p.row * 0.25),
+                      alignment: Alignment(
+                        p.xFraction * 2 - 1,
+                        -0.6 + p.row * 0.25,
+                      ),
                       child: GestureDetector(
                         onTap: () => _onPoiTap(p.poi),
                         child: ArPoiChip(poi: p.poi),
@@ -348,13 +361,19 @@ class _ArExplorePageState extends State<ArExplorePage> {
                   const SizedBox(height: 4),
                   Text(
                     'Approx. $dist away',
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 12,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   if (_checkinMessage != null) ...[
                     Text(
                       _checkinMessage!,
-                      style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                      ),
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -368,14 +387,17 @@ class _ArExplorePageState extends State<ArExplorePage> {
                                 final poi = _selectedPoi;
                                 if (poi == null) return;
 
-                                debugPrint('[AR_CHECKIN] attempt poiId=${poi.id} name=${poi.name}');
+                                debugPrint(
+                                  '[AR_CHECKIN] attempt poiId=${poi.id} name=${poi.name}',
+                                );
 
                                 setState(() {
                                   _checkinLoading = true;
                                   _checkinMessage = null;
                                 });
 
-                                final pos = await _locationService.getCurrentPosition();
+                                final pos =
+                                    await _locationService.getCurrentPosition();
 
                                 if (!mounted) return;
 
@@ -390,7 +412,9 @@ class _ArExplorePageState extends State<ArExplorePage> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.black87,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('Check in here'),
                     ),
@@ -420,7 +444,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
               mainAxisSize: MainAxisSize.max,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   padding: EdgeInsets.zero,
                   onPressed: () => Navigator.of(context).pop(),
                 ),
@@ -456,28 +484,28 @@ class _ArExplorePageState extends State<ArExplorePage> {
                       _maxPoisPerCategory = value;
                     });
                   },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(
-                      value: 1,
-                      child: Text('1 per category'),
-                    ),
-                    PopupMenuItem(
-                      value: 2,
-                      child: Text('2 per category'),
-                    ),
-                    PopupMenuItem(
-                      value: 3,
-                      child: Text('3 per category'),
-                    ),
-                  ],
+                  itemBuilder:
+                      (context) => const [
+                        PopupMenuItem(value: 1, child: Text('1 per category')),
+                        PopupMenuItem(value: 2, child: Text('2 per category')),
+                        PopupMenuItem(value: 3, child: Text('3 per category')),
+                      ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                  icon: const Icon(
+                    Icons.refresh,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   padding: EdgeInsets.zero,
                   onPressed: _loadPoisForCurrentLocation,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.help_outline, color: Colors.white, size: 20),
+                  icon: const Icon(
+                    Icons.help_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   padding: EdgeInsets.zero,
                   onPressed: () => setState(() => _showHelp = true),
                 ),
@@ -500,7 +528,10 @@ class _ArExplorePageState extends State<ArExplorePage> {
           children: [
             if (_poisError != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 margin: const EdgeInsets.only(bottom: 6),
                 decoration: BoxDecoration(
                   color: Colors.redAccent.withOpacity(0.85),
@@ -514,7 +545,10 @@ class _ArExplorePageState extends State<ArExplorePage> {
               )
             else if (!_isLoadingPois && _pois.isEmpty)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 margin: const EdgeInsets.only(bottom: 6),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.6),
@@ -528,7 +562,10 @@ class _ArExplorePageState extends State<ArExplorePage> {
               )
             else
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 margin: const EdgeInsets.only(bottom: 6),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.4),
@@ -574,7 +611,9 @@ class _ArExplorePageState extends State<ArExplorePage> {
                           checkmarkColor: Colors.black87,
                           labelStyle: TextStyle(
                             color:
-                                _selectedCategories.contains(key) ? Colors.black87 : Colors.white,
+                                _selectedCategories.contains(key)
+                                    ? Colors.black87
+                                    : Colors.white,
                           ),
                         ),
                       ),
@@ -625,7 +664,10 @@ class _ArExplorePageState extends State<ArExplorePage> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () => setState(() => _showHelp = false),
-                      child: const Text('Got it', style: TextStyle(color: Colors.white)),
+                      child: const Text(
+                        'Got it',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     ),
                   ),
                 ],
@@ -650,7 +692,10 @@ class _CenterReticle extends StatelessWidget {
           height: 56,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 2),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.9),
+              width: 2,
+            ),
             color: Colors.black.withValues(alpha: 0.15),
           ),
           child: Center(
@@ -674,7 +719,11 @@ class _ArStatusMessage extends StatelessWidget {
   final String title;
   final String message;
 
-  const _ArStatusMessage({required this.icon, required this.title, required this.message});
+  const _ArStatusMessage({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
 
   @override
   Widget build(BuildContext context) {
