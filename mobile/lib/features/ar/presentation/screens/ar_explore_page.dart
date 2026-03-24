@@ -1,11 +1,20 @@
 import 'dart:async';
 
+import 'package:ar_flutter_plugin_engine/ar_flutter_plugin.dart';
+import 'package:ar_flutter_plugin_engine/datatypes/config_planedetection.dart';
+import 'package:ar_flutter_plugin_engine/datatypes/node_types.dart';
+import 'package:ar_flutter_plugin_engine/managers/ar_anchor_manager.dart';
+import 'package:ar_flutter_plugin_engine/managers/ar_location_manager.dart';
+import 'package:ar_flutter_plugin_engine/managers/ar_object_manager.dart';
+import 'package:ar_flutter_plugin_engine/managers/ar_session_manager.dart';
+import 'package:ar_flutter_plugin_engine/models/ar_node.dart';
 import 'package:camera/camera.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:vector_math/vector_math_64.dart' as vmath;
 
 import 'package:mobile/features/checkin/data/services/location_service.dart';
 import 'package:mobile/features/checkin/presentation/bloc/checkin_bloc.dart';
@@ -16,6 +25,7 @@ import 'package:mobile/features/poi_search/data/repositories/poi_search_reposito
 import 'package:mobile/features/poi_search/data/models/poi_categories.dart';
 
 import '../../application/ar_poi_layout.dart';
+import '../../application/ar_world_transform.dart';
 import '../../data/ar_nearby_poi_api_client.dart';
 import '../../data/device_heading_service.dart';
 import '../../data/ar_poi_source_from_backend_nearby.dart';
@@ -33,8 +43,22 @@ class ArExplorePage extends StatefulWidget {
 
 enum _ArModeStatus { checking, cameraDenied, ready }
 
+enum _TopHudAction {
+  maxPerCategory1,
+  maxPerCategory2,
+  maxPerCategory3,
+  refreshPois,
+  toggleDebugPanel,
+  togglePlacementMode,
+}
+
 class _ArExplorePageState extends State<ArExplorePage> {
+  static const String _poiNodeUri =
+      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb';
+
   CameraController? _cameraController;
+  ARSessionManager? _arSessionManager;
+  ARObjectManager? _arObjectManager;
 
   _ArModeStatus _status = _ArModeStatus.checking;
 
@@ -53,11 +77,18 @@ class _ArExplorePageState extends State<ArExplorePage> {
   final Set<String> _selectedCategories = Set<String>.from(
     PoiCategories.defaults,
   );
-  bool _showHelp = true;
+  bool _showDebugPanel = true;
+  double _headingOffsetDeg = 0;
+  bool _useWorldAnchors = true;
+  bool _isArViewReady = false;
+  bool _isSyncingArNodes = false;
+  String? _arMessage;
 
   int _maxPoisPerCategory = 1;
 
   StreamSubscription<double>? _headingSubscription;
+  final List<ARNode> _arNodes = <ARNode>[];
+  final Map<String, ArPoi> _poiByNodeName = <String, ArPoi>{};
 
   @override
   void initState() {
@@ -76,44 +107,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
       return;
     }
 
-    try {
-      debugPrint('[AR_MODE] camera permission granted, initializing camera');
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        debugPrint('[AR_MODE] no cameras available on device');
-        setState(() => _status = _ArModeStatus.cameraDenied);
-        return;
-      }
-
-      final backCamera = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
-        orElse: () => cameras.first,
-      );
-
-      final controller = CameraController(
-        backCamera,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-
-      await controller.initialize();
-
-      if (!mounted) {
-        await controller.dispose();
-        return;
-      }
-
-      debugPrint('[AR_MODE] camera initialized successfully');
-      setState(() {
-        _cameraController = controller;
-        _status = _ArModeStatus.ready;
-      });
-
-      await _loadPoisForCurrentLocation();
-    } catch (e) {
-      debugPrint('[AR_MODE] camera initialization failed: $e');
-      setState(() => _status = _ArModeStatus.cameraDenied);
-    }
+    if (!mounted) return;
+    setState(() {
+      _status = _ArModeStatus.ready;
+    });
+    await _loadPoisForCurrentLocation();
   }
 
   Future<void> _loadPoisForCurrentLocation() async {
@@ -150,7 +148,10 @@ class _ArExplorePageState extends State<ArExplorePage> {
       final List<String>? effectiveCategories =
           _selectedCategories.isEmpty
               ? null
-              : _selectedCategories.map((c) => c.toLowerCase()).toList();
+              : _selectedCategories
+                  .expand(_expandCategoryFiltersForApi)
+                  .toSet()
+                  .toList();
 
       final pois = await source.getNearbyArPois(
         lat: pos.latitude,
@@ -158,12 +159,14 @@ class _ArExplorePageState extends State<ArExplorePage> {
         categories: effectiveCategories,
         radiusMeters: 600,
       );
+      final filteredPois = _applyPoiFilters(pois);
 
       if (!mounted) return;
 
       setState(() {
-        _pois = pois;
+        _pois = filteredPois;
       });
+      await _syncArNodes();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -188,9 +191,160 @@ class _ArExplorePageState extends State<ArExplorePage> {
     }, onError: (_) {});
   }
 
+  void _onArViewCreated(
+    ARSessionManager arSessionManager,
+    ARObjectManager arObjectManager,
+    ARAnchorManager _,
+    ARLocationManager __,
+  ) {
+    _disposeFallbackCamera();
+    _arSessionManager = arSessionManager;
+    _arObjectManager = arObjectManager;
+
+    _arSessionManager!.onInitialize(
+      showAnimatedGuide: false,
+      showFeaturePoints: false,
+      showPlanes: false,
+      showWorldOrigin: false,
+      handleTaps: false,
+    );
+    _arObjectManager!.onInitialize();
+    _arObjectManager!.onNodeTap = _onArNodeTap;
+
+    if (!mounted) return;
+    setState(() {
+      _isArViewReady = true;
+      _arMessage = null;
+    });
+
+    _syncArNodes();
+  }
+
+  void _clearArNodes() {
+    final manager = _arObjectManager;
+    if (manager == null) return;
+    for (final node in _arNodes) {
+      manager.removeNode(node);
+    }
+    _arNodes.clear();
+    _poiByNodeName.clear();
+  }
+
+  Future<void> _ensureFallbackCameraInitialized() async {
+    if (_cameraController?.value.isInitialized == true) return;
+    try {
+      debugPrint('[AR_MODE] initializing fallback camera (CameraX)');
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) return;
+      final backCamera = cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
+
+      final controller = CameraController(
+        backCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      setState(() {
+        _cameraController = controller;
+      });
+    } catch (e) {
+      debugPrint('[AR_MODE] fallback camera initialization failed: $e');
+    }
+  }
+
+  void _disposeFallbackCamera() {
+    final controller = _cameraController;
+    _cameraController = null;
+    controller?.dispose();
+  }
+
+  Future<void> _syncArNodes() async {
+    if (!_useWorldAnchors || !_isArViewReady || _isSyncingArNodes) return;
+    final manager = _arObjectManager;
+    if (manager == null) return;
+
+    _isSyncingArNodes = true;
+    final effectiveHeadingDeg = _normalizeHeadingDeg(
+      _deviceHeadingDeg + _headingOffsetDeg,
+    );
+    final placements = buildArWorldPlacements(
+      pois: _pois,
+      deviceHeadingDeg: effectiveHeadingDeg,
+      maxPerCategory: _maxPoisPerCategory,
+    );
+
+    try {
+      _clearArNodes();
+      final addedNodes = <ARNode>[];
+      final nodeToPoi = <String, ArPoi>{};
+
+      for (final placement in placements) {
+        final nodeName = 'poi_${placement.poi.id}';
+        final scaleFactor = (26.0 / placement.renderDistanceMeters).clamp(
+          0.07,
+          0.18,
+        );
+        final node = ARNode(
+          type: NodeType.webGLB,
+          uri: _poiNodeUri,
+          name: nodeName,
+          position: vmath.Vector3(
+            placement.xMeters,
+            placement.yMeters,
+            placement.zMeters,
+          ),
+          scale: vmath.Vector3.all(scaleFactor),
+        );
+        final added = await manager.addNode(node);
+        if (added == true) {
+          addedNodes.add(node);
+          nodeToPoi[nodeName] = placement.poi;
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _arNodes
+          ..clear()
+          ..addAll(addedNodes);
+        _poiByNodeName
+          ..clear()
+          ..addAll(nodeToPoi);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _arMessage = 'AR anchors could not be synced. Using fallback overlay.';
+        _useWorldAnchors = false;
+      });
+    } finally {
+      _isSyncingArNodes = false;
+    }
+  }
+
+  Future<void> _onArNodeTap(List<dynamic> nodeNames) async {
+    if (nodeNames.isEmpty) return;
+    final first = nodeNames.first;
+    if (first is! String) return;
+    final poi = _poiByNodeName[first];
+    if (poi == null || !mounted) return;
+    setState(() {
+      _selectedPoi = poi;
+    });
+  }
+
   @override
   void dispose() {
     _headingSubscription?.cancel();
+    _clearArNodes();
+    _arSessionManager?.dispose();
     _cameraController?.dispose();
     super.dispose();
   }
@@ -257,11 +411,53 @@ class _ArExplorePageState extends State<ArExplorePage> {
           onBackToMap: () => Navigator.of(context).pop(),
         );
       case _ArModeStatus.ready:
-        final positioned = layoutArPois(
+        final effectiveHeadingDeg = _normalizeHeadingDeg(
+          _deviceHeadingDeg + _headingOffsetDeg,
+        );
+        final worldPlacements = buildArWorldPlacements(
           pois: _pois,
-          deviceHeadingDeg: _deviceHeadingDeg,
+          deviceHeadingDeg: effectiveHeadingDeg,
           maxPerCategory: _maxPoisPerCategory,
         );
+        final positioned = layoutArPois(
+          pois: _pois,
+          deviceHeadingDeg: effectiveHeadingDeg,
+          maxPerCategory: _maxPoisPerCategory,
+        );
+
+        if (_useWorldAnchors) {
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: ARView(
+                  onARViewCreated: _onArViewCreated,
+                  planeDetectionConfig: PlaneDetectionConfig.none,
+                ),
+              ),
+              Positioned.fill(
+                child: Stack(
+                  children: [
+                    _buildTopHud(),
+                    _buildBottomHud(),
+                    if (_showDebugPanel)
+                      _buildWorldDebugPanel(
+                        placements: worldPlacements,
+                        effectiveHeadingDeg: effectiveHeadingDeg,
+                      ),
+                    _buildWorldFloatingLabels(worldPlacements),
+                    if (_arMessage != null) _buildArMessage(),
+                  ],
+                ),
+              ),
+              if (_selectedPoi != null) _buildPoiBottomSheet(),
+            ],
+          );
+        }
+
+        if (_cameraController == null ||
+            !_cameraController!.value.isInitialized) {
+          Future.microtask(_ensureFallbackCameraInitialized);
+        }
 
         return Stack(
           children: [
@@ -272,12 +468,16 @@ class _ArExplorePageState extends State<ArExplorePage> {
                       ? CameraPreview(_cameraController!)
                       : const ColoredBox(color: Colors.black),
             ),
-            const _CenterReticle(),
             Positioned.fill(
               child: Stack(
                 children: [
                   _buildTopHud(),
                   _buildBottomHud(),
+                  if (_showDebugPanel)
+                    _buildDebugPanel(
+                      positioned: positioned,
+                      effectiveHeadingDeg: effectiveHeadingDeg,
+                    ),
                   for (final p in positioned)
                     Align(
                       alignment: Alignment(
@@ -292,7 +492,6 @@ class _ArExplorePageState extends State<ArExplorePage> {
                 ],
               ),
             ),
-            if (_showHelp) _buildHelpOverlay(),
             if (_selectedPoi != null) _buildPoiBottomSheet(),
           ],
         );
@@ -441,7 +640,6 @@ class _ArExplorePageState extends State<ArExplorePage> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
-              mainAxisSize: MainAxisSize.max,
               children: [
                 IconButton(
                   icon: const Icon(
@@ -450,6 +648,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
                     size: 20,
                   ),
                   padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  visualDensity: VisualDensity.compact,
                   onPressed: () => Navigator.of(context).pop(),
                 ),
                 const SizedBox(width: 4),
@@ -476,38 +679,104 @@ class _ArExplorePageState extends State<ArExplorePage> {
                       ),
                     ),
                   ),
-                PopupMenuButton<int>(
-                  icon: const Icon(Icons.tune, color: Colors.white, size: 20),
+                PopupMenuButton<_TopHudAction>(
+                  tooltip: 'AR options',
+                  icon: const Icon(
+                    Icons.more_vert,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                   padding: EdgeInsets.zero,
-                  onSelected: (value) {
-                    setState(() {
-                      _maxPoisPerCategory = value;
-                    });
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _TopHudAction.maxPerCategory1:
+                        setState(() => _maxPoisPerCategory = 1);
+                        _syncArNodes();
+                        break;
+                      case _TopHudAction.maxPerCategory2:
+                        setState(() => _maxPoisPerCategory = 2);
+                        _syncArNodes();
+                        break;
+                      case _TopHudAction.maxPerCategory3:
+                        setState(() => _maxPoisPerCategory = 3);
+                        _syncArNodes();
+                        break;
+                      case _TopHudAction.refreshPois:
+                        _loadPoisForCurrentLocation();
+                        break;
+                      case _TopHudAction.toggleDebugPanel:
+                        setState(() => _showDebugPanel = !_showDebugPanel);
+                        break;
+                      case _TopHudAction.togglePlacementMode:
+                        setState(() {
+                          _useWorldAnchors = !_useWorldAnchors;
+                          _arMessage =
+                              _useWorldAnchors
+                                  ? 'World-anchor mode enabled.'
+                                  : 'Compass fallback mode enabled.';
+                        });
+                        if (_useWorldAnchors) {
+                          _disposeFallbackCamera();
+                          _syncArNodes();
+                        } else {
+                          _clearArNodes();
+                          _ensureFallbackCameraInitialized();
+                        }
+                        break;
+                    }
                   },
                   itemBuilder:
-                      (context) => const [
-                        PopupMenuItem(value: 1, child: Text('1 per category')),
-                        PopupMenuItem(value: 2, child: Text('2 per category')),
-                        PopupMenuItem(value: 3, child: Text('3 per category')),
+                      (context) => [
+                        PopupMenuItem<_TopHudAction>(
+                          value: _TopHudAction.maxPerCategory1,
+                          child: Text(
+                            _maxPoisPerCategory == 1
+                                ? '✓ 1 per category'
+                                : '1 per category',
+                          ),
+                        ),
+                        PopupMenuItem<_TopHudAction>(
+                          value: _TopHudAction.maxPerCategory2,
+                          child: Text(
+                            _maxPoisPerCategory == 2
+                                ? '✓ 2 per category'
+                                : '2 per category',
+                          ),
+                        ),
+                        PopupMenuItem<_TopHudAction>(
+                          value: _TopHudAction.maxPerCategory3,
+                          child: Text(
+                            _maxPoisPerCategory == 3
+                                ? '✓ 3 per category'
+                                : '3 per category',
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem<_TopHudAction>(
+                          value: _TopHudAction.refreshPois,
+                          child: Text('Refresh places'),
+                        ),
+                        PopupMenuItem<_TopHudAction>(
+                          value: _TopHudAction.toggleDebugPanel,
+                          child: Text(
+                            _showDebugPanel
+                                ? 'Hide debug panel'
+                                : 'Show debug panel',
+                          ),
+                        ),
+                        PopupMenuItem<_TopHudAction>(
+                          value: _TopHudAction.togglePlacementMode,
+                          child: Text(
+                            _useWorldAnchors
+                                ? 'Use compass fallback'
+                                : 'Use world anchors',
+                          ),
+                        ),
                       ],
-                ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.refresh,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  padding: EdgeInsets.zero,
-                  onPressed: _loadPoisForCurrentLocation,
-                ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.help_outline,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  padding: EdgeInsets.zero,
-                  onPressed: () => setState(() => _showHelp = true),
                 ),
               ],
             ),
@@ -627,48 +896,371 @@ class _ArExplorePageState extends State<ArExplorePage> {
     );
   }
 
-  Widget _buildHelpOverlay() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black.withOpacity(0.45),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(16),
+  Widget _buildWorldFloatingLabels(List<ArWorldPlacement> placements) {
+    if (placements.isEmpty) return const SizedBox.shrink();
+    final labels = _buildWorldLabelPositions(placements);
+    return Align(
+      alignment: Alignment.center,
+      child: IgnorePointer(
+        ignoring: false,
+        child: Stack(
+          children: [
+            for (final label in labels)
+              Align(
+                alignment: Alignment(label.x * 2 - 1, label.yAlign),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 190),
+                  child: Transform.scale(
+                    scale: label.scale,
+                    alignment: Alignment.center,
+                    child: GestureDetector(
+                      onTap: () => _onPoiTap(label.placement.poi),
+                      child: ArPoiChip(poi: label.placement.poi),
+                    ),
+                  ),
+                ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_WorldLabelPosition> _buildWorldLabelPositions(
+    List<ArWorldPlacement> placements,
+  ) {
+    final placed = <_WorldLabelPosition>[];
+    const visibleFovDeg = 55.0;
+    const minXGap = 0.17;
+    const maxRows = 4;
+
+    // Keep labels stable and readable by favoring closer POIs first.
+    final sorted = [...placements]
+      ..sort((a, b) => a.poi.distanceMeters.compareTo(b.poi.distanceMeters));
+    final minDistance = sorted.first.poi.distanceMeters;
+    final maxDistance = sorted.last.poi.distanceMeters;
+
+    for (final placement in sorted) {
+      final rel = placement.relativeBearingDeg;
+      var x = (0.5 + (rel / visibleFovDeg) * 0.5).clamp(0.08, 0.92);
+      int row = 0;
+      while (row < maxRows &&
+          placed.any((p) => p.row == row && (p.x - x).abs() < minXGap)) {
+        row++;
+      }
+      if (row >= maxRows) {
+        // If crowded, nudge horizontally to nearest free slot.
+        x = (x + 0.08).clamp(0.08, 0.92);
+        row = maxRows - 1;
+      }
+      placed.add(
+        _WorldLabelPosition(
+          placement: placement,
+          x: x,
+          row: row,
+          yAlign: -0.56 + (row * 0.2),
+          scale: _relativeLabelScale(
+            placement.poi.distanceMeters,
+            minDistance,
+            maxDistance,
+          ),
+        ),
+      );
+    }
+    return placed;
+  }
+
+  double _relativeLabelScale(
+    double distanceMeters,
+    double minDistanceMeters,
+    double maxDistanceMeters,
+  ) {
+    if ((maxDistanceMeters - minDistanceMeters).abs() < 0.1) {
+      return 0.88;
+    }
+    final t = ((distanceMeters - minDistanceMeters) /
+            (maxDistanceMeters - minDistanceMeters))
+        .clamp(0.0, 1.0);
+    // Closest -> 1.0, farthest -> 0.70
+    return (1.0 - (0.30 * t)).clamp(0.70, 1.0);
+  }
+
+  bool _isDisplayablePoiName(String rawName) {
+    final normalized = rawName.trim().toLowerCase();
+    if (normalized.isEmpty) return false;
+    return normalized != 'unnamed' &&
+        normalized != 'null' &&
+        normalized != 'undefined' &&
+        normalized != '-';
+  }
+
+  List<ArPoi> _applyPoiFilters(List<ArPoi> pois) {
+    final out = <ArPoi>[];
+    final seenKeys = <String>{};
+    final selected = _selectedCategories.map(_canonicalCategory).toSet();
+    final enforceCategory = selected.isNotEmpty;
+
+    for (final poi in pois) {
+      if (!_isDisplayablePoiName(poi.name)) continue;
+
+      final canonicalPoiCategory = _canonicalCategory(poi.categoryKey);
+      if (enforceCategory && !selected.contains(canonicalPoiCategory)) {
+        continue;
+      }
+
+      final dedupeKey = _buildPoiDedupeKey(poi);
+      if (!seenKeys.add(dedupeKey)) continue;
+      out.add(poi);
+    }
+
+    out.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+    return out;
+  }
+
+  String _buildPoiDedupeKey(ArPoi poi) {
+    final id = poi.id.trim().toLowerCase();
+    if (id.isNotEmpty) return 'id:$id';
+    final name = poi.name.trim().toLowerCase();
+    final cat = _canonicalCategory(poi.categoryKey);
+    final dist = poi.distanceMeters.round();
+    final bearing = poi.bearingDegrees.round();
+    return 'fallback:$name|$cat|$dist|$bearing';
+  }
+
+  String _canonicalCategory(String raw) {
+    final c = raw.trim().toLowerCase();
+    switch (c) {
+      case 'restaurants':
+        return 'restaurant';
+      case 'cafes':
+        return 'cafe';
+      case 'museums':
+        return 'museum';
+      case 'monument':
+        return 'monuments';
+      case 'park':
+        return 'parks';
+      default:
+        return c;
+    }
+  }
+
+  Iterable<String> _expandCategoryFiltersForApi(String category) {
+    final canonical = _canonicalCategory(category);
+    switch (canonical) {
+      case 'restaurant':
+        return const ['restaurant', 'restaurants'];
+      case 'cafe':
+        return const ['cafe', 'cafes'];
+      case 'museum':
+        return const ['museum', 'museums'];
+      case 'monuments':
+        return const ['monuments', 'monument'];
+      case 'parks':
+        return const ['parks', 'park'];
+      default:
+        return [canonical];
+    }
+  }
+
+  Widget _buildWorldDebugPanel({
+    required List<ArWorldPlacement> placements,
+    required double effectiveHeadingDeg,
+  }) {
+    ArWorldPlacement? focus;
+    if (_selectedPoi != null) {
+      for (final p in placements) {
+        if (p.poi.id == _selectedPoi!.id) {
+          focus = p;
+          break;
+        }
+      }
+    }
+    focus ??= placements.isNotEmpty ? placements.first : null;
+
+    final poiName = focus?.poi.name ?? '-';
+    final rel = focus?.relativeBearingDeg.toStringAsFixed(1) ?? '-';
+    final dist = focus?.poi.distanceMeters.toStringAsFixed(1) ?? '-';
+    final arDist = focus?.renderDistanceMeters.toStringAsFixed(1) ?? '-';
+
+    return Align(
+      alignment: Alignment.topRight,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 68, right: 12),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 260),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.68),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: DefaultTextStyle(
+              style: const TextStyle(color: Colors.white, fontSize: 11),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
-                    'How to use AR Mode',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    'AR World Anchor Debug',
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  Text(
+                    'mode: ${_useWorldAnchors ? 'world-anchor' : 'fallback'}',
+                  ),
+                  Text('arReady: $_isArViewReady'),
+                  Text('rawHeading: ${_deviceHeadingDeg.toStringAsFixed(1)}°'),
+                  Text('effective: ${effectiveHeadingDeg.toStringAsFixed(1)}°'),
+                  Text('anchors: ${_arNodes.length}'),
+                  const SizedBox(height: 4),
+                  Text('focusPoi: $poiName'),
+                  Text('relative: $rel°'),
+                  Text('poiDistance: $dist m'),
+                  Text('renderDistance: $arDist m'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildArMessage() {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 64),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              _arMessage!,
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDebugPanel({
+    required List<ArPoiPositioned> positioned,
+    required double effectiveHeadingDeg,
+  }) {
+    final ArPoiPositioned? focus = _resolveDebugFocus(positioned);
+    final String poiName = focus?.poi.name ?? '-';
+    final String poiBearing =
+        focus != null ? focus.poi.bearingDegrees.toStringAsFixed(1) : '-';
+    final String relAngle =
+        focus != null
+            ? _signedRelativeAngleDeg(
+              toBearingDeg: focus.poi.bearingDegrees,
+              fromHeadingDeg: effectiveHeadingDeg,
+            ).toStringAsFixed(1)
+            : '-';
+    final String xFraction =
+        focus != null ? focus.xFraction.toStringAsFixed(3) : '-';
+
+    return Align(
+      alignment: Alignment.topRight,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 68, right: 12),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 250),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.68),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: DefaultTextStyle(
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   const Text(
-                    '• Move your phone around to see nearby places overlaid on the camera.\n'
-                    '• Use the category buttons at the bottom to filter what you see.\n'
-                    '• Tap the refresh icon to reload nearby places.',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                    'AR Debug / Calibration',
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => setState(() => _showHelp = false),
-                      child: const Text(
-                        'Got it',
-                        style: TextStyle(color: Colors.white),
+                  const SizedBox(height: 6),
+                  Text('rawHeading: ${_deviceHeadingDeg.toStringAsFixed(1)}°'),
+                  Text('offset: ${_headingOffsetDeg.toStringAsFixed(1)}°'),
+                  Text('effective: ${effectiveHeadingDeg.toStringAsFixed(1)}°'),
+                  const SizedBox(height: 4),
+                  Text('focusPoi: $poiName'),
+                  Text('poiBearing: $poiBearing°'),
+                  Text('relative: $relAngle°'),
+                  Text('xFraction: $xFraction'),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _headingOffsetDeg = _normalizeSigned180(
+                                _headingOffsetDeg - 2,
+                              );
+                            });
+                            _syncArNodes();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white54),
+                            minimumSize: const Size(0, 34),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: const Text('-2°'),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _headingOffsetDeg = 0;
+                            });
+                            _syncArNodes();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white54),
+                            minimumSize: const Size(0, 34),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: const Text('Reset'),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _headingOffsetDeg = _normalizeSigned180(
+                                _headingOffsetDeg + 2,
+                              );
+                            });
+                            _syncArNodes();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white54),
+                            minimumSize: const Size(0, 34),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: const Text('+2°'),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -678,39 +1270,38 @@ class _ArExplorePageState extends State<ArExplorePage> {
       ),
     );
   }
-}
 
-class _CenterReticle extends StatelessWidget {
-  const _CenterReticle();
+  ArPoiPositioned? _resolveDebugFocus(List<ArPoiPositioned> positioned) {
+    if (positioned.isEmpty) return null;
+    if (_selectedPoi != null) {
+      for (final p in positioned) {
+        if (p.poi.id == _selectedPoi!.id) return p;
+      }
+    }
+    return positioned.reduce((a, b) {
+      final aDist = (a.xFraction - 0.5).abs();
+      final bDist = (b.xFraction - 0.5).abs();
+      return aDist <= bDist ? a : b;
+    });
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Center(
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.9),
-              width: 2,
-            ),
-            color: Colors.black.withValues(alpha: 0.15),
-          ),
-          child: Center(
-            child: Container(
-              width: 4,
-              height: 4,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.95),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  double _normalizeHeadingDeg(double deg) {
+    final normalized = deg % 360.0;
+    return normalized < 0 ? normalized + 360.0 : normalized;
+  }
+
+  double _normalizeSigned180(double deg) {
+    var normalized = deg % 360.0;
+    if (normalized > 180.0) normalized -= 360.0;
+    if (normalized < -180.0) normalized += 360.0;
+    return normalized;
+  }
+
+  double _signedRelativeAngleDeg({
+    required double toBearingDeg,
+    required double fromHeadingDeg,
+  }) {
+    return _normalizeSigned180(toBearingDeg - fromHeadingDeg);
   }
 }
 
@@ -802,4 +1393,20 @@ class _CameraDeniedMessage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _WorldLabelPosition {
+  final ArWorldPlacement placement;
+  final double x;
+  final int row;
+  final double yAlign;
+  final double scale;
+
+  const _WorldLabelPosition({
+    required this.placement,
+    required this.x,
+    required this.row,
+    required this.yAlign,
+    required this.scale,
+  });
 }
