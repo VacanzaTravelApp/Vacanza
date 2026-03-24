@@ -42,6 +42,12 @@ serpapi:
   connect-timeout: 10s
   read-timeout: 30s
 
+foursquare:
+  base-url: https://api.foursquare.com/v3
+  api-key: ${FOURSQUARE_API_KEY}
+  connect-timeout: 8s
+  read-timeout: 15s
+
 ticketmaster:
   base-url: https://app.ticketmaster.com/discovery/v2
   api-key: ${TICKETMASTER_API_KEY}
