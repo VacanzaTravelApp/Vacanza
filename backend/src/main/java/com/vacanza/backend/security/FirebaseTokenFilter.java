@@ -1,6 +1,7 @@
 package com.vacanza.backend.security;
 
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.enums.Role;
@@ -9,6 +10,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -94,14 +96,8 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             String email = decoded.getEmail(); // can be null
             boolean emailVerified = Boolean.TRUE.equals(decoded.isEmailVerified());
 
-            // DB sync: create user if missing
-            User user = userRepository.findByFirebaseUid(uid).orElseGet(() -> userRepository.save(
-                    User.builder()
-                            .firebaseUid(uid)
-                            // If email is null, set a safe placeholder to avoid null constraints.
-                            .email(email != null ? email : ("uid:" + uid))
-                            .role(Role.USER)
-                            .build()));
+            // DB sync: create user if missing (race-safe — concurrent requests may hit this)
+            User user = findOrCreateUser(uid, email);
 
             List<SimpleGrantedAuthority> authorities = List.of(
                     new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
@@ -129,14 +125,45 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
 
             filterChain.doFilter(request, response);
 
-        } catch (Exception ex) {
-            // Token invalid/expired/verification failed (only when Bearer is present)
+        } catch (FirebaseAuthException ex) {
+            // Token invalid or expired — legitimate authentication failure
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write(
                     "{\"status\":401,\"error\":\"Unauthorized\","
                             + "\"message\":\"Invalid or expired token. Please re-authenticate.\","
                             + "\"path\":\"" + request.getRequestURI() + "\"}");
+        } catch (Exception ex) {
+            // Unexpected error (DB, network, etc.) — do NOT return 401, that would trigger force-logout
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.setContentType("application/json");
+            response.getWriter().write(
+                    "{\"status\":500,\"error\":\"Internal Server Error\","
+                            + "\"message\":\"An unexpected error occurred. Please try again.\","
+                            + "\"path\":\"" + request.getRequestURI() + "\"}");
         }
+    }
+
+    /**
+     * Race-safe user lookup/creation.
+     * When multiple parallel requests hit this filter simultaneously for a new user,
+     * the first request creates the user; the others get DataIntegrityViolationException
+     * on the unique constraint. We catch that and retry the lookup instead of propagating.
+     */
+    private User findOrCreateUser(String firebaseUid, String email) {
+        return userRepository.findByFirebaseUid(firebaseUid).orElseGet(() -> {
+            try {
+                return userRepository.save(
+                        User.builder()
+                                .firebaseUid(firebaseUid)
+                                .email(email != null ? email : ("uid:" + firebaseUid))
+                                .role(Role.USER)
+                                .build());
+            } catch (DataIntegrityViolationException e) {
+                // Another concurrent request already created this user — fetch it.
+                return userRepository.findByFirebaseUid(firebaseUid)
+                        .orElseThrow(() -> e);
+            }
+        });
     }
 }
