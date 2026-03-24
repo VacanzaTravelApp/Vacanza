@@ -153,8 +153,14 @@ public class BookingServiceImpl implements BookingService {
                 .findByCacheKeyAndExpiresAtAfter(key, Instant.now());
 
         if (cached.isPresent()) {
-            log.info("[CACHE HIT] Airport autocomplete: key={}", key);
-            return deserialize(cached.get().getResultsJson(), new TypeReference<>() {});
+            String json = cached.get().getResultsJson();
+            // Treat a cached empty result as a miss — could be a stale entry
+            // from before the suggested_locations JSON mapping fix.
+            if (json != null && !json.isBlank() && !json.equals("[]")) {
+                log.info("[CACHE HIT] Airport autocomplete: key={}", key);
+                return deserialize(json, new TypeReference<>() {});
+            }
+            log.info("[CACHE BYPASS] Airport autocomplete: key={} had empty cached result, re-fetching", key);
         }
 
         log.info("[CACHE MISS] Airport autocomplete: key={} — calling SerpAPI", key);
@@ -180,6 +186,7 @@ public class BookingServiceImpl implements BookingService {
 
         return results;
     }
+
 
     // ──────────────────────────────────────────────────────────────
     // Private helpers
