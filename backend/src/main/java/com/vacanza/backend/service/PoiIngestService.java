@@ -49,9 +49,15 @@ public class PoiIngestService {
             String internalCategory,
             int limit) {
 
-        GeoapifyResponse resp = geoapifyClient
-                .search(filter, List.of(geoapifyCategory), limit)
-                .block();
+        GeoapifyResponse resp;
+        try {
+            resp = geoapifyClient
+                    .search(filter, List.of(geoapifyCategory), limit)
+                    .block();
+        } catch (Exception e) {
+            // Geoapify timeout / network error — skip silently, return empty result
+            return 0;
+        }
 
         if (resp == null || resp.getFeatures() == null)
             return 0;

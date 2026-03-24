@@ -132,6 +132,11 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
         } catch (Exception ex) {
             // Token invalid/expired/verification failed (only when Bearer is present)
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write(
+                    "{\"status\":401,\"error\":\"Unauthorized\","
+                            + "\"message\":\"Invalid or expired token. Please re-authenticate.\","
+                            + "\"path\":\"" + request.getRequestURI() + "\"}");
         }
     }
 }
