@@ -617,163 +617,163 @@ export default function VacanzaChat({
         </div>
       ) : (
         <>
-      <div
-        className="chat-content-scroll"
-        ref={scrollContainerRef}
-        role="log"
-        aria-live="polite"
-        aria-relevant="additions"
-      >
-        {showMessageSpinner ? (
-          <div className="chat-loading-center">
-            <Spin tip="Yükleniyor..." />
-          </div>
-        ) : (
-          <>
-            {messages.map((msg) => {
-              const routeList = routesForMessage(msg);
-              return (
-              <div key={msg.id} className={`chat-row ${msg.type}-row`}>
-                <div className={`message-bubble ${msg.type}-bubble`}>
-                  <div className="msg-text">{msg.text}</div>
-                  {msg.time ? <span className="msg-time">{msg.time}</span> : null}
-                </div>
-                {routeList.map((rd, rIdx) => (
-                  <div key={`${msg.id}-route-${rIdx}`} className="route-card-outer">
-                    {onRequestDrawToEdit ? (
-                      <div
-                        className={`route-card-preface ${rIdx > 0 ? "route-card-preface--stacked" : ""}`}
-                        role="note"
-                      >
-                        <div className="route-card-preface-row">
-                          <span className="route-card-preface-label">Yeniden çiz</span>
-                          <button
-                            type="button"
-                            className="route-draw-edit-btn"
-                            aria-label="Haritada alan çizerek günü yeniden planla"
-                            onClick={() => {
-                              onRequestDrawToEdit();
-                              onClose();
-                            }}
-                          >
-                            <EditOutlined aria-hidden />
-                            Haritada çiz
-                          </button>
-                        </div>
-                        <p className="route-card-preface-copy">
-                          Haritada alan çiz, sağ panelden günü seç; turuncu banttan o günü seçtiğin alana göre
-                          <strong> yenilersin</strong>.
-                        </p>
+          <div
+            className="chat-content-scroll"
+            ref={scrollContainerRef}
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+          >
+            {showMessageSpinner ? (
+              <div className="chat-loading-center">
+                <Spin tip="Yükleniyor..." />
+              </div>
+            ) : (
+              <>
+                {messages.map((msg) => {
+                  const routeList = routesForMessage(msg);
+                  return (
+                    <div key={msg.id} className={`chat-row ${msg.type}-row`}>
+                      <div className={`message-bubble ${msg.type}-bubble`}>
+                        <div className="msg-text">{msg.text}</div>
+                        {msg.time ? <span className="msg-time">{msg.time}</span> : null}
                       </div>
-                    ) : null}
-                    <div className="route-card">
-                    <div className="route-card-title">{rd.title}</div>
-                    <div className="route-card-meta">
-                      {rd.destination} &middot; {rd.total_days || rd.totalDays} gün &middot;{" "}
-                      {(rd.days || []).reduce((sum, d) => sum + (d.waypoints?.length || 0), 0)} yer
-                    </div>
-                    <div className="route-card-days">
-                      {(rd.days || []).map((d) => (
-                        <div key={d.day} className="route-card-day-row">
-                          <span className="route-card-day-badge">Gün {d.day}</span>
-                          <span className="route-card-day-text">{(d.waypoints || []).map((w) => w.name).join(", ")}</span>
+                      {routeList.map((rd, rIdx) => (
+                        <div key={`${msg.id}-route-${rIdx}`} className="route-card-outer">
+                          {onRequestDrawToEdit ? (
+                            <div
+                              className={`route-card-preface ${rIdx > 0 ? "route-card-preface--stacked" : ""}`}
+                              role="note"
+                            >
+                              <div className="route-card-preface-row">
+                                <span className="route-card-preface-label">Yeniden çiz</span>
+                                <button
+                                  type="button"
+                                  className="route-draw-edit-btn"
+                                  aria-label="Haritada alan çizerek günü yeniden planla"
+                                  onClick={() => {
+                                    onRequestDrawToEdit();
+                                    onClose();
+                                  }}
+                                >
+                                  <EditOutlined aria-hidden />
+                                  Haritada çiz
+                                </button>
+                              </div>
+                              <p className="route-card-preface-copy">
+                                Haritada alan çiz, sağ panelden günü seç; turuncu banttan o günü seçtiğin alana göre
+                                <strong> yenilersin</strong>.
+                              </p>
+                            </div>
+                          ) : null}
+                          <div className="route-card">
+                            <div className="route-card-title">{rd.title}</div>
+                            <div className="route-card-meta">
+                              {rd.destination} &middot; {rd.total_days || rd.totalDays} gün &middot;{" "}
+                              {(rd.days || []).reduce((sum, d) => sum + (d.waypoints?.length || 0), 0)} yer
+                            </div>
+                            <div className="route-card-days">
+                              {(rd.days || []).map((d) => (
+                                <div key={d.day} className="route-card-day-row">
+                                  <span className="route-card-day-badge">Gün {d.day}</span>
+                                  <span className="route-card-day-text">{(d.waypoints || []).map((w) => w.name).join(", ")}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <RouteCardFeedback
+                              route={rd}
+                              storageKey={`${msg.id}-r${rIdx}`}
+                              routeId={msg.routeIdList?.[rIdx] ?? null}
+                              initialDbVote={msg.routeFeedbackList?.[rIdx] ?? null}
+                            />
+                            <button
+                              type="button"
+                              className="route-show-btn"
+                              onClick={() => {
+                                if (onRouteGenerated) {
+                                  onRouteGenerated(normalizeRouteForMap(rd), {
+                                    conversationId: conversationId ?? undefined,
+                                  });
+                                }
+                                onClose();
+                              }}
+                            >
+                              Rotayı Haritada Göster
+                            </button>
+                          </div>
                         </div>
                       ))}
+                      {msg.type === "ai" && msg.noRouteHint && routeList.length === 0 ? (
+                        <div className="route-card route-card-hint">
+                          <span>Rota verisi alınamadı. Yukarıdaki hızlı butonlardan birini tekrar deneyin.</span>
+                        </div>
+                      ) : null}
                     </div>
-                    <RouteCardFeedback
-                      route={rd}
-                      storageKey={`${msg.id}-r${rIdx}`}
-                      routeId={msg.routeIdList?.[rIdx] ?? null}
-                      initialDbVote={msg.routeFeedbackList?.[rIdx] ?? null}
-                    />
-                    <button
-                      type="button"
-                      className="route-show-btn"
-                      onClick={() => {
-                        if (onRouteGenerated) {
-                          onRouteGenerated(normalizeRouteForMap(rd), {
-                            conversationId: conversationId ?? undefined,
-                          });
-                        }
-                        onClose();
-                      }}
-                    >
-                      Rotayı Haritada Göster
-                    </button>
+                  );
+                })}
+                {loading && (
+                  <div className="chat-row ai-row">
+                    <div className="message-bubble ai-bubble chat-typing-bubble">
+                      <Spin size="small" />
+                      <span className="chat-typing-label">Yanıt hazırlanıyor…</span>
                     </div>
                   </div>
-                ))}
-                {msg.type === "ai" && msg.noRouteHint && routeList.length === 0 ? (
-                  <div className="route-card route-card-hint">
-                    <span>Rota verisi alınamadı. Yukarıdaki hızlı butonlardan birini tekrar deneyin.</span>
-                  </div>
-                ) : null}
-              </div>
-            );
-            })}
-            {loading && (
-              <div className="chat-row ai-row">
-                <div className="message-bubble ai-bubble chat-typing-bubble">
-                  <Spin size="small" />
-                  <span className="chat-typing-label">Yanıt hazırlanıyor…</span>
-                </div>
-              </div>
+                )}
+                <div ref={messagesEndRef} />
+              </>
             )}
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
+          </div>
 
-      {!initialLoading && (
-        <div className="chat-footer-refined">
-          <div className="chat-quick-actions">
-            <span className="chat-quick-label">Rota planla:</span>
-            <button
-              type="button"
-              className="chat-quick-chip"
-              onClick={() => handleSendMessage("3 günlük İstanbul planı yap")}
-              disabled={loading || messagesLoading}
-            >
-              3 gün İstanbul
-            </button>
-            <button
-              type="button"
-              className="chat-quick-chip"
-              onClick={() => handleSendMessage("Plan a 2-day trip to Rome")}
-              disabled={loading || messagesLoading}
-            >
-              2 gün Roma
-            </button>
-            <button
-              type="button"
-              className="chat-quick-chip"
-              onClick={() => handleSendMessage("Bana 4 günlük Antalya tatil planı oluştur")}
-              disabled={loading || messagesLoading}
-            >
-              4 gün Antalya
-            </button>
-          </div>
-          <div className="chat-input-field-group">
-            <input
-              type="text"
-              placeholder="Rota planı için örn: 3 günlük Paris planı yap..."
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              disabled={loading || messagesLoading}
-            />
-            <button
-              type="button"
-              className="chat-send-icon"
-              onClick={() => handleSendMessage()}
-              disabled={loading || messagesLoading || !inputText.trim()}
-              aria-label="Gönder"
-            >
-              <SendOutlined />
-            </button>
-          </div>
-        </div>
-      )}
+          {!initialLoading && (
+            <div className="chat-footer-refined">
+              <div className="chat-quick-actions">
+                <span className="chat-quick-label">Rota planla:</span>
+                <button
+                  type="button"
+                  className="chat-quick-chip"
+                  onClick={() => handleSendMessage("3 günlük İstanbul planı yap")}
+                  disabled={loading || messagesLoading}
+                >
+                  3 gün İstanbul
+                </button>
+                <button
+                  type="button"
+                  className="chat-quick-chip"
+                  onClick={() => handleSendMessage("Plan a 2-day trip to Rome")}
+                  disabled={loading || messagesLoading}
+                >
+                  2 gün Roma
+                </button>
+                <button
+                  type="button"
+                  className="chat-quick-chip"
+                  onClick={() => handleSendMessage("Bana 4 günlük Antalya tatil planı oluştur")}
+                  disabled={loading || messagesLoading}
+                >
+                  4 gün Antalya
+                </button>
+              </div>
+              <div className="chat-input-field-group">
+                <input
+                  type="text"
+                  placeholder="Rota planı için örn: 3 günlük Paris planı yap..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                  disabled={loading || messagesLoading}
+                />
+                <button
+                  type="button"
+                  className="chat-send-icon"
+                  onClick={() => handleSendMessage()}
+                  disabled={loading || messagesLoading || !inputText.trim()}
+                  aria-label="Gönder"
+                >
+                  <SendOutlined />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

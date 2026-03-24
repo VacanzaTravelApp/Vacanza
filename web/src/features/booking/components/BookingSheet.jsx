@@ -1,14 +1,43 @@
-import React, { useReducer, useEffect, useMemo } from "react";
+import React, { useReducer, useEffect, useMemo, useState } from "react";
 import "../styles/bookingSheet.css";
 import { bookingReducer, initialState } from "../bookingReducer";
 import { auth } from "../../../firebase";
+import http from "../../../api/http";
+import { MdFlightTakeoff, MdImageNotSupported, MdHotel } from "react-icons/md";
 
 export default function BookingSheet({ open, onClose }) {
   const [state, dispatch] = useReducer(bookingReducer, initialState);
+  const [airportResults, setAirportResults] = useState([]);
+  const [activeSearchField, setActiveSearchField] = useState(null); // 'origin' | 'destination'
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    if (!open) dispatch({ type: "RESET_STATE" });
+    if (!open) {
+      dispatch({ type: "RESET_STATE" });
+      setAirportResults([]);
+      setActiveSearchField(null);
+      setSearchQuery("");
+    }
   }, [open]);
+
+  // Airport Autocomplete Effect
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setAirportResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await http.get(`/bookings/airports/search?q=${searchQuery}`);
+        setAirportResults(res.data || []);
+      } catch (err) {
+        console.error("Airport search failed:", err);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const filteredAndSortedItems = useMemo(() => {
     let list = [...state.items];
@@ -37,8 +66,13 @@ export default function BookingSheet({ open, onClose }) {
     const isHotel = state.bookingType === 'hotels';
 
     const errors = {};
-    if (!destination) errors.destination = "Entry required";
-    if (!isHotel && !origin) errors.origin = "Entry required";
+    if (!isHotel) {
+      if (!origin) errors.origin = "Entry required";
+      if (!destination) errors.destination = "Entry required";
+    } else {
+      if (!destination) errors.destination = "Entry required";
+    }
+
     if (!dates) errors.dates = "Selection required";
 
     if ((isHotel || isRoundTrip) && !checkOutDate) {
@@ -52,9 +86,6 @@ export default function BookingSheet({ open, onClose }) {
 
     dispatch({ type: "SEARCH_START" });
     try {
-      const user = auth.currentUser;
-      if (!user) { alert("Lütfen önce giriş yapın!"); dispatch({ type: "SEARCH_ERROR" }); return; }
-      const token = await user.getIdToken();
       const endpoint = isHotel ? `/bookings/accommodations/search` : `/bookings/transportation/search`;
 
       // SORT MAPPING: Backend SortCriteria enum: PRICE_ASC, PRICE_DESC, RATING_DESC
@@ -82,18 +113,31 @@ export default function BookingSheet({ open, onClose }) {
         sortBy: apiSortBy
       };
 
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) throw new Error(`Sunucu Hatası: ${response.status}`);
-      const data = await response.json();
-      dispatch({ type: "SEARCH_SUCCESS", payload: data || [] });
+      const response = await http.post(endpoint, payload);
+      dispatch({ type: "SEARCH_SUCCESS", payload: response.data || [] });
     } catch (err) {
-      console.error("Hata:", err);
-      dispatch({ type: "SEARCH_ERROR" });
+      console.error("Error:", err);
+      const status = err?.response?.status;
+      const dataMsg = err?.response?.data?.message || "";
+      let errorMsg = "Search is currently unavailable. Please try again later.";
+
+      if (status === 400) {
+        if (dataMsg.toUpperCase().includes("IATA")) {
+          errorMsg = "Please make sure to select a valid 3-letter airport code (IATA).";
+        } else {
+          errorMsg = "Please fill in all mandatory fields correctly.";
+        }
+      } else if (status === 401) {
+        errorMsg = "Unauthorized access, please log in to the system.";
+      } else if (status === 500) {
+        errorMsg = "Search is currently unavailable. Please try again later.";
+      } else if (status === 502) {
+        errorMsg = "Invalid response from SerpApi (Bad Gateway).";
+      } else if (status === 503) {
+        errorMsg = "The service is currently busy. SerpApi request limit may have been exceeded.";
+      }
+
+      dispatch({ type: "SEARCH_ERROR", payload: errorMsg });
     }
   };
 
@@ -108,6 +152,11 @@ export default function BookingSheet({ open, onClose }) {
 
   const formatDuration = (d) => d?.replace('PT', '').toLowerCase() || '2h 15m';
 
+  const formatStops = (s) => {
+    if (!s || s === 0) return "Direct";
+    return `${s} stop${s > 1 ? 's' : ''}`;
+  };
+
   const renderError = (field) => {
     if (state.errors?.[field]) {
       return <span className="field-error-msg">{state.errors[field]}</span>;
@@ -115,7 +164,7 @@ export default function BookingSheet({ open, onClose }) {
     return null;
   };
 
-  // ORTAK SORT COMPONENTİ
+  // COMMON SORT COMPONENT
   const SortField = (
     <div className="sort-container-refined">
       <label>Sort by</label>
@@ -143,34 +192,86 @@ export default function BookingSheet({ open, onClose }) {
               <div className="tab-pill-container-mock">
                 <button className={state.bookingType === 'hotels' ? 'pill-active-mock' : ''}
                   onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'hotels' } })}>
-                  <span className="pill-icon">🏨</span> Hotels
+                  <span className="pill-icon"><MdHotel /></span> Hotels
                 </button>
                 <button className={state.bookingType === 'flights' ? 'pill-active-mock' : ''}
                   onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'flights' } })}>
-                  <span className="pill-icon">✈️</span> Flights
+                  <span className="pill-icon"><MdFlightTakeoff /></span> Flights
                 </button>
               </div>
 
               <div className="inputs-grid-refined">
                 {state.bookingType === 'flights' && (
-                  <div className="input-group-modern">
+                  <div className="input-group-modern" style={{ position: 'relative' }}>
                     <label>Origin</label>
-                    <input type="text" placeholder="Airport code (e.g. IST, ESB)" maxLength="3" value={state.searchParams.origin}
-                      onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { origin: e.target.value.toUpperCase() } })} />
+                    <input type="text"
+                      placeholder="e.g. IST or London"
+                      value={state.searchParams.origin}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        dispatch({ type: "UPDATE_PARAM", payload: { origin: val } });
+                        setActiveSearchField('origin');
+                        setSearchQuery(val);
+                      }}
+                      onFocus={() => {
+                        setActiveSearchField('origin');
+                        setSearchQuery(state.searchParams.origin || "");
+                      }}
+                    />
+                    {activeSearchField === 'origin' && airportResults.length > 0 && (
+                      <div className="airport-dropdown-refined">
+                        {airportResults.map((item, i) => (
+                          <div key={i} className="airport-item" onClick={() => {
+                            dispatch({ type: "UPDATE_PARAM", payload: { origin: item.iataCode } });
+                            setAirportResults([]);
+                            setActiveSearchField(null);
+                          }}>
+                            <span className="iata">{item.iataCode}</span>
+                            <span className="aname">{item.name}</span>
+                            <span className="city">{item.city}, {item.country}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {renderError('origin')}
                   </div>
                 )}
 
-                <div className="input-group-modern">
+                <div className="input-group-modern" style={{ position: 'relative' }}>
                   <label>{state.bookingType === 'hotels' ? 'Search location or hotel' : 'Destination'}</label>
                   <input type="text"
-                    placeholder={state.bookingType === 'hotels' ? "Where are you going? (City or hotel)" : "Airport code (e.g. SAW, CDG)"}
-                    maxLength={state.bookingType === 'hotels' ? undefined : 3}
+                    placeholder={state.bookingType === 'hotels' ? "e.g. Istanbul, Hotels in Paris, near Eiffel Tower" : "e.g. SAW, Tokyo or Paris"}
                     value={state.searchParams.destination}
                     onChange={(e) => {
                       const val = e.target.value;
-                      dispatch({ type: "UPDATE_PARAM", payload: { destination: state.bookingType === 'hotels' ? val : val.toUpperCase() } })
-                    }} />
+                      dispatch({ type: "UPDATE_PARAM", payload: { destination: val } });
+                      if (state.bookingType === 'flights') {
+                        setActiveSearchField('destination');
+                        setSearchQuery(val);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (state.bookingType === 'flights') {
+                        setActiveSearchField('destination');
+                        setSearchQuery(state.searchParams.destination || "");
+                      }
+                    }}
+                  />
+                  {activeSearchField === 'destination' && airportResults.length > 0 && (
+                    <div className="airport-dropdown-refined">
+                      {airportResults.map((item, i) => (
+                        <div key={i} className="airport-item" onClick={() => {
+                          dispatch({ type: "UPDATE_PARAM", payload: { destination: item.iataCode } });
+                          setAirportResults([]);
+                          setActiveSearchField(null);
+                        }}>
+                          <span className="iata">{item.iataCode}</span>
+                          <span className="aname">{item.name}</span>
+                          <span className="city">{item.city}, {item.country}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {renderError('destination')}
                 </div>
 
@@ -242,19 +343,23 @@ export default function BookingSheet({ open, onClose }) {
               </div>
 
               {SortField}
+              {state.generalError && <div className="validation-error-msg">{state.generalError}</div>}
               <button className="main-search-btn" onClick={handleSearch} disabled={state.loading}>
                 {state.loading ? "Searching..." : `Search ${state.bookingType === 'hotels' ? 'Hotels' : 'Flights'}`}
               </button>
             </div>
 
           ) : (
-            <div className="results-container-mock">
-              <div className="results-header-mock">
-                <h3 className="found-count-title-mock" style={{ textTransform: 'capitalize' }}>
-                  {filteredAndSortedItems.length} {state.bookingType} Found
+            <div className="results-container-mobile">
+              <div className="results-header-mobile">
+                <h3 className="count-title">
+                  {filteredAndSortedItems.length} {state.bookingType === 'hotels' ? 'Hotels' : 'Flights'} Found
                 </h3>
-                <p className="route-sub-detail-mock">
-                  {state.bookingType === 'flights' ? `${state.searchParams.origin} • ${state.searchParams.destination}` : state.searchParams.destination} • {state.searchParams.dates}{state.searchParams.checkOutDate ? ` – ${state.searchParams.checkOutDate}` : ""}
+                <p className="summary-detail">
+                  {state.bookingType === 'flights'
+                    ? `${state.searchParams.origin} → ${state.searchParams.destination} · ${state.searchParams.dates} · ${state.searchParams.adults || 1} adult`
+                    : `${state.searchParams.destination} · ${state.searchParams.dates}${state.searchParams.checkOutDate ? ` – ${state.searchParams.checkOutDate}` : ""} · ${state.searchParams.adults || 1} adult`
+                  }
                 </p>
               </div>
 
@@ -262,69 +367,101 @@ export default function BookingSheet({ open, onClose }) {
                 {filteredAndSortedItems.map((item, idx) => {
                   const isHotel = state.bookingType === 'hotels';
                   if (isHotel) {
-                    const thumbUrl = item.imageUrl || `https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=200&h=200`;
                     return (
-                      <div key={idx} className="premium-result-card">
-                        <div className="result-card-main">
-                          <div className="result-thumb-container">
+                      <div key={idx} className="hotel-result-card-mobile">
+                        <div className="hotel-card-left">
+                          {item.imageUrl ? (
                             <img
-                              src={thumbUrl}
+                              src={item.imageUrl}
                               alt={item.hotelName}
-                              className="result-thumb"
+                              className="hotel-card-thumb"
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.style.display = 'none';
-                                e.target.parentNode.innerHTML = `<span class="thumb-fallback-icon">🏨</span>`;
+                                e.target.outerHTML = '<div class="hotel-thumb-placeholder" style="font-size: 11px; font-weight: 500; color: #999; text-align: center; line-height: 1.2;">No Photo<br/>Available</div>';
                               }}
                             />
+                          ) : (
+                            <div className="hotel-thumb-placeholder" style={{ fontSize: '11px', fontWeight: 500, color: '#999', textAlign: 'center', lineHeight: '1.2' }}>No Photo<br />Available</div>
+                          )}
+                        </div>
+                        <div className="hotel-card-right">
+                          <div className="hotel-header-line">
+                            <h4 className="hotel-title-text">{item.hotelName}</h4>
+                            <span className="hotel-price-blue">${(item.pricePerNight || item.price).toFixed(2)}</span>
                           </div>
-                          <div className="result-info-center">
-                            <h4 className="result-title">{item.hotelName}</h4>
-                            <div className="result-meta-row">
-                              {item.hotelClass && <span style={{ color: '#f59e0b', fontSize: 12, marginRight: 4 }}>{'★'.repeat(item.hotelClass)}</span>}
-                              {item.rating && <><span className="result-rating">★ {item.rating}</span><span className="meta-dot">•</span></>}
-                              <span className="result-dist">{item.totalReviews ? `${item.totalReviews} reviews` : item.providerName || "Google Hotels"}</span>
-                            </div>
-                            <div className="result-price-row">
-                              <span className="price-val">${item.pricePerNight || item.price}</span>
-                              <span className="price-unit">/ night</span>
-                            </div>
+
+
+                          <div className="hotel-meta-row-mobile">
+                            <span className="hotel-rating-yellow"><span style={{ color: '#FFD166', marginRight: '3px', fontSize: '15px' }}>★</span>{item.rating || '4.0'}</span>
+                            {item.totalReviews && <span className="hotel-reviews-count">({item.totalReviews} reviews)</span>}
                           </div>
-                          <button className="book-now-btn-green" onClick={() => window.open(item.externalBookingUrl, '_blank')}>
-                            Book Now
-                          </button>
+
+                          {item.description && (
+                            <p className="hotel-desc-clamp">{item.description}</p>
+                          )}
+
+                          <div className="hotel-provider-line">
+                            {item.providerName || "Google Hotels"}
+                          </div>
+
+                          <div className="hotel-action-align-right">
+                            <button className="hotel-open-booking-btn" onClick={() => window.open(item.externalBookingUrl, '_blank')}>
+                              Open booking
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
                   }
 
                   return (
-                    <div key={idx} className="hotel-detail-card">
-                      <div className="card-top-row">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {item.airlineLogo && <img src={item.airlineLogo} alt="" style={{ width: 24, height: 24, borderRadius: 4 }} />}
-                          <span className="carrier-tag">{item.carrier} {item.flightNumber && `(${item.flightNumber})`}</span>
+                    <div key={idx} className="flight-result-card-mobile">
+                      <div className="flight-card-top-row">
+                        <div className="flight-logo-info">
+                          <div className="flight-logo-circle">
+                            {item.airlineLogo ? (
+                              <img src={item.airlineLogo} alt={item.carrier} />
+                            ) : (
+                              <MdFlightTakeoff style={{ fontSize: '20px', color: '#007AFF' }} />
+                            )}
+                          </div>
+                          <div className="flight-time-carrier">
+                            <div className="flight-time-range">
+                              {formatTime(item.departureTime)} – {formatTime(item.arrivalTime)}
+                            </div>
+                            <div className="flight-carrier-details">
+                              {item.carrier}{item.flightNumber ? ` · ${item.flightNumber}` : ''}
+                            </div>
+                          </div>
                         </div>
-                        <span className="price-tag-blue">${item.price}</span>
+
+                        <div className="flight-price-class">
+                          <div className="flight-price-text">${Math.round(item.price)}</div>
+                          {item.travelClass && (
+                            <div className="flight-class-pill">{item.travelClass}</div>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, padding: '0 4px 8px' }}>{item.travelClass || 'Economy'}</div>
-                      <div className="flight-path-row">
-                        <div className="time-node">
-                          <span className="t-val">{formatTime(item.departureTime)}</span>
-                          <span className="c-val">{item.origin}</span>
+
+                      <div className="flight-route-section">
+                        <div className="flight-route-labels">
+                          <span>{item.origin}</span>
+                          <span>{item.duration || 'Auto'}</span>
+                          <span>{item.destination}</span>
                         </div>
-                        <div className="path-line-group">
-                          <span className="dur-val">{item.duration || 'Auto'}</span>
-                          <div className="line-bar"><div className="dot" /></div>
-                          <span className="stop-badge-orange">{item.stops === 0 ? 'Direct' : `${item.stops} stop`}</span>
+                        <div className="flight-path-bar-wrap">
+                          <div className="flight-path-bar"></div>
+                          {item.stops > 0 && <div className="flight-path-dot"></div>}
                         </div>
-                        <div className="time-node" style={{ textAlign: 'right' }}>
-                          <span className="t-val">{formatTime(item.arrivalTime)}</span>
-                          <span className="c-val">{item.destination}</span>
+                        <div className="flight-stops-badge-wrap">
+                          <span className={`flight-stops-badge ${item.stops === 0 ? 'direct' : 'stops'}`}>
+                            {formatStops(item.stops)}
+                          </span>
                         </div>
                       </div>
-                      <button className="google-action-btn" onClick={() => window.open(item.externalBookingUrl, '_blank')}>
-                        Proceed to Flight ↗
+
+                      <button className="flight-google-btn-mobile" onClick={() => window.open(item.externalBookingUrl, '_blank')}>
+                        Open in Google Flights <span className="arrow">→</span>
                       </button>
                     </div>
                   );

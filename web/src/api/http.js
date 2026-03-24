@@ -2,8 +2,8 @@ import axios from "axios";
 import { auth } from "../firebase";
 
 const http = axios.create({
-  // Vite Proxy'sini kullanmak için tam URL yerine sadece / kullanıyoruz.
-  // Bu CORS hatalarını önler.
+  // Use only / instead of full URL to use Vite Proxy.
+  // This prevents CORS errors.
   baseURL: "/",
   headers: { "Content-Type": "application/json" },
 });
@@ -13,8 +13,8 @@ http.interceptors.request.use(
     const user = auth.currentUser;
 
     if (user) {
-      // Debug/stabilite için token'ı zorla yenile
-      const token = await user.getIdToken(true);
+      // Use cached token instead of forcing refresh on every request
+      const token = await user.getIdToken();
       config.headers.Authorization = `Bearer ${token}`;
     }
 
@@ -25,7 +25,7 @@ http.interceptors.request.use(
 
 http.interceptors.response.use(
   (response) => {
-    // JSON beklerken Vite index.html (veya login HTML) gelirse yakala
+    // Catch Vite index.html (or login HTML) when JSON is expected
     const contentType = response.headers?.["content-type"] || "";
     const isHtml =
       contentType.includes("text/html") ||
@@ -33,7 +33,7 @@ http.interceptors.response.use(
         response.data.toLowerCase().includes("<!doctype html"));
 
     if (isHtml) {
-      console.warn("⚠️ HTML döndü (JSON bekleniyordu). Proxy path veya auth kontrol et.");
+      console.warn("⚠️ HTML returned (JSON expected). Check proxy paths or auth.");
       return Promise.reject(
         new Error("HTML response received (check Vite proxy paths and authentication).")
       );
