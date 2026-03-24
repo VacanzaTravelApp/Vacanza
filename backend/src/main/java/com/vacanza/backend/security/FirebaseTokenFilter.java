@@ -1,5 +1,6 @@
 package com.vacanza.backend.security;
 
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
@@ -88,6 +89,14 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
 
         try {
             String token = header.substring("Bearer ".length()).trim();
+
+            // If Firebase is not initialized (e.g., missing firebase JSON in dev/CI),
+            // skip token verification entirely and continue the chain.
+            // SecurityConfig decides if endpoint needs auth or not.
+            if (FirebaseApp.getApps().isEmpty()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             // Verify Firebase ID token (throws if invalid/expired)
             FirebaseToken decoded = FirebaseAuth.getInstance().verifyIdToken(token);
