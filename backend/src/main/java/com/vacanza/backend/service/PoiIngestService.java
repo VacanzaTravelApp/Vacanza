@@ -103,12 +103,20 @@ public class PoiIngestService {
     // FRONTEND → GEOAPIFY MAP
     private String mapFrontendToGeoapify(String c) {
         return switch (c.toLowerCase()) {
-            case "restaurant" -> "catering.restaurant";
-            case "cafe" -> "catering.cafe";
-            case "museum" -> "entertainment.museum";
-            case "monuments" -> "tourism.attraction";
-            case "parks" -> "leisure.park";
-            default -> null;
+            case "restaurant"                   -> "catering.restaurant";
+            case "cafe"                         -> "catering.cafe";
+            case "museum"                       -> "entertainment.museum";
+            case "monument", "monuments"        -> "tourism.attraction";
+            case "park", "parks"                -> "leisure.park";
+            case "landmark"                     -> "tourism.sights";
+            case "historic_site", "historic"    -> "heritage.ruins";
+            case "art_gallery", "gallery"       -> "entertainment.culture";
+            case "market"                       -> "commercial.marketplace";
+            case "neighborhood"                 -> "tourism.sights";
+            case "ruins"                        -> "heritage.ruins";
+            case "church", "mosque", "place_of_worship" -> "religion";
+            case "palace"                       -> "heritage.castle";
+            default                             -> null;
         };
     }
 }
