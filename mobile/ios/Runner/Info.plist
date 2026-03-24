@@ -48,8 +48,10 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Vacanza needs your location to check you into nearby places.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Vacanza uses the camera to set your profile photo.</string>
+	<string>Vacanza uses the camera for AR exploration and profile photo capture.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Vacanza uses the photo library to set your profile photo.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Vacanza uses device motion sensors to align AR points of interest.</string>
 </dict>
 </plist>
