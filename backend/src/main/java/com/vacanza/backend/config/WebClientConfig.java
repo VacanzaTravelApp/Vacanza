@@ -12,6 +12,7 @@ import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
@@ -23,7 +24,7 @@ import java.time.Duration;
 @Configuration
 @EnableConfigurationProperties({ GeoapifyProperties.class, AiServiceProperties.class,
         SerpApiProperties.class, MapboxProperties.class, TicketmasterProperties.class,
-        OpenMeteoProperties.class })
+        OpenMeteoProperties.class, ViatorProperties.class })
 public class WebClientConfig {
 
     @Bean
@@ -128,6 +129,27 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .filter(log4xx5xx("[OPEN-METEO]"))
                 .build();
+    }
+
+    @Bean
+    @Qualifier("viatorWebClient")
+    public WebClient viatorWebClient(ViatorProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        WebClient.Builder builder = WebClient.builder()
+                .baseUrl(props.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json;version=2.0")
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(log4xx5xx("[VIATOR]"));
+        if (StringUtils.hasText(props.getApiKey())) {
+            builder.defaultHeader("exp-api-key", props.getApiKey());
+        }
+        return builder.build();
     }
 
     /**
