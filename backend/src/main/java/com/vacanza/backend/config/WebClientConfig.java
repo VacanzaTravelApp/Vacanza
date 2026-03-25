@@ -23,7 +23,7 @@ import java.time.Duration;
 @Configuration
 @EnableConfigurationProperties({ GeoapifyProperties.class, AiServiceProperties.class,
         SerpApiProperties.class, MapboxProperties.class, TicketmasterProperties.class,
-        OpenMeteoProperties.class })
+        OpenMeteoProperties.class, ViatorProperties.class })
 public class WebClientConfig {
 
     @Bean
@@ -127,6 +127,25 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .filter(log4xx5xx("[OPEN-METEO]"))
+                .build();
+    }
+
+    @Bean
+    @Qualifier("viatorWebClient")
+    public WebClient viatorWebClient(ViatorProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        return WebClient.builder()
+                .baseUrl(props.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json;version=2.0")
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .defaultHeader("exp-api-key", props.getApiKey())
+                .filter(log4xx5xx("[VIATOR]"))
                 .build();
     }
 
