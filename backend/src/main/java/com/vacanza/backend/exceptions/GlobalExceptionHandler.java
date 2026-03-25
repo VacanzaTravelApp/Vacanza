@@ -1,6 +1,7 @@
 package com.vacanza.backend.exceptions;
 
 import com.vacanza.backend.dto.response.ErrorResponse;
+import com.vacanza.backend.integration.viator.ViatorPartnerUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -128,5 +129,21 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
 
         return new ResponseEntity<>(body, ex.getStatus());
+    }
+
+    /**
+     * Viator Partner API transport failure (DNS, connection, timeout) when not handled inline.
+     */
+    @ExceptionHandler(ViatorPartnerUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleViatorPartnerUnavailable(
+            ViatorPartnerUnavailableException ex, HttpServletRequest request) {
+
+        ErrorResponse body = ErrorResponse.of(
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase(),
+                ex.getMessage() != null ? ex.getMessage() : "Viator Partner API unreachable",
+                request.getRequestURI());
+
+        return new ResponseEntity<>(body, HttpStatus.SERVICE_UNAVAILABLE);
     }
 }

@@ -7,10 +7,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Viator Partner API client.
@@ -67,6 +70,10 @@ public class ViatorClient {
         } catch (WebClientResponseException e) {
             return handleWebClientExceptionForAttractions(e);
         } catch (Exception e) {
+            if (isPartnerTransportFailure(e)) {
+                log.warn("[VIATOR] searchAttractions transport failure: {}", e.toString());
+                throw new ViatorPartnerUnavailableException("Viator Partner API unreachable", e);
+            }
             log.warn("[VIATOR] searchAttractions failed: {}", e.getMessage());
             return ViatorAttractionSearchResponse.empty();
         }
@@ -98,9 +105,40 @@ public class ViatorClient {
         } catch (WebClientResponseException e) {
             return handleWebClientExceptionForProducts(e);
         } catch (Exception e) {
+            if (isPartnerTransportFailure(e)) {
+                log.warn("[VIATOR] searchProducts transport failure: {}", e.toString());
+                throw new ViatorPartnerUnavailableException("Viator Partner API unreachable", e);
+            }
             log.warn("[VIATOR] searchProducts failed: {}", e.getMessage());
             return ViatorProductSearchResponse.empty();
         }
+    }
+
+    /**
+     * True for network / timeout / connection issues (not HTTP status responses).
+     */
+    static boolean isPartnerTransportFailure(Throwable t) {
+        Throwable c = t;
+        while (c != null) {
+            if (c instanceof WebClientRequestException) {
+                return true;
+            }
+            if (c instanceof IOException) {
+                return true;
+            }
+            if (c instanceof TimeoutException) {
+                return true;
+            }
+            String name = c.getClass().getName();
+            if (name.contains("ConnectException")
+                    || name.contains("UnknownHostException")
+                    || name.contains("DnsNameResolverTimeout")
+                    || (name.contains("Timeout") && name.contains("Exception"))) {
+                return true;
+            }
+            c = c.getCause();
+        }
+        return false;
     }
 
     private ViatorAttractionSearchResponse handleWebClientExceptionForAttractions(WebClientResponseException e) {
