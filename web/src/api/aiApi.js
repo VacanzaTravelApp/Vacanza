@@ -43,6 +43,12 @@ export const aiApi = {
         return response.data;
     },
 
+    /** Viator: waypoint başına fiyat + booking URL (GET /routes/:id/pricing). */
+    getRoutePricing: async (routeId) => {
+        const response = await http.get(`/routes/${routeId}/pricing`);
+        return asArray(response.data);
+    },
+
     /** All routes saved for this conversation (oldest first). */
     getRoutesForConversation: async (conversationId) => {
         try {
