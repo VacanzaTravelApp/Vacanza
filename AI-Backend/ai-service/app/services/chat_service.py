@@ -22,6 +22,9 @@ from app.services.preference_extraction_service import extract_preferences
 logger = logging.getLogger(__name__)
 
 MEMORY_WINDOW = 10  # Last N user+assistant pairs for context
+# Must match Java ChatProxyController MAX_CHAT_ITINERARY_DAYS / polygon caps
+ITINERARY_DAYS_MIN = 1
+ITINERARY_DAYS_MAX = 16
 RAG_TOP_K = 8  # Max similar old messages (5-10 range for token limit)
 RAG_MAX_CHARS_PER_MSG = 250  # Truncate to avoid token overflow (~80 tokens/msg)
 # Tighter RAG for itinerary Turn1/Turn2 (same retrieval, shorter injection)
@@ -314,6 +317,34 @@ def _parse_weather_context(user_content: str) -> list[dict] | dict | None:
         return None
     except Exception:
         return None
+
+
+def _clamp_itinerary_days(raw: object, default: int = 3) -> int:
+    """Clamp tool/model day counts (ignore -99, huge values, invalid types)."""
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        return default
+    try:
+        if isinstance(raw, int):
+            d = raw
+        elif isinstance(raw, float):
+            d = int(round(raw))
+        else:
+            d = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(ITINERARY_DAYS_MIN, min(d, ITINERARY_DAYS_MAX))
+
+
+def _sanitize_route_total_days(route_data: RouteData | None) -> RouteData | None:
+    """Cap total_days from model output (non-tool JSON paths)."""
+    if route_data is None:
+        return None
+    td = _clamp_itinerary_days(route_data.total_days, default=ITINERARY_DAYS_MIN)
+    if td == route_data.total_days:
+        return route_data
+    return route_data.model_copy(update={"total_days": td})
 
 
 def _parse_tool_call(content: str) -> dict | None:
@@ -943,7 +974,7 @@ Route generation rules:
     tool_pois = _parse_tool_result_pois(user_content)
     if tool_pois is not None:
         tool_call = _parse_tool_call(user_content) or {}
-        days = int(tool_call.get("days") or 2)
+        days = _clamp_itinerary_days(tool_call.get("days"), default=3)
         travel_style = str(tool_call.get("travel_style") or "general").strip() or "general"
         replan_ctx = _parse_replan_day_context(user_content)
         if replan_ctx is not None:
@@ -994,7 +1025,7 @@ Route generation rules:
         raw_ai_content = str(turn2.content)
         ai_content, route_data = _parse_route_from_response(raw_ai_content)
         if route_data:
-            route_data = _optimize_route_order(route_data)
+            route_data = _sanitize_route_total_days(_optimize_route_order(route_data))
 
     # Turn1: itinerary request => tool-call JSON ONLY (backend will execute tool)
     elif _is_itinerary_request(user_content):
@@ -1013,7 +1044,7 @@ Route generation rules:
         raw_ai_content = str(response.content)
         ai_content, route_data = _parse_route_from_response(raw_ai_content)
         if route_data:
-            route_data = _optimize_route_order(route_data)
+            route_data = _sanitize_route_total_days(_optimize_route_order(route_data))
 
     # Output moderation: block harmful AI response before returning to user
     ai_flagged, ai_flagged_cats = await is_content_flagged(settings, ai_content)

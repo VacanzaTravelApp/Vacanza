@@ -91,6 +91,14 @@ public class ChatProxyController {
         /** Single-day replan can use a smaller drawn area. */
         private static final int MIN_POIS_REPLAN_DAY = 2;
 
+        /** Text-chat {@code search_pois} tool: same bounds as polygon routes (model cannot force -99 or 500). */
+        private static final int MIN_CHAT_ITINERARY_DAYS = 1;
+        private static final int MAX_CHAT_ITINERARY_DAYS = 16;
+        /** Max Mapbox category round-trips per tool call. */
+        private static final int MAX_CHAT_TOOL_CATEGORIES = 16;
+        /** Cap destination string length before geocode (prompt-injection / abuse). */
+        private static final int MAX_CHAT_TOOL_DESTINATION_CHARS = 240;
+
         private final AiServiceClient aiServiceClient;
         private final CurrentUserProvider currentUserProvider;
         private final UserInfoService userInfoService;
@@ -147,22 +155,25 @@ public class ChatProxyController {
                                 String toolJsonRaw = extractLeadingJsonObject(response.getContent());
                                 var toolCall = parseToolCallFromJson(toolJsonRaw);
                                 if (toolCall != null && "search_pois".equalsIgnoreCase(toolCall.tool)) {
+                                        PoiToolCall safeTool = normalizeChatPoiToolCall(toolCall);
+                                        String toolJsonForTurn2 = canonicalSearchPoisToolJson(safeTool);
                                         var exec = executePoiSearchWithWeather(
-                                                        toolCall.destination,
-                                                        toolCall.categories,
-                                                        toolCall.days,
+                                                        safeTool.destination(),
+                                                        safeTool.categories(),
+                                                        safeTool.days(),
                                                         profile,
                                                         user.getUserId());
                                         var pois = exec.pois();
                                         routePlanningWeather = exec.planningWeather();
                                         if (pois.isEmpty()) {
-                                                log.warn("POI tool returned empty list for destination='{}' categories={}", toolCall.destination, toolCall.categories);
+                                                log.warn("POI tool returned empty list for destination='{}' categories={}",
+                                                                safeTool.destination(), safeTool.categories());
                                         }
                                         // Send tool result back to AI service (turn 2).
-                                        // Reuse the model's original JSON for line 1 so snake_case (e.g. travel_style) matches Python.
+                                        // Line 1: server-normalized tool JSON (days/categories/destination bounds).
                                         var toolMsg = new AiChatDto.MessageSendRequest();
                                         StringBuilder toolBody = new StringBuilder();
-                                        toolBody.append(toolJsonRaw).append("\n");
+                                        toolBody.append(toolJsonForTurn2).append("\n");
                                         toolBody.append("__TOOL_RESULT__search_pois__")
                                                         .append(objectMapper.writeValueAsString(pois));
                                         try {
@@ -514,6 +525,48 @@ public class ChatProxyController {
         }
 
         private record PoiToolCall(String tool, String destination, Integer days, String travelStyle, List<String> categories) {}
+
+        /**
+         * Clamp {@code search_pois} fields from the model before geocode, weather, and Mapbox (cost + sanity).
+         */
+        private PoiToolCall normalizeChatPoiToolCall(PoiToolCall raw) {
+                String dest = raw.destination() != null ? raw.destination().trim() : "";
+                if (dest.length() > MAX_CHAT_TOOL_DESTINATION_CHARS) {
+                        dest = dest.substring(0, MAX_CHAT_TOOL_DESTINATION_CHARS);
+                }
+                int days = raw.days() != null ? raw.days() : 3;
+                days = Math.min(Math.max(days, MIN_CHAT_ITINERARY_DAYS), MAX_CHAT_ITINERARY_DAYS);
+                List<String> cats = raw.categories() != null
+                                ? new ArrayList<>(withoutDiningCategories(raw.categories()))
+                                : new ArrayList<>();
+                if (cats.size() > MAX_CHAT_TOOL_CATEGORIES) {
+                        cats = new ArrayList<>(cats.subList(0, MAX_CHAT_TOOL_CATEGORIES));
+                }
+                if (cats.isEmpty()) {
+                        cats = new ArrayList<>(DEFAULT_POLYGON_CATEGORIES);
+                }
+                String ts = raw.travelStyle();
+                if (ts == null || ts.isBlank()) {
+                        ts = "general";
+                } else {
+                        ts = ts.trim();
+                }
+                return new PoiToolCall(raw.tool(), dest, days, ts, cats);
+        }
+
+        private String canonicalSearchPoisToolJson(PoiToolCall t) {
+                try {
+                        Map<String, Object> map = new LinkedHashMap<>();
+                        map.put("tool", t.tool());
+                        map.put("destination", t.destination());
+                        map.put("days", t.days());
+                        map.put("travel_style", t.travelStyle());
+                        map.put("categories", t.categories());
+                        return objectMapper.writeValueAsString(map);
+                } catch (Exception e) {
+                        throw new IllegalStateException("canonicalSearchPoisToolJson", e);
+                }
+        }
 
         /**
          * Model output may include markdown fences or prose; extract the first JSON object for tool parsing.
