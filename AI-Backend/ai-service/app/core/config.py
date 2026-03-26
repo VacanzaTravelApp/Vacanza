@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     app_port: int = 8000
     debug: bool = False
 
+    # When False, /ai/test and /ai/embed return 404 (avoid open proxy to OpenAI if service is exposed).
+    expose_ai_debug_routes: bool = False
+
 
 
     @computed_field

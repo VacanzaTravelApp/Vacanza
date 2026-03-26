@@ -11,6 +11,12 @@ from app.services.openai_service import test_connection
 router = APIRouter()
 
 
+def _require_debug_routes(settings: Settings) -> None:
+    """Hide diagnostic endpoints unless explicitly enabled (reduces OpenAI proxy abuse)."""
+    if not settings.expose_ai_debug_routes:
+        raise HTTPException(status_code=404, detail="Not found")
+
+
 class EmbedRequest(BaseModel):
     """Request body for embedding endpoint."""
 
@@ -26,6 +32,7 @@ async def test_openai_connection(
     Returns:
         Success status and message from OpenAI.
     """
+    _require_debug_routes(settings)
     success, message = await test_connection(settings)
     if not success:
         raise HTTPException(
@@ -47,6 +54,7 @@ async def embed_text(
     Returns:
         Embedding vector (1536 dims) and dimension.
     """
+    _require_debug_routes(settings)
     text = body.text
     service = create_embedding_service(settings)
     if not service:
