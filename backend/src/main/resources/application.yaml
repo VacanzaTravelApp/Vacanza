@@ -24,9 +24,9 @@ spring:
     init:
       mode: always
 
-geoapify:
-  base-url: https://api.geoapify.com/v2
-  api-key: ${GEOAPIFY_API_KEY}
+foursquare:
+  base-url: https://api.foursquare.com/v3
+  api-key: ${FOURSQUARE_API_KEY}
 
 mapbox:
   access-token: ${MAPBOX_ACCESS_TOKEN}
