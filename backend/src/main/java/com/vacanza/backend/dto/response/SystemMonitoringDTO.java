@@ -29,7 +29,7 @@ public class SystemMonitoringDTO {
     private List<ServiceStatus> services;
 
     /**
-     * API usage metrics per external service (Ticketmaster, SerpApi, Geoapify, etc.).
+     * API usage metrics per external service (Ticketmaster, SerpApi, Foursquare, etc.).
      */
     private List<ApiUsageMetric> apiMetrics;
 
