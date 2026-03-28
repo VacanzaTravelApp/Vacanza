@@ -6,15 +6,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Getter
 @Setter
-@ConfigurationProperties(prefix = "geoapify")
-public class GeoapifyProperties {
+@ConfigurationProperties(prefix = "foursquare")
+public class FoursquareProperties {
 
-    private String baseUrl = "https://api.geoapify.com/v2";
+    private String baseUrl = "https://api.foursquare.com/v3";
 
     /**
-     * Geoapify API Key
+     * Foursquare API Key (Authorization header value).
      */
     private String apiKey;
-
-
 }
