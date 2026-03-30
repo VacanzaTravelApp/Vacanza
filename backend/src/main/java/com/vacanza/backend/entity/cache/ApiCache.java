@@ -8,6 +8,19 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
+/**
+ * Generic, single-table cache for all SerpAPI call results.
+ * <p>
+ * Each row stores one JSON-serialized API response, keyed by
+ * {@code (cacheType, cacheKey)} with a TTL via {@code expiresAt}.
+ * <p>
+ * TTLs by type:
+ * <ul>
+ *   <li>AIRPORT — 30 days  (IATA codes never change)</li>
+ *   <li>HOTEL   — 12 hours (prices are fairly stable)</li>
+ *   <li>FLIGHT  — 6 hours  (prices change intra-day)</li>
+ * </ul>
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -19,7 +32,10 @@ import java.time.Instant;
                 name = "uq_api_cache_type_key",
                 columnNames = {"cache_type", "cache_key"}
         ),
-        indexes = @Index(name = "idx_api_cache_expires", columnList = "expires_at")
+        indexes = @Index(
+                name = "idx_api_cache_expires",
+                columnList = "expires_at"
+        )
 )
 public class ApiCache {
 
@@ -34,6 +50,7 @@ public class ApiCache {
     @Column(name = "cache_key", nullable = false, length = 512)
     private String cacheKey;
 
+    /** JSON-serialized API response (List of DTOs). */
     @Column(name = "results_json", nullable = false, columnDefinition = "TEXT")
     private String resultsJson;
 

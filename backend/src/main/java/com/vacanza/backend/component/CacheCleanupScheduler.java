@@ -9,6 +9,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
+/**
+ * Nightly job that purges expired SerpAPI cache entries.
+ * Runs at 03:00 every day.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
