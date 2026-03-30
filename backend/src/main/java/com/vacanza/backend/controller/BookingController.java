@@ -3,6 +3,7 @@ package com.vacanza.backend.controller;
 import com.vacanza.backend.dto.request.AccommodationSearchRequestDTO;
 import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
+import com.vacanza.backend.dto.response.DestinationSuggestionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
 import com.vacanza.backend.exceptions.BookingException;
 import com.vacanza.backend.integration.booking.SerpApiAirportSuggestion;
@@ -65,6 +66,27 @@ public class BookingController {
 
         log.info("Airport autocomplete request: q='{}'", q);
         List<SerpApiAirportSuggestion> results = bookingService.searchAirports(q);
+        return ResponseEntity.ok(results);
+    }
+
+    /**
+     * Hotel destination autocomplete for the accommodation search UI.
+     *
+     * <p>Reuses the airport autocomplete data under the hood — so this endpoint
+     * does NOT make any extra SerpAPI calls. Returns unique city+country
+     * pairs with pre-built search queries like "Hotels in Istanbul".
+     *
+     * @param q partial city or destination name (e.g. "istan", "paris")
+     * @return unique destination suggestions with display names
+     */
+    @GetMapping("/destinations/search")
+    public ResponseEntity<List<DestinationSuggestionDTO>> searchDestinations(
+            @RequestParam
+            @Size(min = 2, message = "Query must be at least 2 characters")
+            String q) {
+
+        log.info("Destination autocomplete request: q='{}'", q);
+        List<DestinationSuggestionDTO> results = bookingService.searchDestinations(q);
         return ResponseEntity.ok(results);
     }
 
