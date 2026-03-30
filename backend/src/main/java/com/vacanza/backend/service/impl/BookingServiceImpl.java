@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vacanza.backend.dto.request.AccommodationSearchRequestDTO;
 import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
+import com.vacanza.backend.dto.response.DestinationSuggestionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
 import com.vacanza.backend.entity.cache.ApiCache;
 import com.vacanza.backend.entity.cache.ApiCacheType;
@@ -23,9 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -50,7 +49,6 @@ public class BookingServiceImpl implements BookingService {
         public List<AccommodationOptionDTO> searchAccommodations(AccommodationSearchRequestDTO request) {
                 String key = CacheKeys.hotel(request);
 
-                // 1. Check cache
                 Optional<ApiCache> cached = cacheRepo
                         .findByCacheTypeAndCacheKeyAndExpiresAtAfter(
                                 ApiCacheType.HOTEL, key, Instant.now());
@@ -63,11 +61,9 @@ public class BookingServiceImpl implements BookingService {
                         return sortAccommodations(results, request.getSortBy());
                 }
 
-                // 2. Cache miss — call SerpAPI
                 log.info("[CACHE MISS] Hotel: key={} — calling SerpAPI", key);
                 List<AccommodationOptionDTO> results = serpApiClient.searchHotels(request);
 
-                // 3. Persist non-empty results
                 if (!results.isEmpty()) {
                         upsertCache(ApiCacheType.HOTEL, key, serialize(results),
                                 HOTEL_TTL_HOURS, ChronoUnit.HOURS);
@@ -143,14 +139,53 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ──────────────────────────────────────────────
+        // Hotel destination autocomplete
+        // Reuses airport autocomplete data — ZERO extra SerpAPI calls
+        // ──────────────────────────────────────────────
+
+        @Override
+        public List<DestinationSuggestionDTO> searchDestinations(String query) {
+                if (query == null || query.isBlank()) {
+                        throw new BookingException(
+                                "Destination search query must not be blank",
+                                HttpStatus.BAD_REQUEST);
+                }
+
+                // Reuse the same airport autocomplete (already cached with 30d TTL)
+                List<SerpApiAirportSuggestion> airports = searchAirports(query);
+
+                // Extract unique city+country pairs, build destination suggestions
+                Set<String> seen = new LinkedHashSet<>();
+                List<DestinationSuggestionDTO> destinations = new ArrayList<>();
+
+                for (SerpApiAirportSuggestion s : airports) {
+                        String city = s.getCity();
+                        String country = s.getCountry();
+                        if (city == null || city.isBlank()) continue;
+
+                        String uniqueKey = (city + "_" + (country != null ? country : "")).toLowerCase();
+                        if (!seen.add(uniqueKey)) continue;  // duplicate city+country
+
+                        String displayName = country != null && !country.isBlank()
+                                ? city + ", " + country
+                                : city;
+
+                        destinations.add(DestinationSuggestionDTO.builder()
+                                .city(city)
+                                .country(country)
+                                .displayName(displayName)
+                                .searchQuery("Hotels in " + city)
+                                .build());
+                }
+
+                log.info("[DESTINATION] '{}' → {} unique destinations", query, destinations.size());
+                return destinations;
+        }
+
+        // ──────────────────────────────────────────────
         // Cache helpers
         // ──────────────────────────────────────────────
 
-        /**
-         * Insert or overwrite an existing cache row.
-         * If a row with the same (type, key) exists (expired), we reuse it
-         * instead of inserting a duplicate.
-         */
         private void upsertCache(ApiCacheType type, String key, String json,
                                  long ttlAmount, ChronoUnit ttlUnit) {
                 Instant now = Instant.now();
@@ -195,7 +230,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // ──────────────────────────────────────────────
-        // Budget & sort (unchanged logic)
+        // Budget & sort
         // ──────────────────────────────────────────────
 
         private List<TransportOptionDTO> applyBudgetAndSort(
