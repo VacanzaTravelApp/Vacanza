@@ -1827,7 +1827,7 @@ export default function MapPage() {
               if (!polygonRouteSubmitting) setPolygonRouteParamsOpen(false);
             }}
             footer={null}
-            destroyOnClose
+            destroyOnHidden
             maskClosable={!polygonRouteSubmitting}
             zIndex={1100}
           >

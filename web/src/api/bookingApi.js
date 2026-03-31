@@ -95,3 +95,18 @@ export async function searchFlights(body) {
     return { success: false, error: mapError(error) };
   }
 }
+
+// ======================
+// AIRPORTS
+// ======================
+
+export async function searchAirports(query) {
+  try {
+    const res = await api.get(`/bookings/airports/search`, {
+      params: { q: query },
+    });
+    return res.data || [];
+  } catch (error) {
+    return [];
+  }
+}
