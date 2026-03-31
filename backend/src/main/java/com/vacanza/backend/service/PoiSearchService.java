@@ -41,13 +41,12 @@ public class PoiSearchService {
 
         List<PointOfInterest> all = fetchByBbox(bbox, frontendCategories);
 
-        // No results in DB — trigger ingest from Geoapify
+        // No results in DB — trigger ingest from Mapbox + Foursquare
         if (all.isEmpty()) {
 
-            String geoapifyFilter = buildRectFilterFromRequest(request);
-
             poiIngestService.ingestMultipleCategories(
-                    geoapifyFilter,
+                    bbox.getMinLng(), bbox.getMinLat(),
+                    bbox.getMaxLng(), bbox.getMaxLat(),
                     frontendCategories,
                     INGEST_LIMIT);
 
@@ -144,34 +143,6 @@ public class PoiSearchService {
                 .priceLevel(p.getPriceLevel())
                 .externalId(p.getExternalId())
                 .build();
-    }
-
-    private String buildRectFilterFromRequest(PoiSearchInAreaRequestDTO r) {
-
-        PoiSearchInAreaRequestDTO.Bbox b;
-
-        if (r.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
-            b = r.getBbox();
-        } else {
-            // polygon → bbox
-            double minLat = Double.MAX_VALUE, minLng = Double.MAX_VALUE;
-            double maxLat = -Double.MAX_VALUE, maxLng = -Double.MAX_VALUE;
-
-            for (var p : r.getPolygon()) {
-                minLat = Math.min(minLat, p.getLat());
-                minLng = Math.min(minLng, p.getLng());
-                maxLat = Math.max(maxLat, p.getLat());
-                maxLng = Math.max(maxLng, p.getLng());
-            }
-
-            b = new PoiSearchInAreaRequestDTO.Bbox(minLat, minLng, maxLat, maxLng);
-        }
-
-        return String.format(
-                Locale.US,
-                "rect:%f,%f,%f,%f",
-                b.getMinLng(), b.getMinLat(),
-                b.getMaxLng(), b.getMaxLat());
     }
 
 }

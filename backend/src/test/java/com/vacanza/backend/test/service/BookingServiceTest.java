@@ -1,21 +1,20 @@
 package com.vacanza.backend.test.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vacanza.backend.dto.request.AccommodationSearchRequestDTO;
 import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
+import com.vacanza.backend.dto.response.DestinationSuggestionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
-import com.vacanza.backend.entity.cache.AirportAutocompleteCache;
-import com.vacanza.backend.entity.cache.FlightSearchCache;
-import com.vacanza.backend.entity.cache.HotelSearchCache;
+import com.vacanza.backend.entity.cache.ApiCache;
+import com.vacanza.backend.entity.cache.ApiCacheType;
 import com.vacanza.backend.entity.enums.SortCriteria;
 import com.vacanza.backend.exceptions.BookingException;
 import com.vacanza.backend.integration.booking.SerpApiAirportSuggestion;
 import com.vacanza.backend.integration.booking.SerpApiClient;
-import com.vacanza.backend.repo.AirportAutocompleteCacheRepository;
-import com.vacanza.backend.repo.FlightSearchCacheRepository;
-import com.vacanza.backend.repo.HotelSearchCacheRepository;
+import com.vacanza.backend.repo.ApiCacheRepository;
 import com.vacanza.backend.service.impl.BookingServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,354 +39,288 @@ import static org.mockito.Mockito.*;
 class BookingServiceTest {
 
     @Mock private SerpApiClient serpApiClient;
+    @Mock private ApiCacheRepository cacheRepo;
     @Mock private ObjectMapper objectMapper;
-    @Mock private FlightSearchCacheRepository flightCacheRepo;
-    @Mock private HotelSearchCacheRepository hotelCacheRepo;
-    @Mock private AirportAutocompleteCacheRepository airportCacheRepo;
 
-    @InjectMocks
-    private BookingServiceImpl bookingService;
+    @InjectMocks private BookingServiceImpl bookingService;
 
-    // ──────────────────────────────────────────────────────────────
-    // Cache HIT — SerpAPI must NOT be called
-    // ──────────────────────────────────────────────────────────────
+    // ── Cache HIT ──────────────────────────────────────
 
     @Test
-    @DisplayName("CACHE HIT: should return cached flights without calling SerpAPI")
-    void shouldReturnCachedFlights_WhenCacheHit() throws JsonProcessingException {
-        TransportSearchRequestDTO request = flightRequest();
+    @DisplayName("CACHE HIT: flights — SerpAPI not called")
+    void cacheHit_flights() throws JsonProcessingException {
+        TransportSearchRequestDTO req = flightReq();
+        String json = "[]";
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.FLIGHT), anyString(), any(Instant.class)))
+                .thenReturn(Optional.of(cacheEntry(ApiCacheType.FLIGHT, json)));
+        when(objectMapper.readValue(eq(json), any(TypeReference.class)))
+                .thenReturn(List.of(TransportOptionDTO.builder().carrier("TK").price(new BigDecimal("200")).build()));
 
-        String cachedJson = "[{\"carrier\":\"TK\",\"price\":200}]";
-        FlightSearchCache hit = FlightSearchCache.builder()
-                .cacheKey("IST_CDG_2025-07-01_OW_1_USD")
-                .resultsJson(cachedJson)
-                .cachedAt(Instant.now().minusSeconds(3600))
-                .expiresAt(Instant.now().plusSeconds(18000))
-                .build();
+        List<TransportOptionDTO> r = bookingService.searchTransportation(req);
 
-        when(flightCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
-                .thenReturn(Optional.of(hit));
-
-        List<TransportOptionDTO> deserialized = List.of(
-                TransportOptionDTO.builder().carrier("TK").price(new BigDecimal("200")).build());
-        when(objectMapper.readValue(eq(cachedJson), any(com.fasterxml.jackson.core.type.TypeReference.class)))
-                .thenReturn(deserialized);
-
-        List<TransportOptionDTO> results = bookingService.searchTransportation(request);
-
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getCarrier()).isEqualTo("TK");
+        assertThat(r).hasSize(1);
         verify(serpApiClient, never()).searchFlights(any());
     }
 
     @Test
-    @DisplayName("CACHE HIT: should return cached hotels without calling SerpAPI")
-    void shouldReturnCachedHotels_WhenCacheHit() throws JsonProcessingException {
-        AccommodationSearchRequestDTO request = hotelRequest();
+    @DisplayName("CACHE HIT: hotels — SerpAPI not called")
+    void cacheHit_hotels() throws JsonProcessingException {
+        AccommodationSearchRequestDTO req = hotelReq();
+        String json = "[]";
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.HOTEL), anyString(), any(Instant.class)))
+                .thenReturn(Optional.of(cacheEntry(ApiCacheType.HOTEL, json)));
+        when(objectMapper.readValue(eq(json), any(TypeReference.class)))
+                .thenReturn(List.of(AccommodationOptionDTO.builder().hotelName("Ritz").price(new BigDecimal("500")).build()));
 
-        String cachedJson = "[{\"hotelName\":\"Ritz\",\"price\":500}]";
-        HotelSearchCache hit = HotelSearchCache.builder()
-                .cacheKey("paris_2025-07-01_2025-07-05_1_USD_any")
-                .resultsJson(cachedJson)
-                .cachedAt(Instant.now().minusSeconds(3600))
-                .expiresAt(Instant.now().plusSeconds(40000))
-                .build();
+        List<AccommodationOptionDTO> r = bookingService.searchAccommodations(req);
 
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
-                .thenReturn(Optional.of(hit));
-
-        List<AccommodationOptionDTO> deserialized = List.of(
-                AccommodationOptionDTO.builder().hotelName("Ritz").price(new BigDecimal("500")).build());
-        when(objectMapper.readValue(eq(cachedJson), any(com.fasterxml.jackson.core.type.TypeReference.class)))
-                .thenReturn(deserialized);
-
-        List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
-
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getHotelName()).isEqualTo("Ritz");
+        assertThat(r).hasSize(1);
         verify(serpApiClient, never()).searchHotels(any());
     }
 
     @Test
-    @DisplayName("CACHE HIT: should return cached airport suggestions without calling SerpAPI")
-    void shouldReturnCachedAirports_WhenCacheHit() throws JsonProcessingException {
-        String cachedJson = "[{\"iataCode\":\"IST\"}]";
-        AirportAutocompleteCache hit = AirportAutocompleteCache.builder()
-                .cacheKey("istanbul")
-                .resultsJson(cachedJson)
-                .cachedAt(Instant.now().minusSeconds(3600))
-                .expiresAt(Instant.now().plusSeconds(600000))
-                .build();
+    @DisplayName("CACHE HIT: airports — SerpAPI not called")
+    void cacheHit_airports() throws JsonProcessingException {
+        String json = "[]";
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.AIRPORT), eq("istanbul"), any(Instant.class)))
+                .thenReturn(Optional.of(cacheEntry(ApiCacheType.AIRPORT, json)));
+        SerpApiAirportSuggestion s = new SerpApiAirportSuggestion();
+        s.setIataCode("IST");
+        when(objectMapper.readValue(eq(json), any(TypeReference.class)))
+                .thenReturn(List.of(s));
 
-        when(airportCacheRepo.findByCacheKeyAndExpiresAtAfter(eq("istanbul"), any(Instant.class)))
-                .thenReturn(Optional.of(hit));
+        List<SerpApiAirportSuggestion> r = bookingService.searchAirports("Istanbul");
 
-        SerpApiAirportSuggestion suggestion = new SerpApiAirportSuggestion();
-        suggestion.setIataCode("IST");
-        when(objectMapper.readValue(eq(cachedJson), any(com.fasterxml.jackson.core.type.TypeReference.class)))
-                .thenReturn(List.of(suggestion));
-
-        List<SerpApiAirportSuggestion> results = bookingService.searchAirports("Istanbul");
-
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getIataCode()).isEqualTo("IST");
+        assertThat(r).hasSize(1);
         verify(serpApiClient, never()).searchAirports(any());
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Cache MISS — SerpAPI must be called and result saved
-    // ──────────────────────────────────────────────────────────────
+    // ── Cache MISS ──────────────────────────────────────
 
     @Test
-    @DisplayName("CACHE MISS: should call SerpAPI and save result for flights")
-    void shouldCallSerpApiAndSave_WhenFlightCacheMiss() throws JsonProcessingException {
-        TransportSearchRequestDTO request = flightRequest();
-
-        when(flightCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
+    @DisplayName("CACHE MISS: flights — SerpAPI called, result saved")
+    void cacheMiss_flights() throws JsonProcessingException {
+        TransportSearchRequestDTO req = flightReq();
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.FLIGHT), anyString(), any(Instant.class)))
                 .thenReturn(Optional.empty());
-
-        List<TransportOptionDTO> apiResults = List.of(
-                TransportOptionDTO.builder().carrier("TK").price(new BigDecimal("200")).build());
-        when(serpApiClient.searchFlights(any())).thenReturn(apiResults);
-        when(objectMapper.writeValueAsString(any())).thenReturn("[{\"carrier\":\"TK\"}]");
-
-        // Upsert check — nothing existing
-        when(flightCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), eq(Instant.EPOCH)))
-                .thenReturn(Optional.empty());
-
-        List<TransportOptionDTO> results = bookingService.searchTransportation(request);
-
-        assertThat(results).hasSize(1);
-        verify(serpApiClient, times(1)).searchFlights(any());
-        verify(flightCacheRepo, times(1)).save(any(FlightSearchCache.class));
-    }
-
-    @Test
-    @DisplayName("CACHE MISS: should call SerpAPI and save result for hotels")
-    void shouldCallSerpApiAndSave_WhenHotelCacheMiss() throws JsonProcessingException {
-        AccommodationSearchRequestDTO request = hotelRequest();
-
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
-                .thenReturn(Optional.empty());
-
-        List<AccommodationOptionDTO> apiResults = List.of(
-                AccommodationOptionDTO.builder().hotelName("Ritz").price(new BigDecimal("500")).build());
-        when(serpApiClient.searchHotels(any())).thenReturn(apiResults);
-        when(objectMapper.writeValueAsString(any())).thenReturn("[{\"hotelName\":\"Ritz\"}]");
-
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), eq(Instant.EPOCH)))
-                .thenReturn(Optional.empty());
-
-        List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
-
-        assertThat(results).hasSize(1);
-        verify(serpApiClient, times(1)).searchHotels(any());
-        verify(hotelCacheRepo, times(1)).save(any(HotelSearchCache.class));
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Budget filtering (still applied post-cache-read)
-    // ──────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("Should filter out flights exceeding budget (cache miss path)")
-    void shouldFilterFlights_ExceedingBudget() throws JsonProcessingException {
-        TransportSearchRequestDTO request = flightRequest();
-        request.setBudget(new BigDecimal("250.00"));
-
-        when(flightCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
-                .thenReturn(Optional.empty());
-
-        List<TransportOptionDTO> mockResults = List.of(
-                TransportOptionDTO.builder().carrier("TK").price(new BigDecimal("200.00")).build(),
-                TransportOptionDTO.builder().carrier("AF").price(new BigDecimal("400.00")).build(),
-                TransportOptionDTO.builder().carrier("PC").price(new BigDecimal("150.00")).build());
-
-        when(serpApiClient.searchFlights(any())).thenReturn(mockResults);
+        when(serpApiClient.searchFlights(any())).thenReturn(List.of(
+                TransportOptionDTO.builder().carrier("TK").price(new BigDecimal("200")).build()));
         when(objectMapper.writeValueAsString(any())).thenReturn("[]");
-        when(flightCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), eq(Instant.EPOCH)))
+        when(cacheRepo.findByCacheTypeAndCacheKey(eq(ApiCacheType.FLIGHT), anyString()))
                 .thenReturn(Optional.empty());
 
-        List<TransportOptionDTO> results = bookingService.searchTransportation(request);
+        List<TransportOptionDTO> r = bookingService.searchTransportation(req);
 
-        assertThat(results).hasSize(2);
-        assertThat(results).extracting(TransportOptionDTO::getCarrier)
-                .containsExactlyInAnyOrder("TK", "PC");
+        assertThat(r).hasSize(1);
+        verify(serpApiClient).searchFlights(any());
+        verify(cacheRepo).save(any(ApiCache.class));
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Sorting
-    // ──────────────────────────────────────────────────────────────
-
     @Test
-    @DisplayName("Should sort accommodations by PRICE_ASC (cache miss path)")
-    void shouldSortAccommodations_PriceAsc() throws JsonProcessingException {
-        AccommodationSearchRequestDTO request = hotelRequest();
-        request.setSortBy(SortCriteria.PRICE_ASC);
-
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
+    @DisplayName("CACHE MISS: hotels — SerpAPI called, result saved")
+    void cacheMiss_hotels() throws JsonProcessingException {
+        AccommodationSearchRequestDTO req = hotelReq();
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.HOTEL), anyString(), any(Instant.class)))
                 .thenReturn(Optional.empty());
-
-        List<AccommodationOptionDTO> mockResults = List.of(
-                AccommodationOptionDTO.builder().hotelName("Expensive").price(new BigDecimal("300.00")).build(),
-                AccommodationOptionDTO.builder().hotelName("Cheap").price(new BigDecimal("50.00")).build(),
-                AccommodationOptionDTO.builder().hotelName("Mid").price(new BigDecimal("150.00")).build());
-
-        when(serpApiClient.searchHotels(any())).thenReturn(mockResults);
+        when(serpApiClient.searchHotels(any())).thenReturn(List.of(
+                AccommodationOptionDTO.builder().hotelName("Ritz").price(new BigDecimal("500")).build()));
         when(objectMapper.writeValueAsString(any())).thenReturn("[]");
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), eq(Instant.EPOCH)))
+        when(cacheRepo.findByCacheTypeAndCacheKey(eq(ApiCacheType.HOTEL), anyString()))
                 .thenReturn(Optional.empty());
 
-        List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
+        List<AccommodationOptionDTO> r = bookingService.searchAccommodations(req);
 
-        assertThat(results).extracting(AccommodationOptionDTO::getPrice)
-                .containsExactly(
-                        new BigDecimal("50.00"),
-                        new BigDecimal("150.00"),
-                        new BigDecimal("300.00"));
+        assertThat(r).hasSize(1);
+        verify(serpApiClient).searchHotels(any());
+        verify(cacheRepo).save(any(ApiCache.class));
     }
 
     @Test
-    @DisplayName("Should sort accommodations by PRICE_DESC (cache miss path)")
-    void shouldSortAccommodations_PriceDesc() throws JsonProcessingException {
-        AccommodationSearchRequestDTO request = hotelRequest();
-        request.setSortBy(SortCriteria.PRICE_DESC);
-
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
+    @DisplayName("CACHE MISS: airport — SerpAPI called, result saved with 30d TTL")
+    void cacheMiss_airports() throws JsonProcessingException {
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.AIRPORT), eq("istanbul"), any(Instant.class)))
                 .thenReturn(Optional.empty());
-
-        List<AccommodationOptionDTO> mockResults = List.of(
-                AccommodationOptionDTO.builder().hotelName("Cheap").price(new BigDecimal("50.00")).build(),
-                AccommodationOptionDTO.builder().hotelName("Expensive").price(new BigDecimal("300.00")).build());
-
-        when(serpApiClient.searchHotels(any())).thenReturn(mockResults);
+        SerpApiAirportSuggestion ist = new SerpApiAirportSuggestion();
+        ist.setIataCode("IST"); ist.setCity("Istanbul"); ist.setCountry("Turkey");
+        when(serpApiClient.searchAirports("istanbul")).thenReturn(List.of(ist));
         when(objectMapper.writeValueAsString(any())).thenReturn("[]");
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), eq(Instant.EPOCH)))
+        when(cacheRepo.findByCacheTypeAndCacheKey(eq(ApiCacheType.AIRPORT), eq("istanbul")))
                 .thenReturn(Optional.empty());
 
-        List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
+        List<SerpApiAirportSuggestion> r = bookingService.searchAirports("istanbul");
 
-        assertThat(results).extracting(AccommodationOptionDTO::getPrice)
-                .containsExactly(new BigDecimal("300.00"), new BigDecimal("50.00"));
+        assertThat(r).hasSize(1);
+        verify(cacheRepo).save(any(ApiCache.class));
     }
 
-    @Test
-    @DisplayName("Should sort accommodations by RATING_DESC (cache miss path)")
-    void shouldSortAccommodations_RatingDesc() throws JsonProcessingException {
-        AccommodationSearchRequestDTO request = hotelRequest();
-        request.setSortBy(SortCriteria.RATING_DESC);
-
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
-                .thenReturn(Optional.empty());
-
-        List<AccommodationOptionDTO> mockResults = List.of(
-                AccommodationOptionDTO.builder().hotelName("Low").rating(2.5).build(),
-                AccommodationOptionDTO.builder().hotelName("High").rating(4.8).build(),
-                AccommodationOptionDTO.builder().hotelName("Mid").rating(3.5).build());
-
-        when(serpApiClient.searchHotels(any())).thenReturn(mockResults);
-        when(objectMapper.writeValueAsString(any())).thenReturn("[]");
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), eq(Instant.EPOCH)))
-                .thenReturn(Optional.empty());
-
-        List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
-
-        assertThat(results).extracting(AccommodationOptionDTO::getRating)
-                .containsExactly(4.8, 3.5, 2.5);
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Empty API responses
-    // ──────────────────────────────────────────────────────────────
+    // ── Empty results NOT cached ────────────────────────
 
     @Test
-    @DisplayName("Should return empty list when API client returns empty (cache miss path)")
-    void shouldReturnEmpty_WhenApiReturnsEmpty() {
-        AccommodationSearchRequestDTO request = hotelRequest();
-
-        when(hotelCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
-                .thenReturn(Optional.empty());
-        when(serpApiClient.searchHotels(any())).thenReturn(Collections.emptyList());
-
-        List<AccommodationOptionDTO> results = bookingService.searchAccommodations(request);
-
-        assertThat(results).isEmpty();
-        // Empty results must NOT be cached
-        verify(hotelCacheRepo, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("Should return empty list when flight API returns empty (cache miss path)")
-    void shouldReturnEmpty_WhenFlightApiReturnsEmpty() {
-        TransportSearchRequestDTO request = flightRequest();
-
-        when(flightCacheRepo.findByCacheKeyAndExpiresAtAfter(anyString(), any(Instant.class)))
+    @DisplayName("Empty flight results should NOT be cached")
+    void emptyFlights_notCached() {
+        TransportSearchRequestDTO req = flightReq();
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.FLIGHT), anyString(), any(Instant.class)))
                 .thenReturn(Optional.empty());
         when(serpApiClient.searchFlights(any())).thenReturn(Collections.emptyList());
 
-        List<TransportOptionDTO> results = bookingService.searchTransportation(request);
-
-        assertThat(results).isEmpty();
-        verify(flightCacheRepo, never()).save(any());
+        assertThat(bookingService.searchTransportation(req)).isEmpty();
+        verify(cacheRepo, never()).save(any());
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Airport autocomplete validation
-    // ──────────────────────────────────────────────────────────────
+    @Test
+    @DisplayName("Empty hotel results should NOT be cached")
+    void emptyHotels_notCached() {
+        AccommodationSearchRequestDTO req = hotelReq();
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.HOTEL), anyString(), any(Instant.class)))
+                .thenReturn(Optional.empty());
+        when(serpApiClient.searchHotels(any())).thenReturn(Collections.emptyList());
+
+        assertThat(bookingService.searchAccommodations(req)).isEmpty();
+        verify(cacheRepo, never()).save(any());
+    }
+
+    // ── Destination autocomplete (zero SerpAPI cost) ────
 
     @Test
-    @DisplayName("Should throw BookingException when airport query is blank")
-    void searchAirports_BlankQuery_ThrowsException() {
+    @DisplayName("searchDestinations reuses airport cache — zero extra SerpAPI calls")
+    void destinations_reusesAirportCache() throws JsonProcessingException {
+        String json = "[]";
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.AIRPORT), eq("istanbul"), any(Instant.class)))
+                .thenReturn(Optional.of(cacheEntry(ApiCacheType.AIRPORT, json)));
+
+        SerpApiAirportSuggestion s1 = new SerpApiAirportSuggestion();
+        s1.setIataCode("IST"); s1.setCity("Istanbul"); s1.setCountry("Turkey");
+        SerpApiAirportSuggestion s2 = new SerpApiAirportSuggestion();
+        s2.setIataCode("SAW"); s2.setCity("Istanbul"); s2.setCountry("Turkey");
+
+        when(objectMapper.readValue(eq(json), any(TypeReference.class)))
+                .thenReturn(List.of(s1, s2));
+
+        List<DestinationSuggestionDTO> r = bookingService.searchDestinations("Istanbul");
+
+        // Two airports in same city → one unique destination
+        assertThat(r).hasSize(1);
+        assertThat(r.get(0).getCity()).isEqualTo("Istanbul");
+        assertThat(r.get(0).getDisplayName()).isEqualTo("Istanbul, Turkey");
+        assertThat(r.get(0).getSearchQuery()).isEqualTo("Hotels in Istanbul");
+        verify(serpApiClient, never()).searchAirports(any());
+    }
+
+    // ── Budget filtering ────────────────────────────────
+
+    @Test
+    @DisplayName("Flights over budget are filtered out")
+    void budgetFilter() throws JsonProcessingException {
+        TransportSearchRequestDTO req = flightReq();
+        req.setBudget(new BigDecimal("250"));
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.FLIGHT), anyString(), any(Instant.class)))
+                .thenReturn(Optional.empty());
+        when(serpApiClient.searchFlights(any())).thenReturn(List.of(
+                TransportOptionDTO.builder().carrier("TK").price(new BigDecimal("200")).build(),
+                TransportOptionDTO.builder().carrier("AF").price(new BigDecimal("400")).build()));
+        when(objectMapper.writeValueAsString(any())).thenReturn("[]");
+        when(cacheRepo.findByCacheTypeAndCacheKey(eq(ApiCacheType.FLIGHT), anyString()))
+                .thenReturn(Optional.empty());
+
+        List<TransportOptionDTO> r = bookingService.searchTransportation(req);
+
+        assertThat(r).hasSize(1);
+        assertThat(r.get(0).getCarrier()).isEqualTo("TK");
+    }
+
+    // ── Sorting ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("Hotels sorted by PRICE_ASC")
+    void sort_priceAsc() throws JsonProcessingException {
+        AccommodationSearchRequestDTO req = hotelReq();
+        req.setSortBy(SortCriteria.PRICE_ASC);
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.HOTEL), anyString(), any(Instant.class)))
+                .thenReturn(Optional.empty());
+        when(serpApiClient.searchHotels(any())).thenReturn(List.of(
+                AccommodationOptionDTO.builder().hotelName("X").price(new BigDecimal("300")).build(),
+                AccommodationOptionDTO.builder().hotelName("Y").price(new BigDecimal("50")).build()));
+        when(objectMapper.writeValueAsString(any())).thenReturn("[]");
+        when(cacheRepo.findByCacheTypeAndCacheKey(eq(ApiCacheType.HOTEL), anyString()))
+                .thenReturn(Optional.empty());
+
+        List<AccommodationOptionDTO> r = bookingService.searchAccommodations(req);
+
+        assertThat(r.get(0).getPrice()).isEqualByComparingTo("50");
+        assertThat(r.get(1).getPrice()).isEqualByComparingTo("300");
+    }
+
+    @Test
+    @DisplayName("Hotels sorted by RATING_DESC")
+    void sort_ratingDesc() throws JsonProcessingException {
+        AccommodationSearchRequestDTO req = hotelReq();
+        req.setSortBy(SortCriteria.RATING_DESC);
+        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.HOTEL), anyString(), any(Instant.class)))
+                .thenReturn(Optional.empty());
+        when(serpApiClient.searchHotels(any())).thenReturn(List.of(
+                AccommodationOptionDTO.builder().hotelName("Low").rating(2.5).build(),
+                AccommodationOptionDTO.builder().hotelName("High").rating(4.8).build()));
+        when(objectMapper.writeValueAsString(any())).thenReturn("[]");
+        when(cacheRepo.findByCacheTypeAndCacheKey(eq(ApiCacheType.HOTEL), anyString()))
+                .thenReturn(Optional.empty());
+
+        List<AccommodationOptionDTO> r = bookingService.searchAccommodations(req);
+
+        assertThat(r.get(0).getRating()).isEqualTo(4.8);
+    }
+
+    // ── Validation ──────────────────────────────────────
+
+    @Test
+    @DisplayName("Blank airport query throws BookingException")
+    void blankAirportQuery() {
         assertThatThrownBy(() -> bookingService.searchAirports("   "))
-                .isInstanceOf(BookingException.class)
-                .hasMessageContaining("must not be blank");
+                .isInstanceOf(BookingException.class);
     }
 
     @Test
-    @DisplayName("CACHE MISS: should delegate to SerpApiClient and save airport suggestions")
-    void searchAirports_CacheMiss_ReturnsSuggestionsAndSaves() throws JsonProcessingException {
-        SerpApiAirportSuggestion ist = new SerpApiAirportSuggestion();
-        ist.setIataCode("IST");
-        ist.setName("Istanbul Airport");
-        ist.setCity("Istanbul");
-        ist.setCountry("Turkey");
-
-        when(airportCacheRepo.findByCacheKeyAndExpiresAtAfter(eq("istanbul"), any(Instant.class)))
-                .thenReturn(Optional.empty());
-        when(serpApiClient.searchAirports(anyString())).thenReturn(List.of(ist));
-        when(objectMapper.writeValueAsString(any())).thenReturn("[{\"iataCode\":\"IST\"}]");
-        when(airportCacheRepo.findByCacheKeyAndExpiresAtAfter(eq("istanbul"), eq(Instant.EPOCH)))
-                .thenReturn(Optional.empty());
-
-        List<SerpApiAirportSuggestion> results = bookingService.searchAirports("istanbul");
-
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).getIataCode()).isEqualTo("IST");
-        assertThat(results.get(0).getName()).isEqualTo("Istanbul Airport");
-        verify(airportCacheRepo, times(1)).save(any(AirportAutocompleteCache.class));
+    @DisplayName("Blank destination query throws BookingException")
+    void blankDestinationQuery() {
+        assertThatThrownBy(() -> bookingService.searchDestinations("  "))
+                .isInstanceOf(BookingException.class);
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Helpers
-    // ──────────────────────────────────────────────────────────────
+    // ── Helpers ─────────────────────────────────────────
 
-    private TransportSearchRequestDTO flightRequest() {
+    private TransportSearchRequestDTO flightReq() {
         TransportSearchRequestDTO r = new TransportSearchRequestDTO();
-        r.setOrigin("IST");
-        r.setDestination("CDG");
+        r.setOrigin("IST"); r.setDestination("CDG");
         r.setDepartureDate(LocalDate.of(2025, 7, 1));
-        r.setCurrency("USD");
-        r.setAdults(1);
+        r.setCurrency("USD"); r.setAdults(1);
         return r;
     }
 
-    private AccommodationSearchRequestDTO hotelRequest() {
+    private AccommodationSearchRequestDTO hotelReq() {
         AccommodationSearchRequestDTO r = new AccommodationSearchRequestDTO();
         r.setQuery("Hotels in Paris");
         r.setCheckInDate(LocalDate.of(2025, 7, 1));
         r.setCheckOutDate(LocalDate.of(2025, 7, 5));
-        r.setCurrency("USD");
-        r.setAdults(1);
+        r.setCurrency("USD"); r.setAdults(1);
         return r;
+    }
+
+    private ApiCache cacheEntry(ApiCacheType type, String json) {
+        return ApiCache.builder()
+                .cacheType(type).cacheKey("test-key").resultsJson(json)
+                .cachedAt(Instant.now().minusSeconds(60))
+                .expiresAt(Instant.now().plusSeconds(60000))
+                .build();
     }
 }

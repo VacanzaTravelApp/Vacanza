@@ -1,8 +1,6 @@
 package com.vacanza.backend.component;
 
-import com.vacanza.backend.repo.AirportAutocompleteCacheRepository;
-import com.vacanza.backend.repo.FlightSearchCacheRepository;
-import com.vacanza.backend.repo.HotelSearchCacheRepository;
+import com.vacanza.backend.repo.ApiCacheRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,28 +10,24 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 
 /**
- * Nightly job that deletes expired SerpAPI cache entries from the database.
- * Runs at 03:00 every day to keep tables lean.
+ * Nightly job that purges expired SerpAPI cache entries.
+ * Runs at 03:00 every day.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class CacheCleanupScheduler {
 
-    private final FlightSearchCacheRepository    flightCacheRepo;
-    private final HotelSearchCacheRepository     hotelCacheRepo;
-    private final AirportAutocompleteCacheRepository airportCacheRepo;
+    private final ApiCacheRepository cacheRepo;
 
     @Transactional
     @Scheduled(cron = "0 0 3 * * *")
-    public void cleanupExpiredCacheEntries() {
+    public void purgeExpiredEntries() {
         Instant now = Instant.now();
-        log.info("[CACHE CLEANUP] Starting expired cache entry cleanup at {}", now);
-
-        flightCacheRepo.deleteAllByExpiresAtBefore(now);
-        hotelCacheRepo.deleteAllByExpiresAtBefore(now);
-        airportCacheRepo.deleteAllByExpiresAtBefore(now);
-
-        log.info("[CACHE CLEANUP] Cleanup complete");
+        long before = cacheRepo.count();
+        cacheRepo.deleteAllByExpiresAtBefore(now);
+        long after = cacheRepo.count();
+        log.info("[CACHE CLEANUP] Purged {} expired entries, {} remaining",
+                before - after, after);
     }
 }
