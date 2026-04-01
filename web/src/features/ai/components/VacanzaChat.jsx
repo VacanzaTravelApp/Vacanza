@@ -283,30 +283,6 @@ const GREETING = {
   time: "",
 };
 
-function normalizePricingRow(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  return {
-    waypointName: raw.waypointName ?? raw.waypoint_name ?? "",
-    day: Number(raw.day) || 0,
-    order: Number(raw.order) || 0,
-    minPriceUsd: raw.minPriceUsd ?? raw.min_price_usd,
-    currency: raw.currency ?? "USD",
-    bookingUrl: raw.bookingUrl ?? raw.booking_url,
-    found: Boolean(raw.found),
-    status: raw.status,
-    message: raw.message,
-  };
-}
-
-function formatTicketPriceLine(row) {
-  if (!row?.found || row.minPriceUsd == null) return null;
-  const n = Number(row.minPriceUsd);
-  const ccy = row.currency || "USD";
-  if (Number.isNaN(n)) return `from ${ccy}`;
-  const decimals = n % 1 === 0 ? 0 : 2;
-  return `from $${n.toFixed(decimals)} ${ccy}`;
-}
-
 export default function VacanzaChat({
   isOpen,
   onClose,
@@ -326,28 +302,8 @@ export default function VacanzaChat({
   const [initialLoading, setInitialLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
-  /** `${messageId}-${routeIndex}` → bilet fiyatları yüklenirken / sonuç satırları */
-  const [ticketLoadingByKey, setTicketLoadingByKey] = useState({});
-  const [ticketRowsByKey, setTicketRowsByKey] = useState({});
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
-
-  const ticketStateKey = (msgId, rIdx) => `${msgId}-r${rIdx}`;
-
-  const handleTicketSearch = useCallback(async (routeId, msgId, rIdx) => {
-    const key = ticketStateKey(msgId, rIdx);
-    setTicketLoadingByKey((prev) => ({ ...prev, [key]: true }));
-    try {
-      const rows = await aiApi.getRoutePricing(routeId);
-      setTicketRowsByKey((prev) => ({ ...prev, [key]: Array.isArray(rows) ? rows : [] }));
-    } catch (e) {
-      console.error(e);
-      message.error("Bilet fiyatları yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.");
-      setTicketRowsByKey((prev) => ({ ...prev, [key]: [] }));
-    } finally {
-      setTicketLoadingByKey((prev) => ({ ...prev, [key]: false }));
-    }
-  }, []);
 
   const scrollToBottom = () => {
     const el = scrollContainerRef.current;
@@ -744,85 +700,6 @@ export default function VacanzaChat({
                     >
                       Rotayı Haritada Göster
                     </button>
-                    {(() => {
-                      const routeIdForCard = msg.routeIdList?.[rIdx];
-                      if (!routeIdForCard) return null;
-                      const tk = ticketStateKey(msg.id, rIdx);
-                      const ticketLoading = ticketLoadingByKey[tk];
-                      const rawRows = ticketRowsByKey[tk];
-                      const list =
-                        rawRows === undefined
-                          ? null
-                          : (Array.isArray(rawRows) ? rawRows : []).map(normalizePricingRow).filter(Boolean);
-                      const showTicketEmpty =
-                        list &&
-                        !ticketLoading &&
-                        (list.length === 0 ||
-                          (list.length > 0 && list.every((r) => !r.found)));
-                      const showTicketCards =
-                        list && list.length > 0 && !ticketLoading && !list.every((r) => !r.found);
-                      return (
-                        <div className="route-ticket-section">
-                          <button
-                            type="button"
-                            className="route-tickets-btn"
-                            onClick={() => handleTicketSearch(routeIdForCard, msg.id, rIdx)}
-                            disabled={ticketLoading || messagesLoading}
-                          >
-                            Bilet Bul 🎫
-                          </button>
-                          {ticketLoading ? (
-                            <div className="ticket-loading-wrap" aria-live="polite">
-                              <Spin size="small" />
-                              <span className="ticket-loading-label">Fiyatlar yükleniyor…</span>
-                            </div>
-                          ) : null}
-                          {showTicketEmpty ? (
-                            <div className="ticket-empty" role="status">
-                              Uygun bilet bulunamadı
-                            </div>
-                          ) : null}
-                          {showTicketCards ? (
-                            <ul className="ticket-card-list">
-                              {list.map((row, ti) => (
-                                <li
-                                  key={`${tk}-t${ti}-${row.day}-${row.order}`}
-                                  className="ticket-card"
-                                >
-                                  <div className="ticket-card-head">
-                                    <span className="ticket-waypoint-name">{row.waypointName}</span>
-                                    <span className="ticket-day">Gün {row.day}</span>
-                                  </div>
-                                  {(() => {
-                                    const priceLine = formatTicketPriceLine(row);
-                                    if (priceLine) {
-                                      return <div className="ticket-price">{priceLine}</div>;
-                                    }
-                                    if (row.status === "PARTNER_UNAVAILABLE" && row.message) {
-                                      return (
-                                        <div className="ticket-price ticket-price--muted">{row.message}</div>
-                                      );
-                                    }
-                                    return <div className="ticket-price ticket-price--muted">—</div>;
-                                  })()}
-                                  {row.found && row.bookingUrl ? (
-                                    <button
-                                      type="button"
-                                      className="ticket-buy-btn"
-                                      onClick={() =>
-                                        window.open(row.bookingUrl, "_blank", "noopener,noreferrer")
-                                      }
-                                    >
-                                      Bilet Al
-                                    </button>
-                                  ) : null}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </div>
-                      );
-                    })()}
                     </div>
                   </div>
                 ))}
