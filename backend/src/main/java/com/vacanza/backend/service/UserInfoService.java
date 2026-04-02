@@ -11,7 +11,11 @@ import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.io.IOException;
+import java.util.Map;
 
 /**
  * Profile upsert:
@@ -95,6 +99,83 @@ public class UserInfoService {
         return toDto(userInfoRepository.save(info));
     }
 
+    // ──────────────────────────────────────────────
+    // Profile photo (PostgreSQL bytea)
+    // ──────────────────────────────────────────────
+
+    private static final long MAX_PHOTO_SIZE = 2 * 1024 * 1024; // 2 MB
+
+    /**
+     * Upload profile photo — stores binary data directly in PostgreSQL bytea.
+     * Max 2 MB, only image/* content types allowed.
+     */
+    @Transactional
+    public void uploadProfilePhoto(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty");
+        }
+        if (file.getSize() > MAX_PHOTO_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "File too large — max 2 MB allowed");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Only image files are allowed (image/jpeg, image/png, etc.)");
+        }
+
+        User user = currentUserProvider.getCurrentUserEntity();
+        UserInfo info = userInfoRepository.findByUser(user)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Create profile before uploading photo"));
+
+        try {
+            info.setProfileImageData(file.getBytes());
+            info.setProfileImageType(contentType);
+            userInfoRepository.save(info);
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Failed to read uploaded file");
+        }
+    }
+
+    /**
+     * Returns profile photo bytes + content type.
+     * @return map with "data" (byte[]) and "contentType" (String)
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getProfilePhoto() {
+        User user = currentUserProvider.getCurrentUserEntity();
+        UserInfo info = userInfoRepository.findByUser(user)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User profile not found"));
+
+        if (info.getProfileImageData() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No profile photo uploaded");
+        }
+
+        return Map.of(
+                "data", info.getProfileImageData(),
+                "contentType", info.getProfileImageType() != null
+                        ? info.getProfileImageType() : "image/jpeg"
+        );
+    }
+
+    /**
+     * Delete profile photo — clears binary data from DB.
+     */
+    @Transactional
+    public void deleteProfilePhoto() {
+        User user = currentUserProvider.getCurrentUserEntity();
+        UserInfo info = userInfoRepository.findByUser(user)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User profile not found"));
+
+        info.setProfileImageData(null);
+        info.setProfileImageType(null);
+        userInfoRepository.save(info);
+    }
+
     private UserInfoResponseDTO toDto(UserInfo info) {
         return UserInfoResponseDTO.builder()
                 .infoId(info.getInfoId())
@@ -109,6 +190,7 @@ public class UserInfoService {
                 .birthDate(info.getBirthDate())
                 .gender(info.getGender())
                 .profileImageUrl(info.getProfileImageUrl())
+                .hasProfilePhoto(info.getProfileImageData() != null)
                 .joinDate(info.getJoinDate())
                 .build();
     }
