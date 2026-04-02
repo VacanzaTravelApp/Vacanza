@@ -111,6 +111,7 @@ public class SerpApiAirportSuggestion {
                 for (SubAirport sub : entry.getAirports()) {
                     SerpApiAirportSuggestion s = new SerpApiAirportSuggestion();
                     s.setIataCode(isIataCode(sub.getId()) ? sub.getId() : null);
+                    s.setKgmid(isKgmid(sub.getId()) ? sub.getId() : null);
                     s.setName(sub.getName());
                     s.setCity(entry.getCity() != null ? entry.getCity() : entry.getName());
                     s.setCountry(entry.getCountry());
