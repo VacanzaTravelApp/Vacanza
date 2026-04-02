@@ -6,6 +6,8 @@ import com.vacanza.backend.dto.response.TransportOptionDTO;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -168,11 +170,25 @@ public class SerpApiFlightResponse {
                     String flightNumber = firstFlight.getFlightNumber();
                     String travelClass = firstFlight.getTravelClass();
 
-                    // Build a descriptive Google Flights deep-link
-                    String bookingUrl = String.format(
-                            "https://www.google.com/travel/flights?q=%s+to+%s+on+%s",
-                            origin, destination,
-                            departureTime != null ? departureTime.substring(0, 10) : "");
+                    // Build a descriptive Google Flights deep-link using
+                    // human-readable names so Google can resolve the query
+                    String originName = firstFlight.getDepartureAirport() != null
+                            && firstFlight.getDepartureAirport().getName() != null
+                            ? firstFlight.getDepartureAirport().getName()
+                            : origin;
+                    String destinationName = lastFlight.getArrivalAirport() != null
+                            && lastFlight.getArrivalAirport().getName() != null
+                            ? lastFlight.getArrivalAirport().getName()
+                            : destination;
+
+                    String dateStr = departureTime != null && departureTime.length() >= 10
+                            ? departureTime.substring(0, 10)
+                            : "";
+
+                    String rawQuery = String.format("flights from %s to %s on %s",
+                            originName, destinationName, dateStr).trim();
+                    String bookingUrl = "https://www.google.com/travel/flights?q="
+                            + URLEncoder.encode(rawQuery, StandardCharsets.UTF_8);
 
                     // departure_token is only present in round-trip first-leg responses;
                     // fall back to booking_token for one-way flights.
