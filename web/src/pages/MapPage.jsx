@@ -788,11 +788,11 @@ export default function MapPage() {
     () =>
       Boolean(
         user &&
-          selection?.mode === "polygon" &&
-          (selection.polygon?.length ?? 0) >= 3 &&
-          !activeRoute &&
-          polygonRouteBannerDismissed &&
-          !resultsOpen
+        selection?.mode === "polygon" &&
+        (selection.polygon?.length ?? 0) >= 3 &&
+        !activeRoute &&
+        polygonRouteBannerDismissed &&
+        !resultsOpen
       ),
     [user, selection, activeRoute, polygonRouteBannerDismissed, resultsOpen]
   );
@@ -802,9 +802,9 @@ export default function MapPage() {
     () =>
       Boolean(
         user &&
-          activeRoute &&
-          selection?.mode === "polygon" &&
-          (selection.polygon?.length ?? 0) >= 3
+        activeRoute &&
+        selection?.mode === "polygon" &&
+        (selection.polygon?.length ?? 0) >= 3
       ),
     [user, activeRoute, selection]
   );
@@ -1072,7 +1072,7 @@ export default function MapPage() {
   const headerHeight = isMobile ? 54 : 64;
   const contentPadding = isMobile ? 0 : 24;
   const mapContainerRadius = isMobile ? 0 : 12;
-  const mapContainerHeight = isMobile ? `calc(100vh - ${headerHeight}px)` : "calc(100vh - 88px)";
+  const mapContainerHeight = isMobile ? `calc(100vh - ${headerHeight}px)` : `calc(100vh - ${headerHeight + contentPadding * 2}px)`;
 
   const fabSize = isMobile ? 44 : 48;
   const fabGap = isMobile ? 8 : 10;
@@ -1083,12 +1083,12 @@ export default function MapPage() {
 
   const resultsWidth = isMobile ? "calc(100% - 24px)" : "min(760px, calc(100% - 48px))";
   const resultsBottom = isMobile ? 12 : 18;
-  const resultsMaxHeight = isMobile ? 240 : 260;
+  const resultsMaxHeight = isMobile ? 220 : 240;
 
   const userCardWidth = isMobile ? 220 : 280;
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout style={{ height: "100vh", overflow: "hidden", background: "#f0f2f5" }}>
       <Header
         style={{
           display: "flex",
@@ -1116,7 +1116,13 @@ export default function MapPage() {
         </Button>
       </Header>
 
-      <Content style={{ marginTop: headerHeight, padding: contentPadding, position: "relative" }}>
+      <Content style={{
+        marginTop: headerHeight,
+        padding: contentPadding,
+        position: "relative",
+        height: `calc(100vh - ${headerHeight}px)`,
+        overflow: "hidden"
+      }}>
         <div
           style={{
             height: mapContainerHeight,
@@ -1136,24 +1142,104 @@ export default function MapPage() {
                 style={{
                   position: "absolute",
                   top: 12,
-                  left: 12,
-                  right: 12,
-                  zIndex: 25,
+                  right: isMobile ? "auto" : 80, // Desktop'ta butonların (Fabs) yanına yasla
+                  left: isMobile ? "50%" : "auto",
+                  transform: isMobile ? "translateX(-50%)" : "none",
+                  width: isMobile ? "calc(100% - 24px)" : "max-content",
+                  maxWidth: isMobile ? "none" : "calc(100% - 420px)", // Profil kartına (320px) çarpmaması için güvenli alan
+                  zIndex: 90, // Profil kartıyla (100) çakışsa da görünür kalsın veya hemen altına insin
                   display: "flex",
                   justifyContent: "center",
-                  pointerEvents: "none",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  pointerEvents: "auto", // Butonlara tıklanabilsin
                   boxSizing: "border-box",
                 }}
               >
                 <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
+                  <Card
+                    size="small"
+                    styles={{ body: { padding: "10px 12px" } }}
+                    style={{
+                      borderRadius: 12,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                      background: "rgba(255,255,255,0.96)",
+                      backdropFilter: "blur(8px)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: isMobile ? "column" : "row",
+                        alignItems: isMobile ? "stretch" : "flex-start",
+                        justifyContent: "space-between",
+                        gap: 10,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 13,
+                          color: "#333",
+                          lineHeight: 1.45,
+                          flex: isMobile ? "none" : "1 1 0",
+                          minWidth: 0,
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        Bu alan için rota oluşturabilirsin. Önce haritayı ve sonuçları inceleyebilirsin; hazır olunca{" "}
+                        <b>Rota oluştur</b> ile devam et.
+                      </span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          flexShrink: 0,
+                          alignSelf: isMobile ? "stretch" : "auto",
+                        }}
+                      >
+                        <Button type="primary" size="small" onClick={openPolygonRouteParams}>
+                          Rota oluştur
+                        </Button>
+                        <Tooltip title="Bandı gizle (alan aynı kalır; rota için sonuç panelindeki düğmeyi kullan)">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<CloseOutlined />}
+                            onClick={() => setPolygonRouteBannerDismissed(true)}
+                            aria-label="Rota isteğini gizle"
+                          />
+                        </Tooltip>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+          {showReplanDayBanner && (
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                right: 12,
+                zIndex: 25,
+                display: "flex",
+                justifyContent: "center",
+                pointerEvents: "none",
+                boxSizing: "border-box",
+              }}
+            >
+              <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
                 <Card
                   size="small"
                   styles={{ body: { padding: "10px 12px" } }}
                   style={{
                     borderRadius: 12,
                     boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                    background: "rgba(255,255,255,0.96)",
+                    background: "rgba(255,248,240,0.98)",
                     backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(249,115,22,0.35)",
                   }}
                 >
                   <div
@@ -1175,102 +1261,26 @@ export default function MapPage() {
                         wordBreak: "break-word",
                       }}
                     >
-                      Bu alan için rota oluşturabilirsin. Önce haritayı ve sonuçları inceleyebilirsin; hazır olunca{" "}
-                      <b>Rota oluştur</b> ile devam et.
+                      <b>Gün {activeDay}</b> — Haritada çizdiğin alandaki mekânlara göre durakları güncelle. Bunun için
+                      sohbet veya harita rotasına bağlı bir oturum gerekir.
                     </span>
-                    <div
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={replanDaySubmitting}
+                      onClick={submitReplanDayFromPolygon}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
+                        background: "#ea580c",
+                        borderColor: "#c2410c",
                         flexShrink: 0,
-                        alignSelf: isMobile ? "stretch" : "auto",
+                        alignSelf: isMobile ? "stretch" : "flex-start",
+                        whiteSpace: isMobile ? "normal" : "nowrap",
                       }}
                     >
-                      <Button type="primary" size="small" onClick={openPolygonRouteParams}>
-                        Rota oluştur
-                      </Button>
-                      <Tooltip title="Bandı gizle (alan aynı kalır; rota için sonuç panelindeki düğmeyi kullan)">
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<CloseOutlined />}
-                          onClick={() => setPolygonRouteBannerDismissed(true)}
-                          aria-label="Rota isteğini gizle"
-                        />
-                      </Tooltip>
-                    </div>
+                      {isMobile ? "Çizime göre güncelle" : "Günü çizime göre yenile"}
+                    </Button>
                   </div>
                 </Card>
-                </div>
-              </div>
-            )}
-
-          {showReplanDayBanner && (
-            <div
-              style={{
-                position: "absolute",
-                top: 12,
-                left: 12,
-                right: 12,
-                zIndex: 25,
-                display: "flex",
-                justifyContent: "center",
-                pointerEvents: "none",
-                boxSizing: "border-box",
-              }}
-            >
-              <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
-              <Card
-                size="small"
-                styles={{ body: { padding: "10px 12px" } }}
-                style={{
-                  borderRadius: 12,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                  background: "rgba(255,248,240,0.98)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(249,115,22,0.35)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: isMobile ? "column" : "row",
-                    alignItems: isMobile ? "stretch" : "flex-start",
-                    justifyContent: "space-between",
-                    gap: 10,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: "#333",
-                      lineHeight: 1.45,
-                      flex: isMobile ? "none" : "1 1 0",
-                      minWidth: 0,
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    <b>Gün {activeDay}</b> — Haritada çizdiğin alandaki mekânlara göre durakları güncelle. Bunun için
-                    sohbet veya harita rotasına bağlı bir oturum gerekir.
-                  </span>
-                  <Button
-                    type="primary"
-                    size="small"
-                    loading={replanDaySubmitting}
-                    onClick={submitReplanDayFromPolygon}
-                    style={{
-                      background: "#ea580c",
-                      borderColor: "#c2410c",
-                      flexShrink: 0,
-                      alignSelf: isMobile ? "stretch" : "flex-start",
-                      whiteSpace: isMobile ? "normal" : "nowrap",
-                    }}
-                  >
-                    {isMobile ? "Çizime göre güncelle" : "Günü çizime göre yenile"}
-                  </Button>
-                </div>
-              </Card>
               </div>
             </div>
           )}
@@ -1696,7 +1706,8 @@ export default function MapPage() {
                 transform: "translateX(-50%)",
                 bottom: resultsBottom,
                 zIndex: 80,
-                width: resultsWidth,
+                width: isMobile ? "calc(100% - 24px)" : "min(680px, calc(100% - 360px))",
+                paddingBottom: isMobile ? 0 : 20,
               }}
             >
               <Card
@@ -1708,7 +1719,7 @@ export default function MapPage() {
                   backdropFilter: "blur(6px)",
                 }}
                 // ✅ antd warning fix: bodyStyle -> styles.body
-                styles={{ body: { padding: 14 } }}
+                styles={{ body: { padding: "8px 16px 12px" } }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1724,30 +1735,30 @@ export default function MapPage() {
                         Rota oluştur
                       </Button>
                     )}
-                  <Button
-                    type="text"
-                    icon={<CloseOutlined />}
-                    onClick={async () => {
-                      // ✅ alanı sil + VIEWPORT'a dön + tüm POI'leri getir
-                      setResultsOpen(false);
-                      setResultsTab("all");
-                      setSelection({ mode: null, polygon: [] });
-                      setMode("VIEWPORT");
+                    <Button
+                      type="text"
+                      icon={<CloseOutlined />}
+                      onClick={async () => {
+                        // ✅ alanı sil + VIEWPORT'a dön + tüm POI'leri getir
+                        setResultsOpen(false);
+                        setResultsTab("all");
+                        setSelection({ mode: null, polygon: [] });
+                        setMode("VIEWPORT");
 
-                      const bbox = getViewportBbox();
-                      if (bbox) {
-                        await fetchPois({ selectionType: "BBOX", bbox, categoriesOverride: [] });
-                      }
+                        const bbox = getViewportBbox();
+                        if (bbox) {
+                          await fetchPois({ selectionType: "BBOX", bbox, categoriesOverride: [] });
+                        }
 
-                      setFilterOpen(true);
-                    }}
-                    aria-label="Close results"
-                  />
+                        setFilterOpen(true);
+                      }}
+                      aria-label="Close results"
+                    />
                   </div>
                 </div>
 
                 <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 6 }}>
-                  {[{ key: "all", label: "All" }, ...UI_CATEGORIES.map((c) => ({ key: c.key, label: c.label, emoji: c.emoji }))].map(
+                  {[{ key: "all", label: "All", emoji: "📍" }, ...UI_CATEGORIES].map(
                     (t) => {
                       const active = resultsTab === t.key;
                       return (
@@ -1759,7 +1770,7 @@ export default function MapPage() {
                             display: "inline-flex",
                             alignItems: "center",
                             gap: 8,
-                            padding: "8px 12px",
+                            padding: "6px 12px",
                             borderRadius: 999,
                             border: active ? "1px solid #1890ff" : "1px solid #e6e6e6",
                             background: active ? "rgba(24,144,255,0.10)" : "#fff",
@@ -1769,7 +1780,11 @@ export default function MapPage() {
                             color: active ? "#1677ff" : "#444",
                           }}
                         >
-                          {t.emoji ? <span>{t.emoji}</span> : null}
+                          {t.img ? (
+                            <img src={t.img} alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />
+                          ) : (
+                            t.emoji ? <span style={{ fontSize: 20, lineHeight: 1 }}>{t.emoji}</span> : null
+                          )}
                           <span>{t.label}</span>
                         </button>
                       );
@@ -1777,7 +1792,7 @@ export default function MapPage() {
                   )}
                 </div>
 
-                <div style={{ marginTop: 12, maxHeight: resultsMaxHeight, overflowY: "auto", paddingRight: 6 }}>
+                <div style={{ marginTop: 10, maxHeight: resultsMaxHeight, overflowY: "auto", paddingRight: 6 }}>
                   {poiLoading ? (
                     <div style={{ padding: 10, color: "#777" }}>Loading results...</div>
                   ) : resultsPois.length === 0 ? (
@@ -1814,9 +1829,14 @@ export default function MapPage() {
                                 background: icon?.fill || "#F1F5F9",
                                 border: `1px solid ${icon?.ring || "#CBD5E1"}`,
                                 flex: "0 0 auto",
+                                overflow: "hidden", // Görsel taşmasını önle
                               }}
                             >
-                              <span style={{ fontSize: 18 }}>{icon?.emoji || "📍"}</span>
+                              {icon?.img ? (
+                                <img src={icon.img} alt="" style={{ width: "80%", height: "80%", objectFit: "contain" }} />
+                              ) : (
+                                <span style={{ fontSize: 18 }}>{icon?.emoji || "📍"}</span>
+                              )}
                             </div>
 
                             <div style={{ display: "flex", flexDirection: "column" }}>
@@ -1841,7 +1861,7 @@ export default function MapPage() {
               if (!polygonRouteSubmitting) setPolygonRouteParamsOpen(false);
             }}
             footer={null}
-            destroyOnClose
+            destroyOnHidden
             maskClosable={!polygonRouteSubmitting}
             zIndex={1100}
           >
