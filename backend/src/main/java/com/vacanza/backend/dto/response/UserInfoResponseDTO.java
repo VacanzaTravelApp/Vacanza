@@ -33,5 +33,8 @@ public class UserInfoResponseDTO {
 
     private String profileImageUrl;
 
+    /** true if user has uploaded a profile photo (binary data in DB) */
+    private boolean hasProfilePhoto;
+
     private Instant joinDate;
 }
