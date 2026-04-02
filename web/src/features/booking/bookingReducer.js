@@ -59,11 +59,15 @@ export function bookingReducer(state, action) {
     case "SEARCH_START":
       return { ...state, loading: true };
     case "SEARCH_SUCCESS":
-      return { ...state, loading: false, items: action.payload, view: 'results' };
+      return { ...state, loading: false, items: action.payload, view: 'results', status: 'success', error: null };
     case "SEARCH_ERROR":
-      return { ...state, loading: false };
+      return { ...state, loading: false, status: 'error', error: action.payload };
     case "RETRY":
       return { ...state, view: 'search', items: [], sortBy: 'low' };
+    case "OPEN_FILTERS":
+      return { ...state, view: 'filters' };
+    case "CLOSE_FILTERS":
+      return { ...state, view: 'results' };
     case "RESET_STATE":
       return initialState;
     default:
