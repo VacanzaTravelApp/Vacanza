@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../models/accommodation_option.dart';
 import '../models/accommodation_search_request.dart';
 import '../models/airport_suggestion.dart';
+import '../models/destination_suggestion.dart';
 import '../models/transport_option.dart';
 import '../models/transport_search_request.dart';
 
@@ -55,6 +56,47 @@ class BookingApiClient {
       }
     }
     log('[BOOKING_API] airports count=${results.length}');
+    return results;
+  }
+
+  /// Hotel destination autocomplete.
+  ///
+  /// `GET /bookings/destinations/search?q=...` — `q` must be at least 2 characters.
+  Future<List<DestinationSuggestion>> searchDestinations(String query) async {
+    final q = query.trim();
+    final fullUrl =
+        '${_dio.options.baseUrl}/bookings/destinations/search?q=${Uri.encodeQueryComponent(q)}';
+    log('[BOOKING_API] GET $fullUrl');
+
+    final response = await _dio.get<dynamic>(
+      '/bookings/destinations/search',
+      queryParameters: {'q': q},
+    );
+
+    final status = response.statusCode;
+    final data = response.data;
+    log('[BOOKING_API] destinations status=$status type=${data.runtimeType}');
+
+    if (data is! List) {
+      throw FormatException(
+        'Expected List from $fullUrl, got ${data.runtimeType}',
+      );
+    }
+
+    final results = <DestinationSuggestion>[];
+    for (var i = 0; i < data.length; i++) {
+      final raw = data[i];
+      if (raw is! Map<String, dynamic>) {
+        log('[BOOKING_API] destinations item[$i] skip type=${raw.runtimeType}');
+        continue;
+      }
+      try {
+        results.add(DestinationSuggestion.fromJson(raw));
+      } catch (e) {
+        log('[BOOKING_API] destinations parse error at $i: $e');
+      }
+    }
+    log('[BOOKING_API] destinations count=${results.length}');
     return results;
   }
 

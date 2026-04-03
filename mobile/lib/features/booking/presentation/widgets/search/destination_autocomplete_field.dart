@@ -3,39 +3,39 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../data/models/airport_autocomplete_slot.dart';
-import '../../../data/models/airport_suggestion.dart';
+import '../../../data/models/destination_autocomplete_slot.dart';
+import '../../../data/models/destination_suggestion.dart';
 import '../../cubit/booking_cubit.dart';
 import '../../cubit/booking_state.dart';
 import 'booking_autocomplete_scroll.dart';
 import 'booking_field_scroll_padding.dart';
 
-/// Flight origin/destination with debounced `GET /bookings/airports/search`.
-class AirportAutocompleteField extends StatefulWidget {
+/// Hotel destination with debounced `GET /bookings/destinations/search`.
+class DestinationAutocompleteField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final String placeholder;
   final IconData icon;
-  final bool isOrigin;
+  final VoidCallback? onSearchSubmitted;
 
-  const AirportAutocompleteField({
+  const DestinationAutocompleteField({
     super.key,
     required this.controller,
     required this.label,
     required this.placeholder,
-    required this.icon,
-    required this.isOrigin,
+    this.icon = Icons.search_rounded,
+    this.onSearchSubmitted,
   });
 
   @override
-  State<AirportAutocompleteField> createState() =>
-      _AirportAutocompleteFieldState();
+  State<DestinationAutocompleteField> createState() =>
+      _DestinationAutocompleteFieldState();
 }
 
-class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
+class _DestinationAutocompleteFieldState extends State<DestinationAutocompleteField>
     with WidgetsBindingObserver {
   static const _accent = Color(0xFF0096FF);
-  static const _debounceMs = 300;
+  static const _debounceMs = 400;
 
   final FocusNode _focus = FocusNode();
   final GlobalKey _columnKey = GlobalKey();
@@ -74,46 +74,28 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
 
   void _onControllerChanged() {
     final cubit = context.read<BookingCubit>();
-    final text = widget.controller.text;
-    if (widget.isOrigin) {
-      cubit.onOriginFieldTextChanged(text);
-    } else {
-      cubit.onDestinationFieldTextChanged(text);
-    }
+    cubit.onHotelDestinationFieldTextChanged(widget.controller.text);
 
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: _debounceMs), () {
       if (!mounted) return;
-      final q = text.trim();
+      final q = widget.controller.text.trim();
       if (q.length < 2) {
-        if (widget.isOrigin) {
-          cubit.clearOriginAirportSuggestions();
-        } else {
-          cubit.clearDestinationAirportSuggestions();
-        }
+        cubit.clearHotelDestinationSuggestions();
         return;
       }
-      if (widget.isOrigin) {
-        cubit.fetchOriginAirportSuggestions(q);
-      } else {
-        cubit.fetchDestinationAirportSuggestions(q);
-      }
+      cubit.fetchHotelDestinationSuggestions(q);
     });
   }
 
-  void _pick(AirportSuggestion s) {
-    widget.controller.text = s.dropdownLabel;
-    final cubit = context.read<BookingCubit>();
-    if (widget.isOrigin) {
-      cubit.selectOriginAirport(s);
-    } else {
-      cubit.selectDestinationAirport(s);
-    }
+  void _pick(DestinationSuggestion s) {
+    widget.controller.text = s.displayName;
+    context.read<BookingCubit>().selectHotelDestination(s);
     _focus.unfocus();
     setState(() {});
   }
 
-  Widget _suggestionsPanel(AirportAutocompleteSlot slot) {
+  Widget _suggestionsPanel(DestinationAutocompleteSlot slot) {
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(12),
@@ -138,23 +120,26 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, i) {
                   final s = slot.suggestions[i];
-                  final subtitle = [
-                    if (s.city.isNotEmpty) s.city,
-                    if (s.country.isNotEmpty) s.country,
-                  ].join(', ');
+                  final sub = s.searchQuery.trim().isNotEmpty &&
+                          s.searchQuery != s.displayName
+                      ? s.searchQuery
+                      : [
+                          if (s.city.isNotEmpty) s.city,
+                          if (s.country.isNotEmpty) s.country,
+                        ].join(', ');
                   return ListTile(
                     dense: true,
                     title: Text(
-                      s.dropdownLabel,
+                      s.displayName,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    subtitle: subtitle.isEmpty
+                    subtitle: sub.isEmpty
                         ? null
                         : Text(
-                            subtitle,
+                            sub,
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,
@@ -168,24 +153,21 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
     );
   }
 
-  AirportAutocompleteSlot? _slot(BookingState st) {
-    if (st is! BookingSearch) return null;
-    return widget.isOrigin ? st.originAirport : st.destinationAirport;
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocListener<BookingCubit, BookingState>(
       listenWhen: (prev, next) {
         if (!_focus.hasFocus) return false;
-        return _slot(prev) != _slot(next);
+        DestinationAutocompleteSlot? s(BookingState st) =>
+            st is BookingSearch ? st.hotelDestination : null;
+        return s(prev) != s(next);
       },
       listener: (_, __) {
         scheduleBookingAutocompleteScrollIntoView(_columnKey);
       },
       child: BlocBuilder<BookingCubit, BookingState>(
         builder: (context, state) {
-          final slot = _slot(state);
+          final slot = state is BookingSearch ? state.hotelDestination : null;
 
           Widget? panel;
           if (_focus.hasFocus &&
@@ -253,6 +235,14 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
                       ),
                     ),
                   ),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) {
+                    if (widget.onSearchSubmitted != null) {
+                      widget.onSearchSubmitted!();
+                    } else {
+                      FocusScope.of(context).unfocus();
+                    }
+                  },
                 ),
                 if (slot != null &&
                     slot.suggestionError != null &&

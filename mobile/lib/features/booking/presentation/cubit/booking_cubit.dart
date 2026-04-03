@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/models/accommodation_search_request.dart';
 import '../../data/models/airport_autocomplete_slot.dart';
 import '../../data/models/airport_suggestion.dart';
+import '../../data/models/destination_autocomplete_slot.dart';
+import '../../data/models/destination_suggestion.dart';
 import '../../data/models/sort_criteria.dart';
 import '../../data/models/transport_search_request.dart';
 import '../../data/repositories/booking_repository.dart';
@@ -26,6 +28,7 @@ class BookingCubit extends Cubit<BookingState> {
 
   int _originSuggestionSeq = 0;
   int _destSuggestionSeq = 0;
+  int _hotelDestinationSeq = 0;
 
   // ── Internal state for retry / filter re-run ──────────────────
   AccommodationSearchRequest? _lastHotelRequest;
@@ -49,11 +52,16 @@ class BookingCubit extends Cubit<BookingState> {
   void switchType(BookingType type) {
     _currentType = type;
     log('[BOOKING_CUBIT] switchType → $type');
-    emit(BookingSearch(
+    emit(_searchWithClearedAutocomplete(type));
+  }
+
+  BookingSearch _searchWithClearedAutocomplete(BookingType type) {
+    return BookingSearch(
       type: type,
       originAirport: const AirportAutocompleteSlot(),
       destinationAirport: const AirportAutocompleteSlot(),
-    ));
+      hotelDestination: const DestinationAutocompleteSlot(),
+    );
   }
 
   // ── Airport autocomplete (TASK-2) ─────────────────────────────
@@ -61,6 +69,7 @@ class BookingCubit extends Cubit<BookingState> {
   void _patchBookingSearch({
     AirportAutocompleteSlot? originAirport,
     AirportAutocompleteSlot? destinationAirport,
+    DestinationAutocompleteSlot? hotelDestination,
   }) {
     final s = state;
     if (s is! BookingSearch) return;
@@ -68,6 +77,7 @@ class BookingCubit extends Cubit<BookingState> {
       type: s.type,
       originAirport: originAirport ?? s.originAirport,
       destinationAirport: destinationAirport ?? s.destinationAirport,
+      hotelDestination: hotelDestination ?? s.hotelDestination,
     ));
   }
 
@@ -260,6 +270,101 @@ class BookingCubit extends Cubit<BookingState> {
     );
   }
 
+  // ── Hotel destination autocomplete (TASK-3) ─────────────────
+
+  void onHotelDestinationFieldTextChanged(String text) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    final sel = s.hotelDestination.selected;
+    if (sel != null && text != sel.displayName) {
+      _patchBookingSearch(
+        hotelDestination: s.hotelDestination.copyWith(clearSelected: true),
+      );
+    }
+  }
+
+  void clearHotelDestinationSuggestions() {
+    final s = state;
+    if (s is! BookingSearch) return;
+    _hotelDestinationSeq++;
+    _patchBookingSearch(
+      hotelDestination: s.hotelDestination.copyWith(
+        clearSuggestions: true,
+        loadingSuggestions: false,
+        clearSuggestionError: true,
+      ),
+    );
+  }
+
+  Future<void> fetchHotelDestinationSuggestions(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) {
+      clearHotelDestinationSuggestions();
+      return;
+    }
+
+    final s = state;
+    if (s is! BookingSearch) return;
+
+    final seq = ++_hotelDestinationSeq;
+    _patchBookingSearch(
+      hotelDestination: s.hotelDestination.copyWith(
+        loadingSuggestions: true,
+        clearSuggestionError: true,
+      ),
+    );
+
+    try {
+      final list = await _repository.searchDestinations(trimmed);
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _hotelDestinationSeq) return;
+
+      _patchBookingSearch(
+        hotelDestination: cur.hotelDestination.copyWith(
+          suggestions: list,
+          loadingSuggestions: false,
+          clearSuggestionError: true,
+        ),
+      );
+    } on BookingException catch (e) {
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _hotelDestinationSeq) return;
+      _patchBookingSearch(
+        hotelDestination: cur.hotelDestination.copyWith(
+          loadingSuggestions: false,
+          clearSuggestions: true,
+          suggestionError: e.message,
+        ),
+      );
+    } catch (e) {
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _hotelDestinationSeq) return;
+      _patchBookingSearch(
+        hotelDestination: cur.hotelDestination.copyWith(
+          loadingSuggestions: false,
+          clearSuggestions: true,
+          suggestionError: e.toString(),
+        ),
+      );
+    }
+  }
+
+  void selectHotelDestination(DestinationSuggestion suggestion) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    _patchBookingSearch(
+      hotelDestination: s.hotelDestination.copyWith(
+        selected: suggestion,
+        clearSuggestions: true,
+        loadingSuggestions: false,
+        clearSuggestionError: true,
+      ),
+    );
+  }
+
   /// Searches hotels via repository.
   Future<void> searchHotels(AccommodationSearchRequest request) async {
     // Guard: ignore if already loading
@@ -433,11 +538,7 @@ class BookingCubit extends Cubit<BookingState> {
     }
     // No previous request — go back to search
     if (isClosed) return;
-    emit(BookingSearch(
-      type: _currentType,
-      originAirport: const AirportAutocompleteSlot(),
-      destinationAirport: const AirportAutocompleteSlot(),
-    ));
+    emit(_searchWithClearedAutocomplete(_currentType));
   }
 
   /// Returns from Filters to the previous Results state.
@@ -447,22 +548,14 @@ class BookingCubit extends Cubit<BookingState> {
       emit(_previousResultsState!);
       _previousResultsState = null;
     } else {
-      emit(BookingSearch(
-        type: _currentType,
-        originAirport: const AirportAutocompleteSlot(),
-        destinationAirport: const AirportAutocompleteSlot(),
-      ));
+      emit(_searchWithClearedAutocomplete(_currentType));
     }
   }
 
   /// Goes back to the Search form.
   void backToSearch() {
     log('[BOOKING_CUBIT] backToSearch');
-    emit(BookingSearch(
-      type: _currentType,
-      originAirport: const AirportAutocompleteSlot(),
-      destinationAirport: const AirportAutocompleteSlot(),
-    ));
+    emit(_searchWithClearedAutocomplete(_currentType));
   }
 
   // ── Private helpers ───────────────────────────────────────────
