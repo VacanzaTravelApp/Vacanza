@@ -181,4 +181,75 @@ public final class AiChatDto {
 
         private Double confidence;
     }
+
+    /** Request body for POST /events/rank — rank Ticketmaster events against a saved route. */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EventRankingRequest {
+        private String destination;
+
+        @JsonProperty("total_days")
+        private int totalDays;
+
+        @JsonProperty("route_days")
+        private List<RouteDaySummaryForAi> routeDays;
+
+        private List<EventBriefForRanking> events;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RouteDaySummaryForAi {
+        private int day;
+        private String title;
+
+        @JsonProperty("waypoint_categories")
+        private List<String> waypointCategories;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EventBriefForRanking {
+        private String id;
+        private String name;
+        private String description;
+        private String startTime;
+        private String category;
+        private String venueName;
+    }
+
+    /** Response from POST /events/rank. */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EventRankingAiResponse {
+        private String message;
+
+        @JsonProperty("ranked_events")
+        private List<EventRankingItem> rankedEvents;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EventRankingItem {
+        private String id;
+
+        @JsonProperty("matched_day")
+        private Integer matchedDay;
+
+        @JsonProperty("match_reason")
+        private String matchReason;
+
+        @JsonProperty("relevance_score")
+        private Double relevanceScore;
+    }
 }

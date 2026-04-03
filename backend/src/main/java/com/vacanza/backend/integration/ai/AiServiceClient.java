@@ -5,16 +5,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Client for AI chat service. Proxies requests with X-User-Id and X-User-Profile headers.
  */
+@Slf4j
 @Component
 public class AiServiceClient {
 
@@ -118,5 +122,30 @@ public class AiServiceClient {
                 .header(X_USER_ID, userId.toString())
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<>() {});
+    }
+
+    /**
+     * POST /events/rank — rank and annotate events for a route (optional; may be unavailable until AI service ships it).
+     *
+     * @return empty if the call fails or returns no body
+     */
+    public Optional<AiChatDto.EventRankingAiResponse> rankRouteEvents(UUID userId, AiChatDto.EventRankingRequest body) {
+        if (body == null || body.getEvents() == null || body.getEvents().isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            AiChatDto.EventRankingAiResponse response = webClient.post()
+                    .uri("/events/rank")
+                    .header(X_USER_ID, userId.toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(AiChatDto.EventRankingAiResponse.class)
+                    .block(Duration.ofSeconds(45));
+            return Optional.ofNullable(response);
+        } catch (Exception e) {
+            log.warn("AI event ranking failed: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 }

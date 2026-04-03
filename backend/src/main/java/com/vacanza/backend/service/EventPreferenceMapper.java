@@ -3,6 +3,7 @@ package com.vacanza.backend.service;
 import com.vacanza.backend.entity.UserPreferenceAi;
 import com.vacanza.backend.entity.UserPreferences;
 import com.vacanza.backend.entity.enums.TravelStyle;
+import com.vacanza.backend.integration.ai.AiChatDto;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -52,25 +53,63 @@ public class EventPreferenceMapper {
      */
     public List<String> mapToTicketmasterCategories(UserPreferences structured, List<UserPreferenceAi> aiPrefs) {
         LinkedHashSet<String> categories = new LinkedHashSet<>();
-
-        if (structured != null) {
-            addFromTravelStyle(structured.getTravelStyle(), categories);
-            addFromFavoriteCategories(structured.getFavoriteCategories(), categories);
-        }
-
-        if (aiPrefs != null) {
-            for (UserPreferenceAi pref : aiPrefs) {
-                if (pref == null || pref.getPreferenceKey() == null) {
-                    continue;
-                }
-                if (!EVENT_INTEREST_KEY.equalsIgnoreCase(pref.getPreferenceKey().trim())) {
-                    continue;
-                }
-                addFromKeywordText(pref.getPreferenceValue(), categories);
-            }
-        }
-
+        addStructured(structured, categories);
+        addFromUserPreferenceAiList(aiPrefs, categories);
         return new ArrayList<>(categories);
+    }
+
+    /**
+     * Same category mapping as {@link #mapToTicketmasterCategories(UserPreferences, List)} but using
+     * {@link AiChatDto.ExtractedPreference} rows from
+     * {@link UserPreferenceAiService#getExistingPreferences(com.vacanza.backend.entity.User)}.
+     * <p>
+     * Named separately because Java cannot overload two {@code List&lt;?&gt;} parameter types (same erasure).
+     */
+    public List<String> mapToTicketmasterCategoriesFromExtracted(UserPreferences structured,
+            List<AiChatDto.ExtractedPreference> extractedPrefs) {
+        LinkedHashSet<String> categories = new LinkedHashSet<>();
+        addStructured(structured, categories);
+        addFromExtractedPreferences(extractedPrefs, categories);
+        return new ArrayList<>(categories);
+    }
+
+    private static void addStructured(UserPreferences structured, LinkedHashSet<String> categories) {
+        if (structured == null) {
+            return;
+        }
+        addFromTravelStyle(structured.getTravelStyle(), categories);
+        addFromFavoriteCategories(structured.getFavoriteCategories(), categories);
+    }
+
+    private static void addFromUserPreferenceAiList(List<UserPreferenceAi> aiPrefs, LinkedHashSet<String> categories) {
+        if (aiPrefs == null) {
+            return;
+        }
+        for (UserPreferenceAi pref : aiPrefs) {
+            if (pref == null || pref.getPreferenceKey() == null) {
+                continue;
+            }
+            if (!EVENT_INTEREST_KEY.equalsIgnoreCase(pref.getPreferenceKey().trim())) {
+                continue;
+            }
+            addFromKeywordText(pref.getPreferenceValue(), categories);
+        }
+    }
+
+    private static void addFromExtractedPreferences(List<AiChatDto.ExtractedPreference> extractedPrefs,
+            LinkedHashSet<String> categories) {
+        if (extractedPrefs == null) {
+            return;
+        }
+        for (AiChatDto.ExtractedPreference pref : extractedPrefs) {
+            if (pref == null || pref.getPreferenceKey() == null) {
+                continue;
+            }
+            if (!EVENT_INTEREST_KEY.equalsIgnoreCase(pref.getPreferenceKey().trim())) {
+                continue;
+            }
+            addFromKeywordText(pref.getPreferenceValue(), categories);
+        }
     }
 
     private static void addFromTravelStyle(TravelStyle style, LinkedHashSet<String> out) {
