@@ -6,6 +6,7 @@ import '../api/booking_api_client.dart';
 import '../models/accommodation_option.dart';
 import '../models/accommodation_search_request.dart';
 import '../models/airport_suggestion.dart';
+import '../models/destination_suggestion.dart';
 import '../models/transport_option.dart';
 import '../models/transport_search_request.dart';
 
@@ -32,6 +33,18 @@ class BookingRepository {
   Future<List<AirportSuggestion>> searchAirports(String query) async {
     try {
       return await _apiClient.searchAirports(query);
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException catch (e) {
+      log('[BOOKING_REPO] FormatException: $e');
+      throw const BookingException('Unexpected server response');
+    }
+  }
+
+  /// Hotel destination autocomplete; throws [BookingException] on error.
+  Future<List<DestinationSuggestion>> searchDestinations(String query) async {
+    try {
+      return await _apiClient.searchDestinations(query);
     } on DioException catch (e) {
       throw _mapDioException(e);
     } on FormatException catch (e) {
