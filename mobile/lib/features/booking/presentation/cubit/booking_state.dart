@@ -1,6 +1,7 @@
 import '../../data/models/accommodation_option.dart';
 import '../../data/models/accommodation_search_request.dart';
 import '../../data/models/airport_autocomplete_slot.dart';
+import '../../data/models/destination_autocomplete_slot.dart';
 import '../../data/models/sort_criteria.dart';
 import '../../data/models/transport_option.dart';
 import '../../data/models/transport_search_request.dart';
@@ -27,10 +28,14 @@ class BookingSearch extends BookingState {
   final AirportAutocompleteSlot originAirport;
   final AirportAutocompleteSlot destinationAirport;
 
+  /// Hotel destination autocomplete — independent of accommodation search results.
+  final DestinationAutocompleteSlot hotelDestination;
+
   const BookingSearch({
     this.type = BookingType.hotels,
     this.originAirport = const AirportAutocompleteSlot(),
     this.destinationAirport = const AirportAutocompleteSlot(),
+    this.hotelDestination = const DestinationAutocompleteSlot(),
   });
 }
 
