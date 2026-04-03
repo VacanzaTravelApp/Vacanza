@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as dev;
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
@@ -7,6 +9,7 @@ import '../dto/check_in_dto.dart';
 import '../dto/travel_stats_dto.dart';
 import '../dto/user_preferences_dto.dart';
 import '../dto/user_profile_dto.dart';
+import '../utils/profile_photo_prepare.dart';
 
 /// Remote data source for profile APIs. Uses shared [Dio] (Bearer token via JwtInterceptor).
 /// Throws [DioException] or [FormatException] on failure.
@@ -16,6 +19,9 @@ class ProfileRemoteDataSource {
   ProfileRemoteDataSource(this._dio);
 
   static const _basePath = '/users/me';
+
+  /// Max upload size aligned with backend (2 MB).
+  static const maxProfilePhotoBytes = 2 * 1024 * 1024;
 
   Future<UserProfileDto> getProfile() async {
     final response = await _dio.get<dynamic>('$_basePath/profile');
@@ -40,6 +46,64 @@ class ProfileRemoteDataSource {
       );
     }
     return UserProfileDto.fromJson(data);
+  }
+
+  /// `POST /users/me/profile/photo` — multipart field `file` (image/*, max 2 MB).
+  /// Files over [maxProfilePhotoBytes] are JPEG-compressed/resized first.
+  Future<void> uploadProfilePhoto(String filePath) async {
+    final original = File(filePath);
+    if (!await original.exists()) {
+      throw const FormatException('File does not exist');
+    }
+    if (await original.length() == 0) {
+      throw const FormatException('File is empty');
+    }
+
+    final prepared = await prepareProfilePhotoForUpload(
+      filePath,
+      maxBytes: maxProfilePhotoBytes,
+    );
+    final createdTemp = prepared.path != filePath;
+
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          prepared.path,
+          filename: 'profile.jpg',
+        ),
+      });
+      await _dio.post<dynamic>('$_basePath/profile/photo', data: formData);
+    } finally {
+      if (createdTemp) {
+        try {
+          if (await prepared.exists()) {
+            await prepared.delete();
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
+  /// `GET /users/me/profile/photo` — binary image, not JSON.
+  /// Returns `null` if status is 404 (no photo / no profile).
+  Future<Uint8List?> fetchProfilePhotoBytes() async {
+    try {
+      final response = await _dio.get<List<int>>(
+        '$_basePath/profile/photo',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final data = response.data;
+      if (data == null || data.isEmpty) return null;
+      return Uint8List.fromList(data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// `DELETE /users/me/profile/photo`
+  Future<void> deleteProfilePhoto() async {
+    await _dio.delete<dynamic>('$_basePath/profile/photo');
   }
 
   Future<UserPreferencesDto> getPreferences() async {

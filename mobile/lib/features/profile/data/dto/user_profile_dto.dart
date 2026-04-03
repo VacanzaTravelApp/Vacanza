@@ -14,6 +14,7 @@ class UserProfileDto {
   final String? birthDate;
   final String? gender;
   final String? profileImageUrl;
+  final bool hasProfilePhoto;
   final String? joinDateIso;
 
   const UserProfileDto({
@@ -29,6 +30,7 @@ class UserProfileDto {
     this.birthDate,
     this.gender,
     this.profileImageUrl,
+    this.hasProfilePhoto = false,
     this.joinDateIso,
   });
 
@@ -46,6 +48,7 @@ class UserProfileDto {
       birthDate: json['birthDate']?.toString(),
       gender: json['gender']?.toString(),
       profileImageUrl: json['profileImageUrl']?.toString(),
+      hasProfilePhoto: json['hasProfilePhoto'] == true,
       joinDateIso: json['joinDate']?.toString(),
     );
   }
@@ -68,6 +71,7 @@ class UserProfileDto {
       birthDate: birthDate,
       gender: gender,
       profileImageUrl: profileImageUrl,
+      hasProfilePhoto: hasProfilePhoto,
       joinDate: joinDate,
     );
   }

@@ -12,6 +12,8 @@ class UserProfile {
   final String? birthDate;
   final String? gender;
   final String? profileImageUrl;
+  /// True when backend stores a binary profile photo (GET /users/me/profile/photo).
+  final bool hasProfilePhoto;
   final DateTime? joinDate;
 
   const UserProfile({
@@ -27,6 +29,7 @@ class UserProfile {
     this.birthDate,
     this.gender,
     this.profileImageUrl,
+    this.hasProfilePhoto = false,
     this.joinDate,
   });
 
@@ -45,6 +48,7 @@ class UserProfile {
       firstName: '',
       lastName: '',
       displayName: '',
+      hasProfilePhoto: false,
     );
   }
 
@@ -61,6 +65,7 @@ class UserProfile {
     String? birthDate,
     String? gender,
     String? profileImageUrl,
+    bool? hasProfilePhoto,
     DateTime? joinDate,
   }) {
     return UserProfile(
@@ -76,6 +81,7 @@ class UserProfile {
       birthDate: birthDate ?? this.birthDate,
       gender: gender ?? this.gender,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      hasProfilePhoto: hasProfilePhoto ?? this.hasProfilePhoto,
       joinDate: joinDate ?? this.joinDate,
     );
   }
