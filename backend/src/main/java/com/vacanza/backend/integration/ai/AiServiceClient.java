@@ -125,26 +125,28 @@ public class AiServiceClient {
     }
 
     /**
-     * POST /events/rank — rank and annotate events for a route (optional; may be unavailable until AI service ships it).
+     * POST /events/recommend-for-route — LLM ranking and personalized message for Ticketmaster events.
      *
      * @return empty if the call fails or returns no body
      */
-    public Optional<AiChatDto.EventRankingAiResponse> rankRouteEvents(UUID userId, AiChatDto.EventRankingRequest body) {
-        if (body == null || body.getEvents() == null || body.getEvents().isEmpty()) {
+    public Optional<AiChatDto.EventRecommendAiResponse> recommendEventsForRoute(
+            UUID userId,
+            AiChatDto.EventRecommendAiRequest body) {
+        if (body == null || body.getAvailableEvents() == null || body.getAvailableEvents().isEmpty()) {
             return Optional.empty();
         }
         try {
-            AiChatDto.EventRankingAiResponse response = webClient.post()
-                    .uri("/events/rank")
+            AiChatDto.EventRecommendAiResponse response = webClient.post()
+                    .uri("/events/recommend-for-route")
                     .header(X_USER_ID, userId.toString())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(body)
                     .retrieve()
-                    .bodyToMono(AiChatDto.EventRankingAiResponse.class)
-                    .block(Duration.ofSeconds(45));
+                    .bodyToMono(AiChatDto.EventRecommendAiResponse.class)
+                    .block(Duration.ofSeconds(60));
             return Optional.ofNullable(response);
         } catch (Exception e) {
-            log.warn("AI event ranking failed: {}", e.getMessage());
+            log.warn("AI event recommendation failed: {}", e.getMessage());
             return Optional.empty();
         }
     }

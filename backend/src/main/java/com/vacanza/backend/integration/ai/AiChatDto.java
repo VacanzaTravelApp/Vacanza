@@ -182,66 +182,96 @@ public final class AiChatDto {
         private Double confidence;
     }
 
-    /** Request body for POST /events/rank — rank Ticketmaster events against a saved route. */
+    /** POST /events/recommend-for-route — AI ranking and personalized message. */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class EventRankingRequest {
+    public static class DaySummaryAi {
+        private int day;
+        private String title;
+        private List<String> categories;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RouteSummaryForRecommend {
         private String destination;
 
         @JsonProperty("total_days")
         private int totalDays;
 
-        @JsonProperty("route_days")
-        private List<RouteDaySummaryForAi> routeDays;
+        @JsonProperty("start_date")
+        private String startDate;
 
-        private List<EventBriefForRanking> events;
+        @JsonProperty("day_summaries")
+        private List<DaySummaryAi> daySummaries;
     }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class RouteDaySummaryForAi {
-        private int day;
-        private String title;
+    public static class UserPreferenceSummaryAi {
+        @JsonProperty("travel_style")
+        private String travelStyle;
 
-        @JsonProperty("waypoint_categories")
-        private List<String> waypointCategories;
+        @JsonProperty("favorite_categories")
+        private List<String> favoriteCategories;
+
+        @JsonProperty("event_interest")
+        private String eventInterest;
+
+        @JsonProperty("preferred_language")
+        private String preferredLanguage;
     }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class EventBriefForRanking {
+    public static class AvailableEventAi {
         private String id;
         private String name;
         private String description;
+
+        @JsonProperty("start_time")
         private String startTime;
-        private String category;
+
+        @JsonProperty("end_time")
+        private String endTime;
+
+        @JsonProperty("venue_name")
         private String venueName;
-    }
-
-    /** Response from POST /events/rank. */
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class EventRankingAiResponse {
-        private String message;
-
-        @JsonProperty("ranked_events")
-        private List<EventRankingItem> rankedEvents;
+        private String category;
+        private Double latitude;
+        private Double longitude;
     }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class EventRankingItem {
-        private String id;
+    public static class EventRecommendAiRequest {
+        @JsonProperty("route_summary")
+        private RouteSummaryForRecommend routeSummary;
+
+        @JsonProperty("user_preferences")
+        private UserPreferenceSummaryAi userPreferences;
+
+        @JsonProperty("available_events")
+        private List<AvailableEventAi> availableEvents;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RecommendedEventResultAi {
+        @JsonProperty("event_id")
+        private String eventId;
 
         @JsonProperty("matched_day")
         private Integer matchedDay;
@@ -251,5 +281,16 @@ public final class AiChatDto {
 
         @JsonProperty("relevance_score")
         private Double relevanceScore;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EventRecommendAiResponse {
+        private String message;
+
+        @JsonProperty("recommended_events")
+        private List<RecommendedEventResultAi> recommendedEvents;
     }
 }

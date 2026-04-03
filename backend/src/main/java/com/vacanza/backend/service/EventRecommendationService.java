@@ -100,13 +100,15 @@ public class EventRecommendationService {
                     .build();
         }
 
-        AiChatDto.EventRankingRequest rankingRequest = buildRankingRequest(routeData, rawDestination, totalDays, filtered);
-        Optional<AiChatDto.EventRankingAiResponse> aiRanked = aiServiceClient.rankRouteEvents(user.getUserId(), rankingRequest);
+        AiChatDto.EventRecommendAiRequest aiRequest = buildEventRecommendRequest(
+                routeData, rawDestination, totalDays, route, structured, aiPrefs, filtered);
+        Optional<AiChatDto.EventRecommendAiResponse> aiRanked =
+                aiServiceClient.recommendEventsForRoute(user.getUserId(), aiRequest);
 
         if (aiRanked.isPresent()
-                && aiRanked.get().getRankedEvents() != null
-                && !aiRanked.get().getRankedEvents().isEmpty()) {
-            List<RecommendedEvent> ranked = buildFromAiRanking(filtered, aiRanked.get());
+                && aiRanked.get().getRecommendedEvents() != null
+                && !aiRanked.get().getRecommendedEvents().isEmpty()) {
+            List<RecommendedEvent> ranked = buildFromAiRecommendResponse(filtered, aiRanked.get());
             if (!ranked.isEmpty()) {
                 String message = aiRanked.get().getMessage();
                 if (message == null || message.isBlank()) {
@@ -192,12 +194,20 @@ public class EventRecommendationService {
         return trimmed;
     }
 
-    private static AiChatDto.EventRankingRequest buildRankingRequest(
+    private static AiChatDto.EventRecommendAiRequest buildEventRecommendRequest(
             AiChatDto.RouteData routeData,
-            String destination,
+            String rawDestination,
             int totalDays,
+            AiRoute route,
+            UserPreferences structured,
+            List<AiChatDto.ExtractedPreference> aiPrefs,
             List<EventDTO> events) {
-        List<AiChatDto.RouteDaySummaryForAi> routeDays = new ArrayList<>();
+        AiChatDto.RouteSummaryForRecommend rs = new AiChatDto.RouteSummaryForRecommend();
+        rs.setDestination(rawDestination != null ? rawDestination : "");
+        rs.setTotalDays(totalDays);
+        rs.setStartDate(route.getGeneratedAt().toLocalDate().toString());
+
+        List<AiChatDto.DaySummaryAi> daySummaries = new ArrayList<>();
         if (routeData != null && routeData.getDays() != null) {
             for (AiChatDto.DayPlan day : routeData.getDays()) {
                 List<String> cats = new ArrayList<>();
@@ -208,31 +218,66 @@ public class EventRecommendationService {
                         }
                     }
                 }
-                routeDays.add(new AiChatDto.RouteDaySummaryForAi(day.getDay(), day.getTitle(), cats));
+                AiChatDto.DaySummaryAi ds = new AiChatDto.DaySummaryAi();
+                ds.setDay(day.getDay());
+                ds.setTitle(day.getTitle() != null ? day.getTitle() : "");
+                ds.setCategories(cats);
+                daySummaries.add(ds);
             }
         }
+        rs.setDaySummaries(daySummaries);
 
-        List<AiChatDto.EventBriefForRanking> briefs = events.stream()
-                .map(EventRecommendationService::toBrief)
+        AiChatDto.UserPreferenceSummaryAi up = new AiChatDto.UserPreferenceSummaryAi();
+        if (structured != null) {
+            up.setTravelStyle(structured.getTravelStyle() != null ? structured.getTravelStyle().name() : null);
+            up.setFavoriteCategories(structured.getFavoriteCategories() != null
+                    ? structured.getFavoriteCategories()
+                    : List.of());
+            up.setPreferredLanguage(structured.getPreferredLanguage() != null
+                    ? structured.getPreferredLanguage()
+                    : "tr");
+        } else {
+            up.setFavoriteCategories(List.of());
+            up.setPreferredLanguage("tr");
+        }
+        up.setEventInterest(extractEventInterest(aiPrefs));
+
+        List<AiChatDto.AvailableEventAi> avail = events.stream()
+                .map(EventRecommendationService::toAvailableEventAi)
                 .collect(Collectors.toList());
 
-        AiChatDto.EventRankingRequest req = new AiChatDto.EventRankingRequest();
-        req.setDestination(destination);
-        req.setTotalDays(totalDays);
-        req.setRouteDays(routeDays);
-        req.setEvents(briefs);
+        AiChatDto.EventRecommendAiRequest req = new AiChatDto.EventRecommendAiRequest();
+        req.setRouteSummary(rs);
+        req.setUserPreferences(up);
+        req.setAvailableEvents(avail);
         return req;
     }
 
-    private static AiChatDto.EventBriefForRanking toBrief(EventDTO e) {
-        AiChatDto.EventBriefForRanking b = new AiChatDto.EventBriefForRanking();
-        b.setId(e.getId());
-        b.setName(e.getName());
-        b.setDescription(e.getDescription());
-        b.setStartTime(e.getStartTime());
-        b.setCategory(e.getCategory());
-        b.setVenueName(e.getVenueName());
-        return b;
+    private static String extractEventInterest(List<AiChatDto.ExtractedPreference> prefs) {
+        if (prefs == null) {
+            return null;
+        }
+        return prefs.stream()
+                .filter(p -> p.getPreferenceKey() != null
+                        && "event_interest".equalsIgnoreCase(p.getPreferenceKey().trim()))
+                .map(AiChatDto.ExtractedPreference::getPreferenceValue)
+                .filter(v -> v != null && !v.isBlank())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static AiChatDto.AvailableEventAi toAvailableEventAi(EventDTO e) {
+        AiChatDto.AvailableEventAi a = new AiChatDto.AvailableEventAi();
+        a.setId(e.getId());
+        a.setName(e.getName());
+        a.setDescription(e.getDescription());
+        a.setStartTime(e.getStartTime());
+        a.setEndTime(e.getEndTime());
+        a.setVenueName(e.getVenueName());
+        a.setCategory(e.getCategory());
+        a.setLatitude(e.getLatitude());
+        a.setLongitude(e.getLongitude());
+        return a;
     }
 
     private static List<EventDTO> sortByStartTime(List<EventDTO> events) {
@@ -241,9 +286,9 @@ public class EventRecommendationService {
                 .collect(Collectors.toList());
     }
 
-    private static List<RecommendedEvent> buildFromAiRanking(
+    private static List<RecommendedEvent> buildFromAiRecommendResponse(
             List<EventDTO> filtered,
-            AiChatDto.EventRankingAiResponse response) {
+            AiChatDto.EventRecommendAiResponse response) {
         Map<String, EventDTO> byId = new HashMap<>();
         for (EventDTO e : filtered) {
             if (e.getId() != null) {
@@ -251,11 +296,11 @@ public class EventRecommendationService {
             }
         }
         List<RecommendedEvent> out = new ArrayList<>();
-        for (AiChatDto.EventRankingItem item : response.getRankedEvents()) {
-            if (item == null || item.getId() == null) {
+        for (AiChatDto.RecommendedEventResultAi item : response.getRecommendedEvents()) {
+            if (item == null || item.getEventId() == null) {
                 continue;
             }
-            EventDTO e = byId.get(item.getId());
+            EventDTO e = byId.get(item.getEventId());
             if (e == null) {
                 continue;
             }
@@ -264,7 +309,7 @@ public class EventRecommendationService {
         return out;
     }
 
-    private static RecommendedEvent toRecommended(EventDTO e, AiChatDto.EventRankingItem ai) {
+    private static RecommendedEvent toRecommended(EventDTO e, AiChatDto.RecommendedEventResultAi ai) {
         String ticketLink = e.getTicketLink();
         if (ticketLink == null || ticketLink.isBlank()) {
             ticketLink = e.getLink();
