@@ -2,6 +2,15 @@ import http from "./http";
 
 const asArray = (data) => (Array.isArray(data) ? data : []);
 
+/**
+ * Event recommendations for a saved route (GET /routes/:routeId/event-recommendations).
+ * @returns {Promise<{ message: string, events: Array<object>, totalFound: number, hasRecommendations: boolean }>}
+ */
+export const getEventRecommendations = async (routeId) => {
+    const res = await http.get(`/routes/${routeId}/event-recommendations`);
+    return res.data;
+};
+
 export const aiApi = {
     // Create a new conversation
     createConversation: async () => {
@@ -42,6 +51,8 @@ export const aiApi = {
         const response = await http.get(`/routes/${routeId}`);
         return response.data;
     },
+
+    getEventRecommendations,
 
     /** Viator: waypoint başına fiyat + booking URL (GET /routes/:id/pricing). */
     getRoutePricing: async (routeId) => {
