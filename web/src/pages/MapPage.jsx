@@ -1917,7 +1917,11 @@ export default function MapPage() {
             onConversationIdChange={(id) => setMapChatConversationId(id)}
             onRequestDrawToEdit={handleRequestDrawToEditFromChat}
             onRouteGenerated={(routeData, meta) => {
-              setActiveRoute(routeData);
+              const merged =
+                meta?.routeId != null && meta.routeId !== ""
+                  ? { ...routeData, routeId: meta.routeId }
+                  : routeData;
+              setActiveRoute(merged);
               setActiveDay(1);
               if (meta?.conversationId) setMapChatConversationId(String(meta.conversationId));
               setIsChatOpen(false);

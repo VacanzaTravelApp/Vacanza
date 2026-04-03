@@ -1,0 +1,215 @@
+/* Event recommendations — matches vacanzaChat / routePanel tokens */
+
+@keyframes eventRecFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes eventRecShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.event-recommendations-section {
+  margin-top: 16px;
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--vc-border, #e5e7eb);
+  background: linear-gradient(
+    180deg,
+    rgba(61, 168, 200, 0.04) 0%,
+    transparent 100%
+  );
+  border-radius: 0 0 12px 12px;
+}
+
+.event-recommendations-section.event-rec-loaded {
+  animation: eventRecFadeIn 0.35s ease-out;
+}
+
+.event-recommendations-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--vc-text-secondary, #6b7280);
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.event-recommendations-header svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--vc-primary, #3da8c8);
+  font-size: 16px;
+}
+
+.event-recommendations-list {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(61, 168, 200, 0.45) transparent;
+}
+
+.event-recommendations-list::-webkit-scrollbar {
+  height: 6px;
+}
+
+.event-recommendations-list::-webkit-scrollbar-thumb {
+  background: rgba(61, 168, 200, 0.35);
+  border-radius: 4px;
+}
+
+.event-recommendations-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 4px;
+}
+
+/* Skeleton */
+.event-rec-skeleton {
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.event-rec-skeleton-card {
+  flex: 0 0 200px;
+  height: 148px;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    #f3f4f6 0%,
+    #eceff2 40%,
+    #f3f4f6 80%
+  );
+  background-size: 200% 100%;
+  animation: eventRecShimmer 1.2s ease-in-out infinite;
+}
+
+/* EventCard (horizontal tile) */
+.event-card {
+  flex: 0 0 min(240px, 85vw);
+  max-width: 260px;
+  min-height: 120px;
+  border: 1px solid var(--vc-border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--vc-white, #fff);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.event-card-thumb-wrap {
+  width: 100%;
+  height: 88px;
+  min-height: 88px;
+  background: var(--vc-surface, #f9fafb);
+  overflow: hidden;
+}
+
+.event-card-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.event-card-thumb-placeholder {
+  width: 100%;
+  height: 88px;
+  min-height: 88px;
+  background: linear-gradient(135deg, #e0f2f7 0%, #f0fdfa 100%);
+}
+
+.event-card-body {
+  padding: 10px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.event-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vc-text, #1c1c1e);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.event-card-cat {
+  font-size: 11px;
+  color: var(--vc-primary, #3da8c8);
+  font-weight: 500;
+}
+
+.event-card-when,
+.event-card-venue,
+.event-card-address {
+  font-size: 11px;
+  color: var(--vc-text-secondary, #6b7280);
+  line-height: 1.3;
+}
+
+.event-card-day {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vc-text, #1c1c1e);
+}
+
+.event-card-reason {
+  font-size: 11px;
+  color: var(--vc-muted, #9ca3af);
+  margin: 0;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.event-card-desc {
+  font-size: 11px;
+  color: var(--vc-text-secondary, #6b7280);
+  margin: 0;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.event-card-score {
+  font-size: 10px;
+  color: var(--vc-muted, #9ca3af);
+}
+
+.event-card-link {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vc-primary, #3da8c8);
+  text-decoration: none;
+}
+
+.event-card-link:hover {
+  text-decoration: underline;
+}

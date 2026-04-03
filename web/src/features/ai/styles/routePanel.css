@@ -458,6 +458,15 @@
   color: #EA580C;
 }
 
+.route-panel-event-recs {
+  flex-shrink: 0;
+  padding: 0 10px 8px;
+}
+
+.route-panel-event-recs .event-recommendations-section {
+  margin-top: 8px;
+}
+
 .route-panel-notes {
   padding: 10px 16px 14px;
   font-size: 12px;

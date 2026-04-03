@@ -3,6 +3,7 @@ import { Button } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
 import { getCategoryColor } from "../../../constants/categoryColors";
 import WaypointFeedback from "./WaypointFeedback";
+import EventRecommendations from "./EventRecommendations";
 import "../styles/routePanel.css";
 
 const TIME_SLOT_LABELS = {
@@ -295,6 +296,12 @@ export default function RoutePanel({
           </ul>
         )}
       </div>
+
+      {(route.routeId ?? route.route_id) ? (
+        <div className="route-panel-event-recs">
+          <EventRecommendations routeId={route.routeId ?? route.route_id} />
+        </div>
+      ) : null}
 
       {route.notes && (
         <div className="route-panel-notes">{route.notes}</div>

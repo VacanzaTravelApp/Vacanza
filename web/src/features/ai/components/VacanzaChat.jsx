@@ -12,6 +12,7 @@ import {
 import "../styles/vacanzaChat.css";
 import { normalizeRouteForMap } from "../utils/routeMap";
 import RouteCardFeedback from "./RouteCardFeedback";
+import EventRecommendations from "./EventRecommendations";
 
 /**
  * Sayfa oturumu: kullanıcı mesaj attıysa oluşturulmuş conversation id.
@@ -737,6 +738,7 @@ export default function VacanzaChat({
                         if (onRouteGenerated) {
                           onRouteGenerated(normalizeRouteForMap(rd), {
                             conversationId: conversationId ?? undefined,
+                            routeId: msg.routeIdList?.[rIdx] ?? undefined,
                           });
                         }
                         onClose();
@@ -823,6 +825,9 @@ export default function VacanzaChat({
                         </div>
                       );
                     })()}
+                    {msg.routeIdList?.[rIdx] ? (
+                      <EventRecommendations routeId={msg.routeIdList[rIdx]} />
+                    ) : null}
                     </div>
                   </div>
                 ))}
