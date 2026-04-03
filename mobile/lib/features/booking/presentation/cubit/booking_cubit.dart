@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/accommodation_search_request.dart';
+import '../../data/models/booking_currency.dart';
 import '../../data/models/airport_autocomplete_slot.dart';
 import '../../data/models/airport_suggestion.dart';
 import '../../data/models/destination_autocomplete_slot.dart';
@@ -51,17 +52,45 @@ class BookingCubit extends Cubit<BookingState> {
   /// Switches between Hotels / Flights and resets to Search.
   void switchType(BookingType type) {
     _currentType = type;
+    String? keepCurrency;
+    if (state is BookingSearch) {
+      keepCurrency = (state as BookingSearch).currency;
+    }
     log('[BOOKING_CUBIT] switchType → $type');
-    emit(_searchWithClearedAutocomplete(type));
+    emit(_searchWithClearedAutocomplete(type, currency: keepCurrency));
   }
 
-  BookingSearch _searchWithClearedAutocomplete(BookingType type) {
+  BookingSearch _searchWithClearedAutocomplete(
+    BookingType type, {
+    String? currency,
+  }) {
+    final resolved = BookingCurrencies.normalize(
+      currency ??
+          _lastHotelRequest?.currency ??
+          _lastFlightRequest?.currency,
+    );
     return BookingSearch(
       type: type,
+      currency: resolved,
       originAirport: const AirportAutocompleteSlot(),
       destinationAirport: const AirportAutocompleteSlot(),
       hotelDestination: const DestinationAutocompleteSlot(),
     );
+  }
+
+  /// Updates shared currency (hotels + flights). Only in [BookingSearch].
+  void setCurrency(String code) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    final next = BookingCurrencies.normalize(code);
+    if (next == s.currency) return;
+    emit(BookingSearch(
+      type: s.type,
+      currency: next,
+      originAirport: s.originAirport,
+      destinationAirport: s.destinationAirport,
+      hotelDestination: s.hotelDestination,
+    ));
   }
 
   // ── Airport autocomplete (TASK-2) ─────────────────────────────
@@ -75,6 +104,7 @@ class BookingCubit extends Cubit<BookingState> {
     if (s is! BookingSearch) return;
     emit(BookingSearch(
       type: s.type,
+      currency: s.currency,
       originAirport: originAirport ?? s.originAirport,
       destinationAirport: destinationAirport ?? s.destinationAirport,
       hotelDestination: hotelDestination ?? s.hotelDestination,
@@ -538,7 +568,11 @@ class BookingCubit extends Cubit<BookingState> {
     }
     // No previous request — go back to search
     if (isClosed) return;
-    emit(_searchWithClearedAutocomplete(_currentType));
+    emit(_searchWithClearedAutocomplete(
+      _currentType,
+      currency:
+          _lastHotelRequest?.currency ?? _lastFlightRequest?.currency,
+    ));
   }
 
   /// Returns from Filters to the previous Results state.
@@ -548,14 +582,22 @@ class BookingCubit extends Cubit<BookingState> {
       emit(_previousResultsState!);
       _previousResultsState = null;
     } else {
-      emit(_searchWithClearedAutocomplete(_currentType));
+      emit(_searchWithClearedAutocomplete(
+        _currentType,
+        currency:
+            _lastHotelRequest?.currency ?? _lastFlightRequest?.currency,
+      ));
     }
   }
 
   /// Goes back to the Search form.
   void backToSearch() {
     log('[BOOKING_CUBIT] backToSearch');
-    emit(_searchWithClearedAutocomplete(_currentType));
+    emit(_searchWithClearedAutocomplete(
+      _currentType,
+      currency:
+          _lastHotelRequest?.currency ?? _lastFlightRequest?.currency,
+    ));
   }
 
   // ── Private helpers ───────────────────────────────────────────
