@@ -366,7 +366,7 @@
 }
 
 .filter-title {
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     font-size: 15px;
     font-weight: 800;
     color: var(--text-main); /* Integrated title color */
@@ -595,10 +595,112 @@
     position: fixed;
     inset: 0;
     z-index: 1990; /* Right BELOW sidebar (2000) */
-    background: rgba(26, 35, 50, 0.25);
-    backdrop-filter: blur(1.5px); /* Subtler, more professional blur */
+    background: rgba(15, 23, 42, 0.4); /* Darker overlay */
+    backdrop-filter: blur(8px); /* Much stronger blur for focus */
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.4s ease;
+    transition: all 0.4s ease;
 }
 .sidebar-open .vivid-sidebar-overlay { opacity: 1; pointer-events: auto; }
+
+.local-time-badge {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 4px 12px;
+  border-radius: 12px;
+  margin-left: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+.theme-midnight .local-time-badge {
+    background: rgba(15, 23, 42, 0.4);
+    color: #F8FAFC;
+    border-color: rgba(255,255,255,0.05);
+}
+
+.clock-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--vivid-blue);
+    margin-top: 2px;
+}
+
+.vivid-theme-toggle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+    font-size: 20px;
+    transition: all 0.3s ease;
+    margin-right: 8px;
+}
+
+.vivid-theme-toggle:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.08) rotate(15deg);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Manual Theme Toggle Styling */
+.vivid-theme-toggle {
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+}
+
+.vivid-theme-toggle .toggle-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: rgba(255,255,255,0.4);
+    color: var(--text-main);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: all 0.3s ease;
+    font-size: 18px;
+}
+
+.theme-midnight .vivid-theme-toggle .toggle-btn {
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+}
+
+.vivid-theme-toggle .toggle-btn:hover {
+    background: rgba(255,255,255,0.8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.theme-midnight .vivid-theme-toggle .toggle-btn:hover {
+    background: rgba(255,255,255,0.15);
+}
+
+.vivid-theme-toggle .toggle-btn.is-night {
+    color: #818cf8; /* Indigo/Lavender Moon for fresh blue feel */
+}
+
+/* Fresh Blue Dark Mode Overrides */
+.theme-midnight {
+    --card-bg: rgba(15, 23, 42, 0.85); /* Deep slate-blue navy */
+    --card-border: rgba(51, 65, 85, 0.5);
+    --text-main: #f8fafc;
+    --text-sub: #94a3b8;
+    --vivid-navy-rgb: 15, 23, 42;
+}

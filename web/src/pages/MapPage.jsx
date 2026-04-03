@@ -567,12 +567,19 @@ export default function MapPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(false);
 
-  // Time-based theme logic
+  // Time-based theme logic (consistent with AuthLayout)
   const calculateTimeState = useCallback(() => {
-    const hour = new Date().getHours();
-    // 0: Day Style, 1: Night Style
-    if (hour >= 5 && hour < 19) return { theme: "theme-ocean", style: 0 };
-    return { theme: "theme-midnight", style: 1 };
+    const now = new Date();
+    const hour = now.getHours();
+    const minutes = now.getMinutes();
+    
+    const formattedTime = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    
+    // 0: Day (Streets), 1: Night (Dark)
+    if (hour >= 5 && hour < 19) {
+      return { theme: "theme-ocean", style: 0, formattedTime };
+    }
+    return { theme: "theme-midnight", style: 1, formattedTime };
   }, []);
 
   const [timeState, setTimeState] = useState(calculateTimeState());
@@ -623,6 +630,16 @@ export default function MapPage() {
       if (fabExpanded) setFabExpanded(false);
     }
   }, [bookingOpen]);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+      if (resultsOpen) setResultsOpen(false);
+      if (fabExpanded) setFabExpanded(false);
+    }
+  }, [sidebarOpen]);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
   const mapStyle = useMemo(() => STYLES[styleIndex], [styleIndex]);
@@ -1451,6 +1468,7 @@ export default function MapPage() {
             <div className="line" />
           </button>
           <div className="brand-logo vivid-brand">Vacanza</div>
+          <span className="local-time-badge">{timeState.formattedTime} Local Time</span>
         </div>
         <div className="header-right">
            {/* Header kept clean as requested */}
@@ -1619,14 +1637,24 @@ export default function MapPage() {
           </Tooltip>
 
           <div className={`fab-sub-actions ${fabExpanded ? "visible" : ""}`}>
-            <Tooltip title="Book Flights & Hotels" placement="left">
-               <button className="sub-fab vivid-interactive" onClick={() => { setBookingOpen(true); setFabExpanded(false); }}>
-                  <CalendarOutlined />
-               </button>
+            <Tooltip title="Local Filters" placement="left">
+                <button className="sub-fab vivid-interactive" onClick={() => { 
+                   const next = !filterOpen;
+                   if (next) setIsChatOpen(false);
+                   setFilterOpen(next); 
+                   setFabExpanded(false); 
+                }}>
+                   <UnorderedListOutlined />
+                </button>
             </Tooltip>
             <Tooltip title="Draw Area" placement="left">
                <button className="sub-fab vivid-interactive" onClick={() => { startFreehand(); setFabExpanded(false); }}>
                   <PencilIcon />
+               </button>
+            </Tooltip>
+            <Tooltip title="Book Flights & Hotels" placement="left">
+               <button className="sub-fab vivid-interactive" onClick={() => { setBookingOpen(true); setFabExpanded(false); }}>
+                  <CalendarOutlined />
                </button>
             </Tooltip>
             <Tooltip title={is3D ? "Reset to 2D View" : "Enable 3D Perspective"} placement="left">
@@ -1638,16 +1666,6 @@ export default function MapPage() {
                <button className="sub-fab vivid-interactive" onClick={() => { handleStyleChange(); /* No setFabExpanded(false) */ }}>
                   <LayerIcon />
                </button>
-            </Tooltip>
-            <Tooltip title="Adjust Local Filters" placement="left">
-                <button className="sub-fab vivid-interactive" onClick={() => { 
-                   const next = !filterOpen;
-                   if (next) setIsChatOpen(false);
-                   setFilterOpen(next); 
-                   setFabExpanded(false); 
-                }}>
-                   <UnorderedListOutlined />
-                </button>
             </Tooltip>
           </div>
         </div>
