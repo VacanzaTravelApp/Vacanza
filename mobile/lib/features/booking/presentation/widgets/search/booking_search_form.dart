@@ -11,7 +11,7 @@ import 'booking_date_field.dart';
 import 'booking_type_toggle.dart';
 import 'budget_field.dart';
 import 'airport_autocomplete_field.dart';
-import 'booking_field_scroll_padding.dart';
+import 'destination_autocomplete_field.dart';
 import 'sort_dropdown.dart';
 
 /// UC1.8-MOB6 — Orchestrator form for hotel/flight search.
@@ -118,7 +118,9 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
 
   bool _isValid(BookingSearch? search) {
     if (_type == BookingType.hotels) {
-      return _hotelQueryCtrl.text.trim().isNotEmpty &&
+      final destOk = search?.hotelDestination.selected != null ||
+          _hotelQueryCtrl.text.trim().length >= 2;
+      return destOk &&
           _checkInCtrl.text.isNotEmpty &&
           _checkOutCtrl.text.isNotEmpty;
     }
@@ -250,9 +252,14 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     final budget = BudgetField.parse(_budgetCtrl.text);
 
     if (_type == BookingType.hotels) {
+      final fromSelection =
+          search?.hotelDestination.selected?.searchQuery.trim() ?? '';
+      final query = fromSelection.isNotEmpty
+          ? fromSelection
+          : _hotelQueryCtrl.text.trim();
       cubit.searchHotels(
         AccommodationSearchRequest(
-          query: _hotelQueryCtrl.text.trim(),
+          query: query,
           checkInDate: _checkInCtrl.text,
           checkOutDate: _checkOutCtrl.text,
           adults: _adults,
@@ -310,37 +317,12 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   List<Widget> _hotelFields() {
     final now = DateTime.now();
     return [
-      TextField(
+      DestinationAutocompleteField(
         controller: _hotelQueryCtrl,
-        cursorColor: _accent,
-        scrollPadding: bookingFieldScrollPadding(context),
-        decoration: InputDecoration(
-          labelText: 'Search hotels',
-          hintText: 'e.g. Hotels in Paris, Bali resorts',
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: Color(0xFFAAAAAA),
-          ),
-          filled: true,
-          fillColor: const Color(0xFFFAFAFA),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: Color(0xFF0096FF),
-              width: 1.5,
-            ),
-          ),
-        ),
-        textInputAction: TextInputAction.search,
-        onSubmitted: (_) => _onSearch(),
+        label: 'Destination',
+        placeholder: 'e.g. Paris or Istanbul',
+        icon: Icons.location_city_rounded,
+        onSearchSubmitted: _onSearch,
       ),
       const SizedBox(height: 12),
       Row(
