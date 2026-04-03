@@ -501,7 +501,7 @@
 /* Overlap & Positioning Fixes */
 .results-sheet {
     position: fixed;
-    bottom: 120px; /* Leave breathing room for AI Pill at bottom (32px) */
+    bottom: 24px; /* Lower position now that AI Pill is hidden */
     left: 50%;
     transform: translateX(-50%);
 }
@@ -522,9 +522,36 @@
 
 /* Scrollbar tuning */
 .glass-panel::-webkit-scrollbar { width: 4px; }
-.glass-panel::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
+.glass-panel .ant-btn-text.ant-btn-icon-only {
+  background: rgba(255, 255, 255, 0.08); /* More visible background */
+  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: var(--text-main);
+}
 
-/* Restored Button & Overlay Styles */
+.glass-panel .ant-btn-text.ant-btn-icon-only:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.05);
+}
+
+.header-actions .ant-btn-link, 
+.filter-header-actions .vivid-reset-btn {
+  font-weight: 600;
+  color: var(--vivid-blue);
+  opacity: 0.85;
+}
+
+.header-actions .ant-btn-link:hover,
+.filter-header-actions .vivid-reset-btn:hover {
+  opacity: 1;
+  text-shadow: 0 0 10px rgba(61, 168, 200, 0.3);
+}
+
 .main-fab {
     width: 60px;
     height: 60px;

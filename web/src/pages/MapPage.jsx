@@ -47,11 +47,9 @@ const INITIAL_VIEW_STATE = {
 };
 
 const STYLES = [
-  "mapbox://styles/mapbox/outdoors-v12",
-  "mapbox://styles/mapbox/streets-v11",
-  "mapbox://styles/mapbox/navigation-night-v1",
-  "mapbox://styles/mapbox/satellite-streets-v12",
-  "mapbox://styles/mapbox/light-v11",
+  "mapbox://styles/mapbox/streets-v12",          // 0: Day (Streets)
+  "mapbox://styles/mapbox/dark-v11",             // 1: Night (Dark)
+  "mapbox://styles/mapbox/satellite-streets-v12" // 2: Live (Satellite + Labels)
 ];
 
 const RestaurantIcon = () => (
@@ -85,6 +83,36 @@ const ParkIcon = () => (
     <path d="M12 22v-6"></path>
     <path d="M5 16l7-9 7 9H5z"></path>
     <path d="M7 11l5-7 5 7H7z"></path>
+  </svg>
+);
+
+const AttractionIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><path d="M12 8v8" /><path d="M8 12h8" />
+  </svg>
+);
+
+const BarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 2h18" /><path d="M18 20a1 1 0 0 0 1-1V5H5v14a1 1 0 0 0 1 1h12z" /><path d="M12 11h.01" /><path d="M12 7h.01" /><path d="M12 15h.01" />
+  </svg>
+);
+
+const ShoppingIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" />
+  </svg>
+);
+
+const HotelIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 22h20" /><path d="M7 22v-5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v5" /><path d="M9 10h6" /><path d="M11 14h2" /><path d="M11 6h2" /><path d="M5 22V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v18" />
+  </svg>
+);
+
+const TransportIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="3" width="16" height="16" rx="2" /><path d="M9 22h6" /><path d="M8 7h8" /><path d="M12 3v16" />
   </svg>
 );
 
@@ -154,6 +182,7 @@ const UI_CATEGORIES = [
     icon: <RestaurantIcon />,
     img: restaurantImg,
     pill: "rgba(255, 107, 107, 0.15)",
+    fill: "rgba(255, 107, 107, 1)",
     ring: "#FF6B6B",
     uiKey: "restaurant",
   },
@@ -165,6 +194,7 @@ const UI_CATEGORIES = [
     icon: <CafeIcon />,
     img: cafeImg,
     pill: "rgba(255, 179, 71, 0.15)",
+    fill: "rgba(255, 179, 71, 1)",
     ring: "#FFB347",
     uiKey: "cafe",
   },
@@ -176,31 +206,98 @@ const UI_CATEGORIES = [
     icon: <MuseumIcon />,
     img: museumImg,
     pill: "rgba(0, 180, 216, 0.15)",
+    fill: "rgba(0, 180, 216, 1)",
     ring: "#00B4D8",
     uiKey: "museum",
   },
   {
     key: "monuments",
-    label: "Monuments",
-    geo: "tourism.attraction.monument",
-    aliases: ["monument", "monuments", "tourism.attraction.monument"],
+    label: "Monuments/Arts",
+    aliases: ["monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre", "art_gallery", "gallery"],
     icon: <MonumentIcon />,
-    img: monumentImg,
-    pill: "rgba(45, 212, 168, 0.15)",
-    ring: "#2DD4A8",
+    emoji: "🏛️",
+    pill: "rgba(99, 102, 241, 0.15)",
+    fill: "rgba(99, 102, 241, 1)",
+    ring: "#4338ca",
     uiKey: "monuments",
   },
   {
-    key: "parks",
+    key: "park",
     label: "Parks",
-    geo: "leisure.park",
-    aliases: ["park", "parks", "leisure.park"],
+    aliases: ["park", "garden", "forest", "nature_reserve", "wood", "leisure.park", "recreation_ground", "national_park"],
     icon: <ParkIcon />,
-    img: parkImg,
-    pill: "rgba(123, 198, 126, 0.15)",
-    ring: "#7BC67E",
-    uiKey: "parks",
+    emoji: "🌲",
+    pill: "rgba(34, 197, 94, 0.15)",
+    fill: "rgba(34, 197, 94, 1)",
+    ring: "#15803d",
+    uiKey: "park",
   },
+  {
+    key: "attraction",
+    label: "Attractions",
+    aliases: ["attraction", "viewpoint", "theme_park", "zoo", "aquarium", "historic", "scenic_viewpoint"],
+    icon: <AttractionIcon />,
+    emoji: "🎡",
+    pill: "rgba(168, 85, 247, 0.15)",
+    fill: "rgba(168, 85, 247, 1)",
+    ring: "#7e22ce",
+    uiKey: "attraction",
+  },
+  {
+    key: "bar",
+    label: "Nightlife",
+    aliases: ["bar", "pub", "night_club", "liquor_store", "alcohol", "wine_bar", "beer_garden"],
+    icon: <BarIcon />,
+    emoji: "🍸",
+    pill: "rgba(236, 72, 153, 0.15)",
+    fill: "rgba(236, 72, 153, 1)",
+    ring: "#be185d",
+    uiKey: "bar",
+  },
+  {
+    key: "shopping",
+    label: "Shopping",
+    aliases: ["shop", "mall", "supermarket", "marketplace", "clothing_store", "bakery", "convenience", "electronics"],
+    icon: <ShoppingIcon />,
+    emoji: "🛍️",
+    pill: "rgba(245, 158, 11, 0.15)",
+    fill: "rgba(245, 158, 11, 1)",
+    ring: "#b45309",
+    uiKey: "shopping",
+  },
+  {
+    key: "hotel",
+    label: "Hotels/Stay",
+    aliases: ["hotel", "motel", "hostel", "apartment", "guest_house", "accommodation", "lodging"],
+    icon: <HotelIcon />,
+    emoji: "🏨",
+    pill: "rgba(14, 165, 233, 0.15)",
+    fill: "rgba(14, 165, 233, 1)",
+    ring: "#0369a1",
+    uiKey: "hotel",
+  },
+  {
+    key: "transport",
+    label: "Transport/Transit",
+    aliases: ["station", "airport", "bus_stop", "subway_entrance", "train_station", "ferry_terminal", "transit_stop", "stop_area"],
+    icon: <TransportIcon />,
+    emoji: "🚉",
+    pill: "rgba(71, 85, 105, 0.15)",
+    fill: "rgba(71, 85, 105, 1)",
+    ring: "#334155",
+    uiKey: "transport",
+  },
+  {
+    key: "others",
+    label: "Others/Misc",
+    aliases: ["poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy", "hospital", "clinic"],
+    icon: <GlobalOutlined />,
+    emoji: "🌐",
+    pill: "rgba(100, 116, 139, 0.1)",
+    fill: "rgba(100, 116, 139, 1)",
+    ring: "#475569",
+    uiKey: "others",
+  }
 ];
 
 function hideTrafficLayers(map) {
@@ -396,9 +493,37 @@ export default function MapPage() {
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
-  const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
-  const [styleIndex, setStyleIndex] = useState(1);
+  const [viewState, setViewState] = useState({
+    longitude: 32.8597,
+    latitude: 39.9334,
+    zoom: 12,
+    pitch: 0,
+    bearing: 0,
+  });
+
+  // Attempt to center map on user's current location on mount
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setViewState((prev) => ({
+            ...prev,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            zoom: 13, // Slightly closer on user location
+          }));
+        },
+        (err) => {
+          console.log("[MapPage] Geolocation denied or failed, using default center.", err);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    }
+  }, []);
+
+  const [styleIndex, setStyleIndex] = useState(0);
   const [is3D, setIs3D] = useState(false);
+  const [mapboxPois, setMapboxPois] = useState([]);
 
   const [mode, setMode] = useState("VIEWPORT"); // VIEWPORT | SELECTION
   const [selection, setSelection] = useState({ mode: null, polygon: [] });
@@ -411,7 +536,7 @@ export default function MapPage() {
   const [poisRaw, setPoisRaw] = useState([]);
   const [poiLoading, setPoiLoading] = useState(false);
 
-  const [filterOpen, setFilterOpen] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const [selectedCats, setSelectedCats] = useState(() => {
     const all = {};
@@ -445,10 +570,9 @@ export default function MapPage() {
   // Time-based theme logic
   const calculateTimeState = useCallback(() => {
     const hour = new Date().getHours();
-    if (hour >= 5 && hour < 8) return { theme: "theme-sunrise", style: 0 };
-    if (hour >= 8 && hour < 16) return { theme: "theme-ocean", style: 1 };
-    if (hour >= 16 && hour < 19) return { theme: "theme-sunset", style: 0 };
-    return { theme: "theme-midnight", style: 2 };
+    // 0: Day Style, 1: Night Style
+    if (hour >= 5 && hour < 19) return { theme: "theme-ocean", style: 0 };
+    return { theme: "theme-midnight", style: 1 };
   }, []);
 
   const [timeState, setTimeState] = useState(calculateTimeState());
@@ -465,22 +589,40 @@ export default function MapPage() {
     // For now, let it follow timeState.style
     setStyleIndex(timeState.style);
   }, [timeState.style]);
+  // Mutual exclusion for ALL panels to avoid overlaps - fixed logic
   useEffect(() => {
-    if (resultsOpen) setFilterOpen(false);
-  }, [resultsOpen]);
-
-  // Prevent UI Overlaps between AI Chat and Filter
-  useEffect(() => {
-    if (isChatOpen && filterOpen) {
-      setFilterOpen(false);
+    if (resultsOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+      if (fabExpanded) setFabExpanded(false);
     }
-  }, [isChatOpen, filterOpen]);
+  }, [resultsOpen]); // Only react when resultsOpen changes
 
   useEffect(() => {
-    if (filterOpen && isChatOpen) {
-      setIsChatOpen(false);
+    if (filterOpen) {
+      if (resultsOpen) setResultsOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (bookingOpen) setBookingOpen(false);
     }
-  }, [filterOpen, isChatOpen]);
+  }, [filterOpen]);
+
+  useEffect(() => {
+    if (isChatOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (resultsOpen) setResultsOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+    }
+  }, [isChatOpen]);
+
+  useEffect(() => {
+    if (bookingOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (resultsOpen) setResultsOpen(false);
+      if (fabExpanded) setFabExpanded(false);
+    }
+  }, [bookingOpen]);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
   const mapStyle = useMemo(() => STYLES[styleIndex], [styleIndex]);
@@ -598,6 +740,53 @@ export default function MapPage() {
       console.error(e);
     }
   }, [navigate]);
+
+  const handleMapIdle = useCallback(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current.getMap();
+    
+    // Standard Mapbox layers for diverse POIs
+    const poiLayers = [
+      'poi-label', 
+      'settlement-label', 
+      'medical-label', 
+      'transit-label', 
+      'airport-label', 
+      'natural-label',
+      'park-label',
+      'place-label'
+    ];
+    
+    // Safety check: only query layers that exist in current style
+    const styleLayers = map.getStyle().layers.map(l => l.id);
+    const validLayers = poiLayers.filter(id => styleLayers.includes(id));
+    
+    const features = map.queryRenderedFeatures({ layers: validLayers });
+    if (!features || features.length === 0) return;
+
+    const discovered = features.map(f => {
+      const p = f.properties;
+      const name = p.name_en || p.name;
+      const type = p.type || p.maki || p.class || p.category || p.category_en || "poi";
+      const [lng, lat] = f.geometry.coordinates;
+      
+      return {
+        id: `mb-${name}-${lng.toFixed(5)}-${lat.toFixed(5)}`,
+        name: name,
+        category: type.toLowerCase(),
+        location: { lat, lng },
+        source: 'mapbox'
+      };
+    }).filter(p => !!p.name);
+
+    setMapboxPois(prev => {
+      const existingIds = new Set(prev.map(p => p.id));
+      const newPois = discovered.filter(p => !existingIds.has(p.id));
+      const combined = [...prev, ...newPois];
+      // Limit to 1000 for performance vs density balance
+      return combined.length > 1000 ? combined.slice(-1000) : combined;
+    });
+  }, []);
 
   const getViewportBbox = useCallback(() => {
     const map = mapRef.current?.getMap?.();
@@ -720,15 +909,22 @@ export default function MapPage() {
     setFilterOpen(true);
   }, [fetchPois, getViewportBbox]);
 
-  const handleResetFilters = useCallback(async () => {
-    // 1. Reset categories
+  const handleSelectAllFilters = useCallback(() => {
     const all = {};
     UI_CATEGORIES.forEach((c) => (all[c.key] = true));
     setSelectedCats(all);
+  }, []);
 
-    // 2. Clear selection
+  const handleDeselectAllFilters = useCallback(() => {
+    const all = {};
+    UI_CATEGORIES.forEach((c) => (all[c.key] = false));
+    setSelectedCats(all);
+  }, []);
+
+  const handleResetFilters = useCallback(async () => {
+    handleSelectAllFilters();
     await clearSelectionOnly();
-  }, [clearSelectionOnly]);
+  }, [handleSelectAllFilters, clearSelectionOnly]);
 
   const onMouseDownFreehand = useCallback(
     (e) => {
@@ -778,8 +974,8 @@ export default function MapPage() {
     setSelection({ mode: "polygon", polygon: poly });
 
     await fetchPois({ selectionType: "POLYGON", polygon: poly });
-    setFilterOpen(true);
-
+    
+    // Crucial: The useEffect will handle closing others when resultsOpen becomes true
     setResultsOpen(true);
     setResultsTab("all");
 
@@ -944,32 +1140,18 @@ export default function MapPage() {
 
   // 3D toggle: pitch + gerçek 3D layerlar
   const handleToggle2D3D = useCallback(() => {
-    const nextIs3D = !is3D;
-    setIs3D(nextIs3D);
-
+    const next = !is3D;
+    setIs3D(next);
     const map = mapRef.current?.getMap?.();
     if (map) {
-      map.easeTo({ pitch: nextIs3D ? 60 : 0, duration: 650 });
-      ensureMapbox3D(map, nextIs3D);
+      map.easeTo({ pitch: next ? 60 : 0, duration: 650 });
+      ensureMapbox3D(map, next);
     }
-
-    setViewState((prev) => ({ ...prev, pitch: nextIs3D ? 60 : 0 }));
+    setViewState((prev) => ({ ...prev, pitch: next ? 60 : 0 }));
   }, [is3D]);
 
   const handleStyleChange = useCallback(() => {
     setStyleIndex((i) => (i + 1) % STYLES.length);
-  }, []);
-
-  // Map helper to hide traffic/congestion
-  const hideTrafficLayers = useCallback((map) => {
-    if (!map) return;
-    const layers = map.getStyle()?.layers || [];
-    layers.forEach((layer) => {
-      const id = layer.id.toLowerCase();
-      if (id.includes("traffic") || id.includes("congestion") || id.includes("incidents")) {
-        map.setLayoutProperty(layer.id, "visibility", "none");
-      }
-    });
   }, []);
 
   // Map load + style reload => 3D tekrar ekle + traffic sakla
@@ -979,7 +1161,7 @@ export default function MapPage() {
       ensureMapbox3D(map, is3D);
       hideTrafficLayers(map);
     }
-  }, [is3D, hideTrafficLayers]);
+  }, [is3D]);
 
   const onStyleData = useCallback((e) => {
     const map = e?.target || mapRef.current?.getMap?.();
@@ -987,11 +1169,30 @@ export default function MapPage() {
       ensureMapbox3D(map, is3D);
       hideTrafficLayers(map);
     }
-  }, [is3D, hideTrafficLayers]);
+  }, [is3D]);
 
   // POI'ler: polygon içi filtre + UI filtre
+  // Combined POI list (Backend + Mapbox Discoveries)
   const pois = useMemo(() => {
-    let list = poisRaw;
+    const all = [...poisRaw];
+    const poiCoords = new Set(poisRaw.map(p => `${p.latitude?.toFixed(4)},${p.longitude?.toFixed(4)}`));
+    
+    mapboxPois.forEach(mbp => {
+      const coordKey = `${mbp.location.lat.toFixed(4)},${mbp.location.lng.toFixed(4)}`;
+      if (!poiCoords.has(coordKey)) {
+        all.push({
+          poiId: mbp.id,
+          latitude: mbp.location.lat,
+          longitude: mbp.location.lng,
+          name: mbp.name,
+          category: mbp.category,
+          source: 'mapbox'
+        });
+        poiCoords.add(coordKey);
+      }
+    });
+
+    let list = all;
 
     if (mode === "SELECTION" && selection?.mode === "polygon" && selection.polygon.length >= 3) {
       list = list.filter((p) => isPointInsidePolygon(p.latitude, p.longitude, selection.polygon));
@@ -1004,7 +1205,7 @@ export default function MapPage() {
       if (!icon) return true;
       return activeKeys.has(icon.uiKey);
     });
-  }, [poisRaw, mode, selection, selectedCats]);
+  }, [poisRaw, mapboxPois, mode, selection, selectedCats]);
 
   const resultsPois = useMemo(() => {
     if (!resultsOpen) return [];
@@ -1197,8 +1398,8 @@ export default function MapPage() {
     const bbox = polygonToBbox(selection.polygon);
     if (!bbox) return;
 
-    const bottomPad = isMobile ? 300 : RESULTS_PANEL_APPROX_HEIGHT_DESKTOP + 60;
-    const rightPad = isMobile ? 16 : filterOpen ? FILTER_PANEL_APPROX_WIDTH_DESKTOP + 60 : 90;
+    const bottomPad = isMobile ? 340 : 380; // Optimized for lowered list sheet
+    const rightPad = isMobile ? 16 : filterOpen ? (FILTER_PANEL_APPROX_WIDTH_DESKTOP + 60) : 90;
 
     map.fitBounds(
       [
@@ -1206,9 +1407,9 @@ export default function MapPage() {
         [bbox.maxLng, bbox.maxLat],
       ],
       {
-        duration: 650,
+        duration: 800,
         padding: {
-          top: isMobile ? 90 : 90,
+          top: isMobile ? 80 : 100,
           left: isMobile ? 16 : 90,
           right: rightPad,
           bottom: bottomPad,
@@ -1304,6 +1505,7 @@ export default function MapPage() {
           ref={mapRef}
           {...viewState}
           onMove={(evt) => setViewState(evt.viewState)}
+          onIdle={handleMapIdle}
           onMoveEnd={() => { if (mode === "VIEWPORT" && !freehandEnabled) scheduleViewportFetch(); }}
           mapStyle={STYLES[styleIndex]}
           mapboxAccessToken={MAPBOX_TOKEN}
@@ -1331,27 +1533,31 @@ export default function MapPage() {
             <Layer {...previewGlowLayer} />
             <Layer {...previewMainLayer} />
           </Source>
-
           {pois.map((p) => {
-            const title = getSafePoiTitle(p);
             const icon = poiIconByCategory(p.category);
-            const color = icon?.ring || "#1890ff";
+            const catKey = icon?.uiKey || "others";
+            if (!selectedCats[catKey]) return null;
+
+            const title = getSafePoiTitle(p);
+            const catInfo = UI_CATEGORIES.find(c => c.key === catKey);
+            const markerBg = catInfo?.fill || "rgba(100, 116, 139, 1)";
+            
             return (
               <Marker key={p.poiId || `${p.latitude}-${p.longitude}-${title}`} longitude={p.longitude} latitude={p.latitude} anchor="bottom">
                 <Tooltip title={title}>
-                  <div style={{ cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.15))" }}>
+                  <div style={{ cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.25))" }}>
                     <div style={{
-                      width: 30, height: 30, borderRadius: "50% 50% 50% 0", transform: "rotate(-45deg)",
-                      background: color, border: "2,5px solid white", 
+                      width: 32, height: 32, borderRadius: "50% 50% 50% 0", transform: "rotate(-45deg)",
+                      background: markerBg, border: "2.5px solid white", 
                       display: "grid", placeItems: "center",
-                      boxShadow: "0 3px 8px rgba(0,0,0,0.2)",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                       position: "relative"
                     }}>
                       <div style={{ 
                         transform: "rotate(45deg)", color: "white", 
                         display: "grid", placeItems: "center",
-                        width: 20, height: 20,
-                        fontSize: 15,
+                        width: 22, height: 22,
+                        fontSize: 16,
                         lineHeight: 0,
                       }}>
                         {icon?.icon || <GlobalOutlined />}
@@ -1383,17 +1589,19 @@ export default function MapPage() {
           ))}
         </Map>
 
-        {/* 4. AI Sticky Pill (CENTRAL) */}
-        <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
-           setFilterOpen(false);
-           setFabExpanded(false);
-           setIsChatOpen(true);
-        }}>
-           <div className="pill-content">
-              <CompassOutlined className="pill-icon" />
-              <span className="pill-text">Ask Vacanza AI</span>
-           </div>
-        </button>
+        {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel is closed */}
+        {!canShowResultsPanel && (
+          <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
+             setFilterOpen(false);
+             setFabExpanded(false);
+             setIsChatOpen(true);
+          }}>
+             <div className="pill-content">
+                <CompassOutlined className="pill-icon" />
+                <span className="pill-text">Ask Vacanza AI</span>
+             </div>
+          </button>
+        )}
 
         {/* 5. Unified Action FAB (RIGHT) */}
         <div className="vivid-fab-group">
@@ -1422,12 +1630,12 @@ export default function MapPage() {
                </button>
             </Tooltip>
             <Tooltip title={is3D ? "Reset to 2D View" : "Enable 3D Perspective"} placement="left">
-               <button className="sub-fab vivid-interactive" onClick={() => { handleToggle2D3D(); setFabExpanded(false); }}>
+               <button className="sub-fab vivid-interactive" onClick={() => { handleToggle2D3D(); /* No setFabExpanded(false) */ }}>
                   <CubeIcon />
                </button>
             </Tooltip>
             <Tooltip title="Switch Map Theme" placement="left">
-               <button className="sub-fab vivid-interactive" onClick={() => { handleStyleChange(); setFabExpanded(false); }}>
+               <button className="sub-fab vivid-interactive" onClick={() => { handleStyleChange(); /* No setFabExpanded(false) */ }}>
                   <LayerIcon />
                </button>
             </Tooltip>
@@ -1449,9 +1657,11 @@ export default function MapPage() {
           <div className="glass-panel filter-panel">
             <div className="filter-header">
               <span className="filter-title">Filter Places</span>
-              <div className="filter-header-actions">
-                <Button size="small" type="link" onClick={handleResetFilters} className="vivid-reset-btn">Reset</Button>
-                <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setFilterOpen(false)} />
+              <div className="filter-header-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <Button size="small" type="link" onClick={handleSelectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>All</Button>
+                <div style={{ height: 12, width: 1, background: "rgba(0,0,0,0.1)" }} />
+                <Button size="small" type="link" onClick={handleDeselectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>None</Button>
+                <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setFilterOpen(false)} style={{ marginLeft: 4 }} />
               </div>
             </div>
             <div className="filter-body">
@@ -1509,15 +1719,32 @@ export default function MapPage() {
                 })}
              </div>
 
-             <div style={{ maxHeight: "30vh", overflowY: "auto", marginTop: 8 }}>
+             <div style={{ maxHeight: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4 }}>
                 {resultsPois.map(p => (
-                  <div key={p.poiId} style={{ display: "flex", alignItems: "center", gap: 16, padding: 12, borderRadius: 16, background: "rgba(255,255,255,0.4)", marginBottom: 8, border: "1px solid rgba(0,0,0,0.05)" }}>
-                     <div style={{ width: 44, height: 44, borderRadius: 12, background: "white", display: "grid", placeItems: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-                        <div style={{ color: poiIconByCategory(p.category)?.ring }}>{poiIconByCategory(p.category)?.icon}</div>
+                  <div key={p.poiId} style={{ 
+                    display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", 
+                    borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)", 
+                    marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
+                    backdropFilter: "blur(4px)"
+                  }}>
+                     <div style={{ 
+                       width: 48, height: 48, borderRadius: 14, 
+                       background: "rgba(255,255,255,0.05)", 
+                       display: "grid", placeItems: "center", 
+                       boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                       border: "1px solid rgba(255,255,255,0.1)"
+                     }}>
+                        <div style={{ 
+                          color: poiIconByCategory(p.category)?.ring, 
+                          fontSize: 20,
+                          filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))" 
+                        }}>
+                          {poiIconByCategory(p.category)?.icon}
+                        </div>
                      </div>
-                     <div>
-                        <div style={{ fontWeight: 700 }}>{getSafePoiTitle(p)}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-sub)" }}>{labelByCategory(p.category)}</div>
+                     <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
+                        <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p.category)}</div>
                      </div>
                   </div>
                 ))}
