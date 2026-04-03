@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../data/profile_preference_options.dart';
+import '../styles/profile_sheet_styles.dart';
 
 /// Config for the searchable multi-select picker bottom sheet.
 class SearchableMultiSelectPickerConfig {
@@ -92,13 +93,9 @@ class _SearchableMultiSelectPickerSheetState
     final accent = widget.config.accentColor;
     final options = _filteredOptions;
 
-    return Container(
+    return ProfileSheetStyles.sheetPanel(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

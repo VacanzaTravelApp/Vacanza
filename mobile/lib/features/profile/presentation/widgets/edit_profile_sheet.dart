@@ -1,14 +1,13 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
-
 import '../../data/models/user_profile.dart';
 import '../../data/profile_profile_options.dart';
+import '../../data/utils/profile_photo_pick_crop.dart';
 import '../bloc/profile_bloc.dart';
 import '../bloc/profile_event.dart';
+import '../bloc/profile_state.dart';
 import '../styles/profile_sheet_styles.dart';
+import 'profile_photo_source_sheet.dart';
 import 'searchable_multi_select_picker_sheet.dart';
 
 /// Edit Profile bottom sheet: basic info; read-only email/join date.
@@ -32,8 +31,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   late TextEditingController _lastNameController;
   late TextEditingController _preferredNameController;
 
-  /// Local file path from camera/gallery picker; used for preview only (no upload infra yet).
-  String? _pickedLocalFilePath;
+  /// User chose "Remove photo" — DELETE binary and/or clear URL on save.
+  bool _userRemovedPhoto = false;
 
   @override
   void initState() {
@@ -65,22 +64,26 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     });
   }
 
-  void _save() {
+  Future<void> _save() async {
     _syncDraftFromControllers();
-    // TODO: Integrate profile photo upload (e.g. Firebase Storage) and set profileImageUrl from returned URL.
-    UserProfile draftToSave = _draft;
-    if (_pickedLocalFilePath != null) {
-      // Picked new photo but no upload: do not send profileImageUrl so backend keeps existing.
-      draftToSave = _draft.copyWith(profileImageUrl: widget.initialProfile.profileImageUrl);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo upload not available yet.')),
-        );
+    final bloc = context.read<ProfileBloc>();
+
+    if (_userRemovedPhoto && widget.initialProfile.hasProfilePhoto) {
+      bloc.add(const ProfilePhotoDeleteRequested());
+      try {
+        await bloc.stream.firstWhere((s) => s.isProfilePhotoBusy);
+        await bloc.stream.firstWhere((s) => !s.isProfilePhotoBusy);
+      } catch (_) {}
+      if (!mounted) return;
+      final err = bloc.state.profileUpdateError;
+      if (err != null && err.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+        bloc.add(const ProfileUpdateErrorDismissed());
+        return;
       }
     }
-    context.read<ProfileBloc>().add(
-          ProfileUpdateRequested(widget.initialProfile, draftToSave),
-        );
+
+    bloc.add(ProfileUpdateRequested(widget.initialProfile, _draft));
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -108,52 +111,53 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     }
   }
 
-  void _showPhotoSourceSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take photo'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from gallery'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Remove photo'),
-              onTap: () {
-                Navigator.pop(ctx);
-                setState(() {
-                  _pickedLocalFilePath = null;
-                  _draft = _draft.copyWith(profileImageUrl: null);
-                });
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+  bool get _canShowRemovePhoto {
+    if (_userRemovedPhoto) return false;
+    if (_draft.profileImageUrl != null && _draft.profileImageUrl!.trim().isNotEmpty) {
+      return true;
+    }
+    if (widget.initialProfile.hasProfilePhoto) return true;
+    return false;
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
-    final xFile = await picker.pickImage(source: source);
-    if (xFile != null && mounted) {
-      setState(() => _pickedLocalFilePath = xFile.path);
+  /// After crop UI "Save", upload immediately and return to profile hub (close sheet).
+  Future<void> _uploadPhotoThenCloseSheet(String path) async {
+    final bloc = context.read<ProfileBloc>();
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    bloc.add(ProfilePhotoUploadRequested(path));
+    try {
+      if (!bloc.state.isProfilePhotoBusy) {
+        await bloc.stream.firstWhere((s) => s.isProfilePhotoBusy);
+      }
+      await bloc.stream.firstWhere((s) => !s.isProfilePhotoBusy);
+    } catch (_) {}
+    final err = bloc.state.profileUpdateError;
+    if (err != null && err.isNotEmpty) {
+      messenger?.showSnackBar(SnackBar(content: Text(err)));
+      bloc.add(const ProfileUpdateErrorDismissed());
+      return;
     }
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  void _showPhotoSourceSheet() {
+    showProfilePhotoSourceBottomSheet(
+      context,
+      showRemove: _canShowRemovePhoto,
+      onPickSource: (source) async {
+        final path = await pickAndCropSquareProfilePhoto(source);
+        if (path != null && mounted) {
+          await _uploadPhotoThenCloseSheet(path);
+        }
+      },
+      onRemove: () async {
+        if (!mounted) return;
+        setState(() {
+          _userRemovedPhoto = true;
+          _draft = _draft.copyWith(profileImageUrl: null);
+        });
+      },
+    );
   }
 
   void _openCountryPicker() {
@@ -179,13 +183,9 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ProfileSheetStyles.sheetPanel(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -256,22 +256,48 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
 
   Widget _buildPhotoSection() {
     const avatarSize = 108.0;
+    const ring = 3.0;
+    final innerSize = avatarSize - 2 * ring;
     const cameraButtonSize = 34.0;
+
     Widget avatarContent;
-    if (_pickedLocalFilePath != null) {
-      avatarContent = Image.file(
-        File(_pickedLocalFilePath!),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      );
+    if (_userRemovedPhoto) {
+      avatarContent = const Icon(Icons.person, size: 48, color: Color(0xFF9CA3AF));
     } else if (_draft.profileImageUrl != null && _draft.profileImageUrl!.trim().isNotEmpty) {
       avatarContent = Image.network(
         _draft.profileImageUrl!,
         fit: BoxFit.cover,
+        alignment: Alignment.center,
+        filterQuality: FilterQuality.medium,
         width: double.infinity,
         height: double.infinity,
         errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 48, color: Color(0xFF9CA3AF)),
+      );
+    } else if (widget.initialProfile.hasProfilePhoto) {
+      avatarContent = BlocBuilder<ProfileBloc, ProfileState>(
+        buildWhen: (a, b) => a.profilePhotoBytes != b.profilePhotoBytes,
+        builder: (context, state) {
+          final bytes = state.profilePhotoBytes;
+          if (bytes != null && bytes.isNotEmpty) {
+            return Image.memory(
+              bytes,
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+              filterQuality: FilterQuality.medium,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (_, __, ___) =>
+                  const Icon(Icons.person, size: 48, color: Color(0xFF9CA3AF)),
+            );
+          }
+          return const Center(
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        },
       );
     } else {
       avatarContent = const Icon(Icons.person, size: 48, color: Color(0xFF9CA3AF));
@@ -288,20 +314,30 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               Container(
                 width: avatarSize,
                 height: avatarSize,
-                decoration: BoxDecoration(
+                padding: const EdgeInsets.all(ring),
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF0096FF), Color(0xFF2ECC71)],
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      color: Color(0x26000000),
+                      blurRadius: 12,
+                      offset: Offset(0, 4),
                     ),
                   ],
-                  color: Colors.grey.shade200,
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: avatarContent,
+                child: ClipOval(
+                  child: SizedBox(
+                    width: innerSize,
+                    height: innerSize,
+                    child: ColoredBox(
+                      color: Colors.grey.shade200,
+                      child: avatarContent,
+                    ),
+                  ),
+                ),
               ),
               Positioned(
                 right: -2,
@@ -581,22 +617,28 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   Widget _buildFooter(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      child: Row(
-        children: [
-          Expanded(
-            child: ProfileSheetStyles.secondaryButton(
-              text: 'Cancel',
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ProfileSheetStyles.primaryButton(
-              text: 'Save',
-              onPressed: _save,
-            ),
-          ),
-        ],
+      child: BlocBuilder<ProfileBloc, ProfileState>(
+        buildWhen: (a, b) => a.isProfilePhotoBusy != b.isProfilePhotoBusy,
+        builder: (context, state) {
+          final busy = state.isProfilePhotoBusy;
+          return Row(
+            children: [
+              Expanded(
+                child: ProfileSheetStyles.secondaryButton(
+                  text: 'Cancel',
+                  onPressed: busy ? null : () => Navigator.of(context).pop(),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ProfileSheetStyles.primaryButton(
+                  text: busy ? 'Saving…' : 'Save',
+                  onPressed: busy ? null : _save,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

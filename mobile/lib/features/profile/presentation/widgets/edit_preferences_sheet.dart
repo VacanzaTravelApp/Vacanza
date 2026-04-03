@@ -244,13 +244,9 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ProfileSheetStyles.sheetPanel(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

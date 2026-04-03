@@ -18,6 +18,7 @@ import '../styles/profile_ui_style.dart';
 import '../widgets/edit_preferences_sheet.dart';
 import '../widgets/edit_profile_sheet.dart';
 import '../widgets/profile_character_card.dart';
+import '../widgets/profile_photo_viewer.dart';
 import '../../data/models/check_in.dart';
 import '../../data/models/user_preferences.dart';
 import '../../data/models/user_profile.dart';
@@ -113,7 +114,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _ProfileHeaderSection(),
+              _ProfileHeaderSection(
+                onOpenEditProfile: () {
+                  final s = context.read<ProfileBloc>().state;
+                  final initial = s.profile ??
+                      UserProfile.defaultForDraft(userId: '', email: '');
+                  _openEditProfileSheet(context, initial);
+                },
+              ),
 
               const SizedBox(height: 16),
 
@@ -220,7 +228,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 // ─── Header + Character + Gamification (isolated from ProfileBloc rebuilds) ───
 
 class _ProfileHeaderSection extends StatelessWidget {
-  const _ProfileHeaderSection();
+  final VoidCallback onOpenEditProfile;
+
+  const _ProfileHeaderSection({required this.onOpenEditProfile});
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +260,9 @@ class _ProfileHeaderSection extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         BlocBuilder<ProfileBloc, ProfileState>(
-          buildWhen: (prev, curr) => prev.profile != curr.profile,
+          buildWhen: (prev, curr) =>
+              prev.profile != curr.profile ||
+              prev.profilePhotoBytes != curr.profilePhotoBytes,
           builder: (context, profileState) {
             final displayName = profileState.profile != null
                 ? (profileState.profile!.displayName.trim().isNotEmpty
@@ -266,6 +278,14 @@ class _ProfileHeaderSection extends StatelessWidget {
                 return false;
               },
               builder: (context, state) {
+                void openPhotoViewer() {
+                  showProfilePhotoViewer(
+                    context,
+                    profilePhotoBytes: profileState.profilePhotoBytes,
+                    profileImageUrl: profileState.profile?.profileImageUrl,
+                  );
+                }
+
                 return switch (state) {
                   GamificationInitial() || GamificationLoading() =>
                     ProfileCharacterCard(
@@ -273,12 +293,18 @@ class _ProfileHeaderSection extends StatelessWidget {
                       roleText: '—',
                       levelText: '—',
                       profileImageUrl: profileState.profile?.profileImageUrl,
+                      profilePhotoBytes: profileState.profilePhotoBytes,
+                      onInfoTap: onOpenEditProfile,
+                      onAvatarTap: openPhotoViewer,
                     ),
                   GamificationError() => ProfileCharacterCard(
                       name: displayName,
                       roleText: 'Traveler',
                       levelText: '—',
                       profileImageUrl: profileState.profile?.profileImageUrl,
+                      profilePhotoBytes: profileState.profilePhotoBytes,
+                      onInfoTap: onOpenEditProfile,
+                      onAvatarTap: openPhotoViewer,
                     ),
                   GamificationLoaded(:final profile) => ProfileCharacterCard(
                       name: displayName,
@@ -287,6 +313,9 @@ class _ProfileHeaderSection extends StatelessWidget {
                       totalXp: profile.totalXp,
                       xpProgressPercent: profile.xpProgressPercent,
                       profileImageUrl: profileState.profile?.profileImageUrl,
+                      profilePhotoBytes: profileState.profilePhotoBytes,
+                      onInfoTap: onOpenEditProfile,
+                      onAvatarTap: openPhotoViewer,
                     ),
                 };
               },
