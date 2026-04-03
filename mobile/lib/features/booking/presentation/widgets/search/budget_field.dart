@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'booking_field_scroll_padding.dart';
+
 /// Optional budget input with $ prefix and USD badge.
 class BudgetField extends StatelessWidget {
   final TextEditingController controller;
@@ -32,6 +34,7 @@ class BudgetField extends StatelessWidget {
         ),
         TextFormField(
           controller: controller,
+          scrollPadding: bookingFieldScrollPadding(context),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),

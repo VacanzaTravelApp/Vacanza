@@ -83,9 +83,13 @@ class BookingBottomSheet extends StatelessWidget {
                         onTap: () => FocusScope.of(context).unfocus(),
                         child: SingleChildScrollView(
                           controller: scrollController,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 24,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: EdgeInsets.fromLTRB(
+                            24,
+                            24,
+                            24,
+                            24 + MediaQuery.viewInsetsOf(context).bottom,
                           ),
                           child: _buildBody(context, state),
                         ),
