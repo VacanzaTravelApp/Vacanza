@@ -33,11 +33,31 @@ class UserProfile {
     this.joinDate,
   });
 
-  /// Display name for UI: preferredName if set, else "firstName lastName".
-  String get displayNameFallback =>
-      (preferredName != null && preferredName!.trim().isNotEmpty)
-          ? preferredName!
-          : '$firstName ${lastName.trim()}'.trim();
+  /// Local fallback when API [displayName] is empty: preferred → full legal name (with optional middle) → first + last.
+  static String computeDisplayNameFallback({
+    required String firstName,
+    String? middleName,
+    required String lastName,
+    String? preferredName,
+  }) {
+    if (preferredName != null && preferredName.trim().isNotEmpty) {
+      return preferredName.trim();
+    }
+    final first = firstName.trim();
+    final middle = middleName?.trim() ?? '';
+    final last = lastName.trim();
+    if (middle.isNotEmpty) {
+      return '$first $middle $last'.trim();
+    }
+    return '$first $last'.trim();
+  }
+
+  String get displayNameFallback => computeDisplayNameFallback(
+        firstName: firstName,
+        middleName: middleName,
+        lastName: lastName,
+        preferredName: preferredName,
+      );
 
   /// Safe defaults when opening Edit Profile before profile is loaded.
   static UserProfile defaultForDraft({String userId = '', String email = ''}) {

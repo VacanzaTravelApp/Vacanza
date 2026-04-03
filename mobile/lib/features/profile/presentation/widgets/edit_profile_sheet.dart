@@ -370,9 +370,15 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     final joinFormatted = _draft.joinDate != null
         ? _formatJoinDate(_draft.joinDate!)
         : '—';
-    final displayName = (_draft.preferredName != null && _draft.preferredName!.trim().isNotEmpty)
-        ? _draft.preferredName!.trim()
-        : ([_draft.firstName, _draft.lastName].where((s) => s.isNotEmpty).join(' ').trim().isEmpty ? '—' : '${_draft.firstName} ${_draft.lastName}'.trim());
+    final resolved = _draft.displayName.trim().isNotEmpty
+        ? _draft.displayName.trim()
+        : UserProfile.computeDisplayNameFallback(
+            firstName: _draft.firstName,
+            middleName: _draft.middleName,
+            lastName: _draft.lastName,
+            preferredName: _draft.preferredName,
+          );
+    final displayName = resolved.isEmpty ? '—' : resolved;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
