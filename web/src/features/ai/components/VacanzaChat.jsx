@@ -53,6 +53,27 @@ function routesForMessage(msg) {
 }
 
 /**
+ * Sohbet balonu: model **kalın** işaretlerini gerçek vurguya çevirir (düz metinde ** kalmaz).
+ * Satır sonları .msg-text { white-space: pre-wrap } ile korunur.
+ */
+function ChatBubbleRichText({ text }) {
+  const s = text == null ? "" : String(text);
+  if (!s.includes("**")) return s;
+  const out = [];
+  const re = /\*\*([^*]+)\*\*/g;
+  let last = 0;
+  let m;
+  let k = 0;
+  while ((m = re.exec(s)) !== null) {
+    if (m.index > last) out.push(s.slice(last, m.index));
+    out.push(<strong key={`sb-${k++}`}>{m[1]}</strong>);
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) out.push(s.slice(last));
+  return out.length ? out : s;
+}
+
+/**
  * Rota kartı eklenecek asistan balonları (yemek önerisi, genel sohbet vb. hariç).
  * Zaman eşlemesi bu havuzda yapılır; aksi halde "en yakın asistan" yanlışlıkla yemek cevabı oluyordu.
  */
@@ -590,6 +611,26 @@ export default function VacanzaChat({
           time: formatMessageTime(new Date()),
         };
         setMessages((prev) => [...prev, aiMsg]);
+
+        const extractedPrefs =
+          response.extracted_preferences ?? response.extractedPreferences ?? null;
+        if (Array.isArray(extractedPrefs) && extractedPrefs.length > 0) {
+          const snippets = extractedPrefs
+            .map((p) => p.preference_value ?? p.preferenceValue)
+            .filter((v) => v != null && String(v).trim() !== "")
+            .map((v) => {
+              const s = String(v).trim();
+              return s.length > 48 ? `${s.slice(0, 45)}…` : s;
+            })
+            .slice(0, 2);
+          const more =
+            extractedPrefs.length > 2 ? ` (+${extractedPrefs.length - 2})` : "";
+          message.success(
+            snippets.length > 0
+              ? `Tercihlerin kaydedildi: ${snippets.join(" · ")}${more}`
+              : `${extractedPrefs.length} tercih profiline kaydedildi.`
+          );
+        }
       }
       await refreshConversations();
     } catch {
@@ -707,7 +748,9 @@ export default function VacanzaChat({
               return (
               <div key={msg.id} className={`chat-row ${msg.type}-row`}>
                 <div className={`message-bubble ${msg.type}-bubble`}>
-                  <div className="msg-text">{msg.text}</div>
+                  <div className="msg-text">
+                    <ChatBubbleRichText text={msg.text} />
+                  </div>
                   {msg.time ? <span className="msg-time">{msg.time}</span> : null}
                 </div>
                 {routeList.map((rd, rIdx) => (

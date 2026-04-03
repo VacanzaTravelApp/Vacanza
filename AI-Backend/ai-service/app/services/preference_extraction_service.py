@@ -26,11 +26,11 @@ Focus on these preference categories:
 - budget_preference: BUDGET, MID_RANGE, LUXURY
 - accommodation_preference: Hotel, hostel, Airbnb, resort, camping, etc.
 - climate_preference: TROPICAL, WARM, COLD, MILD, DRY
-- cultural_interest: Museums, history, art, architecture, nightlife, etc.
-- event_interest: Music festivals, concerts, sports events, etc.
+- cultural_interest: Museums, history, art, architecture, etc.
+- event_interest: Music festivals, concerts, raves, electronic music / club culture, sports events, etc. (use this when the user expresses love for parties, DJs, or similar — not for naming specific venues)
 - transport_preference: FLY, TRAIN, DRIVE, PUBLIC_TRANSIT, WALK
-- dietary_restriction: Vegan, vegetarian, halal, kosher, gluten-free, etc.
-- health_condition: Allergies (pollen, dust, sun, etc.), motion sickness, mobility issues, chronic conditions relevant to travel
+- dietary_restriction: Vegan, vegetarian, halal, kosher, gluten-free, food allergies (e.g. chocolate, nuts, dairy, shellfish, eggs), etc.
+- health_condition: Non-food allergies (pollen, dust, sun, etc.), motion sickness, mobility issues, chronic conditions relevant to travel
 - language_preference: Languages the user prefers to communicate in
 - destination_preference: Preferred destinations, regions, or countries
 - trip_pace: RELAXED, MODERATE, PACKED
