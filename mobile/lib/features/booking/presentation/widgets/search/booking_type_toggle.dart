@@ -76,15 +76,15 @@ class BookingTypeToggle extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: isActive ? _accent : const Color(0xFF999999),
+                color: isActive ? _accent : const Color(0xFF64748B),
               ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: isActive ? _accent : const Color(0xFF999999),
+                  fontWeight: FontWeight.w600,
+                  color: isActive ? _accent : const Color(0xFF475569),
                 ),
               ),
             ],

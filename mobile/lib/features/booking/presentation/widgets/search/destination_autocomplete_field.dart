@@ -9,6 +9,7 @@ import '../../cubit/booking_cubit.dart';
 import '../../cubit/booking_state.dart';
 import 'booking_autocomplete_scroll.dart';
 import 'booking_field_scroll_padding.dart';
+import 'booking_search_field_styles.dart';
 
 /// Hotel destination with debounced `GET /bookings/destinations/search`.
 class DestinationAutocompleteField extends StatefulWidget {
@@ -185,11 +186,7 @@ class _DestinationAutocompleteFieldState extends State<DestinationAutocompleteFi
                   padding: const EdgeInsets.only(left: 4, bottom: 4),
                   child: Text(
                     widget.label,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF999999),
-                    ),
+                    style: BookingSearchFieldStyles.fieldLabel,
                   ),
                 ),
                 TextField(

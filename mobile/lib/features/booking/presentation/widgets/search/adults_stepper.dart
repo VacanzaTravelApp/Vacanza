@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'booking_search_field_styles.dart';
+
 /// ± stepper for adult count, clamped 1–10.
 class AdultsStepper extends StatelessWidget {
   final int value;
@@ -16,15 +18,11 @@ class AdultsStepper extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 4),
           child: Text(
             'Adults',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF999999),
-            ),
+            style: BookingSearchFieldStyles.fieldLabel,
           ),
         ),
         Container(
