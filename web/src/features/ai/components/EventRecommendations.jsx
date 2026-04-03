@@ -5,8 +5,9 @@ import "../styles/eventRecommendations.css";
 
 /**
  * Fetches and shows event recommendations for a saved backend route.
+ * @param {number} [tripDay] — 1-based itinerary day (e.g. when the user selects "Gün 2" on the map panel); narrows Ticketmaster to that calendar day.
  */
-export default function EventRecommendations({ routeId, refreshKey = 0 }) {
+export default function EventRecommendations({ routeId, tripDay, refreshKey = 0 }) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [internalRefresh, setInternalRefresh] = useState(0);
@@ -24,7 +25,7 @@ export default function EventRecommendations({ routeId, refreshKey = 0 }) {
 
     (async () => {
       try {
-        const res = await getEventRecommendations(routeId);
+        const res = await getEventRecommendations(routeId, { day: tripDay });
         if (!cancelled) setData(res);
       } catch {
         if (!cancelled) setData(null);
@@ -36,7 +37,7 @@ export default function EventRecommendations({ routeId, refreshKey = 0 }) {
     return () => {
       cancelled = true;
     };
-  }, [routeId, refreshKey, internalRefresh]);
+  }, [routeId, tripDay, refreshKey, internalRefresh]);
 
   if (!routeId) return null;
 

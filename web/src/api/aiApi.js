@@ -6,8 +6,12 @@ const asArray = (data) => (Array.isArray(data) ? data : []);
  * Event recommendations for a saved route (GET /routes/:routeId/event-recommendations).
  * @returns {Promise<{ message: string, events: Array<object>, totalFound: number, hasRecommendations: boolean }>}
  */
-export const getEventRecommendations = async (routeId) => {
-    const res = await http.get(`/routes/${routeId}/event-recommendations`);
+export const getEventRecommendations = async (routeId, { day } = {}) => {
+    const params = {};
+    if (day != null && Number.isFinite(Number(day))) {
+        params.day = Number(day);
+    }
+    const res = await http.get(`/routes/${routeId}/event-recommendations`, { params });
     return res.data;
 };
 

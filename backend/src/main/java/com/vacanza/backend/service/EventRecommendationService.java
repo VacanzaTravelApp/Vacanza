@@ -9,6 +9,8 @@ import com.vacanza.backend.dto.response.RecommendedEvent;
 import com.vacanza.backend.entity.AiRoute;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.UserPreferences;
+import com.vacanza.backend.dto.weather.DailyWeatherSummary;
+import com.vacanza.backend.dto.weather.DayPartWeatherDay;
 import com.vacanza.backend.integration.ai.AiChatDto;
 import com.vacanza.backend.integration.ai.AiServiceClient;
 import com.vacanza.backend.repo.UserPreferencesRepository;
@@ -20,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -49,7 +54,7 @@ public class EventRecommendationService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public EventRecommendationResponse getRecommendations(UUID routeId, User user) {
+    public EventRecommendationResponse getRecommendations(UUID routeId, User user, Integer tripDay) {
         AiRoute route = aiRouteService.getRoute(routeId, user)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Route not found"));
 
@@ -69,11 +74,20 @@ public class EventRecommendationService {
         }
 
         int totalDays = resolveTotalDays(routeData, route);
+        LocalDate tripStart = resolveTripStartLocalDate(routeData, route);
+
+        Integer normalizedDay = normalizeTripDay(tripDay, totalDays);
 
         EventSearchRequestDTO request = new EventSearchRequestDTO();
         request.setCity(city);
-        request.setStartDate(route.getGeneratedAt().toLocalDate());
-        request.setEndDate(computeEndDate(request.getStartDate(), totalDays));
+        if (normalizedDay != null) {
+            LocalDate dayDate = tripStart.plusDays(normalizedDay - 1);
+            request.setStartDate(dayDate);
+            request.setEndDate(dayDate);
+        } else {
+            request.setStartDate(tripStart);
+            request.setEndDate(computeEndDate(tripStart, totalDays));
+        }
         String categoryParam = categories.isEmpty() ? null : String.join(", ", categories);
         request.setCategory(categoryParam);
         request.setSize(20);
@@ -90,6 +104,13 @@ public class EventRecommendationService {
                 .filter(e -> e.getIsVirtual() == null || !Boolean.TRUE.equals(e.getIsVirtual()))
                 .collect(Collectors.toList());
 
+        if (normalizedDay != null) {
+            LocalDate target = tripStart.plusDays(normalizedDay - 1);
+            filtered = filtered.stream()
+                    .filter(e -> eventStartsOnLocalDate(e, target))
+                    .collect(Collectors.toList());
+        }
+
         int totalFound = filtered.size();
         if (totalFound == 0) {
             return EventRecommendationResponse.builder()
@@ -101,7 +122,7 @@ public class EventRecommendationService {
         }
 
         AiChatDto.EventRecommendAiRequest aiRequest = buildEventRecommendRequest(
-                routeData, rawDestination, totalDays, route, structured, aiPrefs, filtered);
+                routeData, rawDestination, totalDays, tripStart, structured, aiPrefs, filtered);
         Optional<AiChatDto.EventRecommendAiResponse> aiRanked =
                 aiServiceClient.recommendEventsForRoute(user.getUserId(), aiRequest);
 
@@ -162,6 +183,80 @@ public class EventRecommendationService {
         return Math.max(route.getTotalDays(), 1);
     }
 
+    /**
+     * First calendar day of the trip: from embedded weather (aligned with itinerary days), else route creation date.
+     */
+    static LocalDate resolveTripStartLocalDate(AiChatDto.RouteData routeData, AiRoute route) {
+        Optional<LocalDate> fromWeather = firstWeatherDate(routeData);
+        return fromWeather.orElseGet(() -> route.getGeneratedAt().toLocalDate());
+    }
+
+    private static Optional<LocalDate> firstWeatherDate(AiChatDto.RouteData routeData) {
+        if (routeData == null) {
+            return Optional.empty();
+        }
+        List<DailyWeatherSummary> daily = routeData.getWeatherForecast();
+        if (daily != null && !daily.isEmpty()) {
+            LocalDate d = daily.get(0).date();
+            if (d != null) {
+                return Optional.of(d);
+            }
+        }
+        List<DayPartWeatherDay> parts = routeData.getWeatherDayParts();
+        if (parts != null && !parts.isEmpty()) {
+            LocalDate d = parts.get(0).date();
+            if (d != null) {
+                return Optional.of(d);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** @return 1-based day index within the trip, or null to search the whole trip window */
+    private static Integer normalizeTripDay(Integer tripDay, int totalDays) {
+        if (tripDay == null) {
+            return null;
+        }
+        int d = tripDay;
+        if (d < 1 || d > totalDays) {
+            return null;
+        }
+        return d;
+    }
+
+    private static boolean eventStartsOnLocalDate(EventDTO e, LocalDate target) {
+        if (e == null || target == null) {
+            return false;
+        }
+        LocalDate parsed = parseEventStartLocalDate(e.getStartTime());
+        if (parsed == null) {
+            return true;
+        }
+        return parsed.equals(target);
+    }
+
+    private static LocalDate parseEventStartLocalDate(String startTime) {
+        if (startTime == null || startTime.isBlank()) {
+            return null;
+        }
+        String s = startTime.trim();
+        try {
+            return LocalDate.parse(s.length() >= 10 ? s.substring(0, 10) : s);
+        } catch (DateTimeParseException ignored) {
+            /* fall through */
+        }
+        try {
+            return OffsetDateTime.parse(s).toLocalDate();
+        } catch (DateTimeParseException ignored) {
+            /* fall through */
+        }
+        try {
+            return ZonedDateTime.parse(s).toLocalDate();
+        } catch (DateTimeParseException ignored) {
+            return null;
+        }
+    }
+
     private static LocalDate computeEndDate(LocalDate startDate, int totalDays) {
         if (totalDays <= 1) {
             return startDate;
@@ -198,14 +293,14 @@ public class EventRecommendationService {
             AiChatDto.RouteData routeData,
             String rawDestination,
             int totalDays,
-            AiRoute route,
+            LocalDate tripStart,
             UserPreferences structured,
             List<AiChatDto.ExtractedPreference> aiPrefs,
             List<EventDTO> events) {
         AiChatDto.RouteSummaryForRecommend rs = new AiChatDto.RouteSummaryForRecommend();
         rs.setDestination(rawDestination != null ? rawDestination : "");
         rs.setTotalDays(totalDays);
-        rs.setStartDate(route.getGeneratedAt().toLocalDate().toString());
+        rs.setStartDate(tripStart.toString());
 
         List<AiChatDto.DaySummaryAi> daySummaries = new ArrayList<>();
         if (routeData != null && routeData.getDays() != null) {

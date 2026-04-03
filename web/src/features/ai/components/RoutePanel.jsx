@@ -314,7 +314,7 @@ export default function RoutePanel({
               Ticketmaster — konser, spor, gösteri
             </span>
           </div>
-          <EventRecommendations routeId={route.routeId ?? route.route_id} />
+          <EventRecommendations routeId={route.routeId ?? route.route_id} tripDay={activeDay} />
         </div>
       ) : null}
 

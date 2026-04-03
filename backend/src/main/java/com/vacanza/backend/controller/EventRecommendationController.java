@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -30,10 +31,12 @@ public class EventRecommendationController {
     private final CurrentUserProvider currentUserProvider;
 
     @GetMapping("/{routeId}/event-recommendations")
-    public ResponseEntity<EventRecommendationResponse> getRecommendations(@PathVariable UUID routeId) {
+    public ResponseEntity<EventRecommendationResponse> getRecommendations(
+            @PathVariable UUID routeId,
+            @RequestParam(required = false) Integer day) {
         User user = currentUserProvider.getCurrentUserEntity();
         try {
-            EventRecommendationResponse body = eventRecommendationService.getRecommendations(routeId, user);
+            EventRecommendationResponse body = eventRecommendationService.getRecommendations(routeId, user, day);
             return ResponseEntity.ok(body);
         } catch (ResponseStatusException e) {
             if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
