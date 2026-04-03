@@ -121,6 +121,12 @@ class BookingRepository {
       return const BookingException('Search service temporarily unavailable');
     }
 
+    if (status == 503) {
+      return const BookingException(
+        'Too many requests. Please wait a moment and try again.',
+      );
+    }
+
     if (status != null) {
       return BookingException('Request failed (status: $status)');
     }
