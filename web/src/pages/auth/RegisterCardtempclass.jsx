@@ -9,7 +9,6 @@ import {
   CloseCircleOutlined,
   CheckOutlined,
 } from '@ant-design/icons';
-import { MdFlightTakeoff } from 'react-icons/md';
 import './RegisterCard.css';
 import { useNavigate } from 'react-router-dom';
 
@@ -166,11 +165,7 @@ const RegisterCard = () => {
   return (
     <div className="register-card">
       <div className="card-header">
-        <span className="vacanza-logo">
-          <MdFlightTakeoff className="logo-icon" />
-          Vacanza
-        </span>
-        <h3>Create Your <span style={{ color: '#3da8c8' }}>Vacanza</span> Account</h3>
+        <h3>Sign Up</h3>
         <p className="header-subtext">
           Start your personalized journey today
         </p>
