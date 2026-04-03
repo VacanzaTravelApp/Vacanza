@@ -10,7 +10,8 @@ import 'adults_stepper.dart';
 import 'booking_date_field.dart';
 import 'booking_type_toggle.dart';
 import 'budget_field.dart';
-import 'iata_text_field.dart';
+import 'airport_autocomplete_field.dart';
+import 'booking_field_scroll_padding.dart';
 import 'sort_dropdown.dart';
 
 /// UC1.8-MOB6 — Orchestrator form for hotel/flight search.
@@ -115,15 +116,17 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     }
   }
 
-  bool get _isValid {
+  bool _isValid(BookingSearch? search) {
     if (_type == BookingType.hotels) {
       return _hotelQueryCtrl.text.trim().isNotEmpty &&
           _checkInCtrl.text.isNotEmpty &&
           _checkOutCtrl.text.isNotEmpty;
     }
-    return _originCtrl.text.trim().length >= 3 &&
-        _destinationCtrl.text.trim().length >= 3 &&
-        _departureCtrl.text.isNotEmpty;
+    final originOk = search?.originAirport.selected != null ||
+        _originCtrl.text.trim().length >= 3;
+    final destOk = search?.destinationAirport.selected != null ||
+        _destinationCtrl.text.trim().length >= 3;
+    return originOk && destOk && _departureCtrl.text.isNotEmpty;
   }
 
   void _onTypeChanged(BookingType type) {
@@ -239,9 +242,11 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   }
 
   void _onSearch() {
-    if (!_isValid) return;
-
     final cubit = context.read<BookingCubit>();
+    final search =
+        cubit.state is BookingSearch ? cubit.state as BookingSearch : null;
+    if (!_isValid(search)) return;
+
     final budget = BudgetField.parse(_budgetCtrl.text);
 
     if (_type == BookingType.hotels) {
@@ -256,10 +261,14 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         ),
       );
     } else {
+      final originId = search?.originAirport.selected?.resolvedSearchId ??
+          _originCtrl.text.trim();
+      final destId = search?.destinationAirport.selected?.resolvedSearchId ??
+          _destinationCtrl.text.trim();
       cubit.searchFlights(
         TransportSearchRequest(
-          origin: _originCtrl.text,
-          destination: _destinationCtrl.text,
+          origin: originId,
+          destination: destId,
           departureDate: _departureCtrl.text,
           returnDate: _isRoundTrip && _returnCtrl.text.isNotEmpty
               ? _returnCtrl.text
@@ -276,6 +285,10 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
 
   @override
   Widget build(BuildContext context) {
+    final cubit = context.watch<BookingCubit>();
+    final search =
+        cubit.state is BookingSearch ? cubit.state as BookingSearch : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -289,7 +302,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         const SizedBox(height: 12),
         _sharedFields(),
         const SizedBox(height: 28),
-        _searchButton(),
+        _searchButton(search),
       ],
     );
   }
@@ -300,6 +313,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
       TextField(
         controller: _hotelQueryCtrl,
         cursorColor: _accent,
+        scrollPadding: bookingFieldScrollPadding(context),
         decoration: InputDecoration(
           labelText: 'Search hotels',
           hintText: 'e.g. Hotels in Paris, Bali resorts',
@@ -360,18 +374,20 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   List<Widget> _flightFields() {
     final now = DateTime.now();
     return [
-      IataTextField(
+      AirportAutocompleteField(
         controller: _originCtrl,
         label: 'Origin',
-        placeholder: 'e.g. IST or Istanbul',
+        placeholder: 'e.g. Istanbul or IST',
         icon: Icons.flight_takeoff_rounded,
+        isOrigin: true,
       ),
       const SizedBox(height: 12),
-      IataTextField(
+      AirportAutocompleteField(
         controller: _destinationCtrl,
         label: 'Destination',
-        placeholder: 'e.g. CDG or Paris',
-        icon: Icons.search_rounded,
+        placeholder: 'e.g. Paris or CDG',
+        icon: Icons.flight_land_rounded,
+        isOrigin: false,
       ),
       const SizedBox(height: 12),
 
@@ -484,8 +500,8 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     );
   }
 
-  Widget _searchButton() {
-    final enabled = _isValid;
+  Widget _searchButton(BookingSearch? search) {
+    final enabled = _isValid(search);
     return GestureDetector(
       onTap: enabled ? _onSearch : null,
       child: AnimatedContainer(
