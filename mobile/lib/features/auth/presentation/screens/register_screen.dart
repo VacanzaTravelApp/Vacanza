@@ -19,9 +19,7 @@ import 'package:mobile/features/auth/presentation/bloc/register_event.dart';
 
 // Login ekranı (altta “Already have an account?” yazısı için)
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
-import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
-
-// Register sonrası yönleneceğimiz ana map ekranı (şimdilik mock)
+import 'package:mobile/features/auth/presentation/screens/auth_gate.dart';
 
 
 /// ------------------------------------------------------------
@@ -65,7 +63,7 @@ class RegisterScreen extends StatelessWidget {
         ///  BLoC LISTENER → RegisterBloc değişikliklerini dinliyoruz.
         ///
         ///  Burada UI mantığı var:
-        ///    - SUCCESS olduğunda snackbar + MapScreen yönlendirme
+        ///    - SUCCESS olduğunda snackbar + AuthGate yönlendirme
         ///    - FAILURE olduğunda navigation yapılmaz (form kendi hata gösterir)
         ///
         ///  NOT: BLoC içinde navigation YAPMIYORUZ → UI katmanı sorumludur.
@@ -94,9 +92,10 @@ class RegisterScreen extends StatelessWidget {
 
               // 3) Snackbar görünür olsun diye küçük gecikme
               Future.delayed(const Duration(milliseconds: 300), () {
+                if (!context.mounted) return;
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const HomeMapScreen()),
+                  MaterialPageRoute(builder: (_) => const AuthGate()),
                 );
               });
             }
