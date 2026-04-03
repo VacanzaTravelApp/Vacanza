@@ -45,6 +45,12 @@
   color: var(--vc-text-secondary, #6b7280);
   margin-bottom: 10px;
   padding: 0 2px;
+  flex-wrap: wrap;
+}
+
+.event-recommendations-header-text {
+  flex: 1;
+  min-width: 0;
 }
 
 .event-recommendations-header svg {
@@ -52,6 +58,31 @@
   margin-top: 2px;
   color: var(--vc-primary, #3da8c8);
   font-size: 16px;
+}
+
+.event-rec-refresh-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--vc-primary, #3da8c8);
+  background: transparent;
+  border: 1px solid rgba(61, 168, 200, 0.45);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.event-rec-refresh-btn:hover {
+  background: rgba(61, 168, 200, 0.1);
+}
+
+.event-rec-refresh-btn:focus-visible {
+  outline: 2px solid var(--vc-primary, #3da8c8);
+  outline-offset: 2px;
 }
 
 .event-recommendations-list {

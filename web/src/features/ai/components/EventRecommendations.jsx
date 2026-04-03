@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { FaCalendarAlt } from "react-icons/fa";
 import { getEventRecommendations } from "../../../api/aiApi";
 import EventCard from "./EventCard";
 import "../styles/eventRecommendations.css";
@@ -7,9 +6,10 @@ import "../styles/eventRecommendations.css";
 /**
  * Fetches and shows event recommendations for a saved backend route.
  */
-export default function EventRecommendations({ routeId }) {
+export default function EventRecommendations({ routeId, refreshKey = 0 }) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
+  const [internalRefresh, setInternalRefresh] = useState(0);
 
   useEffect(() => {
     if (!routeId) {
@@ -36,7 +36,7 @@ export default function EventRecommendations({ routeId }) {
     return () => {
       cancelled = true;
     };
-  }, [routeId]);
+  }, [routeId, refreshKey, internalRefresh]);
 
   if (!routeId) return null;
 
@@ -66,8 +66,15 @@ export default function EventRecommendations({ routeId }) {
   return (
     <div className="event-recommendations-section event-rec-loaded">
       <div className="event-recommendations-header">
-        <FaCalendarAlt aria-hidden />
-        <span>{headerText}</span>
+        <span className="event-recommendations-header-text">{headerText}</span>
+        <button
+          type="button"
+          className="event-rec-refresh-btn"
+          onClick={() => setInternalRefresh((n) => n + 1)}
+          aria-label="Etkinlik önerilerini yeniden yükle"
+        >
+          Yenile
+        </button>
       </div>
       <div className="event-recommendations-list">
         {events.map((event) => (
