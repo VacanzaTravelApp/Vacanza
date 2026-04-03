@@ -3,6 +3,7 @@ import { Button } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
 import { getCategoryColor } from "../../../constants/categoryColors";
 import WaypointFeedback from "./WaypointFeedback";
+import EventRecommendations from "./EventRecommendations";
 import "../styles/routePanel.css";
 
 const TIME_SLOT_LABELS = {
@@ -118,6 +119,15 @@ export default function RoutePanel({
           </div>
         </div>
       </div>
+
+      {!showWeatherBlock && route.destination && (
+        <div className="route-panel-weather route-panel-weather--empty" role="status">
+          <div className="route-panel-weather-title">Hava tahmini</div>
+          <p className="route-panel-weather-empty-hint">
+            Bu rota verisinde günlük hava yok. Hava, rota oluşturulurken backend tarafından eklenir.
+          </p>
+        </div>
+      )}
 
       {showWeatherBlock && (
         <div className="route-panel-weather" aria-label="Hava tahmini">
@@ -295,6 +305,18 @@ export default function RoutePanel({
           </ul>
         )}
       </div>
+
+      {(route.routeId ?? route.route_id) ? (
+        <div className="route-panel-event-recs">
+          <div className="route-panel-event-recs-head">
+            <span className="route-panel-event-recs-title">Etkinlik önerileri</span>
+            <span className="route-panel-event-recs-desc">
+              Ticketmaster — konser, spor, gösteri
+            </span>
+          </div>
+          <EventRecommendations routeId={route.routeId ?? route.route_id} tripDay={activeDay} />
+        </div>
+      ) : null}
 
       {route.notes && (
         <div className="route-panel-notes">{route.notes}</div>
