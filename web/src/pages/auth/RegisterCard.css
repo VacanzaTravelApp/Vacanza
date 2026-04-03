@@ -91,20 +91,22 @@
 .register-card .cta-button.ant-btn-primary {
   width: 100%;
   padding: 10px 24px;
-  background: var(--vivid-coral) !important;
+  background: var(--btn-primary-bg) !important;
   border: none !important;
   border-radius: 12px !important;
   font-family: var(--font-display) !important;
   font-weight: 700 !important;
   font-size: 15px !important;
   color: var(--vivid-white) !important;
-  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.25);
+  box-shadow: 0 4px 16px var(--btn-primary-shadow);
   margin-top: 4px;
+  transition: background 1.5s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 
 .register-card .cta-button.ant-btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.35);
+  box-shadow: 0 6px 20px var(--btn-primary-hover-shadow);
+  filter: brightness(1.05);
 }
 
 .login-redirect { text-align: center; margin-top: 14px; font-size: 13px; font-family: var(--font-sans); color: var(--card-subtext); }
@@ -188,12 +190,13 @@
 }
 
 .ant-modal .ant-modal-footer .ant-btn-primary {
-  background: var(--vivid-coral) !important;
+  background: var(--btn-primary-bg) !important;
   border: none !important;
   border-radius: 10px !important;
   font-family: var(--font-display) !important;
   font-variation-settings: 'SOFT' 50, 'WONK' 1 !important;
   color: var(--vivid-white) !important;
+  transition: background 1.5s ease;
 }
 
 .ant-modal .ant-modal-footer .ant-btn-default {

@@ -22,6 +22,10 @@
   --input-placeholder: rgba(26, 35, 50, 0.4);
   --text-shadow: 0 4px 12px rgba(255, 255, 255, 0.4); 
   
+  --btn-primary-bg: #FF6B6B;
+  --btn-primary-shadow: rgba(255, 107, 107, 0.25);
+  --btn-primary-hover-shadow: rgba(255, 107, 107, 0.35);
+  
   --mouse-x: 0;
   --mouse-y: 0;
 }
@@ -31,24 +35,40 @@
   --scene-sun: #FFB347; --scene-mt1: #2DD4A8; --scene-mt2: #00B4D8; --scene-mt3: #7BC67E;
   --scene-ocean1: #48CAE4; --scene-ocean2: #00B4D8; --scene-balloon: #FF6B6B;
   --scene-accent: #2DD4A8; --scene-coral: #FF6B6B; --scene-golden: #FFB347;
+  
+  --btn-primary-bg: #FF6B6B;
+  --btn-primary-shadow: rgba(255, 107, 107, 0.25);
+  --btn-primary-hover-shadow: rgba(255, 107, 107, 0.35);
 }
 .theme-ocean {
   --theme-bg: linear-gradient(145deg, #E0F7FA 0%, #D4F1F9 30%, #F0FFF4 70%, #E8FFF0 100%);
   --scene-sun: #FFD166; --scene-mt1: #06D6A0; --scene-mt2: #118AB2; --scene-mt3: #073B4C;
   --scene-ocean1: #0096C7; --scene-ocean2: #0077B6; --scene-balloon: #EF476F;
   --scene-accent: #06D6A0; --scene-coral: #EF476F; --scene-golden: #FFD166;
+
+  --btn-primary-bg: #EF476F;
+  --btn-primary-shadow: rgba(239, 71, 111, 0.25);
+  --btn-primary-hover-shadow: rgba(239, 71, 111, 0.35);
 }
 .theme-tropical {
   --theme-bg: linear-gradient(145deg, #F0FFF4 0%, #E8FFE8 30%, #FFF8E7 70%, #FFFCF0 100%);
   --scene-sun: #F9C74F; --scene-mt1: #43AA8B; --scene-mt2: #90BE6D; --scene-mt3: #577590;
   --scene-ocean1: #4ECDC4; --scene-ocean2: #2AB7CA; --scene-balloon: #F94144;
   --scene-accent: #43AA8B; --scene-coral: #F94144; --scene-golden: #F9C74F;
+
+  --btn-primary-bg: #F94144;
+  --btn-primary-shadow: rgba(249, 65, 68, 0.25);
+  --btn-primary-hover-shadow: rgba(249, 65, 68, 0.35);
 }
 .theme-sunset {
   --theme-bg: linear-gradient(145deg, #FFE8E8 0%, #FFDAB9 30%, #FFE0C2 70%, #FFECD2 100%);
   --scene-sun: #FF8C42; --scene-mt1: #CE4993; --scene-mt2: #9B59B6; --scene-mt3: #5C3D6E;
   --scene-ocean1: #F78DA7; --scene-ocean2: #D34F9E; --scene-balloon: #FF6B6B;
   --scene-accent: #CE4993; --scene-coral: #FF6B6B; --scene-golden: #FF8C42;
+
+  --btn-primary-bg: #FF6B6B;
+  --btn-primary-shadow: rgba(255, 107, 107, 0.25);
+  --btn-primary-hover-shadow: rgba(255, 107, 107, 0.35);
 }
 .theme-midnight {
   --theme-bg: linear-gradient(145deg, #0A1128 0%, #16244A 30%, #1A365D 70%, #2A4365 100%);
@@ -65,6 +85,10 @@
   --input-border: rgba(255, 255, 255, 0.1);
   --input-placeholder: rgba(255, 255, 255, 0.3);
   --text-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+
+  --btn-primary-bg: #38BDF8;
+  --btn-primary-shadow: rgba(56, 189, 248, 0.25);
+  --btn-primary-hover-shadow: rgba(56, 189, 248, 0.35);
 }
 
 html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
