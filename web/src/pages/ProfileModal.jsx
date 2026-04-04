@@ -306,8 +306,8 @@ const ProfileModal = ({ open, onClose, user }) => {
 
     // ================= MAIN VIEW =================
     const MainView = () => (
-        <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff" }}>
-            <div style={{ padding: "0 24px" }}>
+        <div style={{ background: "#fff", minHeight: "100%" }}>
+            <div style={{ padding: "0 24px", position: "sticky", top: 0, zIndex: 10, background: "#fff", paddingBottom: "8px" }}>
                 <GrabHandle />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, marginTop: 12 }}>
                     <div style={{ fontSize: 22, fontWeight: 900, color: "#1c1c1e" }}>Profile</div>
@@ -324,7 +324,7 @@ const ProfileModal = ({ open, onClose, user }) => {
                 </div>
             </div>
 
-            <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 40px" }}>
+            <div style={{ padding: "0 24px 40px" }}>
                 <ProfileCharacterCard
                     name={profile?.preferredName || profile?.firstName || profile?.displayName || "—"}
                     role={gamification?.roleText || "—"}
@@ -482,8 +482,8 @@ const ProfileModal = ({ open, onClose, user }) => {
         const levelNum = gamification?.levelText ? parseInt(gamification.levelText.replace(/\D/g, ''), 10) : 1;
 
         return (
-            <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#f8f9fa" }}>
-                <div style={{ padding: "0 24px" }}>
+            <div style={{ background: "#f8f9fa", minHeight: "100%" }}>
+                <div style={{ padding: "0 24px", position: "sticky", top: 0, zIndex: 10, background: "#f8f9fa", paddingBottom: "8px" }}>
                     <GrabHandle />
                     <div style={{ display: "flex", alignItems: "center", position: "relative", marginBottom: 32, marginTop: 12 }}>
                         <Button
@@ -511,7 +511,7 @@ const ProfileModal = ({ open, onClose, user }) => {
                     </div>
                 </div>
 
-                <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 40px" }}>
+                <div style={{ padding: "0 24px 40px" }}>
                     <div style={{ background: "#fff", borderRadius: 28, padding: "24px 16px 20px", boxShadow: "0 4px 24px rgba(0,0,0,0.04)", textAlign: "center", marginBottom: 24 }}>
                         <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
                             <Progress
@@ -609,15 +609,15 @@ const ProfileModal = ({ open, onClose, user }) => {
         };
 
         return (
-            <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "32px 32px 0 0" }}>
-                <div style={{ padding: "0 24px" }}>
+            <div style={{ background: "#fff", minHeight: "100%", borderRadius: "32px 32px 0 0" }}>
+                <div style={{ padding: "0 24px", position: "sticky", top: 0, zIndex: 10, background: "#fff", borderRadius: "32px 32px 0 0", paddingBottom: "8px" }}>
                     <GrabHandle />
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, marginTop: 12 }}>
                         <Title level={4} style={{ margin: 0, fontWeight: 800, color: "#1c1c1e", fontSize: 17 }}>Edit Profile</Title>
                     </div>
                 </div>
 
-                <div style={{ flex: 1, padding: "0 24px 24px", overflowY: "auto" }}>
+                <div style={{ padding: "0 24px 24px" }}>
                     {/* Avatar Area */}
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
                         <div style={{ position: "relative" }}>
@@ -958,8 +958,8 @@ const ProfileModal = ({ open, onClose, user }) => {
         );
 
         return (
-            <div style={{ height: "85vh", display: "flex", flexDirection: "column", background: "#fff" }}>
-                <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{ background: "#fff", minHeight: "100%" }}>
+                <div style={{ padding: "0 24px", display: "flex", flexDirection: "column", alignItems: "center", position: "sticky", top: 0, zIndex: 10, background: "#fff", paddingBottom: "8px" }}>
                     <GrabHandle />
                     <div style={{ position: "relative", width: "100%", textAlign: "center", marginBottom: 24, marginTop: 12 }}>
                         <Button
@@ -982,7 +982,7 @@ const ProfileModal = ({ open, onClose, user }) => {
                     </div>
                 </div>
 
-                <div style={{ padding: "0 20px 40px", overflowY: "auto", flex: 1 }}>
+                <div style={{ padding: "0 20px 40px" }}>
                     <Form form={preferencesForm} layout="vertical" onFinish={(v) => updatePrefsMutation.mutate(v)}>
                         <Form.Item name="favoriteCategories" noStyle><input type="hidden" /></Form.Item>
                         <Form.Item name="cuisinePreferences" noStyle><input type="hidden" /></Form.Item>
@@ -1142,8 +1142,8 @@ const ProfileModal = ({ open, onClose, user }) => {
         );
 
         return (
-            <div style={{ height: "100%", maxHeight: "88vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "32px 32px 0 0" }}>
-                <div style={{ padding: "0 24px" }}>
+            <div style={{ background: "#fff", minHeight: "100%", borderRadius: "32px 32px 0 0" }}>
+                <div style={{ padding: "0 24px", position: "sticky", top: 0, zIndex: 10, background: "#fff", borderRadius: "32px 32px 0 0" }}>
                     <GrabHandle />
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, marginTop: 12 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1163,11 +1163,11 @@ const ProfileModal = ({ open, onClose, user }) => {
                     </div>
                 </div>
 
-                <div style={{ padding: "0 24px 16px" }}>
+                <div style={{ padding: "0 24px 16px", position: "sticky", top: "72px", zIndex: 10, background: "#fff", borderBottom: "1px solid #f3f4f6" }}>
                     <Input prefix={<SearchOutlined style={{ color: "#9ca3af" }} />} placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ height: 48, borderRadius: 12, border: "none", background: "#f3f4f6", fontSize: 15, fontWeight: 500 }} />
                 </div>
 
-                <div style={{ flex: 1, overflowY: "auto", padding: "0 24px" }}>
+                <div style={{ padding: "0 24px 24px" }}>
                     {filteredOptions.map(opt => {
                         const isSelected = selectedValues.includes(opt);
                         return (
@@ -1216,7 +1216,7 @@ const ProfileModal = ({ open, onClose, user }) => {
     };
 
     return (
-        <Modal open={open} onCancel={onClose} footer={null} width={480} centered closeIcon={false} styles={{ body: { padding: "0", background: "#f8f9fa" } }} style={{ borderRadius: "32px", overflow: "hidden" }}>
+        <Modal open={open} onCancel={onClose} footer={null} width={480} centered closeIcon={false} styles={{ body: { padding: "0", background: "#f8f9fa", maxHeight: "88vh", overflowY: "auto", overflowX: "hidden" } }} style={{ borderRadius: "32px", overflow: "hidden" }}>
             {view === 'MAIN' && <MainView />}
             {view === 'GAMIFICATION' && <GamificationView />}
             {view === 'EDIT_PROFILE' && <EditProfileView />}
