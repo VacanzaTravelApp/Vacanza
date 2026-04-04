@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../data/models/accommodation_search_request.dart';
+import '../../../data/models/airport_suggestion.dart';
 import '../../../data/models/booking_currency.dart';
 import '../../../data/models/sort_criteria.dart';
 import '../../../data/models/transport_search_request.dart';
@@ -107,8 +108,6 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
       final req = cubit.lastFlightRequest;
       if (req != null) {
         cubit.setCurrency(req.currency);
-        _originCtrl.text = req.origin;
-        _destinationCtrl.text = req.destination;
         _departureCtrl.text = req.departureDate;
         _returnCtrl.text = req.returnDate ?? '';
         _isRoundTrip = req.returnDate != null;
@@ -116,8 +115,42 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         _budgetCtrl.text = req.budget?.toString() ?? '';
         _sort = req.sortBy ?? SortCriteria.priceAsc;
         _departureDate = DateTime.tryParse(req.departureDate);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final c = context.read<BookingCubit>();
+          final r = c.lastFlightRequest;
+          if (r == null) return;
+          if (c.state is! BookingSearch) return;
+          if (r.origin.trim().isNotEmpty) {
+            final o = _suggestionFromResolvedId(r.origin);
+            c.selectOriginAirport(o);
+            _originCtrl.text = o.dropdownLabel;
+          }
+          if (r.destination.trim().isNotEmpty) {
+            final d = _suggestionFromResolvedId(r.destination);
+            c.selectDestinationAirport(d);
+            _destinationCtrl.text = d.dropdownLabel;
+          }
+        });
       }
     }
+  }
+
+  /// Rebuilds a minimal [AirportSuggestion] from a stored request id (TASK-10 restore).
+  AirportSuggestion _suggestionFromResolvedId(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) {
+      return const AirportSuggestion(name: '', city: '', country: '');
+    }
+    final upper = t.toUpperCase();
+    final asIata = RegExp(r'^[A-Z]{3}$').hasMatch(upper);
+    return AirportSuggestion(
+      iataCode: asIata ? upper : null,
+      kgmid: asIata ? null : t,
+      name: '',
+      city: '',
+      country: '',
+    );
   }
 
   bool _isValid(BookingSearch? search) {
@@ -128,11 +161,27 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
           _checkInCtrl.text.isNotEmpty &&
           _checkOutCtrl.text.isNotEmpty;
     }
-    final originOk = search?.originAirport.selected != null ||
-        _originCtrl.text.trim().length >= 3;
-    final destOk = search?.destinationAirport.selected != null ||
-        _destinationCtrl.text.trim().length >= 3;
+    final originOk = search?.originAirport.selected != null;
+    final destOk = search?.destinationAirport.selected != null;
     return originOk && destOk && _departureCtrl.text.isNotEmpty;
+  }
+
+  /// Shown when the user typed in an airport field but did not pick a suggestion (TASK-10).
+  Widget? _flightSelectionHint(BookingSearch? search) {
+    if (search == null) return null;
+    final needOrigin =
+        _originCtrl.text.trim().isNotEmpty && search.originAirport.selected == null;
+    final needDest = _destinationCtrl.text.trim().isNotEmpty &&
+        search.destinationAirport.selected == null;
+    if (!needOrigin && !needDest) return null;
+    return Text(
+      'Pick origin and destination from the suggestions list.',
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: Colors.orange.shade800,
+      ),
+    );
   }
 
   void _onTypeChanged(BookingType type) {
@@ -274,14 +323,12 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         ),
       );
     } else {
-      final originId = search?.originAirport.selected?.resolvedSearchId ??
-          _originCtrl.text.trim();
-      final destId = search?.destinationAirport.selected?.resolvedSearchId ??
-          _destinationCtrl.text.trim();
+      final originSel = search!.originAirport.selected!;
+      final destSel = search.destinationAirport.selected!;
       cubit.searchFlights(
         TransportSearchRequest(
-          origin: originId,
-          destination: destId,
+          origin: originSel.resolvedSearchId,
+          destination: destSel.resolvedSearchId,
           departureDate: _departureCtrl.text,
           returnDate: _isRoundTrip && _returnCtrl.text.isNotEmpty
               ? _returnCtrl.text
@@ -312,7 +359,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         ),
         const SizedBox(height: 20),
         if (_type == BookingType.hotels) ..._hotelFields(),
-        if (_type == BookingType.flights) ..._flightFields(),
+        if (_type == BookingType.flights) ..._flightFields(search),
         const SizedBox(height: 12),
         _sharedFields(search),
         const SizedBox(height: 28),
@@ -360,8 +407,9 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     ];
   }
 
-  List<Widget> _flightFields() {
+  List<Widget> _flightFields(BookingSearch? search) {
     final now = DateTime.now();
+    final hint = _flightSelectionHint(search);
     return [
       AirportAutocompleteField(
         controller: _originCtrl,
@@ -378,6 +426,10 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         icon: Icons.flight_land_rounded,
         isOrigin: false,
       ),
+      if (hint != null) ...[
+        const SizedBox(height: 8),
+        hint,
+      ],
       const SizedBox(height: 12),
 
       // Round-trip toggle
