@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../data/models/accommodation_search_request.dart';
+import '../../../data/models/booking_currency.dart';
 import '../../../data/models/sort_criteria.dart';
 import '../../../data/models/transport_search_request.dart';
 import '../../cubit/booking_cubit.dart';
@@ -13,6 +14,7 @@ import 'budget_field.dart';
 import 'airport_autocomplete_field.dart';
 import 'destination_autocomplete_field.dart';
 import 'sort_dropdown.dart';
+import 'booking_search_field_styles.dart';
 
 /// UC1.8-MOB6 — Orchestrator form for hotel/flight search.
 class BookingSearchForm extends StatefulWidget {
@@ -92,6 +94,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     if (_type == BookingType.hotels) {
       final req = cubit.lastHotelRequest;
       if (req != null) {
+        cubit.setCurrency(req.currency);
         _hotelQueryCtrl.text = req.query;
         _checkInCtrl.text = req.checkInDate;
         _checkOutCtrl.text = req.checkOutDate;
@@ -103,6 +106,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     } else {
       final req = cubit.lastFlightRequest;
       if (req != null) {
+        cubit.setCurrency(req.currency);
         _originCtrl.text = req.origin;
         _destinationCtrl.text = req.destination;
         _departureCtrl.text = req.departureDate;
@@ -250,6 +254,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     if (!_isValid(search)) return;
 
     final budget = BudgetField.parse(_budgetCtrl.text);
+    final currency = BookingCurrencies.normalize(search?.currency);
 
     if (_type == BookingType.hotels) {
       final fromSelection =
@@ -264,6 +269,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
           checkOutDate: _checkOutCtrl.text,
           adults: _adults,
           budget: budget,
+          currency: currency,
           sortBy: _sort,
         ),
       );
@@ -282,6 +288,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
               : null,
           adults: _adults,
           budget: budget,
+          currency: currency,
           sortBy: _sort,
         ),
       );
@@ -307,7 +314,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         if (_type == BookingType.hotels) ..._hotelFields(),
         if (_type == BookingType.flights) ..._flightFields(),
         const SizedBox(height: 12),
-        _sharedFields(),
+        _sharedFields(search),
         const SizedBox(height: 28),
         _searchButton(search),
       ],
@@ -435,18 +442,14 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
           const SizedBox(width: 8),
           const Text(
             'Round trip',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF555555),
-            ),
+            style: BookingSearchFieldStyles.inlineControlLabel,
           ),
         ],
       ),
     );
   }
 
-  Widget _sharedFields() {
+  Widget _sharedFields(BookingSearch? search) {
     return Column(
       children: [
         Row(
@@ -462,6 +465,9 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
             Expanded(
               child: BudgetField(
                 controller: _budgetCtrl,
+                currencyCode: BookingCurrencies.normalize(search?.currency),
+                onCurrencyChanged: (c) =>
+                    context.read<BookingCubit>().setCurrency(c),
                 label: _type == BookingType.hotels
                     ? 'Budget per night'
                     : 'Budget (Optional)',
