@@ -47,18 +47,19 @@ public class AdminServiceImpl implements AdminService {
     public SystemMonitoringDTO getSystemMonitoring() {
         log.info("Fetching system monitoring data");
 
-        // Service statuses from Actuator health
-        List<ServiceStatus> services = buildServiceStatuses();
+        // API usage metrics
+        List<ApiUsageMetric> apiMetrics = apiMetricsCollector.getMetrics();
 
-        // Calculate overall health score
+        // Service statuses derived from Actuator health and live API performance
+        List<ServiceStatus> services = buildServiceStatuses(apiMetrics);
+
+        // Calculate overall health score based on derived microservice statuses
+
         long upCount = services.stream()
                 .filter(s -> "UP".equals(s.getStatus()))
                 .count();
         double systemHealth = services.isEmpty() ? 0.0
                 : Math.round(((double) upCount / services.size()) * 100.0) / 100.0;
-
-        // API usage metrics
-        List<ApiUsageMetric> apiMetrics = apiMetricsCollector.getMetrics();
 
         // Recent logs from login history
         List<LogEntry> logs = buildRecentLogs();
@@ -71,27 +72,53 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    private List<ServiceStatus> buildServiceStatuses() {
+    private List<ServiceStatus> buildServiceStatuses(List<ApiUsageMetric> apiMetrics) {
         List<ServiceStatus> services = new ArrayList<>();
 
-        // Check overall system health from Actuator
+        // Baseline: The Spring Boot application must be up.
         boolean systemUp = healthEndpoint.health().getStatus().equals(Status.UP);
 
-        // We define our known services and derive their status
         services.add(ServiceStatus.builder()
-                .name("Auth Service").status(systemUp ? "UP" : "DOWN").build());
+                .name("Auth Service").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /auth")).build());
         services.add(ServiceStatus.builder()
-                .name("User Service").status(systemUp ? "UP" : "DOWN").build());
+                .name("User Service").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /user")).build());
         services.add(ServiceStatus.builder()
-                .name("Gamification Engine").status(systemUp ? "UP" : "DOWN").build());
+                .name("Gamification Engine").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /gamification")).build());
+        
         services.add(ServiceStatus.builder()
-                .name("POI / Maps API").status(systemUp ? "UP" : "DOWN").build());
+                .name("POI / Maps API").status(determineComponentHealth(systemUp, apiMetrics, "Mapbox", "Foursquare", "Internal: /poi")).build());
         services.add(ServiceStatus.builder()
-                .name("Booking System").status(systemUp ? "UP" : "DOWN").build());
+                .name("Booking System").status(determineComponentHealth(systemUp, apiMetrics, "SerpApi", "Ticketmaster", "Viator", "Internal: /booking")).build());
         services.add(ServiceStatus.builder()
-                .name("AI Recommendation API").status(systemUp ? "UP" : "DOWN").build());
+                .name("AI Recommendation API").status(determineComponentHealth(systemUp, apiMetrics, "AI")).build());
 
         return services;
+    }
+
+    private String determineComponentHealth(boolean systemUp, List<ApiUsageMetric> metrics, String... relatedApiNames) {
+        if (!systemUp) return "DOWN";
+        
+        long totalCalls = 0;
+        long totalErrors = 0;
+        
+        for (ApiUsageMetric m : metrics) {
+            for (String key : relatedApiNames) {
+                if (m.getApiName() != null && m.getApiName().toLowerCase().contains(key.toLowerCase())) {
+                    totalCalls += m.getTotalCalls();
+                    totalErrors += m.getErrorCount();
+                    // Break inner loop so we don't double count if a single apiName matches multiple keys
+                    break;
+                }
+            }
+        }
+        
+        // If there have been at least 3 recent calls to these dependencies, and 50% or more are failing,
+        // declare the specific service as globally DOWN for the monitoring dashboard.
+        if (totalCalls >= 3 && ((double) totalErrors / totalCalls) >= 0.5) {
+            return "DOWN";
+        }
+        
+        return "UP";
     }
 
     private List<LogEntry> buildRecentLogs() {
