@@ -35,7 +35,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -46,43 +45,26 @@ public class ChatProxyController {
 
         /**
          * Default POI categories when the client sends none (aligned with general itinerary tool flow).
-         * Dining categories (restaurant/cafe/market) excluded until a dedicated dining API is integrated.
+         * Broad set: sightseeing + dining + leisure for a rich, personalizable POI pool.
          */
         private static final List<String> DEFAULT_POLYGON_CATEGORIES = List.of(
-                        "museum", "monument", "historic_site", "church", "park", "neighborhood");
+                        "museum", "monument", "historic_site", "church", "park", "neighborhood",
+                        "landmark", "art_gallery", "restaurant", "cafe", "bar");
 
-        /** Strip dining-related Mapbox/AI category keys so routes stay non-food for now. */
-        private static final Set<String> EXCLUDED_DINING_POI_CATEGORIES = Set.of(
-                        "restaurant", "cafe", "market", "bar", "food", "nightlife");
-
-        private static List<String> withoutDiningCategories(List<String> categories) {
-                if (categories == null || categories.isEmpty()) {
-                        return categories == null ? List.of() : categories;
-                }
-                List<String> out = new ArrayList<>();
-                for (String c : categories) {
-                        if (c == null || c.isBlank()) {
-                                continue;
-                        }
-                        String key = c.trim().toLowerCase(Locale.ROOT);
-                        if (EXCLUDED_DINING_POI_CATEGORIES.contains(key)) {
-                                continue;
-                        }
-                        out.add(c.trim());
-                }
-                return out;
-        }
-
-        /** Categories for polygon map search + tool JSON (no dining until dedicated API). */
+        /** Resolve search categories from request or fall back to defaults. */
         private List<String> resolveSearchCategories(List<String> fromRequest) {
-                List<String> base = fromRequest != null && !fromRequest.isEmpty()
-                                ? new ArrayList<>(fromRequest)
-                                : new ArrayList<>(DEFAULT_POLYGON_CATEGORIES);
-                List<String> filtered = new ArrayList<>(withoutDiningCategories(base));
-                if (filtered.isEmpty()) {
-                        return new ArrayList<>(DEFAULT_POLYGON_CATEGORIES);
+                if (fromRequest != null && !fromRequest.isEmpty()) {
+                        List<String> cleaned = new ArrayList<>();
+                        for (String c : fromRequest) {
+                                if (c != null && !c.isBlank()) {
+                                        cleaned.add(c.trim());
+                                }
+                        }
+                        if (!cleaned.isEmpty()) {
+                                return cleaned;
+                        }
                 }
-                return filtered;
+                return new ArrayList<>(DEFAULT_POLYGON_CATEGORIES);
         }
 
         /** Minimum distinct POIs inside the polygon after search + dedup. */
@@ -597,10 +579,9 @@ public class ChatProxyController {
                 var dest = destOpt.get();
                 WeatherPlanningForecast planning = weatherService.getPlanningForecast(
                                 dest.getCenterLat(), dest.getCenterLon(), forecastDays);
-                List<String> cats = withoutDiningCategories(categories);
-                if (cats.isEmpty()) {
-                        cats = new ArrayList<>(DEFAULT_POLYGON_CATEGORIES);
-                }
+                List<String> cats = categories != null && !categories.isEmpty()
+                        ? new ArrayList<>(categories)
+                        : new ArrayList<>(DEFAULT_POLYGON_CATEGORIES);
                 if (cats.isEmpty()) {
                         return new PoiToolExecutionResult(List.of(), planning);
                 }

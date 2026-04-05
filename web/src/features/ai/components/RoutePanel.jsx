@@ -7,9 +7,12 @@ import EventRecommendations from "./EventRecommendations";
 import "../styles/routePanel.css";
 
 const TIME_SLOT_LABELS = {
-  morning: "Morning",
-  afternoon: "Afternoon",
-  evening: "Evening",
+  morning: "Sabah",
+  lunch: "Öğle Yemeği",
+  afternoon: "Öğleden Sonra",
+  evening: "Akşam",
+  dinner: "Akşam Yemeği",
+  night: "Gece",
 };
 
 function formatTimeSlot(slot) {

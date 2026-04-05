@@ -43,8 +43,14 @@ public class MapboxPoiSearchClient {
             Map.entry("park", "park"),
             Map.entry("art_gallery", "art_gallery"),
             Map.entry("restaurant", "restaurant"),
+            Map.entry("fast_food", "fast_food"),
             Map.entry("market", "market"),
             Map.entry("cafe", "cafe"),
+            Map.entry("bar", "bar"),
+            Map.entry("nightlife", "nightclub"),
+            Map.entry("nightclub", "nightclub"),
+            Map.entry("pub", "pub"),
+            Map.entry("food", "restaurant"),
             Map.entry("neighborhood", "neighborhood"),
             Map.entry("ruins", "historic_site")
     );
