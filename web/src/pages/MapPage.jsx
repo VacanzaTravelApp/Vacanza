@@ -1552,7 +1552,7 @@ export default function MapPage() {
           onMove={(evt) => setViewState(evt.viewState)}
           onIdle={handleMapIdle}
           onMoveEnd={() => { if (mode === "VIEWPORT" && !freehandEnabled) scheduleViewportFetch(); }}
-          mapStyle={STYLES[mapStyleIndex]}
+          mapStyle={mapStyle}
           mapboxAccessToken={MAPBOX_TOKEN}
           onMouseDown={onMouseDownFreehand}
           onMouseMove={onMouseMoveFreehand}
@@ -1574,7 +1574,7 @@ export default function MapPage() {
             <Layer {...selectionOutlineGlowLayer} />
             <Layer {...selectionOutlineMainLayer} />
           </Source>
-          <Source id="preview-src" type="geojson" data={previewGeoJSON}>
+          <Source id="preview-src" type="geojson" data={previewGeoJSON} lineMetrics>
             <Layer {...previewGlowLayer} />
             <Layer {...previewMainLayer} />
           </Source>
