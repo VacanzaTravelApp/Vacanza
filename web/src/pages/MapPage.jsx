@@ -170,7 +170,13 @@ const UI_KEY_TO_BACKEND_CATEGORY = {
   cafe: "cafe",
   museum: "museum",
   monuments: "monument",
-  parks: "park",
+  park: "park",
+  attraction: "attraction",
+  bar: "bar",
+  shopping: "shopping",
+  hotel: "hotel",
+  transport: "transport",
+  others: "poi",
 };
 
 const UI_CATEGORIES = [
@@ -178,7 +184,19 @@ const UI_CATEGORIES = [
     key: "restaurant",
     label: "Restaurants",
     geo: "catering.restaurant",
-    aliases: ["restaurant", "restaurants", "catering.restaurant"],
+    aliases: [
+      "restaurant", "restaurants", "catering.restaurant", "fast_food", "food_court", 
+      "pizza_restaurant", "mexican_restaurant", "indian_restaurant", "asian_restaurant", 
+      "burger_restaurant", "diner_restaurant", "noodle_restaurant", "sushi_restaurant", 
+      "buffet_restaurant", "ramen_restaurant", "tapas_restaurant", "steakhouse", 
+      "turkish_restaurant", "japanese_restaurant", "chinese_restaurant", "seafood_restaurant", 
+      "italian_restaurant", "hawaiian_restaurant", "korean_barbeque_restaurant", 
+      "portuguese_restaurant", "latin_american_restaurant", "vietnamese_restaurant", 
+      "french_restaurant", "african_restaurant", "brazilian_restaurant", "filipino_restaurant", 
+      "german_restaurant", "carribean_restaurant", "middle_eastern_restaurant", 
+      "mediterranean_restaurant", "creole_restaurant", "peruvian_restaurant", "wings_joint", 
+      "hot_dog_stand", "food_truck", "food", "food_and_drink", "deli"
+    ],
     icon: <RestaurantIcon />,
     pill: "rgba(255, 107, 107, 0.15)",
     fill: "rgba(255, 107, 107, 1)",
@@ -189,7 +207,12 @@ const UI_CATEGORIES = [
     key: "cafe",
     label: "Cafes",
     geo: "catering.cafe",
-    aliases: ["cafe", "cafes", "catering.cafe"],
+    aliases: [
+      "cafe", "cafes", "catering.cafe", "coffee", "coffee_shop", "teahouse", "bakery", 
+      "dessert_shop", "ice_cream", "confectionery", "juice_bar", "bubble_tea", "donut_shop", 
+      "bagel_shop", "frozen_yogurt_shop", "waffle_shop", "turkish_coffeehouse", 
+      "coffee_roaster", "snack_bar", "tea_house"
+    ],
     icon: <CafeIcon />,
     pill: "rgba(255, 179, 71, 0.15)",
     fill: "rgba(255, 179, 71, 1)",
@@ -198,9 +221,9 @@ const UI_CATEGORIES = [
   },
   {
     key: "museum",
-    label: "Museums",
+    label: "Museums & Arts",
     geo: "tourism.attraction.museum",
-    aliases: ["museum", "museums", "tourism.attraction.museum"],
+    aliases: ["museum", "museums", "tourism.attraction.museum", "planetarium", "aquarium", "art_gallery", "zoo", "zoo_exhibit", "exhibit"],
     icon: <MuseumIcon />,
     pill: "rgba(0, 180, 216, 0.15)",
     fill: "rgba(0, 180, 216, 1)",
@@ -209,8 +232,13 @@ const UI_CATEGORIES = [
   },
   {
     key: "monuments",
-    label: "Monuments/Arts",
-    aliases: ["monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre", "art_gallery", "gallery"],
+    label: "Culture",
+    aliases: [
+      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre", 
+      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture", 
+      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema", 
+      "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish", "religious_buddhist"
+    ],
     icon: <MonumentIcon />,
     emoji: "🏛️",
     pill: "rgba(99, 102, 241, 0.15)",
@@ -220,8 +248,12 @@ const UI_CATEGORIES = [
   },
   {
     key: "park",
-    label: "Parks",
-    aliases: ["park", "garden", "forest", "nature_reserve", "wood", "leisure.park", "recreation_ground", "national_park"],
+    label: "Parks/Nature",
+    aliases: [
+      "park", "garden", "forest", "nature_reserve", "wood", "leisure.park", 
+      "recreation_ground", "national_park", "playground", "dog_park", "picnic_shelter", 
+      "botanical_garden", "natural"
+    ],
     icon: <ParkIcon />,
     emoji: "🌲",
     pill: "rgba(34, 197, 94, 0.15)",
@@ -232,7 +264,14 @@ const UI_CATEGORIES = [
   {
     key: "attraction",
     label: "Attractions",
-    aliases: ["attraction", "viewpoint", "theme_park", "zoo", "aquarium", "historic", "scenic_viewpoint"],
+    aliases: [
+      "attraction", "viewpoint", "theme_park", "zoo", "aquarium", "historic", 
+      "scenic_viewpoint", "tourist_attraction", "lighthouse", "waterfall", "dam", 
+      "cave", "island", "mountain", "mountain_hut", "beach", "stadium", "soccer_stadium", 
+      "basketball_stadium", "football_stadium", "hockey_stadium", "baseball_stadium", 
+      "tennis_stadium", "racetrack", "racecourse", "casino", "amusement_park", 
+      "theme_park_attraction", "fair_grounds"
+    ],
     icon: <AttractionIcon />,
     emoji: "🎡",
     pill: "rgba(168, 85, 247, 0.15)",
@@ -243,7 +282,13 @@ const UI_CATEGORIES = [
   {
     key: "bar",
     label: "Nightlife",
-    aliases: ["bar", "pub", "night_club", "liquor_store", "alcohol", "wine_bar", "beer_garden"],
+    aliases: [
+      "bar", "pub", "night_club", "nightclub", "nightlife", "liquor_store", "alcohol", 
+      "wine_bar", "beer_garden", "cocktail_bar", "lounge", "karaoke_bar", "gay_bar", 
+      "beach_bar", "dive_bar", "stripclub", "brewery", "speakeasy", "champagne_bar", 
+      "sake_bar", "beer_bar", "hookah_lounge", "whiskey_bar", "tiki_bar", "gastropub", 
+      "biergarten"
+    ],
     icon: <BarIcon />,
     emoji: "🍸",
     pill: "rgba(236, 72, 153, 0.15)",
@@ -254,7 +299,18 @@ const UI_CATEGORIES = [
   {
     key: "shopping",
     label: "Shopping",
-    aliases: ["shop", "mall", "supermarket", "marketplace", "clothing_store", "bakery", "convenience", "electronics"],
+    aliases: [
+      "shop", "mall", "supermarket", "marketplace", "clothing_store", "bakery", 
+      "convenience_store", "convenience", "electronics", "electronics_shop", 
+      "hardware_store", "furniture_store", "jewelry_store", "flower_shop", "book_store", 
+      "gift_shop", "toy_store", "pet_store", "pharmacy", "cosmetics_shop", "beauty_store", 
+      "optician", "bicycle_shop", "liquor_store", "alcohol_shop", "vape_shop", 
+      "tobacco_shop", "smoke_shop", "camera_shop", "watch_store", "hobby_shop", 
+      "antique_shop", "thrift_shop", "pawnshop", "duty_free_shop", "outlet_store", 
+      "luggage_store", "music_shop", "fabric_store", "frame_store", "paper_goods_store", 
+      "kitchen_store", "mattress_store", "lighting_store", "arts_and_craft_store", 
+      "home_repair", "baby_goods_shop", "variety_store", "pop_up_shop", "clothing", "shopping_mall", "department_store"
+    ],
     icon: <ShoppingIcon />,
     emoji: "🛍️",
     pill: "rgba(245, 158, 11, 0.15)",
@@ -264,8 +320,8 @@ const UI_CATEGORIES = [
   },
   {
     key: "hotel",
-    label: "Hotels/Stay",
-    aliases: ["hotel", "motel", "hostel", "apartment", "guest_house", "accommodation", "lodging"],
+    label: "Hotels",
+    aliases: ["hotel", "motel", "hostel", "apartment", "guest_house", "accommodation", "lodging", "bed_and_breakfast", "vacation_rental", "resort", "campground", "campsite"],
     icon: <HotelIcon />,
     emoji: "🏨",
     pill: "rgba(14, 165, 233, 0.15)",
@@ -275,8 +331,14 @@ const UI_CATEGORIES = [
   },
   {
     key: "transport",
-    label: "Transport/Transit",
-    aliases: ["station", "airport", "bus_stop", "subway_entrance", "train_station", "ferry_terminal", "transit_stop", "stop_area"],
+    label: "Transport",
+    aliases: [
+      "station", "airport", "bus_stop", "subway_entrance", "train_station", 
+      "ferry_terminal", "transit_stop", "stop_area", "railway_station", "bus_station", 
+      "subway_station", "light_rail_station", "public_transportation_station", "taxi", 
+      "car_rental", "parking_lot", "parking", "gas_station", "charging_station", 
+      "train", "bus", "rail", "subway"
+    ],
     icon: <TransportIcon />,
     emoji: "🚉",
     pill: "rgba(71, 85, 105, 0.15)",
@@ -286,8 +348,23 @@ const UI_CATEGORIES = [
   },
   {
     key: "others",
-    label: "Others/Misc",
-    aliases: ["poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy", "hospital", "clinic"],
+    label: "Services",
+    aliases: [
+      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy", 
+      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist", 
+      "veterinarian", "police_station", "fire_station", "government_offices", "library", 
+      "school", "university", "college", "community_center", "mosque", "church", 
+      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners", 
+      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio", 
+      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course", 
+      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio", 
+      "recording_studio", "television_studio", "radio_studio", "design_studio", 
+      "coworking_space", "event_space", "conference_center", "offices", "factory", 
+      "warehouse", "storage", "services", "it", "consulting", "advertising_agency", 
+      "notary", "lawyer", "photographer", "event_planner", "copyshop", "employment_agency", 
+      "medical_laboratory", "care_services", "rehabilitation_center", "psychotherapist", 
+      "chiropractor", "physiotherapist", "alternative_healthcare", "assisted_living_facility"
+    ],
     icon: <GlobalOutlined />,
     emoji: "🌐",
     pill: "rgba(100, 116, 139, 0.1)",
