@@ -121,11 +121,13 @@ OUTPUT FORMAT (MANDATORY — the map will NOT work without the JSON):
 
 Do NOT output a long formatted list with coordinates. The JSON is the ONLY format the app reads.
 
-route_data format:
+route_data format (preserve trip_dates_user_specified and trip_start_date from the user's message if they gave dates):
 {{
   "title": "...",
   "destination": "...",
   "total_days": {days},
+  "trip_dates_user_specified": true or false,
+  "trip_start_date": "YYYY-MM-DD or omit",
   "days": [
     {{
       "day": 1,
@@ -426,6 +428,8 @@ def _optimize_route_order(route_data: RouteData) -> RouteData:
         total_days=route_data.total_days,
         days=new_days,
         notes=route_data.notes,
+        trip_dates_user_specified=route_data.trip_dates_user_specified,
+        trip_start_date=route_data.trip_start_date,
         weather_forecast=route_data.weather_forecast,
         weather_day_parts=route_data.weather_day_parts,
     )
@@ -921,7 +925,12 @@ When the user asks for a trip plan, vacation plan, itinerary, or route (e.g. "pl
 1. Write a VERY SHORT text summary: MAX 40 words, 2-3 sentences only. Do NOT list places in the text — the JSON contains them. Example: "İstanbul'da 3 günlük plan: tarihi yarımada, müzeler ve Boğaz. Aşağıda günlük program."
 2. On the next line, write EXACTLY this separator (no spaces, no markdown, no bold): ---ROUTE_JSON---
 3. On the next line, write a single valid JSON object (no markdown, no code block) with this structure:
-{"title":"...","destination":"City, Country","total_days":N,"days":[{"day":1,"title":"Day 1: ...","waypoints":[{"name":"Place Name","description":"Short description","category":"museum","day":1,"order":1,"latitude":null,"longitude":null,"estimated_duration_min":60,"time_slot":"morning"}]}],"notes":"Optional tips"}
+{"title":"...","destination":"City, Country","total_days":N,"trip_dates_user_specified":true,"trip_start_date":"2026-06-20","days":[{"day":1,"title":"Day 1: ...","waypoints":[{"name":"Place Name","description":"Short description","category":"museum","day":1,"order":1,"latitude":null,"longitude":null,"estimated_duration_min":60,"time_slot":"morning"}]}],"notes":"Optional tips"}
+
+trip_dates_user_specified + trip_start_date (CRITICAL for tickets/events):
+- If the user states ANY concrete trip dates in the same request (e.g. "20 21 Haziran", "June 20-21", "15-17 Nisan", "next weekend" as specific days), set trip_dates_user_specified to true AND trip_start_date to the FIRST trip day as ISO YYYY-MM-DD (e.g. 2026-06-20). Infer the year: use the next occurrence if the month/day is still ahead this year, else next year.
+- If they give duration/destination only with no calendar dates, set trip_dates_user_specified to false and omit trip_start_date.
+- Never omit trip_start_date when trip_dates_user_specified is true and dates are known.
 
 Route generation rules:
 - category must be one of: museum, beach, park, monument, landmark, hotel, mosque, church, palace, square, bridge, theater, zoo, aquarium, spa, sports (do not use restaurant, cafe, market, bar, nightlife for waypoints)
@@ -932,6 +941,7 @@ Route generation rules:
 - Use the user's preferred language for title, description, day titles, and notes.
 - Consider user profile (budget, travel_style, activity_level) when selecting places; cuisine preferences affect tone only, not dining stops.
 - If the user does not specify the number of days, suggest a reasonable duration (2–5 days).
+- If they ask for a route/plan but give no trip dates, add ONE short question at the end of the 40-word summary (e.g. approximate week or month) so ticket and event lists can stay focused — do not add extra lists or tips.
 - Use the OFFICIAL well-known name of each place for geocoding accuracy (e.g. "Topkapi Palace" not "Topkapı Sarayı", "Blue Mosque" not "Sultan Ahmed Camii", "Colosseum" not "Kolezyum"). Prefer the English or internationally recognized name.
 - Include district or neighborhood in the waypoint name for disambiguation (e.g. "Basilica Cistern, Sultanahmet", "Taksim Square, Beyoglu", "Shibuya Crossing, Shibuya").
 - The text summary before ---ROUTE_JSON--- must NOT contain the JSON. Keep them strictly separated.

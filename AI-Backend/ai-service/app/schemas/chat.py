@@ -131,6 +131,10 @@ class RouteData(BaseModel):
     total_days: int
     days: list[DayPlan] = Field(default_factory=list)
     notes: str | None = None
+    # True = narrow event search to trip dates; false/omit = ~30-day broad search (Java backend)
+    trip_dates_user_specified: bool | None = None
+    # First day of trip when user stated dates (YYYY-MM-DD); Java prefers this over weather for events
+    trip_start_date: str | None = None
     # Filled by Java backend (Open-Meteo); optional in model output
     weather_forecast: list | None = None
     # Morning/afternoon/evening planning hints; optional, set by Java backend
