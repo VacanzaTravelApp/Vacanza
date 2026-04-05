@@ -518,7 +518,15 @@ export default function MapPage() {
     }
   }, []);
 
-  const [styleIndex, setStyleIndex] = useState(0);
+  const initialDarkMode = (() => {
+    const saved = localStorage.getItem('vacanza-theme');
+    if (saved) return saved === 'night';
+    const hour = new Date().getHours();
+    return hour < 6 || hour >= 20;
+  })();
+
+  const [styleIndex, setStyleIndex] = useState(initialDarkMode ? 1 : 0);
+  const [isDarkMode, setIsDarkMode] = useState(initialDarkMode);
   const [is3D, setIs3D] = useState(false);
   const [mapboxPois, setMapboxPois] = useState([]);
 
@@ -566,12 +574,7 @@ export default function MapPage() {
   const [fabExpanded, setFabExpanded] = useState(false);
 
   // 1. Initial State Calculation (Clock-driven unless manual)
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('vacanza-theme');
-    if (saved) return saved === 'night';
-    const hour = new Date().getHours();
-    return hour < 6 || hour >= 20;
-  });
+  // (isDarkMode is now initialized above)
 
   const [isManual, setIsManual] = useState(() => localStorage.getItem('vacanza-manual') === 'true');
 
@@ -609,8 +612,9 @@ export default function MapPage() {
       const now = new Date();
       const h = now.getHours();
       const m = now.getMinutes().toString().padStart(2, '0');
+      const hours12 = h % 12 || 12;
       const ampm = h >= 12 ? 'PM' : 'AM';
-      setFormattedTime(`${h % 12 || 12}:${m} ${ampm}`);
+      setFormattedTime(`${hours12}:${m} ${ampm}`);
     };
     updateTime();
     const timer = setInterval(updateTime, 60000);

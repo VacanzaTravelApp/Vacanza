@@ -4,15 +4,17 @@ import './AuthLayout.css';
 
 const calculateTimeState = () => {
   const now = new Date();
-  const hours = 23; // TEMPORARY FORCE NIGHT
-  const minutes = 30;
-  const timeFloat = hours + minutes / 60;
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
 
-  const isNight = true; // TEMPORARY FORCE NIGHT
+  const isNight = hours < 6 || hours >= 20;
 
-  let theme = 'theme-midnight'; // TEMPORARY FORCE NIGHT
+  let theme = isNight ? 'theme-midnight' : 'theme-sunrise';
   
-  let cyclePeriod = 0.5; // High midnight position
+  // Quick dynamic celestial calc based on time
+  let cyclePeriod = isNight 
+    ? (hours >= 20 ? (hours - 20) + minutes/60 : hours + 4 + minutes/60) / 10
+    : (hours - 6 + minutes/60) / 14;
 
   const elevation = Math.sin(cyclePeriod * Math.PI);
   // Y ranges from 550 (below mountains) to 120 (high noon/midnight sky)
