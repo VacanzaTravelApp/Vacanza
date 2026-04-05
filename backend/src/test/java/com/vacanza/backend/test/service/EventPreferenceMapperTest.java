@@ -55,11 +55,11 @@ class EventPreferenceMapperTest {
     }
 
     @Test
-    void travelStyle_adventure_mapsToSports() {
+    void travelStyle_adventure_addsNoCategory() {
         UserPreferences p = UserPreferences.builder()
                 .travelStyle(TravelStyle.ADVENTURE)
                 .build();
-        assertThat(mapper.mapToTicketmasterCategories(p, null)).containsExactly("Sports");
+        assertThat(mapper.mapToTicketmasterCategories(p, null)).isEmpty();
     }
 
     @Test
@@ -217,5 +217,33 @@ class EventPreferenceMapperTest {
                 .source("CHAT")
                 .build();
         assertThat(mapper.mapToTicketmasterCategories(null, List.of(pref))).containsExactly("Sports");
+    }
+
+    @Test
+    void eventInterest_turkishSportsAndRave_mapsToSportsAndMusic() {
+        UserPreferenceAi pref = UserPreferenceAi.builder()
+                .preferenceKey("event_interest")
+                .preferenceValue("futbol, basketbol, voleybol, rave")
+                .build();
+        assertThat(mapper.mapToTicketmasterCategories(null, List.of(pref)))
+                .containsExactly("Music", "Sports");
+    }
+
+    @Test
+    void eventInterest_volleyball_mapsToSports() {
+        UserPreferenceAi pref = UserPreferenceAi.builder()
+                .preferenceKey("event_interest")
+                .preferenceValue("beach volleyball")
+                .build();
+        assertThat(mapper.mapToTicketmasterCategories(null, List.of(pref))).containsExactly("Sports");
+    }
+
+    @Test
+    void eventInterest_edmTechno_mapsToMusic() {
+        UserPreferenceAi pref = UserPreferenceAi.builder()
+                .preferenceKey("event_interest")
+                .preferenceValue("EDM ve techno geceleri")
+                .build();
+        assertThat(mapper.mapToTicketmasterCategories(null, List.of(pref))).containsExactly("Music");
     }
 }
