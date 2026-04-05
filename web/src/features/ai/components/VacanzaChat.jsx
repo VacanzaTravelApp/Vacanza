@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { aiApi } from "../../../api/aiApi";
-import { Spin, message } from "antd";
+import { Spin, message, Tooltip } from "antd";
 import {
   CloseOutlined,
   CompassOutlined,
@@ -12,6 +12,7 @@ import {
 import "../styles/vacanzaChat.css";
 import { normalizeRouteForMap } from "../utils/routeMap";
 import RouteCardFeedback from "./RouteCardFeedback";
+import EventRecommendations from "./EventRecommendations";
 
 /**
  * Sayfa oturumu: kullanıcı mesaj attıysa oluşturulmuş conversation id.
@@ -49,6 +50,27 @@ function routesForMessage(msg) {
   if (msg.routeDataList?.length) return msg.routeDataList;
   if (msg.routeData) return [msg.routeData];
   return [];
+}
+
+/**
+ * Sohbet balonu: model **kalın** işaretlerini gerçek vurguya çevirir (düz metinde ** kalmaz).
+ * Satır sonları .msg-text { white-space: pre-wrap } ile korunur.
+ */
+function ChatBubbleRichText({ text }) {
+  const s = text == null ? "" : String(text);
+  if (!s.includes("**")) return s;
+  const out = [];
+  const re = /\*\*([^*]+)\*\*/g;
+  let last = 0;
+  let m;
+  let k = 0;
+  while ((m = re.exec(s)) !== null) {
+    if (m.index > last) out.push(s.slice(last, m.index));
+    out.push(<strong key={`sb-${k++}`}>{m[1]}</strong>);
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) out.push(s.slice(last));
+  return out.length ? out : s;
 }
 
 /**
@@ -163,6 +185,33 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
     delete msg._isAssistant;
   }
   return msgs;
+}
+
+/** İlk gün hava özeti — rota JSON’unda weather_forecast varsa sohbet kartında gösterilir. */
+function RouteWeatherStrip({ rd }) {
+  const wf = rd?.weather_forecast ?? rd?.weatherForecast;
+  if (!Array.isArray(wf) || wf.length === 0) return null;
+  const row = wf[0];
+  const tMax = row.temp_max_celsius ?? row.tempMaxCelsius;
+  const tMin = row.temp_min_celsius ?? row.tempMinCelsius;
+  const precip =
+    row.precipitation_probability_max_percent ?? row.precipitationProbabilityMaxPercent;
+  const parts = [];
+  if (tMax != null && tMin != null) {
+    parts.push(`${Math.round(tMax)}° / ${Math.round(tMin)}°`);
+  }
+  if (precip != null && Number.isFinite(Number(precip))) {
+    parts.push(`yağış ~%${Math.round(precip)}`);
+  }
+  if (parts.length === 0) return null;
+  return (
+    <div className="route-card-weather-strip" role="status">
+      <span className="route-card-weather-strip-icon" aria-hidden>
+        🌤️
+      </span>
+      <span className="route-card-weather-strip-text">Hava (1. gün): {parts.join(" · ")}</span>
+    </div>
+  );
 }
 
 function parseDate(value) {
@@ -562,6 +611,26 @@ export default function VacanzaChat({
           time: formatMessageTime(new Date()),
         };
         setMessages((prev) => [...prev, aiMsg]);
+
+        const extractedPrefs =
+          response.extracted_preferences ?? response.extractedPreferences ?? null;
+        if (Array.isArray(extractedPrefs) && extractedPrefs.length > 0) {
+          const snippets = extractedPrefs
+            .map((p) => p.preference_value ?? p.preferenceValue)
+            .filter((v) => v != null && String(v).trim() !== "")
+            .map((v) => {
+              const s = String(v).trim();
+              return s.length > 48 ? `${s.slice(0, 45)}…` : s;
+            })
+            .slice(0, 2);
+          const more =
+            extractedPrefs.length > 2 ? ` (+${extractedPrefs.length - 2})` : "";
+          message.success(
+            snippets.length > 0
+              ? `Tercihlerin kaydedildi: ${snippets.join(" · ")}${more}`
+              : `${extractedPrefs.length} tercih profiline kaydedildi.`
+          );
+        }
       }
       await refreshConversations();
     } catch {
@@ -679,7 +748,9 @@ export default function VacanzaChat({
               return (
               <div key={msg.id} className={`chat-row ${msg.type}-row`}>
                 <div className={`message-bubble ${msg.type}-bubble`}>
-                  <div className="msg-text">{msg.text}</div>
+                  <div className="msg-text">
+                    <ChatBubbleRichText text={msg.text} />
+                  </div>
                   {msg.time ? <span className="msg-time">{msg.time}</span> : null}
                 </div>
                 {routeList.map((rd, rIdx) => (
@@ -724,6 +795,7 @@ export default function VacanzaChat({
                         </div>
                       ))}
                     </div>
+                    <RouteWeatherStrip rd={rd} />
                     <RouteCardFeedback
                       route={rd}
                       storageKey={`${msg.id}-r${rIdx}`}
@@ -737,6 +809,7 @@ export default function VacanzaChat({
                         if (onRouteGenerated) {
                           onRouteGenerated(normalizeRouteForMap(rd), {
                             conversationId: conversationId ?? undefined,
+                            routeId: msg.routeIdList?.[rIdx] ?? undefined,
                           });
                         }
                         onClose();
@@ -746,7 +819,7 @@ export default function VacanzaChat({
                     </button>
                     {(() => {
                       const routeIdForCard = msg.routeIdList?.[rIdx];
-                      if (!routeIdForCard) return null;
+                      const hasRouteId = !!routeIdForCard;
                       const tk = ticketStateKey(msg.id, rIdx);
                       const ticketLoading = ticketLoadingByKey[tk];
                       const rawRows = ticketRowsByKey[tk];
@@ -755,22 +828,54 @@ export default function VacanzaChat({
                           ? null
                           : (Array.isArray(rawRows) ? rawRows : []).map(normalizePricingRow).filter(Boolean);
                       const showTicketEmpty =
+                        hasRouteId &&
                         list &&
                         !ticketLoading &&
                         (list.length === 0 ||
                           (list.length > 0 && list.every((r) => !r.found)));
                       const showTicketCards =
-                        list && list.length > 0 && !ticketLoading && !list.every((r) => !r.found);
+                        hasRouteId &&
+                        list &&
+                        list.length > 0 &&
+                        !ticketLoading &&
+                        !list.every((r) => !r.found);
                       return (
-                        <div className="route-ticket-section">
-                          <button
-                            type="button"
-                            className="route-tickets-btn"
-                            onClick={() => handleTicketSearch(routeIdForCard, msg.id, rIdx)}
-                            disabled={ticketLoading || messagesLoading}
-                          >
-                            Bilet Bul 🎫
-                          </button>
+                        <div className="route-card-subsection route-card-subsection--viator">
+                          <div className="route-card-subsection-head">
+                            <span className="route-card-subsection-title">Müze &amp; tur fiyatları</span>
+                            <span className="route-card-subsection-desc">
+                              Viator — rota duraklarına göre müze / tur ürünleri
+                            </span>
+                          </div>
+                          <div className="route-ticket-section">
+                          {!hasRouteId ? (
+                            <p className="ticket-route-id-hint">
+                              Bu blok Viator fiyatları içindir; yalnızca sunucuda kayıtlı rotada çalışır. AI yanıtında
+                              rota kimliği yoksa düğme kapalıdır — yeni rota isteyin veya sohbeti yenileyin.
+                            </p>
+                          ) : null}
+                          {hasRouteId ? (
+                            <button
+                              type="button"
+                              className="route-tickets-btn"
+                              onClick={() => handleTicketSearch(routeIdForCard, msg.id, rIdx)}
+                              disabled={ticketLoading || messagesLoading}
+                            >
+                              Fiyatları göster
+                            </button>
+                          ) : (
+                            <Tooltip title="Bu rota için route_id gelmediği için Viator fiyatları sorgulanamıyor.">
+                              <span className="route-tickets-btn-wrap">
+                                <button
+                                  type="button"
+                                  className="route-tickets-btn"
+                                  disabled
+                                >
+                                  Fiyatları göster
+                                </button>
+                              </span>
+                            </Tooltip>
+                          )}
                           {ticketLoading ? (
                             <div className="ticket-loading-wrap" aria-live="polite">
                               <Spin size="small" />
@@ -779,7 +884,7 @@ export default function VacanzaChat({
                           ) : null}
                           {showTicketEmpty ? (
                             <div className="ticket-empty" role="status">
-                              Uygun bilet bulunamadı
+                              Uygun müze / tur fiyatı bulunamadı
                             </div>
                           ) : null}
                           {showTicketCards ? (
@@ -820,9 +925,21 @@ export default function VacanzaChat({
                               ))}
                             </ul>
                           ) : null}
+                          </div>
                         </div>
                       );
                     })()}
+                    {msg.routeIdList?.[rIdx] ? (
+                      <div className="route-card-subsection route-card-subsection--events">
+                        <div className="route-card-subsection-head">
+                          <span className="route-card-subsection-title">Etkinlik önerileri</span>
+                          <span className="route-card-subsection-desc">
+                            Ticketmaster — konser, spor, gösteri; tercihlerine göre sıralı
+                          </span>
+                        </div>
+                        <EventRecommendations routeId={msg.routeIdList[rIdx]} />
+                      </div>
+                    ) : null}
                     </div>
                   </div>
                 ))}

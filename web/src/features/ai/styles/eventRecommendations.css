@@ -1,0 +1,169 @@
+/* Event recommendations — matches vacanzaChat / routePanel tokens */
+
+@keyframes eventRecFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes eventRecShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.event-recommendations-section {
+  margin-top: 16px;
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--vc-border, #e5e7eb);
+  background: linear-gradient(
+    180deg,
+    rgba(61, 168, 200, 0.04) 0%,
+    transparent 100%
+  );
+  border-radius: 0 0 12px 12px;
+}
+
+.event-recommendations-section.event-rec-loaded {
+  animation: eventRecFadeIn 0.35s ease-out;
+}
+
+.event-rec-window-hint {
+  margin: 0 2px 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--vc-text-secondary, #6b7280);
+  background: rgba(61, 168, 200, 0.08);
+  border-radius: 8px;
+  border: 1px solid rgba(61, 168, 200, 0.2);
+}
+
+.event-rec-broad-actions {
+  margin-top: 10px;
+  padding: 0 2px 4px;
+}
+
+.event-rec-show-more-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vc-primary, #3da8c8);
+  background: rgba(61, 168, 200, 0.08);
+  border: 1px solid rgba(61, 168, 200, 0.35);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.event-rec-show-more-btn:hover {
+  background: rgba(61, 168, 200, 0.14);
+}
+
+.event-recommendations-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--vc-text-secondary, #6b7280);
+  margin-bottom: 10px;
+  padding: 0 2px;
+  flex-wrap: wrap;
+}
+
+.event-recommendations-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.event-recommendations-header svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--vc-primary, #3da8c8);
+  font-size: 16px;
+}
+
+.event-rec-refresh-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--vc-primary, #3da8c8);
+  background: transparent;
+  border: 1px solid rgba(61, 168, 200, 0.45);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.event-rec-refresh-btn:hover {
+  background: rgba(61, 168, 200, 0.1);
+}
+
+.event-rec-refresh-btn:focus-visible {
+  outline: 2px solid var(--vc-primary, #3da8c8);
+  outline-offset: 2px;
+}
+
+.event-recommendations-list {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(61, 168, 200, 0.45) transparent;
+}
+
+.event-recommendations-list::-webkit-scrollbar {
+  height: 6px;
+}
+
+.event-recommendations-list::-webkit-scrollbar-thumb {
+  background: rgba(61, 168, 200, 0.35);
+  border-radius: 4px;
+}
+
+.event-recommendations-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 4px;
+}
+
+/* Skeleton */
+.event-rec-skeleton {
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.event-rec-skeleton-card {
+  flex: 0 0 200px;
+  height: 148px;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    #f3f4f6 0%,
+    #eceff2 40%,
+    #f3f4f6 80%
+  );
+  background-size: 200% 100%;
+  animation: eventRecShimmer 1.2s ease-in-out infinite;
+}
+
+/* EventCard layout lives in eventCard.css */
+.event-recommendations-list .event-card {
+  flex: 0 0 auto;
+}

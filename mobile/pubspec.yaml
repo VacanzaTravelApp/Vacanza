@@ -59,6 +59,9 @@ dependencies:
 
   # Profile photo picker (camera / gallery)
   image_picker: ^1.0.7
+  # Resize/compress profile uploads to meet backend 2 MB limit
+  flutter_image_compress: ^2.3.0
+  image_cropper: ^12.1.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

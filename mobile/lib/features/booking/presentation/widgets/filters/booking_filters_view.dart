@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../data/models/sort_criteria.dart';
 import '../../cubit/booking_cubit.dart';
 import '../../cubit/booking_state.dart';
+import '../search/booking_field_scroll_padding.dart';
 
 /// UC1.8-MOB8 — Filters view for budget + sort adjustment.
 class BookingFiltersView extends StatefulWidget {
@@ -111,6 +112,7 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
         const SizedBox(height: 6),
         TextFormField(
           controller: _budgetCtrl,
+          scrollPadding: bookingFieldScrollPadding(context),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),

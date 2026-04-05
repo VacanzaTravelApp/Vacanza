@@ -193,7 +193,6 @@ class JwtInterceptor extends Interceptor {
       final response = await _dio.fetch(retriedOptions);
       handler.resolve(response);
       return;
-      return;
     } catch (e) {
       // Refresh/Retry patladı -> logout
       await _forceLogout();

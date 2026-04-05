@@ -5,6 +5,25 @@ import 'package:flutter/material.dart';
 abstract final class ProfileSheetStyles {
   ProfileSheetStyles._();
 
+  static const double sheetTopRadius = 24;
+
+  /// Solid white bottom sheet panel (matches Vacanza theme; blur/frost variants
+  /// can be reintroduced here later if needed).
+  static Widget sheetPanel({
+    required Widget child,
+    BoxConstraints? constraints,
+    double topRadius = sheetTopRadius,
+  }) {
+    return Container(
+      constraints: constraints,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(topRadius)),
+      ),
+      child: child,
+    );
+  }
+
   // ─── Colors ─────────────────────────────────────────────────────────────
   static const primaryBlue = Color(0xFF0096FF);
   static const focusBlue = Color(0xFF5BB8FF); // soft blue for focus, not bright

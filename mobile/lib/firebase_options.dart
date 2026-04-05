@@ -64,7 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '424211182688',
     projectId: 'vacanza-b364c',
     storageBucket: 'vacanza-b364c.firebasestorage.app',
-    iosBundleId: 'com.example.mobile',
+    iosBundleId: 'com.aserhatsahin.vacanza',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '424211182688',
     projectId: 'vacanza-b364c',
     storageBucket: 'vacanza-b364c.firebasestorage.app',
-    iosBundleId: 'com.example.mobile',
+    iosBundleId: 'com.aserhatsahin.vacanza',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

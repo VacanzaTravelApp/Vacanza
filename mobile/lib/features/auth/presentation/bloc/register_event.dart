@@ -27,6 +27,15 @@ class RegisterSubmitted extends RegisterEvent {
   /// Örn: ["Ahmet"], ["Serhat"], ["Ahmet", "Serhat"]
   final List<String> preferredNames;
 
+  /// Optional — sent to `POST /auth/register` only when non-empty.
+  final String? country;
+
+  /// `yyyy-MM-dd` for backend [LocalDate].
+  final String? birthDate;
+
+  /// Backend enum: `MALE` | `FEMALE` | `PREFER_NOT_TO_SAY`.
+  final String? gender;
+
   const RegisterSubmitted({
     required this.firstName,
     required this.middleName,
@@ -34,6 +43,9 @@ class RegisterSubmitted extends RegisterEvent {
     required this.email,
     required this.password,
     required this.preferredNames,
+    this.country,
+    this.birthDate,
+    this.gender,
   });
 
   @override
@@ -44,6 +56,9 @@ class RegisterSubmitted extends RegisterEvent {
     email,
     password,
     preferredNames,
+    country,
+    birthDate,
+    gender,
   ];
 }
 

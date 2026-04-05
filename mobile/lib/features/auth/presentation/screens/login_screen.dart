@@ -7,13 +7,11 @@ import 'package:mobile/core/widgets/animated_background.dart';
 
 import 'package:mobile/features/auth/presentation/widgets/login_form.dart';
 import 'package:mobile/features/auth/presentation/screens/register_screen.dart';
+import 'package:mobile/features/auth/presentation/screens/auth_gate.dart';
 
 // Login BLoC importları
 import 'package:mobile/features/auth/presentation/bloc/login_bloc.dart';
 import 'package:mobile/features/auth/presentation/bloc/login_state.dart';
-import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
-
-// Login başarıya ulaştığında yönleneceğimiz ana ekran (şimdilik mock map)
 
 /// Login ekranı UI + BLoC entegrasyonu - VACANZA-83/84
 ///
@@ -22,31 +20,25 @@ import 'package:mobile/features/map/presentation/screens/home_map_screen.dart';
 ///
 /// VACANZA-84:
 ///   - LoginForm artık LoginBloc ile konuşuyor (LoginSubmitted event).
-///   - Bu ekran da BlocListener<LoginBloc, LoginState> ile
-///     login success durumunu dinleyip MapScreen'e yönlendiriyor.
+///   - Bu ekran da `BlocListener<LoginBloc, LoginState>` ile
+///     login success durumunu dinleyip AuthGate'e yönlendiriyor.
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
-  /// Login başarılı olduğunda yapılacak işlemleri tek yerde topladık:
-  ///  - Kısa bir snackbar ile kullanıcıya feedback ver
-  ///  - Navigation stack'i temizleyerek MapScreen'e git
+  /// Login başarılı olduğunda: snackbar + stack temizleyerek [AuthGate].
+  /// AuthGate `emailVerified` ile VerifyEmail veya haritaya yönlendirir.
   void _onLoginSuccess(BuildContext context) {
-    // Her ihtimale karşı önce aktif snackbari kapatıyoruz.
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-          content: Text('Login successful, redirecting to map...'),
+          content: Text('Login successful, redirecting...'),
         ),
       );
 
-    // Login olduktan sonra geri tuşu ile login ekranına dönmesini
-    // istemediğimiz için pushAndRemoveUntil kullanıyoruz.
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => const HomeMapScreen(),
-      ),
-          (route) => false,
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (route) => false,
     );
   }
 

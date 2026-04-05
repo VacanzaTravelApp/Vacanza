@@ -1,9 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
-/// Profile chip/badge (map top-left). Avatar from [imageUrl] or [imagePath] or placeholder.
+/// Profile chip/badge (map top-left). Avatar from [profilePhotoBytes], then [imageUrl], [imagePath], or placeholder.
 class ProfileBadge extends StatelessWidget {
   final String name;
   final String subtitle;
+
+  /// Binary photo from [GET /users/me/profile/photo] when [UserProfile.hasProfilePhoto].
+  final Uint8List? profilePhotoBytes;
 
   /// Network URL for profile image (from profile.profileImageUrl).
   final String? imageUrl;
@@ -17,38 +22,62 @@ class ProfileBadge extends StatelessWidget {
     super.key,
     required this.name,
     required this.subtitle,
+    this.profilePhotoBytes,
     this.imageUrl,
     this.imagePath,
     this.onTap,
   });
 
+  static const double _avatarSize = 38;
+
   Widget _buildAvatar() {
+    final hasBytes =
+        profilePhotoBytes != null && profilePhotoBytes!.isNotEmpty;
+    if (hasBytes) {
+      return ClipOval(
+        child: SizedBox(
+          width: _avatarSize,
+          height: _avatarSize,
+          child: Image.memory(
+            profilePhotoBytes!,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, __, ___) => _placeholderAvatar(),
+          ),
+        ),
+      );
+    }
     final hasNetworkUrl = imageUrl != null && imageUrl!.trim().isNotEmpty;
     final hasAssetPath = imagePath != null && imagePath!.isNotEmpty;
     if (hasNetworkUrl) {
       return ClipOval(
-        child: Image.network(
-          imageUrl!,
-          width: 38,
-          height: 38,
-          fit: BoxFit.cover,
-          loadingBuilder: (_, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return _placeholderAvatar();
-          },
-          errorBuilder: (_, __, ___) => _placeholderAvatar(),
+        child: SizedBox(
+          width: _avatarSize,
+          height: _avatarSize,
+          child: Image.network(
+            imageUrl!,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+            loadingBuilder: (_, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return _placeholderAvatar();
+            },
+            errorBuilder: (_, __, ___) => _placeholderAvatar(),
+          ),
         ),
       );
     }
     if (hasAssetPath) {
-      return Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          image: DecorationImage(
-            image: AssetImage(imagePath!),
+      return ClipOval(
+        child: SizedBox(
+          width: _avatarSize,
+          height: _avatarSize,
+          child: Image.asset(
+            imagePath!,
             fit: BoxFit.cover,
+            alignment: Alignment.center,
           ),
         ),
       );
@@ -58,8 +87,8 @@ class ProfileBadge extends StatelessWidget {
 
   Widget _placeholderAvatar() {
     return Container(
-      width: 38,
-      height: 38,
+      width: _avatarSize,
+      height: _avatarSize,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(

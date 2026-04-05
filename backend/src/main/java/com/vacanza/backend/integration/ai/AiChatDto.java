@@ -156,6 +156,20 @@ public final class AiChatDto {
         @JsonProperty("total_days")
         private int totalDays;
 
+        /**
+         * When {@code true}, event search uses the trip date range from weather/route (narrow). When {@code false}
+         * or {@code null}/omitted, search uses a ~30-day window from today (broad).
+         */
+        @JsonProperty("trip_dates_user_specified")
+        private Boolean tripDatesUserSpecified;
+
+        /**
+         * First calendar day of the trip when the user stated dates (ISO {@code YYYY-MM-DD}). Takes precedence over
+         * weather for event search and itinerary alignment.
+         */
+        @JsonProperty("trip_start_date")
+        private String tripStartDate;
+
         private List<DayPlan> days;
         private String notes;
 
@@ -180,5 +194,117 @@ public final class AiChatDto {
         private String preferenceValue;
 
         private Double confidence;
+    }
+
+    /** POST /events/recommend-for-route — AI ranking and personalized message. */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class DaySummaryAi {
+        private int day;
+        private String title;
+        private List<String> categories;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RouteSummaryForRecommend {
+        private String destination;
+
+        @JsonProperty("total_days")
+        private int totalDays;
+
+        @JsonProperty("start_date")
+        private String startDate;
+
+        @JsonProperty("day_summaries")
+        private List<DaySummaryAi> daySummaries;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class UserPreferenceSummaryAi {
+        @JsonProperty("travel_style")
+        private String travelStyle;
+
+        @JsonProperty("favorite_categories")
+        private List<String> favoriteCategories;
+
+        @JsonProperty("event_interest")
+        private String eventInterest;
+
+        @JsonProperty("preferred_language")
+        private String preferredLanguage;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AvailableEventAi {
+        private String id;
+        private String name;
+        private String description;
+
+        @JsonProperty("start_time")
+        private String startTime;
+
+        @JsonProperty("end_time")
+        private String endTime;
+
+        @JsonProperty("venue_name")
+        private String venueName;
+        private String category;
+        private Double latitude;
+        private Double longitude;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EventRecommendAiRequest {
+        @JsonProperty("route_summary")
+        private RouteSummaryForRecommend routeSummary;
+
+        @JsonProperty("user_preferences")
+        private UserPreferenceSummaryAi userPreferences;
+
+        @JsonProperty("available_events")
+        private List<AvailableEventAi> availableEvents;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RecommendedEventResultAi {
+        @JsonProperty("event_id")
+        private String eventId;
+
+        @JsonProperty("matched_day")
+        private Integer matchedDay;
+
+        @JsonProperty("match_reason")
+        private String matchReason;
+
+        @JsonProperty("relevance_score")
+        private Double relevanceScore;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EventRecommendAiResponse {
+        private String message;
+
+        @JsonProperty("recommended_events")
+        private List<RecommendedEventResultAi> recommendedEvents;
     }
 }

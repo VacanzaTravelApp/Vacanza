@@ -3,6 +3,11 @@ import 'dart:developer';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/accommodation_search_request.dart';
+import '../../data/models/booking_currency.dart';
+import '../../data/models/airport_autocomplete_slot.dart';
+import '../../data/models/airport_suggestion.dart';
+import '../../data/models/destination_autocomplete_slot.dart';
+import '../../data/models/destination_suggestion.dart';
 import '../../data/models/sort_criteria.dart';
 import '../../data/models/transport_search_request.dart';
 import '../../data/repositories/booking_repository.dart';
@@ -21,6 +26,10 @@ class BookingCubit extends Cubit<BookingState> {
   BookingCubit({required BookingRepository repository})
       : _repository = repository,
         super(const BookingSearch());
+
+  int _originSuggestionSeq = 0;
+  int _destSuggestionSeq = 0;
+  int _hotelDestinationSeq = 0;
 
   // ── Internal state for retry / filter re-run ──────────────────
   AccommodationSearchRequest? _lastHotelRequest;
@@ -43,8 +52,347 @@ class BookingCubit extends Cubit<BookingState> {
   /// Switches between Hotels / Flights and resets to Search.
   void switchType(BookingType type) {
     _currentType = type;
+    String? keepCurrency;
+    if (state is BookingSearch) {
+      keepCurrency = (state as BookingSearch).currency;
+    }
     log('[BOOKING_CUBIT] switchType → $type');
-    emit(BookingSearch(type: type));
+    emit(_searchWithClearedAutocomplete(type, currency: keepCurrency));
+  }
+
+  BookingSearch _searchWithClearedAutocomplete(
+    BookingType type, {
+    String? currency,
+  }) {
+    final resolved = BookingCurrencies.normalize(
+      currency ??
+          _lastHotelRequest?.currency ??
+          _lastFlightRequest?.currency,
+    );
+    return BookingSearch(
+      type: type,
+      currency: resolved,
+      originAirport: const AirportAutocompleteSlot(),
+      destinationAirport: const AirportAutocompleteSlot(),
+      hotelDestination: const DestinationAutocompleteSlot(),
+    );
+  }
+
+  /// Updates shared currency (hotels + flights). Only in [BookingSearch].
+  void setCurrency(String code) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    final next = BookingCurrencies.normalize(code);
+    if (next == s.currency) return;
+    emit(BookingSearch(
+      type: s.type,
+      currency: next,
+      originAirport: s.originAirport,
+      destinationAirport: s.destinationAirport,
+      hotelDestination: s.hotelDestination,
+    ));
+  }
+
+  // ── Airport autocomplete (TASK-2) ─────────────────────────────
+
+  void _patchBookingSearch({
+    AirportAutocompleteSlot? originAirport,
+    AirportAutocompleteSlot? destinationAirport,
+    DestinationAutocompleteSlot? hotelDestination,
+  }) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    emit(BookingSearch(
+      type: s.type,
+      currency: s.currency,
+      originAirport: originAirport ?? s.originAirport,
+      destinationAirport: destinationAirport ?? s.destinationAirport,
+      hotelDestination: hotelDestination ?? s.hotelDestination,
+    ));
+  }
+
+  /// Call when the user edits the origin field; clears [selected] if text diverges.
+  void onOriginFieldTextChanged(String text) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    final sel = s.originAirport.selected;
+    if (sel != null && text != sel.dropdownLabel) {
+      _patchBookingSearch(
+        originAirport: s.originAirport.copyWith(clearSelected: true),
+      );
+    }
+  }
+
+  /// Call when the user edits the destination field.
+  void onDestinationFieldTextChanged(String text) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    final sel = s.destinationAirport.selected;
+    if (sel != null && text != sel.dropdownLabel) {
+      _patchBookingSearch(
+        destinationAirport: s.destinationAirport.copyWith(clearSelected: true),
+      );
+    }
+  }
+
+  /// Clears suggestions when query is under 2 characters or field emptied.
+  void clearOriginAirportSuggestions() {
+    final s = state;
+    if (s is! BookingSearch) return;
+    _originSuggestionSeq++;
+    _patchBookingSearch(
+      originAirport: s.originAirport.copyWith(
+        clearSuggestions: true,
+        loadingSuggestions: false,
+        clearSuggestionError: true,
+      ),
+    );
+  }
+
+  void clearDestinationAirportSuggestions() {
+    final s = state;
+    if (s is! BookingSearch) return;
+    _destSuggestionSeq++;
+    _patchBookingSearch(
+      destinationAirport: s.destinationAirport.copyWith(
+        clearSuggestions: true,
+        loadingSuggestions: false,
+        clearSuggestionError: true,
+      ),
+    );
+  }
+
+  Future<void> fetchOriginAirportSuggestions(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) {
+      clearOriginAirportSuggestions();
+      return;
+    }
+
+    final s = state;
+    if (s is! BookingSearch) return;
+
+    final seq = ++_originSuggestionSeq;
+    _patchBookingSearch(
+      originAirport: s.originAirport.copyWith(
+        loadingSuggestions: true,
+        clearSuggestionError: true,
+      ),
+    );
+
+    try {
+      final list = await _repository.searchAirports(trimmed);
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _originSuggestionSeq) return;
+
+      _patchBookingSearch(
+        originAirport: cur.originAirport.copyWith(
+          suggestions: list,
+          loadingSuggestions: false,
+          clearSuggestionError: true,
+        ),
+      );
+    } on BookingException catch (e) {
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _originSuggestionSeq) return;
+      _patchBookingSearch(
+        originAirport: cur.originAirport.copyWith(
+          loadingSuggestions: false,
+          clearSuggestions: true,
+          suggestionError: e.message,
+        ),
+      );
+    } catch (e) {
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _originSuggestionSeq) return;
+      _patchBookingSearch(
+        originAirport: cur.originAirport.copyWith(
+          loadingSuggestions: false,
+          clearSuggestions: true,
+          suggestionError: e.toString(),
+        ),
+      );
+    }
+  }
+
+  Future<void> fetchDestinationAirportSuggestions(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) {
+      clearDestinationAirportSuggestions();
+      return;
+    }
+
+    final s = state;
+    if (s is! BookingSearch) return;
+
+    final seq = ++_destSuggestionSeq;
+    _patchBookingSearch(
+      destinationAirport: s.destinationAirport.copyWith(
+        loadingSuggestions: true,
+        clearSuggestionError: true,
+      ),
+    );
+
+    try {
+      final list = await _repository.searchAirports(trimmed);
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _destSuggestionSeq) return;
+
+      _patchBookingSearch(
+        destinationAirport: cur.destinationAirport.copyWith(
+          suggestions: list,
+          loadingSuggestions: false,
+          clearSuggestionError: true,
+        ),
+      );
+    } on BookingException catch (e) {
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _destSuggestionSeq) return;
+      _patchBookingSearch(
+        destinationAirport: cur.destinationAirport.copyWith(
+          loadingSuggestions: false,
+          clearSuggestions: true,
+          suggestionError: e.message,
+        ),
+      );
+    } catch (e) {
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _destSuggestionSeq) return;
+      _patchBookingSearch(
+        destinationAirport: cur.destinationAirport.copyWith(
+          loadingSuggestions: false,
+          clearSuggestions: true,
+          suggestionError: e.toString(),
+        ),
+      );
+    }
+  }
+
+  void selectOriginAirport(AirportSuggestion suggestion) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    _patchBookingSearch(
+      originAirport: s.originAirport.copyWith(
+        selected: suggestion,
+        clearSuggestions: true,
+        loadingSuggestions: false,
+        clearSuggestionError: true,
+      ),
+    );
+  }
+
+  void selectDestinationAirport(AirportSuggestion suggestion) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    _patchBookingSearch(
+      destinationAirport: s.destinationAirport.copyWith(
+        selected: suggestion,
+        clearSuggestions: true,
+        loadingSuggestions: false,
+        clearSuggestionError: true,
+      ),
+    );
+  }
+
+  // ── Hotel destination autocomplete (TASK-3) ─────────────────
+
+  void onHotelDestinationFieldTextChanged(String text) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    final sel = s.hotelDestination.selected;
+    if (sel != null && text != sel.displayName) {
+      _patchBookingSearch(
+        hotelDestination: s.hotelDestination.copyWith(clearSelected: true),
+      );
+    }
+  }
+
+  void clearHotelDestinationSuggestions() {
+    final s = state;
+    if (s is! BookingSearch) return;
+    _hotelDestinationSeq++;
+    _patchBookingSearch(
+      hotelDestination: s.hotelDestination.copyWith(
+        clearSuggestions: true,
+        loadingSuggestions: false,
+        clearSuggestionError: true,
+      ),
+    );
+  }
+
+  Future<void> fetchHotelDestinationSuggestions(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) {
+      clearHotelDestinationSuggestions();
+      return;
+    }
+
+    final s = state;
+    if (s is! BookingSearch) return;
+
+    final seq = ++_hotelDestinationSeq;
+    _patchBookingSearch(
+      hotelDestination: s.hotelDestination.copyWith(
+        loadingSuggestions: true,
+        clearSuggestionError: true,
+      ),
+    );
+
+    try {
+      final list = await _repository.searchDestinations(trimmed);
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _hotelDestinationSeq) return;
+
+      _patchBookingSearch(
+        hotelDestination: cur.hotelDestination.copyWith(
+          suggestions: list,
+          loadingSuggestions: false,
+          clearSuggestionError: true,
+        ),
+      );
+    } on BookingException catch (e) {
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _hotelDestinationSeq) return;
+      _patchBookingSearch(
+        hotelDestination: cur.hotelDestination.copyWith(
+          loadingSuggestions: false,
+          clearSuggestions: true,
+          suggestionError: e.message,
+        ),
+      );
+    } catch (e) {
+      if (isClosed) return;
+      final cur = state;
+      if (cur is! BookingSearch || seq != _hotelDestinationSeq) return;
+      _patchBookingSearch(
+        hotelDestination: cur.hotelDestination.copyWith(
+          loadingSuggestions: false,
+          clearSuggestions: true,
+          suggestionError: e.toString(),
+        ),
+      );
+    }
+  }
+
+  void selectHotelDestination(DestinationSuggestion suggestion) {
+    final s = state;
+    if (s is! BookingSearch) return;
+    _patchBookingSearch(
+      hotelDestination: s.hotelDestination.copyWith(
+        selected: suggestion,
+        clearSuggestions: true,
+        loadingSuggestions: false,
+        clearSuggestionError: true,
+      ),
+    );
   }
 
   /// Searches hotels via repository.
@@ -220,7 +568,11 @@ class BookingCubit extends Cubit<BookingState> {
     }
     // No previous request — go back to search
     if (isClosed) return;
-    emit(BookingSearch(type: _currentType));
+    emit(_searchWithClearedAutocomplete(
+      _currentType,
+      currency:
+          _lastHotelRequest?.currency ?? _lastFlightRequest?.currency,
+    ));
   }
 
   /// Returns from Filters to the previous Results state.
@@ -230,14 +582,22 @@ class BookingCubit extends Cubit<BookingState> {
       emit(_previousResultsState!);
       _previousResultsState = null;
     } else {
-      emit(BookingSearch(type: _currentType));
+      emit(_searchWithClearedAutocomplete(
+        _currentType,
+        currency:
+            _lastHotelRequest?.currency ?? _lastFlightRequest?.currency,
+      ));
     }
   }
 
   /// Goes back to the Search form.
   void backToSearch() {
     log('[BOOKING_CUBIT] backToSearch');
-    emit(BookingSearch(type: _currentType));
+    emit(_searchWithClearedAutocomplete(
+      _currentType,
+      currency:
+          _lastHotelRequest?.currency ?? _lastFlightRequest?.currency,
+    ));
   }
 
   // ── Private helpers ───────────────────────────────────────────

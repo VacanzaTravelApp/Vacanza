@@ -77,6 +77,9 @@ class AuthRepository {
     String? middleName,
     required String lastName,
     String? preferredName,
+    String? country,
+    String? birthDate,
+    String? gender,
   }) async {
     try {
       final fbUser = await _firebaseService.register(email, password);
@@ -104,14 +107,29 @@ class AuthRepository {
 
       await _storage.writeAccessToken(firebaseIdToken);
 
+      final body = <String, dynamic>{
+        'firstName': firstName,
+        'lastName': lastName,
+      };
+      if (middleName != null && middleName.trim().isNotEmpty) {
+        body['middleName'] = middleName.trim();
+      }
+      if (preferredName != null && preferredName.trim().isNotEmpty) {
+        body['preferredName'] = preferredName.trim();
+      }
+      if (country != null && country.trim().isNotEmpty) {
+        body['country'] = country.trim();
+      }
+      if (birthDate != null && birthDate.trim().isNotEmpty) {
+        body['birthDate'] = birthDate.trim();
+      }
+      if (gender != null && gender.trim().isNotEmpty) {
+        body['gender'] = gender.trim();
+      }
+
       final res = await _apiClient.registerSync(
         firebaseIdToken: firebaseIdToken,
-        body: {
-          'firstName': firstName,
-          'middleName': middleName,
-          'lastName': lastName,
-          'preferredName': preferredName,
-        },
+        body: body,
       );
 
       if (!res.success) {

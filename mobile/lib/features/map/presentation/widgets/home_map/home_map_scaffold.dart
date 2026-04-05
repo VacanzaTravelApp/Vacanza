@@ -102,7 +102,9 @@ class HomeMapScaffold extends StatelessWidget {
               top: 30,
               left: 16,
               child: BlocBuilder<ProfileBloc, ProfileState>(
-                buildWhen: (prev, curr) => prev.profile != curr.profile,
+                buildWhen: (prev, curr) =>
+                    prev.profile != curr.profile ||
+                    prev.profilePhotoBytes != curr.profilePhotoBytes,
                 builder: (context, profileState) {
                   final p = profileState.profile;
                   final displayName = p != null
@@ -114,6 +116,7 @@ class HomeMapScaffold extends StatelessWidget {
                   return ProfileBadge(
                     name: displayName,
                     subtitle: 'Traveler',
+                    profilePhotoBytes: profileState.profilePhotoBytes,
                     imageUrl: p?.profileImageUrl,
                     onTap: () {
                       Navigator.push(

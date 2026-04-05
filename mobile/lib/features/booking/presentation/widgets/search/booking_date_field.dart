@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'booking_search_field_styles.dart';
+
 /// Reusable read-only date field that opens a date picker on tap.
 ///
 /// Exposes [openPicker] so the parent can programmatically trigger it
@@ -43,11 +45,7 @@ class BookingDateFieldState extends State<BookingDateField> {
           padding: const EdgeInsets.only(left: 4, bottom: 4),
           child: Text(
             widget.label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF999999),
-            ),
+            style: BookingSearchFieldStyles.fieldLabel,
           ),
         ),
         GestureDetector(

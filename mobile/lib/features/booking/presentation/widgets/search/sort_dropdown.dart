@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/models/sort_criteria.dart';
 import '../../cubit/booking_state.dart';
+import 'booking_search_field_styles.dart';
 
 /// Sort criteria dropdown showing type-appropriate options.
 class SortDropdown extends StatelessWidget {
@@ -37,11 +38,7 @@ class SortDropdown extends StatelessWidget {
           padding: EdgeInsets.only(left: 4, bottom: 4),
           child: Text(
             'Sort by',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF999999),
-            ),
+            style: BookingSearchFieldStyles.fieldLabel,
           ),
         ),
         DropdownButtonFormField<SortCriteria>(
@@ -55,7 +52,8 @@ class SortDropdown extends StatelessWidget {
                   value: s,
                   child: Text(
                     _labels[s]!,
-                    style: const TextStyle(fontSize: 13),
+                    style: BookingSearchFieldStyles.dropdownMenuItem
+                        .copyWith(fontSize: 13),
                   ),
                 ),
               )
@@ -86,10 +84,8 @@ class SortDropdown extends StatelessWidget {
             ),
           ),
           dropdownColor: Colors.white,
-          style: const TextStyle(
+          style: BookingSearchFieldStyles.dropdownMenuItem.copyWith(
             fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF1A1A1A),
           ),
         ),
       ],
