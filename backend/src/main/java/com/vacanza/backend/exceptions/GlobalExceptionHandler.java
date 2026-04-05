@@ -1,8 +1,11 @@
 package com.vacanza.backend.exceptions;
 
+import com.vacanza.backend.component.SystemLogCollector;
 import com.vacanza.backend.dto.response.ErrorResponse;
 import com.vacanza.backend.integration.viator.ViatorPartnerUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,8 +20,12 @@ import java.util.stream.Collectors;
  * Tüm controller'lar için merkezi hata yönetimi.
  * Tutarlı JSON error response döndürür.
  */
+@Slf4j
 @RestControllerAdvice
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final SystemLogCollector systemLogCollector;
 
     /**
      * AuthException: backend-controlled auth hataları
@@ -34,6 +41,7 @@ public class GlobalExceptionHandler {
                 ex.getMessage(),
                 request.getRequestURI());
 
+        systemLogCollector.recordError(request.getRequestURI(), "AuthException: " + ex.getMessage());
         return new ResponseEntity<>(body, ex.getStatus());
     }
 
@@ -52,6 +60,9 @@ public class GlobalExceptionHandler {
                 ex.getReason(),
                 request.getRequestURI());
 
+        if (status.is5xxServerError()) {
+            systemLogCollector.recordError(request.getRequestURI(), "ResponseStatusException: " + ex.getReason());
+        }
         return new ResponseEntity<>(body, status);
     }
 
@@ -72,6 +83,7 @@ public class GlobalExceptionHandler {
                 message,
                 request.getRequestURI());
 
+        // Validation errors usually shouldn't clutter the admin panel, so we skip logging them to systemLogCollector.
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
@@ -96,6 +108,7 @@ public class GlobalExceptionHandler {
                 message,
                 request.getRequestURI());
 
+        systemLogCollector.recordError(request.getRequestURI(), "DataIntegrityViolation: " + message);
         return new ResponseEntity<>(body, HttpStatus.CONFLICT);
     }
 
@@ -112,6 +125,7 @@ public class GlobalExceptionHandler {
                 ex.getMessage(),
                 request.getRequestURI());
 
+        systemLogCollector.recordError(request.getRequestURI(), "BookingException: " + ex.getMessage());
         return new ResponseEntity<>(body, ex.getStatus());
     }
 
@@ -128,6 +142,7 @@ public class GlobalExceptionHandler {
                 ex.getMessage(),
                 request.getRequestURI());
 
+        systemLogCollector.recordError(request.getRequestURI(), "EventException: " + ex.getMessage());
         return new ResponseEntity<>(body, ex.getStatus());
     }
 
@@ -144,6 +159,26 @@ public class GlobalExceptionHandler {
                 ex.getMessage() != null ? ex.getMessage() : "Viator Partner API unreachable",
                 request.getRequestURI());
 
+        systemLogCollector.recordError(request.getRequestURI(), "ViatorPartnerUnavailable: " + ex.getMessage());
         return new ResponseEntity<>(body, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    
+    /**
+     * Catch-all for unhandled 500 errors.
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleAllExceptions(
+            Exception ex, HttpServletRequest request) {
+            
+        log.error("Unhandled exception at {}", request.getRequestURI(), ex);
+
+        ErrorResponse body = ErrorResponse.of(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+                "An unexpected server error occurred.",
+                request.getRequestURI());
+
+        systemLogCollector.recordError(request.getRequestURI(), "Unhandled Exception: " + ex.getMessage());
+        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }

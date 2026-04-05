@@ -1,5 +1,6 @@
 package com.vacanza.backend.config;
 
+import com.vacanza.backend.component.ApiMetricsCollector;
 import io.netty.channel.ChannelOption;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -22,6 +23,12 @@ import reactor.netty.http.client.HttpClient;
         OpenMeteoProperties.class, ViatorProperties.class })
 public class WebClientConfig {
 
+    private final ApiMetricsCollector apiMetricsCollector;
+
+    public WebClientConfig(ApiMetricsCollector apiMetricsCollector) {
+        this.apiMetricsCollector = apiMetricsCollector;
+    }
+
     @Bean
     @Qualifier("foursquareWebClient")
     public WebClient foursquareWebClient(FoursquareProperties props) {
@@ -30,7 +37,7 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .defaultHeader("Authorization", props.getApiKey())
-                .filter(log4xx5xx("[FOURSQUARE]"))
+                .filter(apiMetricsAndLogFilter("Foursquare API", "[FOURSQUARE]"))
                 .build();
     }
 
@@ -42,7 +49,7 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .filter(addMapboxAccessToken(props))
-                .filter(log4xx5xx("[MAPBOX-GEOCODE]"))
+                .filter(apiMetricsAndLogFilter("Mapbox Geocoding", "[MAPBOX-GEOCODE]"))
                 .build();
     }
 
@@ -59,7 +66,7 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(log4xx5xx("[AI-SERVICE]"))
+                .filter(apiMetricsAndLogFilter("AI Services", "[AI-SERVICE]"))
                 .build();
     }
 
@@ -76,7 +83,7 @@ public class WebClientConfig {
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(log4xx5xx("[SERPAPI]"))
+                .filter(apiMetricsAndLogFilter("SerpApi / Booking", "[SERPAPI]"))
                 .build();
     }
 
@@ -93,7 +100,7 @@ public class WebClientConfig {
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(log4xx5xx("[TICKETMASTER]"))
+                .filter(apiMetricsAndLogFilter("Ticketmaster API", "[TICKETMASTER]"))
                 .build();
     }
 
@@ -109,7 +116,7 @@ public class WebClientConfig {
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(log4xx5xx("[OPEN-METEO]"))
+                .filter(apiMetricsAndLogFilter("OpenMeteo API", "[OPEN-METEO]"))
                 .build();
     }
 
@@ -127,7 +134,7 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json;version=2.0")
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(log4xx5xx("[VIATOR]"));
+                .filter(apiMetricsAndLogFilter("Viator API", "[VIATOR]"));
         if (StringUtils.hasText(props.getApiKey())) {
             builder.defaultHeader("exp-api-key", props.getApiKey());
         }
@@ -153,13 +160,31 @@ public class WebClientConfig {
         };
     }
 
-    private ExchangeFilterFunction log4xx5xx(String tag) {
-        return (request, next) -> next.exchange(request)
-                .doOnNext(resp -> {
-                    int code = resp.statusCode().value();
-                    if (code >= 400) {
-                        log.warn("{} {} {} -> {}", tag, request.method(), request.url(), code);
-                    }
-                });
+    private ExchangeFilterFunction apiMetricsAndLogFilter(String apiName, String tag) {
+        return (request, next) -> {
+            long start = System.currentTimeMillis();
+            return next.exchange(request)
+                    .doOnNext(resp -> {
+                        long duration = System.currentTimeMillis() - start;
+                        int code = resp.statusCode().value();
+                        if (code >= 400) {
+                            log.warn("{} {} {} -> {}", tag, request.method(), request.url(), code);
+                            if (code >= 500 || code == 429) {
+                                apiMetricsCollector.recordError(apiName);
+                            } else {
+                                // 4xx is usually client error, we still count as success response structurally or count as error?
+                                // Usually 4xx is considered user error, but for monitoring external endpoints, often both are errors.
+                                // Let's log it as an error to track failed external attempts overall.
+                                apiMetricsCollector.recordError(apiName);
+                            }
+                        } else {
+                            apiMetricsCollector.recordCall(apiName, duration);
+                        }
+                    })
+                    .doOnError(throwable -> {
+                        log.error("{} Error {} {} -> {}", tag, request.method(), request.url(), throwable.getMessage());
+                        apiMetricsCollector.recordError(apiName);
+                    });
+        };
     }
 }

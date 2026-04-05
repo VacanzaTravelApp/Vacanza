@@ -1,6 +1,7 @@
 package com.vacanza.backend.service.impl;
 
 import com.vacanza.backend.component.ApiMetricsCollector;
+import com.vacanza.backend.component.SystemLogCollector;
 import com.vacanza.backend.dto.response.AdminAnalyticsDTO;
 import com.vacanza.backend.dto.response.AdminAnalyticsDTO.*;
 import com.vacanza.backend.dto.response.SystemMonitoringDTO;
@@ -37,6 +38,7 @@ public class AdminServiceImpl implements AdminService {
     private final CheckInRepository checkInRepository;
     private final UserLoginHistoryRepository loginHistoryRepository;
     private final ApiMetricsCollector apiMetricsCollector;
+    private final SystemLogCollector systemLogCollector;
     private final HealthEndpoint healthEndpoint;
 
     // ── UC2.1: System Monitoring ────────────────────────────────
@@ -93,7 +95,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private List<LogEntry> buildRecentLogs() {
-        return loginHistoryRepository.findTop50ByOrderByLoginTimeDesc().stream()
+        List<LogEntry> loginLogs = loginHistoryRepository.findTop50ByOrderByLoginTimeDesc().stream()
                 .map(lh -> LogEntry.builder()
                         .timestamp(lh.getLoginTime().toString())
                         .level("INFO")
@@ -102,6 +104,24 @@ public class AdminServiceImpl implements AdminService {
                         .source("AUTH")
                         .build())
                 .collect(Collectors.toList());
+
+        List<LogEntry> systemLogs = systemLogCollector.getRecentLogs();
+
+        List<LogEntry> allLogs = new ArrayList<>();
+        allLogs.addAll(loginLogs);
+        allLogs.addAll(systemLogs);
+
+        allLogs.sort((l1, l2) -> {
+            try {
+                Instant t1 = Instant.parse(l1.getTimestamp());
+                Instant t2 = Instant.parse(l2.getTimestamp());
+                return t2.compareTo(t1);
+            } catch (Exception e) {
+                return 0;
+            }
+        });
+
+        return allLogs.stream().limit(50).collect(Collectors.toList());
     }
 
     // ── UC2.2: Analytics Report ─────────────────────────────────
