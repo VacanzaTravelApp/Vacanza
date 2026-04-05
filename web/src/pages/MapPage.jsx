@@ -9,6 +9,8 @@ import {
   UnorderedListOutlined,
   CloseOutlined,
   InfoCircleOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
@@ -17,6 +19,7 @@ import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
+import { useUserProfile } from "../hooks/useUserProfileData";
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
 import VacanzaChat, {
@@ -25,16 +28,13 @@ import VacanzaChat, {
 } from "../features/ai/components/VacanzaChat";
 import RoutePanel from "../features/ai/components/RoutePanel";
 import ProfileModal from "./ProfileModal";
+import PreferencesModal from "./PreferencesModal";
 import http from "../api/http";
 import { aiApi } from "../api/aiApi";
 import { normalizeRouteForMap } from "../features/ai/utils/routeMap";
 import "./MapPage.css";
 
-import cafeImg from "../assets/poi/poi_cafe.png";
-import museumImg from "../assets/poi/poi_museum.png";
-import monumentImg from "../assets/poi/poi_monument.png";
-import parkImg from "../assets/poi/poi_park.png";
-import restaurantImg from "../assets/poi/poi_restaurant.png";
+
 
 const { Header, Content, Footer } = Layout;
 
@@ -180,7 +180,6 @@ const UI_CATEGORIES = [
     geo: "catering.restaurant",
     aliases: ["restaurant", "restaurants", "catering.restaurant"],
     icon: <RestaurantIcon />,
-    img: restaurantImg,
     pill: "rgba(255, 107, 107, 0.15)",
     fill: "rgba(255, 107, 107, 1)",
     ring: "#FF6B6B",
@@ -192,7 +191,6 @@ const UI_CATEGORIES = [
     geo: "catering.cafe",
     aliases: ["cafe", "cafes", "catering.cafe"],
     icon: <CafeIcon />,
-    img: cafeImg,
     pill: "rgba(255, 179, 71, 0.15)",
     fill: "rgba(255, 179, 71, 1)",
     ring: "#FFB347",
@@ -204,7 +202,6 @@ const UI_CATEGORIES = [
     geo: "tourism.attraction.museum",
     aliases: ["museum", "museums", "tourism.attraction.museum"],
     icon: <MuseumIcon />,
-    img: museumImg,
     pill: "rgba(0, 180, 216, 0.15)",
     fill: "rgba(0, 180, 216, 1)",
     ring: "#00B4D8",
@@ -315,11 +312,10 @@ function poiIconByCategory(category) {
   const c = normalizeCategory(category);
   const found = UI_CATEGORIES.find((x) => x.aliases.includes(c));
   if (!found) return null;
-  return { 
-    emoji: found.emoji, 
-    img: found.img, 
-    ring: found.ring, 
-    fill: found.fill, 
+  return {
+    emoji: found.emoji,
+    ring: found.ring,
+    fill: found.fill,
     uiKey: found.key,
     icon: found.icon // Added this
   };
@@ -487,6 +483,7 @@ export default function MapPage() {
   const navigate = useNavigate();
   const mapRef = useRef(null);
   const isMobile = useIsMobile(768);
+  const { data: profile } = useUserProfile();
   const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
     useGamificationProfile();
 
@@ -548,6 +545,7 @@ export default function MapPage() {
   const [resultsTab, setResultsTab] = useState("all");
   const [bookingOpen, setBookingOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeRoute, setActiveRoute] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
@@ -563,39 +561,61 @@ export default function MapPage() {
   /** Sohbet–harita bağlantısı (replan gün); VacanzaChat onConversationIdChange ile güncellenir. */
   const [mapChatConversationId, setMapChatConversationId] = useState(null);
   const [replanDaySubmitting, setReplanDaySubmitting] = useState(false);
-  
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(false);
 
-  // Time-based theme logic (consistent with AuthLayout)
-  const calculateTimeState = useCallback(() => {
-    const now = new Date();
-    const hour = now.getHours();
-    const minutes = now.getMinutes();
-    
-    const formattedTime = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-    
-    // 0: Day (Streets), 1: Night (Dark)
-    if (hour >= 5 && hour < 19) {
-      return { theme: "theme-ocean", style: 0, formattedTime };
-    }
-    return { theme: "theme-midnight", style: 1, formattedTime };
-  }, []);
+  // 1. Initial State Calculation (Clock-driven unless manual)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('vacanza-theme');
+    if (saved) return saved === 'night';
+    const hour = new Date().getHours();
+    return hour < 6 || hour >= 20;
+  });
 
-  const [timeState, setTimeState] = useState(calculateTimeState());
+  const [isManual, setIsManual] = useState(() => localStorage.getItem('vacanza-manual') === 'true');
 
   useEffect(() => {
-    const timer = setInterval(() => setTimeState(calculateTimeState()), 60000);
+    const syncTheme = () => {
+      if (!isManual) {
+        const hour = new Date().getHours();
+        const shouldBeDark = hour < 6 || hour >= 20;
+        if (shouldBeDark !== isDarkMode) {
+          setIsDarkMode(shouldBeDark);
+          setStyleIndex(shouldBeDark ? 1 : 0);
+        }
+      }
+    };
+
+    const timer = setInterval(syncTheme, 60000);
     return () => clearInterval(timer);
-  }, [calculateTimeState]);
+  }, [isManual, isDarkMode]);
 
-  const currentTheme = timeState.theme;
+  const toggleTheme = () => {
+    const nextVal = !isDarkMode;
+    setIsDarkMode(nextVal);
+    setIsManual(true);
+    setStyleIndex(nextVal ? 1 : 0);
+    localStorage.setItem('vacanza-theme', nextVal ? 'night' : 'day');
+    localStorage.setItem('vacanza-manual', 'true');
+  };
 
+  const themeClass = isDarkMode ? "theme-night" : "theme-day";
+  const mapStyleIndex = isDarkMode ? 1 : 0; 
+
+  const [formattedTime, setFormattedTime] = useState("");
   useEffect(() => {
-    // Sync styleIndex with timeState if manual override hasn't happened recently? 
-    // For now, let it follow timeState.style
-    setStyleIndex(timeState.style);
-  }, [timeState.style]);
+    const updateTime = () => {
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes().toString().padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      setFormattedTime(`${h % 12 || 12}:${m} ${ampm}`);
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 60000);
+    return () => clearInterval(timer);
+  }, []);
   // Mutual exclusion for ALL panels to avoid overlaps - fixed logic
   useEffect(() => {
     if (resultsOpen) {
@@ -761,23 +781,23 @@ export default function MapPage() {
   const handleMapIdle = useCallback(() => {
     if (!mapRef.current) return;
     const map = mapRef.current.getMap();
-    
+
     // Standard Mapbox layers for diverse POIs
     const poiLayers = [
-      'poi-label', 
-      'settlement-label', 
-      'medical-label', 
-      'transit-label', 
-      'airport-label', 
+      'poi-label',
+      'settlement-label',
+      'medical-label',
+      'transit-label',
+      'airport-label',
       'natural-label',
       'park-label',
       'place-label'
     ];
-    
+
     // Safety check: only query layers that exist in current style
     const styleLayers = map.getStyle().layers.map(l => l.id);
     const validLayers = poiLayers.filter(id => styleLayers.includes(id));
-    
+
     const features = map.queryRenderedFeatures({ layers: validLayers });
     if (!features || features.length === 0) return;
 
@@ -786,7 +806,7 @@ export default function MapPage() {
       const name = p.name_en || p.name;
       const type = p.type || p.maki || p.class || p.category || p.category_en || "poi";
       const [lng, lat] = f.geometry.coordinates;
-      
+
       return {
         id: `mb-${name}-${lng.toFixed(5)}-${lat.toFixed(5)}`,
         name: name,
@@ -991,7 +1011,7 @@ export default function MapPage() {
     setSelection({ mode: "polygon", polygon: poly });
 
     await fetchPois({ selectionType: "POLYGON", polygon: poly });
-    
+
     // Crucial: The useEffect will handle closing others when resultsOpen becomes true
     setResultsOpen(true);
     setResultsTab("all");
@@ -1193,7 +1213,7 @@ export default function MapPage() {
   const pois = useMemo(() => {
     const all = [...poisRaw];
     const poiCoords = new Set(poisRaw.map(p => `${p.latitude?.toFixed(4)},${p.longitude?.toFixed(4)}`));
-    
+
     mapboxPois.forEach(mbp => {
       const coordKey = `${mbp.location.lat.toFixed(4)},${mbp.location.lng.toFixed(4)}`;
       if (!poiCoords.has(coordKey)) {
@@ -1457,10 +1477,10 @@ export default function MapPage() {
   const userCardWidth = isMobile ? 220 : 280;
 
   return (
-    <div className={`vivid-map-page ${currentTheme} ${sidebarOpen ? "sidebar-open" : ""}`}>
+    <div className={`vivid-map-page ${themeClass} ${sidebarOpen ? "sidebar-open" : ""}`}>
 
       {/* 1. Header (TOPBAR) */}
-      <header className="vivid-map-header">
+      <header className={`vivid-map-header ${themeClass}`}>
         <div className="header-left">
           <button className="hamburger-btn vivid-interactive" onClick={() => setSidebarOpen(true)}>
             <div className="line" />
@@ -1468,10 +1488,17 @@ export default function MapPage() {
             <div className="line" />
           </button>
           <div className="brand-logo vivid-brand">Vacanza</div>
-          <span className="local-time-badge">{timeState.formattedTime} Local Time</span>
         </div>
-        <div className="header-right">
-           {/* Header kept clean as requested */}
+        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div 
+              className="vivid-theme-toggle" 
+              onClick={toggleTheme}
+              title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
+            >
+              <button className={`toggle-btn ${isDarkMode ? 'is-night' : 'is-day'}`}>
+                {isDarkMode ? <SunOutlined /> : <MoonOutlined />}
+              </button>
+            </div>
         </div>
       </header>
 
@@ -1479,36 +1506,36 @@ export default function MapPage() {
       <div className="vivid-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
       <aside className="vivid-sidebar">
         <div className="sidebar-header" style={{ marginBottom: 24 }}>
-           <span className="brand-logo" style={{ marginLeft: 0, fontSize: 24 }}>Settings</span>
+          <span className="brand-logo" style={{ marginLeft: 0, fontSize: 24 }}>Settings</span>
         </div>
 
         <div className="sidebar-user-section">
-            <div className="sidebar-avatar-wrapper">
-               <Avatar size={90} icon={<UserOutlined />} src={user?.photoURL} className="sidebar-avatar" />
+          <div className="sidebar-avatar-wrapper">
+            <Avatar size={90} icon={<UserOutlined />} src={user?.photoURL} className="sidebar-avatar" />
+          </div>
+          <div className="sidebar-info" style={{ textAlign: "center" }}>
+            <div className="sidebar-username">{profile?.preferredName || profile?.firstName || user?.displayName || "Adventurer"}</div>
+            <div className="sidebar-role">{gamification?.levelText || "Level 1 Explorer"}</div>
+          </div>
+
+          <div className="sidebar-xp-container">
+            <div className="xp-label">
+              <span>Level Progress</span>
+              <span>{gamification?.xpProgressPercent || 0}%</span>
             </div>
-                      <div className="sidebar-info" style={{ textAlign: "center" }}>
-               <div className="sidebar-username">{user?.displayName || "Adventurer"}</div>
-               <div className="sidebar-role">{gamification?.levelText || "Level 1 Explorer"}</div>
+            <div className="sidebar-xp-bar">
+              <div className="sidebar-xp-fill" style={{ width: `${gamification?.xpProgressPercent || 0}%` }} />
             </div>
-           
-           <div className="sidebar-xp-container">
-              <div className="xp-label">
-                 <span>Level Progress</span>
-                 <span>{gamification?.xpProgressPercent || 0}%</span>
-              </div>
-              <div className="sidebar-xp-bar">
-                 <div className="sidebar-xp-fill" style={{ width: `${gamification?.xpProgressPercent || 0}%` }} />
-              </div>
-           </div>
+          </div>
         </div>
 
         <nav className="sidebar-menu">
           <button className="sidebar-item vivid-interactive" onClick={() => { setProfileModalOpen(true); setSidebarOpen(false); }}>
             <UserOutlined /> Account Profile
           </button>
-          
-          <button className="sidebar-item vivid-interactive" onClick={() => { message.info("Preferences coming soon!"); setSidebarOpen(false); }}>
-             <SettingsIcon /> Preferences
+
+          <button className="sidebar-item vivid-interactive" onClick={() => { setPreferencesModalOpen(true); setSidebarOpen(false); }}>
+            <SettingsIcon /> Preferences
           </button>
 
           <button className="sidebar-item logout vivid-interactive" onClick={handleLogout}>
@@ -1525,7 +1552,7 @@ export default function MapPage() {
           onMove={(evt) => setViewState(evt.viewState)}
           onIdle={handleMapIdle}
           onMoveEnd={() => { if (mode === "VIEWPORT" && !freehandEnabled) scheduleViewportFetch(); }}
-          mapStyle={STYLES[styleIndex]}
+          mapStyle={STYLES[mapStyleIndex]}
           mapboxAccessToken={MAPBOX_TOKEN}
           onMouseDown={onMouseDownFreehand}
           onMouseMove={onMouseMoveFreehand}
@@ -1537,8 +1564,8 @@ export default function MapPage() {
           cursor={freehandEnabled ? "crosshair" : "grab"}
           attributionControl={false}
         >
-          <NavigationControl position="top-left" />
-          <GeolocateControl position="top-left" />
+          <NavigationControl position="bottom-left" />
+          <GeolocateControl position="bottom-left" />
 
           <Source id="selection-src" type="geojson" data={selectionGeoJSON}>
             <Layer {...selectionFillLayer} />
@@ -1559,20 +1586,20 @@ export default function MapPage() {
             const title = getSafePoiTitle(p);
             const catInfo = UI_CATEGORIES.find(c => c.key === catKey);
             const markerBg = catInfo?.fill || "rgba(100, 116, 139, 1)";
-            
+
             return (
               <Marker key={p.poiId || `${p.latitude}-${p.longitude}-${title}`} longitude={p.longitude} latitude={p.latitude} anchor="bottom">
                 <Tooltip title={title}>
                   <div style={{ cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.25))" }}>
                     <div style={{
                       width: 32, height: 32, borderRadius: "50% 50% 50% 0", transform: "rotate(-45deg)",
-                      background: markerBg, border: "2.5px solid white", 
+                      background: markerBg, border: "2.5px solid white",
                       display: "grid", placeItems: "center",
                       boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                       position: "relative"
                     }}>
-                      <div style={{ 
-                        transform: "rotate(45deg)", color: "white", 
+                      <div style={{
+                        transform: "rotate(45deg)", color: "white",
                         display: "grid", placeItems: "center",
                         width: 22, height: 22,
                         fontSize: 16,
@@ -1586,7 +1613,7 @@ export default function MapPage() {
               </Marker>
             );
           })}
-          
+
           {activeWaypoints.length >= 2 && (
             <Source id="route-src" type="geojson" data={routeLineGeoJSON} lineMetrics>
               <Layer {...routeGlowLayer} />
@@ -1598,9 +1625,9 @@ export default function MapPage() {
             <Marker key={`route-wp-${wp.day}-${wp.order}`} longitude={wp.longitude} latitude={wp.latitude} anchor="center">
               <Tooltip title={wp.name} placement="top">
                 <div style={{
-                    width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, #F97316, #EF4444)",
-                    border: "2.5px solid white", display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "white", fontSize: 13, fontWeight: 800, boxShadow: "0 2px 8px rgba(249,115,22,0.4)", cursor: "pointer"
+                  width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, #F97316, #EF4444)",
+                  border: "2.5px solid white", display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "white", fontSize: 13, fontWeight: 800, boxShadow: "0 2px 8px rgba(249,115,22,0.4)", cursor: "pointer"
                 }}>{idx + 1}</div>
               </Tooltip>
             </Marker>
@@ -1610,14 +1637,14 @@ export default function MapPage() {
         {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel is closed */}
         {!canShowResultsPanel && (
           <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
-             setFilterOpen(false);
-             setFabExpanded(false);
-             setIsChatOpen(true);
+            setFilterOpen(false);
+            setFabExpanded(false);
+            setIsChatOpen(true);
           }}>
-             <div className="pill-content">
-                <CompassOutlined className="pill-icon" />
-                <span className="pill-text">Ask Vacanza AI</span>
-             </div>
+            <div className="pill-content">
+              <CompassOutlined className="pill-icon" />
+              <span className="pill-text">Ask Vacanza AI</span>
+            </div>
           </button>
         )}
 
@@ -1638,40 +1665,40 @@ export default function MapPage() {
 
           <div className={`fab-sub-actions ${fabExpanded ? "visible" : ""}`}>
             <Tooltip title="Local Filters" placement="left">
-                <button className="sub-fab vivid-interactive" onClick={() => { 
-                   const next = !filterOpen;
-                   if (next) setIsChatOpen(false);
-                   setFilterOpen(next); 
-                   setFabExpanded(false); 
-                }}>
-                   <UnorderedListOutlined />
-                </button>
+              <button className="sub-fab vivid-interactive" onClick={() => {
+                const next = !filterOpen;
+                if (next) setIsChatOpen(false);
+                setFilterOpen(next);
+                setFabExpanded(false);
+              }}>
+                <UnorderedListOutlined />
+              </button>
             </Tooltip>
             <Tooltip title="Draw Area" placement="left">
-               <button className="sub-fab vivid-interactive" onClick={() => { startFreehand(); setFabExpanded(false); }}>
-                  <PencilIcon />
-               </button>
+              <button className="sub-fab vivid-interactive" onClick={() => { startFreehand(); setFabExpanded(false); }}>
+                <PencilIcon />
+              </button>
             </Tooltip>
             <Tooltip title="Book Flights & Hotels" placement="left">
-               <button className="sub-fab vivid-interactive" onClick={() => { setBookingOpen(true); setFabExpanded(false); }}>
-                  <CalendarOutlined />
-               </button>
+              <button className="sub-fab vivid-interactive" onClick={() => { setBookingOpen(true); setFabExpanded(false); }}>
+                <CalendarOutlined />
+              </button>
             </Tooltip>
             <Tooltip title={is3D ? "Reset to 2D View" : "Enable 3D Perspective"} placement="left">
-               <button className="sub-fab vivid-interactive" onClick={() => { handleToggle2D3D(); /* No setFabExpanded(false) */ }}>
-                  <CubeIcon />
-               </button>
+              <button className="sub-fab vivid-interactive" onClick={() => { handleToggle2D3D(); /* No setFabExpanded(false) */ }}>
+                <CubeIcon />
+              </button>
             </Tooltip>
             <Tooltip title="Switch Map Theme" placement="left">
-               <button className="sub-fab vivid-interactive" onClick={() => { handleStyleChange(); /* No setFabExpanded(false) */ }}>
-                  <LayerIcon />
-               </button>
+              <button className="sub-fab vivid-interactive" onClick={() => { handleStyleChange(); /* No setFabExpanded(false) */ }}>
+                <LayerIcon />
+              </button>
             </Tooltip>
           </div>
         </div>
 
         {/* 5. Filter Panel (Glass) */}
-        {filterOpen && !activeRoute && (
+        {filterOpen && (
           <div className="glass-panel filter-panel">
             <div className="filter-header">
               <span className="filter-title">Filter Places</span>
@@ -1704,96 +1731,119 @@ export default function MapPage() {
         {/* 6. Results Sheet (Glass) */}
         {canShowResultsPanel && (
           <div className="glass-panel results-sheet">
-             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                <div>
-                   <div style={{ fontWeight: 800, fontSize: 18 }}>Discover Local Gems</div>
-                   <div style={{ fontSize: 13, color: "var(--text-sub)" }}>{resultsPois.length} curated spots found</div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                   {user && !activeRoute && (
-                     <Button type="primary" shape="round" onClick={openPolygonRouteParams} style={{ background: "var(--vivid-blue)", borderColor: "var(--vivid-blue)" }}>
-                       Create AI Route
-                     </Button>
-                   )}
-                   <Button type="text" icon={<CloseOutlined />} onClick={clearSelectionOnly} />
-                </div>
-             </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 18 }}>Discover Local Gems</div>
+                <div style={{ fontSize: 13, color: "var(--text-sub)" }}>{resultsPois.length} curated spots found</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {user && !activeRoute && (
+                  <Button type="primary" shape="round" onClick={openPolygonRouteParams} style={{ background: "var(--vivid-blue)", borderColor: "var(--vivid-blue)" }}>
+                    Create AI Route
+                  </Button>
+                )}
+                <Button type="text" icon={<CloseOutlined />} onClick={clearSelectionOnly} />
+              </div>
+            </div>
 
-             <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
-                {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...UI_CATEGORIES].map(t => {
-                   const active = resultsTab === t.key;
-                   return (
-                     <button key={t.key} onClick={() => setResultsTab(t.key)}
-                       style={{
-                         flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
-                         border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
-                         background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
-                         color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
-                       }}
-                     >
-                       {t.icon || <GlobalOutlined />} {t.label}
-                     </button>
-                   );
-                })}
-             </div>
+            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
+              {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...UI_CATEGORIES].map(t => {
+                const active = resultsTab === t.key;
+                return (
+                  <button key={t.key} onClick={() => setResultsTab(t.key)}
+                    style={{
+                      flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
+                      border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
+                      background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
+                      color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
+                    }}
+                  >
+                    {t.icon || <GlobalOutlined />} {t.label}
+                  </button>
+                );
+              })}
+            </div>
 
-             <div style={{ maxHeight: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4 }}>
-                {resultsPois.map(p => (
-                  <div key={p.poiId} style={{ 
-                    display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", 
-                    borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)", 
-                    marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
-                    backdropFilter: "blur(4px)"
+            <div style={{ maxHeight: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4 }}>
+              {resultsPois.map(p => (
+                <div key={p.poiId} style={{
+                  display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
+                  borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
+                  marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
+                  backdropFilter: "blur(4px)"
+                }}>
+                  <div style={{
+                    width: 48, height: 48, borderRadius: 14,
+                    background: "rgba(255,255,255,0.05)",
+                    display: "grid", placeItems: "center",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    border: "1px solid rgba(255,255,255,0.1)"
                   }}>
-                     <div style={{ 
-                       width: 48, height: 48, borderRadius: 14, 
-                       background: "rgba(255,255,255,0.05)", 
-                       display: "grid", placeItems: "center", 
-                       boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                       border: "1px solid rgba(255,255,255,0.1)"
-                     }}>
-                        <div style={{ 
-                          color: poiIconByCategory(p.category)?.ring, 
-                          fontSize: 20,
-                          filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))" 
-                        }}>
-                          {poiIconByCategory(p.category)?.icon}
-                        </div>
-                     </div>
-                     <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p.category)}</div>
-                     </div>
+                    <div style={{
+                      color: poiIconByCategory(p.category)?.ring,
+                      fontSize: 20,
+                      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                    }}>
+                      {poiIconByCategory(p.category)?.icon}
+                    </div>
                   </div>
-                ))}
-             </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p.category)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         <Modal title="AI Route Parameters" open={polygonRouteParamsOpen} onCancel={() => setPolygonRouteParamsOpen(false)} footer={null} zIndex={1100}>
-           <Spin spinning={polygonRouteSubmitting}>
-              <Form form={polygonRouteForm} layout="vertical" onFinish={submitPolygonRoute}>
-                 <Form.Item name="totalDays" label="Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
-                 <Form.Item name="travelStyle" label="Travel Style"><Select options={[{value:"general",label:"Balanced"},{value:"history",label:"Historical"},{value:"food",label:"Gourmet"},{value:"nature",label:"Outdoors"}]} /></Form.Item>
-                 <Button type="primary" block size="large" htmlType="submit" loading={polygonRouteSubmitting} style={{ borderRadius: 12 }}>Generate Smart Route</Button>
-              </Form>
-           </Spin>
+          <Spin spinning={polygonRouteSubmitting}>
+            <Form form={polygonRouteForm} layout="vertical" onFinish={submitPolygonRoute}>
+              <Form.Item name="totalDays" label="Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
+              <Form.Item name="travelStyle" label="Travel Style"><Select options={[{ value: "general", label: "Balanced" }, { value: "history", label: "Historical" }, { value: "food", label: "Gourmet" }, { value: "nature", label: "Outdoors" }]} /></Form.Item>
+              <Button type="primary" block size="large" htmlType="submit" loading={polygonRouteSubmitting} style={{ borderRadius: 12 }}>Generate Smart Route</Button>
+            </Form>
+          </Spin>
         </Modal>
 
         <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
-        <VacanzaChat 
-          isOpen={isChatOpen} 
-          onClose={() => setIsChatOpen(false)} 
+        
+        {/* 7. Itinerary/Route Card (RoutePanel) - RESTORED */}
+        {activeRoute && (
+          <RoutePanel
+            route={activeRoute}
+            activeDay={activeDay}
+            onDayChange={setActiveDay}
+            onClose={() => setActiveRoute(null)}
+          />
+        )}
+
+        <VacanzaChat
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
           externalConversationRefreshNonce={chatConversationRefreshNonce}
-          onConversationIdChange={setMapChatConversationId} 
+          onConversationIdChange={setMapChatConversationId}
           onRequestDrawToEdit={handleRequestDrawToEditFromChat}
-          onRouteGenerated={(routeData, meta) => { 
-            setActiveRoute(normalizeRouteForMap(routeData)); 
-            setActiveDay(1); 
-            setIsChatOpen(false); 
+          onRouteGenerated={(routeData, meta) => {
+            setActiveRoute(normalizeRouteForMap(routeData));
+            setActiveDay(1);
+            setIsChatOpen(false);
           }}
         />
-        <ProfileModal open={profileModalOpen} onClose={() => setProfileModalOpen(false)} user={user} />
+        <ProfileModal 
+          open={profileModalOpen} 
+          onClose={() => setProfileModalOpen(false)} 
+          user={user} 
+          themeClass={themeClass}
+          isDarkMode={isDarkMode}
+        />
+        <PreferencesModal 
+          open={preferencesModalOpen} 
+          onClose={() => setPreferencesModalOpen(false)} 
+          themeClass={themeClass}
+          isDarkMode={isDarkMode}
+        />
       </main>
     </div>
   );

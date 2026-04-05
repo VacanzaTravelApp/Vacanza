@@ -4,28 +4,24 @@ import './AuthLayout.css';
 
 const calculateTimeState = () => {
   const now = new Date();
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
+  const hours = 23; // TEMPORARY FORCE NIGHT
+  const minutes = 30;
   const timeFloat = hours + minutes / 60;
+
+  const isNight = true; // TEMPORARY FORCE NIGHT
+
+  let theme = 'theme-midnight'; // TEMPORARY FORCE NIGHT
   
-  const isNight = timeFloat < 6 || timeFloat >= 18;
-  
-  let theme;
-  if (timeFloat >= 5 && timeFloat < 8) theme = 'theme-sunrise';
-  else if (timeFloat >= 8 && timeFloat < 17) theme = 'theme-ocean';
-  else if (timeFloat >= 17 && timeFloat < 19) theme = 'theme-sunset';
-  else theme = 'theme-midnight';
-  
-  let cyclePeriod = isNight ? 
-       (timeFloat >= 18 ? timeFloat - 18 : timeFloat + 6) / 12 : 
-       (timeFloat - 6) / 12; 
-       
+  let cyclePeriod = 0.5; // High midnight position
+
   const elevation = Math.sin(cyclePeriod * Math.PI);
   // Y ranges from 550 (below mountains) to 120 (high noon/midnight sky)
-  const celestialY = 550 - (elevation * 430); 
-  
-  const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  
+  const celestialY = 550 - (elevation * 430);
+
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  const formattedTime = `${hours12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+
   return { theme, isNight, celestialY, formattedTime };
 };
 
@@ -45,39 +41,39 @@ const TravelScene = ({ timeState, isLoaded }) => {
 
       {/* Stars - visible only at night */}
       <g className="night-stars parallax-bg" style={{ opacity: isNight && isLoaded ? 1 : 0, transition: 'opacity 3s ease 1s' }}>
-         <circle cx="200" cy="150" r="2" fill="white" opacity="0.8" className="star-twinkle" />
-         <circle cx="150" cy="80" r="2.5" fill="white" opacity="0.6" className="star-twinkle" style={{animationDelay: '1s'}} />
-         <circle cx="350" cy="120" r="1.5" fill="white" opacity="0.9" />
-         <circle cx="650" cy="100" r="2.5" fill="white" opacity="0.7" className="star-twinkle" style={{animationDelay: '0.5s'}}/>
-         <circle cx="800" cy="60" r="2" fill="white" opacity="0.5" />
-         <circle cx="500" cy="180" r="1.5" fill="white" opacity="0.4" />
-         <circle cx="900" cy="220" r="2" fill="white" opacity="0.6" className="star-twinkle" style={{animationDelay: '1.5s'}}/>
+        <circle cx="200" cy="150" r="2" fill="white" opacity="0.8" className="star-twinkle" />
+        <circle cx="150" cy="80" r="2.5" fill="white" opacity="0.6" className="star-twinkle" style={{ animationDelay: '1s' }} />
+        <circle cx="350" cy="120" r="1.5" fill="white" opacity="0.9" />
+        <circle cx="650" cy="100" r="2.5" fill="white" opacity="0.7" className="star-twinkle" style={{ animationDelay: '0.5s' }} />
+        <circle cx="800" cy="60" r="2" fill="white" opacity="0.5" />
+        <circle cx="500" cy="180" r="1.5" fill="white" opacity="0.4" />
+        <circle cx="900" cy="220" r="2" fill="white" opacity="0.6" className="star-twinkle" style={{ animationDelay: '1.5s' }} />
       </g>
 
       <g className="parallax-far">
         <g style={{ transform: `translate(${CELESTIAL_X}px, ${currentY}px)`, transition: 'transform 3s cubic-bezier(0.34, 1.2, 0.64, 1)' }}>
           {/* Core Shape: Sun or Moon */}
-          <circle 
-            cx="0" cy="0" r="80" 
-            fill="var(--scene-sun)" 
-            opacity="0.95" 
-            mask={isNight ? "url(#moon-mask)" : undefined} 
-            className="celestial-pulse" 
+          <circle
+            cx="0" cy="0" r="80"
+            fill="var(--scene-sun)"
+            opacity="0.95"
+            mask={isNight ? "url(#moon-mask)" : undefined}
+            className="celestial-pulse"
           />
           {/* Outer glows */}
           <circle cx="0" cy="0" r="100" fill="var(--scene-sun)" opacity={isNight ? 0.05 : 0.12} />
           <circle cx="0" cy="0" r="120" fill="var(--scene-sun)" opacity={isNight ? 0.02 : 0.06} />
-          
+
           {/* Rays (Sun only) */}
           <g style={{ opacity: isNight ? 0 : 1, transition: 'opacity 1s ease' }}>
             <g className="sun-rays">
               {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((a) => (
-                 <line key={a}
-                   x1={90 * Math.cos(a * Math.PI / 180)} y1={90 * Math.sin(a * Math.PI / 180)}
-                   x2={110 * Math.cos(a * Math.PI / 180)} y2={110 * Math.sin(a * Math.PI / 180)}
-                   stroke="var(--scene-sun)" strokeWidth="3" strokeLinecap="round" opacity="0.35"
-                 />
-               ))}
+                <line key={a}
+                  x1={90 * Math.cos(a * Math.PI / 180)} y1={90 * Math.sin(a * Math.PI / 180)}
+                  x2={110 * Math.cos(a * Math.PI / 180)} y2={110 * Math.sin(a * Math.PI / 180)}
+                  stroke="var(--scene-sun)" strokeWidth="3" strokeLinecap="round" opacity="0.35"
+                />
+              ))}
             </g>
           </g>
         </g>
@@ -93,7 +89,7 @@ const TravelScene = ({ timeState, isLoaded }) => {
       <g className="cloud cloud-3 parallax-mid" transform="translate(820, 260)">
         <path d="M 17 11 C 17 6 21 3 26 3 C 28 3 30 4 32 6 C 33 3 37 0 42 0 C 49 0 54 4 56 10 C 61 11 65 15 65 20 C 65 25 61 30 55 30 L 16 30 C 7 30 0 23 0 14 C 0 6 5 2 11 2 C 14 2 16 3 18 5 C 18 7 17 9 17 11 Z" fill="white" opacity="0.4" transform="scale(1.6)" />
       </g>
-      
+
       <path className="plane-trail parallax-far" d="M100,200 Q300,100 500,150 Q700,200 900,100"
         stroke="var(--scene-coral)" strokeWidth="2" strokeDasharray="8 10" fill="none" opacity="0.25" />
       <g className="parallax-far" transform="translate(900, 100) rotate(-15)">
@@ -148,20 +144,20 @@ const TinyCompass = () => (
 
 const PlaneIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="currentColor" strokeWidth="1.5">
-    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="currentColor" opacity="0.8"/>
+    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="currentColor" opacity="0.8" />
   </svg>
 );
 
 const WalletIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="currentColor" strokeWidth="1.5">
-    <rect x="3" y="6" width="18" height="12" rx="2" fill="currentColor" opacity="0.4"/>
-    <path d="M3 10h18M7 14h.01" strokeLinecap="round"/>
+    <rect x="3" y="6" width="18" height="12" rx="2" fill="currentColor" opacity="0.4" />
+    <path d="M3 10h18M7 14h.01" strokeLinecap="round" />
   </svg>
 );
 
 const MapIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="currentColor" strokeWidth="1.5">
-    <path d="M9 20l-6-3V4l6 3m0 13l6-3m-6 3V7m6 10l6 3V7l-6-3m0 13V4" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M9 20l-6-3V4l6 3m0 13l6-3m-6 3V7m6 10l6 3V7l-6-3m0 13V4" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -173,12 +169,12 @@ const AuthLayout = ({ children }) => {
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setIsLoaded(true));
-    
+
     const handleMouseMove = (e) => {
       const { innerWidth, innerHeight } = window;
-      const xPos = (e.clientX / innerWidth - 0.5) * 2; 
-      const yPos = (e.clientY / innerHeight - 0.5) * 2; 
-      
+      const xPos = (e.clientX / innerWidth - 0.5) * 2;
+      const yPos = (e.clientY / innerHeight - 0.5) * 2;
+
       document.documentElement.style.setProperty('--mouse-x', xPos);
       document.documentElement.style.setProperty('--mouse-y', yPos);
     };
@@ -204,7 +200,7 @@ const AuthLayout = ({ children }) => {
           <div className="topbar-left">
             <TinyCompass />
             <span className="brand-name">Vacanza</span>
-            <span className="local-time-badge">{timeState.formattedTime} Local Time</span>
+            <span className="local-time-badge">{timeState.formattedTime}</span>
           </div>
           <span className="brand-tagline">Travel Intelligently</span>
         </header>

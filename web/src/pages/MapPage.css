@@ -14,9 +14,9 @@
   --font-serif: 'Instrument Serif', 'Georgia', serif;
   --font-sans: 'DM Sans', 'Helvetica Neue', sans-serif;
 
-  /* Auth-grade glass defaults */
-  --card-bg: rgba(255, 255, 255, 0.85);
-  --card-border: rgba(255, 255, 255, 0.8);
+  /* Auth-grade solid defaults */
+  --card-bg: rgba(255, 255, 255, 0.995);
+  --card-border: rgba(255, 255, 255, 0.95);
   --card-text: var(--vivid-navy);
   --card-subtext: var(--vivid-navy-light);
   
@@ -39,33 +39,34 @@
 /* Themes matching AuthLayout */
 .theme-sunrise {
   --theme-accent: #FFB347;
-  --glass-bg: rgba(255, 245, 238, 0.85);
+  --glass-bg: rgba(255, 245, 238, 0.995);
 }
 .theme-ocean {
   --theme-accent: #00B4D8;
-  --glass-bg: rgba(224, 247, 250, 0.85);
+  --glass-bg: rgba(224, 247, 250, 0.995);
 }
 .theme-tropical {
   --theme-accent: #2DD4A8;
-  --glass-bg: rgba(240, 255, 244, 0.85);
+  --glass-bg: rgba(240, 255, 244, 0.995);
 }
 .theme-sunset {
   --theme-accent: #FF6B6B;
-  --glass-bg: rgba(255, 232, 232, 0.85);
+  --glass-bg: rgba(255, 232, 232, 0.995);
 }
-.theme-midnight {
-    --bg-main: #0a0c12;
-    --card-bg: rgba(15, 23, 42, 0.85);
-    --card-border: rgba(255, 255, 255, 0.1);
+.theme-night {
+    --bg-main: #06080b;
+    --card-bg: rgba(13, 21, 38, 0.75); /* Sophisticated 75% opaque navy */
+    --glass-bg: rgba(26, 27, 38, 0.85);
+    --card-border: #FFFFFF; /* High contrast frame preserved */
     --card-text: #F8FAFC;
-    --card-subtext: #94a3b8;
+    --card-subtext: #94A3B8;
     
-    --text-main: #ffffff;
-    --text-sub: #94a3b8;
+    --text-main: #FFFFFF;
+    --text-sub: #94A3B8;
     --vivid-blue: #38BDF8;
-    --glass-bg: var(--card-bg);
     --glass-border: var(--card-border);
-    --panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    --panel-shadow: 0 45px 120px rgba(0, 0, 0, 0.95);
+    --modal-accent: rgba(56, 189, 248, 0.3);
 }
 
 /* Unified Micro-interactions */
@@ -208,6 +209,8 @@
     margin: 0;
     letter-spacing: -0.5px;
     line-height: 1.2;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .sidebar-role {
@@ -218,6 +221,8 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     margin-top: 4px;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .sidebar-xp-container {
@@ -371,6 +376,8 @@
     font-weight: 800;
     color: var(--text-main); /* Integrated title color */
     letter-spacing: -0.01em;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .filter-header-actions {
@@ -424,6 +431,8 @@
     font-weight: 700;
     color: var(--text-main);
     letter-spacing: 0.01em;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .results-sheet {
@@ -619,10 +628,78 @@
   white-space: nowrap;
   transition: all 0.3s ease;
 }
-.theme-midnight .local-time-badge {
-    background: rgba(15, 23, 42, 0.4);
-    color: #F8FAFC;
-    border-color: rgba(255,255,255,0.05);
+/* Day / Night Theme Consolidation */
+.theme-day {
+    --bg-main: #f8faff;
+    --card-bg: #FFFFFF;
+    --glass-bg: rgba(224, 247, 250, 0.95);
+    --card-border: rgba(0, 0, 0, 0.08); /* High contrast for Day */
+    --card-text: #2c3545;
+    --card-subtext: #5a6b7a;
+    --vivid-blue: #00B4D8;
+    --text-main: #2c3545;
+    --text-sub: #5a6b7a;
+    --vivid-subtle-bg: rgba(0, 0, 0, 0.04);
+}
+
+.theme-night {
+    --bg-main: #13141C; /* Softer dark greyish-blue base */
+    --card-bg: #1A1B26; /* Bluish navy matching the header */
+    --glass-bg: rgba(26, 27, 38, 0.85); /* #1a1b26 */
+    --card-border: rgba(56, 189, 248, 0.2); /* Cyan-blue tint */
+    --card-text: #F8FAFC;
+    --card-subtext: #94A3B8;
+    --vivid-blue: #38BDF8;
+    --text-main: #F8FAFC;
+    --text-sub: #94A3B8;
+    --glass-border: var(--card-border);
+    --panel-shadow: 0 45px 120px rgba(0, 0, 0, 0.85);
+    --modal-accent: rgba(56, 189, 248, 0.3);
+    --vivid-subtle-bg: rgba(255, 255, 255, 0.08);
+}
+
+/* Premium Theme Overrides */
+.theme-day .ant-modal.ant-modal-centered .ant-modal-content {
+    background: #FFFFFF !important;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+    border-radius: 40px !important;
+}
+
+.theme-night .ant-modal.ant-modal-centered .ant-modal-content {
+    background: #0D1526 !important;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.95), 0 0 0 3px rgba(255, 255, 255, 0.03) !important;
+    border-radius: 40px !important;
+}
+
+.vivid-theme-toggle {
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+}
+
+.vivid-theme-toggle .toggle-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.1);
+    background: rgba(255,255,255,1);
+    color: #000000; /* SHINE BLACK icons as requested */
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-size: 20px;
+}
+
+.theme-night .vivid-theme-toggle .toggle-btn {
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: #000000; /* SHINE BLACK icons in dark as well */
+}
+
+.vivid-theme-toggle .toggle-btn:hover {
+    transform: scale(1.1) rotate(10deg);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
 }
 
 .clock-label {
@@ -634,73 +711,43 @@
     margin-top: 2px;
 }
 
-.vivid-theme-toggle {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--text-main);
-    font-size: 20px;
-    transition: all 0.3s ease;
-    margin-right: 8px;
+/* Aggressive Ant Design Modal Overrides - Kill the white frame once */
+.ant-modal.ant-modal-centered .ant-modal-content {
+    background: var(--card-bg, #0A1120) !important;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.95), 0 0 0 3px var(--card-border, #FFFFFF) !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 40px !important;
+    opacity: 1 !important;
+    overflow: hidden !important;
 }
 
-.vivid-theme-toggle:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: scale(1.08) rotate(15deg);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+.ant-modal-body {
+    padding: 0 !important;
+    background: transparent !important;
 }
 
-/* Manual Theme Toggle Styling */
-.vivid-theme-toggle {
-    margin-right: 12px;
-    display: flex;
-    align-items: center;
+/* Specific theme overrides for the content wrapper inside modalRender */
+.theme-night .ant-modal-content {
+    background: rgba(26, 27, 38, 0.75) !important;
+    backdrop-filter: blur(28px) !important;
+    opacity: 1 !important;
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.9), 0 0 0 3px #FFFFFF !important;
+}
+.theme-night .modal-shell {
+    background: transparent !important;
+    border: none !important;
+    padding: 3px;
 }
 
-.vivid-theme-toggle .toggle-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: 1px solid rgba(0,0,0,0.08);
-    background: rgba(255,255,255,0.4);
-    color: var(--text-main);
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-    transition: all 0.3s ease;
-    font-size: 18px;
+.theme-night .ant-input::placeholder,
+.theme-night .ant-input-affix-wrapper .ant-input::placeholder {
+    color: rgba(255, 255, 255, 0.55) !important;
 }
 
-.theme-midnight .vivid-theme-toggle .toggle-btn {
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.05);
+.theme-night .ant-form-item-label > label {
+    color: var(--card-text) !important;
+    opacity: 0.9;
 }
 
-.vivid-theme-toggle .toggle-btn:hover {
-    background: rgba(255,255,255,0.8);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
 
-.theme-midnight .vivid-theme-toggle .toggle-btn:hover {
-    background: rgba(255,255,255,0.15);
-}
-
-.vivid-theme-toggle .toggle-btn.is-night {
-    color: #818cf8; /* Indigo/Lavender Moon for fresh blue feel */
-}
-
-/* Fresh Blue Dark Mode Overrides */
-.theme-midnight {
-    --card-bg: rgba(15, 23, 42, 0.85); /* Deep slate-blue navy */
-    --card-border: rgba(51, 65, 85, 0.5);
-    --text-main: #f8fafc;
-    --text-sub: #94a3b8;
-    --vivid-navy-rgb: 15, 23, 42;
-}

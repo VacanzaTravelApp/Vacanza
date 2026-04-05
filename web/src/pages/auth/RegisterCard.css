@@ -163,7 +163,7 @@
   border-color: var(--vivid-coral) !important;
 }
 
-.ant-modal .ant-modal-content {
+.ant-modal.register-modal .ant-modal-content {
   background: var(--card-bg) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -172,12 +172,12 @@
   border: 1px solid var(--card-border) !important;
 }
 
-.ant-modal .ant-modal-header {
+.ant-modal.register-modal .ant-modal-header {
   background: transparent !important;
   border-bottom: 1px solid var(--input-border) !important;
 }
 
-.ant-modal .ant-modal-title {
+.ant-modal.register-modal .ant-modal-title {
   font-family: var(--font-display) !important;
   font-weight: 700 !important;
   color: var(--card-text) !important;

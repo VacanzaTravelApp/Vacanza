@@ -188,7 +188,7 @@ const RegisterCard = () => {
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="First Name"
+                placeholder="First Name *"
                 size="large"
                 autoComplete="given-name"
               />
@@ -201,7 +201,7 @@ const RegisterCard = () => {
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="Middle Name (Optional)"
+                placeholder="Middle Name"
                 size="large"
               />
             </Form.Item>
@@ -214,7 +214,7 @@ const RegisterCard = () => {
         >
           <Input
             prefix={<UserOutlined />}
-            placeholder="Last Name"
+            placeholder="Last Name *"
             size="large"
             autoComplete="family-name"
           />
@@ -249,7 +249,7 @@ const RegisterCard = () => {
         >
           <Input
             prefix={<MailOutlined />}
-            placeholder="Email address"
+            placeholder="Email address *"
             size="large"
             autoComplete="email"
           />
@@ -262,7 +262,7 @@ const RegisterCard = () => {
         >
           <Input.Password
             prefix={<LockOutlined />}
-            placeholder="Password"
+            placeholder="Password *"
             size="large"
             autoComplete="new-password"
           />
@@ -289,7 +289,7 @@ const RegisterCard = () => {
         >
           <Input.Password
             prefix={<LockOutlined />}
-            placeholder="Confirm Password"
+            placeholder="Confirm Password *"
             size="large"
             autoComplete="new-password"
           />
@@ -310,6 +310,11 @@ const RegisterCard = () => {
             I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
           </Checkbox>
         </Form.Item>
+
+        <div style={{ padding: "0 12px", fontSize: '11px', fontWeight: 700, color: '#455A64', opacity: 0.6, marginBottom: '20px' }}>
+          <span style={{ color: '#FF6B6B' }}>*</span> indicates a mandatory field
+        </div>
+
         <Form.Item>
           <Button
             type="primary"
