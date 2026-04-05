@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vacanza.backend.dto.request.EventSearchRequestDTO;
 import com.vacanza.backend.dto.response.EventDTO;
 import com.vacanza.backend.dto.response.EventRecommendationResponse;
+import com.vacanza.backend.dto.response.EventSearchWindowMode;
 import com.vacanza.backend.dto.response.RecommendedEvent;
 import com.vacanza.backend.entity.AiRoute;
 import com.vacanza.backend.entity.User;
@@ -14,6 +15,7 @@ import com.vacanza.backend.dto.weather.DayPartWeatherDay;
 import com.vacanza.backend.integration.ai.AiChatDto;
 import com.vacanza.backend.integration.ai.AiServiceClient;
 import com.vacanza.backend.repo.UserPreferencesRepository;
+import com.vacanza.backend.util.DestinationCountryParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -23,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -35,8 +38,14 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Orchestrates event recommendations for a saved AI route: preferences → Ticketmaster search →
- * virtual filter → optional AI ranking.
+ * Orchestrates event recommendations for a saved AI route: Ticketmaster search (by place and dates)
+ * → virtual filter → optional AI ranking using user preferences.
+ * <p>
+ * Date range: Ticketmaster uses a <strong>30-day</strong> window from today unless {@code route_data.trip_dates_user_specified}
+ * is {@code true} (user locked specific calendar dates — then the trip window from weather/route is used).
+ * <p>
+ * Preference keywords are <strong>not</strong> sent to Ticketmaster as {@code classificationName}; the AI service
+ * ranks events using profile + {@code event_interest}.
  */
 @Slf4j
 @Service
@@ -44,6 +53,11 @@ import java.util.stream.Collectors;
 public class EventRecommendationService {
 
     private static final String FALLBACK_MESSAGE_TR = "Rotanız için bulunan etkinlikler:";
+
+    /** Broad Ticketmaster window when user did not specify calendar dates (see {@code trip_dates_user_specified}). */
+    private static final int BROAD_EVENT_WINDOW_DAYS = 30;
+
+    private static final ZoneId EVENT_SEARCH_ZONE = ZoneId.of("Europe/Istanbul");
 
     private final AiRouteService aiRouteService;
     private final UserPreferencesRepository userPreferencesRepository;
@@ -62,7 +76,13 @@ public class EventRecommendationService {
 
         UserPreferences structured = userPreferencesRepository.findByUser(user).orElse(null);
         List<AiChatDto.ExtractedPreference> aiPrefs = userPreferenceAiService.getExistingPreferences(user);
-        List<String> categories = eventPreferenceMapper.mapToTicketmasterCategoriesFromExtracted(structured, aiPrefs);
+        List<String> mappedPreferenceCategories =
+                eventPreferenceMapper.mapToTicketmasterCategoriesFromExtracted(structured, aiPrefs);
+        if (!mappedPreferenceCategories.isEmpty()) {
+            log.debug(
+                    "Preference-mapped event categories (AI ranking only; not used as Ticketmaster filter): {}",
+                    mappedPreferenceCategories);
+        }
 
         String rawDestination = firstNonBlank(
                 routeData != null ? routeData.getDestination() : null,
@@ -70,7 +90,7 @@ public class EventRecommendationService {
         String city = parseCityName(rawDestination);
         if (city.isBlank()) {
             log.warn("No destination city for route {}", routeId);
-            return emptyResponse();
+            return emptyResponse(routeData);
         }
 
         int totalDays = resolveTotalDays(routeData, route);
@@ -80,24 +100,19 @@ public class EventRecommendationService {
 
         EventSearchRequestDTO request = new EventSearchRequestDTO();
         request.setCity(city);
-        if (normalizedDay != null) {
-            LocalDate dayDate = tripStart.plusDays(normalizedDay - 1);
-            request.setStartDate(dayDate);
-            request.setEndDate(dayDate);
-        } else {
-            request.setStartDate(tripStart);
-            request.setEndDate(computeEndDate(tripStart, totalDays));
-        }
-        String categoryParam = categories.isEmpty() ? null : String.join(", ", categories);
-        request.setCategory(categoryParam);
-        request.setSize(20);
+        DestinationCountryParser.countryIso2FromDestination(rawDestination).ifPresent(request::setCountryCode);
+        applyGeoFromRoute(routeData, request);
+        applyTicketmasterDateRange(request, routeData, normalizedDay, tripStart, totalDays);
+        // Do not set classificationName on Ticketmaster — keep discovery broad; AI ranks by preferences.
+        request.setCategory(null);
+        request.setSize(50);
 
         List<EventDTO> found;
         try {
             found = eventService.searchEvents(request);
         } catch (Exception e) {
             log.warn("Ticketmaster event search failed for route {}: {}", routeId, e.getMessage());
-            return emptyResponse();
+            return emptyResponse(routeData);
         }
 
         List<EventDTO> filtered = found.stream()
@@ -111,6 +126,8 @@ public class EventRecommendationService {
                     .collect(Collectors.toList());
         }
 
+        EventSearchWindowMode searchWindow = resolveEventSearchWindow(routeData);
+
         int totalFound = filtered.size();
         if (totalFound == 0) {
             return EventRecommendationResponse.builder()
@@ -118,6 +135,7 @@ public class EventRecommendationService {
                     .events(List.of())
                     .totalFound(0)
                     .hasRecommendations(false)
+                    .eventSearchWindow(searchWindow)
                     .build();
         }
 
@@ -140,6 +158,7 @@ public class EventRecommendationService {
                         .events(ranked)
                         .totalFound(totalFound)
                         .hasRecommendations(true)
+                        .eventSearchWindow(searchWindow)
                         .build();
             }
         }
@@ -152,16 +171,28 @@ public class EventRecommendationService {
                 .events(sorted)
                 .totalFound(totalFound)
                 .hasRecommendations(!sorted.isEmpty())
+                .eventSearchWindow(searchWindow)
                 .build();
     }
 
-    private static EventRecommendationResponse emptyResponse() {
+    private static EventRecommendationResponse emptyResponse(AiChatDto.RouteData routeData) {
         return EventRecommendationResponse.builder()
                 .message(null)
                 .events(List.of())
                 .totalFound(0)
                 .hasRecommendations(false)
+                .eventSearchWindow(resolveEventSearchWindow(routeData))
                 .build();
+    }
+
+    private static EventSearchWindowMode resolveEventSearchWindow(AiChatDto.RouteData routeData) {
+        if (routeData != null && Boolean.TRUE.equals(routeData.getTripDatesUserSpecified())) {
+            return EventSearchWindowMode.TRIP_DATES;
+        }
+        if (routeData != null && parseIsoLocalDate(routeData.getTripStartDate()).isPresent()) {
+            return EventSearchWindowMode.TRIP_DATES;
+        }
+        return EventSearchWindowMode.BROAD_30_DAYS;
     }
 
     private AiChatDto.RouteData parseRouteJson(String routeJson) {
@@ -184,11 +215,31 @@ public class EventRecommendationService {
     }
 
     /**
-     * First calendar day of the trip: from embedded weather (aligned with itinerary days), else route creation date.
+     * First calendar day of the trip: explicit {@code trip_start_date} from AI (user-stated dates), else embedded
+     * weather, else route creation date.
      */
-    static LocalDate resolveTripStartLocalDate(AiChatDto.RouteData routeData, AiRoute route) {
+    public static LocalDate resolveTripStartLocalDate(AiChatDto.RouteData routeData, AiRoute route) {
+        Optional<LocalDate> fromRoute = parseIsoLocalDate(routeData != null ? routeData.getTripStartDate() : null);
+        if (fromRoute.isPresent()) {
+            return fromRoute.get();
+        }
         Optional<LocalDate> fromWeather = firstWeatherDate(routeData);
         return fromWeather.orElseGet(() -> route.getGeneratedAt().toLocalDate());
+    }
+
+    static Optional<LocalDate> parseIsoLocalDate(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        String s = raw.trim();
+        if (s.length() >= 10) {
+            s = s.substring(0, 10);
+        }
+        try {
+            return Optional.of(LocalDate.parse(s));
+        } catch (DateTimeParseException e) {
+            return Optional.empty();
+        }
     }
 
     private static Optional<LocalDate> firstWeatherDate(AiChatDto.RouteData routeData) {
@@ -264,6 +315,47 @@ public class EventRecommendationService {
         return startDate.plusDays(totalDays - 1);
     }
 
+    /**
+     * Sets Ticketmaster date range on {@code request}.
+     * <ul>
+     *   <li>Narrow: {@code trip_dates_user_specified == true} <em>or</em> parseable {@code trip_start_date} (user-stated first trip day).</li>
+     *   <li>Broad: otherwise — next {@link #BROAD_EVENT_WINDOW_DAYS} days from today ({@link #EVENT_SEARCH_ZONE}).</li>
+     * </ul>
+     * When a specific trip day is requested ({@code normalizedDay}), results are still filtered to that calendar day
+     * after the fetch.
+     */
+    public static void applyTicketmasterDateRange(
+            EventSearchRequestDTO request,
+            AiChatDto.RouteData routeData,
+            Integer normalizedDay,
+            LocalDate tripStart,
+            int totalDays) {
+        Boolean explicit = routeData != null ? routeData.getTripDatesUserSpecified() : null;
+        boolean narrowTrip = Boolean.TRUE.equals(explicit)
+                || (routeData != null && parseIsoLocalDate(routeData.getTripStartDate()).isPresent());
+
+        if (narrowTrip) {
+            log.debug("Event search using narrow trip window (trip dates or trip_start_date)");
+            if (normalizedDay != null) {
+                LocalDate dayDate = tripStart.plusDays(normalizedDay - 1);
+                request.setStartDate(dayDate);
+                request.setEndDate(dayDate);
+            } else {
+                request.setStartDate(tripStart);
+                request.setEndDate(computeEndDate(tripStart, totalDays));
+            }
+            return;
+        }
+
+        LocalDate today = LocalDate.now(EVENT_SEARCH_ZONE);
+        LocalDate windowEnd = today.plusDays(BROAD_EVENT_WINDOW_DAYS - 1);
+        log.info(
+                "Event search using {}-day broad window from today (trip_dates_user_specified absent or false)",
+                BROAD_EVENT_WINDOW_DAYS);
+        request.setStartDate(today);
+        request.setEndDate(windowEnd);
+    }
+
     private static String firstNonBlank(String a, String b) {
         if (a != null && !a.isBlank()) {
             return a.trim();
@@ -272,6 +364,27 @@ public class EventRecommendationService {
             return b.trim();
         }
         return "";
+    }
+
+    /**
+     * First waypoint with coordinates → Ticketmaster {@code latlong} search center.
+     */
+    private static void applyGeoFromRoute(AiChatDto.RouteData routeData, EventSearchRequestDTO request) {
+        if (routeData == null || routeData.getDays() == null) {
+            return;
+        }
+        for (AiChatDto.DayPlan day : routeData.getDays()) {
+            if (day.getWaypoints() == null) {
+                continue;
+            }
+            for (AiChatDto.RouteWaypoint w : day.getWaypoints()) {
+                if (w.getLatitude() != null && w.getLongitude() != null) {
+                    request.setGeoLatitude(w.getLatitude());
+                    request.setGeoLongitude(w.getLongitude());
+                    return;
+                }
+            }
+        }
     }
 
     /**

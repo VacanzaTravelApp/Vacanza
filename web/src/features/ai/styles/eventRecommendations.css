@@ -36,6 +36,37 @@
   animation: eventRecFadeIn 0.35s ease-out;
 }
 
+.event-rec-window-hint {
+  margin: 0 2px 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--vc-text-secondary, #6b7280);
+  background: rgba(61, 168, 200, 0.08);
+  border-radius: 8px;
+  border: 1px solid rgba(61, 168, 200, 0.2);
+}
+
+.event-rec-broad-actions {
+  margin-top: 10px;
+  padding: 0 2px 4px;
+}
+
+.event-rec-show-more-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vc-primary, #3da8c8);
+  background: rgba(61, 168, 200, 0.08);
+  border: 1px solid rgba(61, 168, 200, 0.35);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.event-rec-show-more-btn:hover {
+  background: rgba(61, 168, 200, 0.14);
+}
+
 .event-recommendations-header {
   display: flex;
   align-items: flex-start;

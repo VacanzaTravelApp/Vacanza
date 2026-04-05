@@ -27,6 +27,16 @@ public class EventSearchRequestDTO {
     private String countryCode;
 
     /**
+     * Optional geo center for Ticketmaster {@code latlong} (from route waypoint). Use with {@link #geoLongitude}.
+     */
+    private Double geoLatitude;
+
+    /**
+     * Optional geo center for Ticketmaster {@code latlong} (from route waypoint). Use with {@link #geoLatitude}.
+     */
+    private Double geoLongitude;
+
+    /**
      * Start date for the event search range. Optional.
      */
     private LocalDate startDate;

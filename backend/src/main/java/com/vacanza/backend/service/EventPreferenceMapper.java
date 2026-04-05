@@ -29,6 +29,14 @@ public class EventPreferenceMapper {
     private static final Pattern LIVE_MUSIC = Pattern.compile("(?i)live\\s+music");
     private static final Pattern WORD_MUSIC = wordPattern("music");
     private static final Pattern WORD_CONCERT = wordPattern("concert");
+    private static final Pattern WORD_RAVE = wordPattern("rave");
+    private static final Pattern WORD_EDM = wordPattern("edm");
+    private static final Pattern WORD_TECHNO = wordPattern("techno");
+    private static final Pattern WORD_FESTIVAL = wordPattern("festival");
+    private static final Pattern WORD_DJ = wordPattern("dj");
+    private static final Pattern WORD_ELECTRONIC = wordPattern("electronic");
+    private static final Pattern WORD_CLUBBING = wordPattern("clubbing");
+
     private static final Pattern WORD_ART = wordPattern("art");
     private static final Pattern WORD_THEATER = wordPattern("theater");
     private static final Pattern WORD_THEATRE = wordPattern("theatre");
@@ -36,8 +44,17 @@ public class EventPreferenceMapper {
     private static final Pattern WORD_OPERA = wordPattern("opera");
     private static final Pattern WORD_BALLET = wordPattern("ballet");
     private static final Pattern WORD_SPORTS = wordPattern("sports");
+    /** Turkish generic "sports" */
+    private static final Pattern WORD_SPOR_TR = wordPattern("spor");
     private static final Pattern WORD_FOOTBALL = wordPattern("football");
+    private static final Pattern WORD_SOCCER = wordPattern("soccer");
     private static final Pattern WORD_BASKETBALL = wordPattern("basketball");
+    private static final Pattern WORD_VOLLEYBALL = wordPattern("volleyball");
+    /** Turkish */
+    private static final Pattern WORD_FUTBOL_TR = wordPattern("futbol");
+    private static final Pattern WORD_BASKETBOL_TR = wordPattern("basketbol");
+    private static final Pattern WORD_VOLEYBOL_TR = wordPattern("voleybol");
+
     private static final Pattern WORD_FILM = wordPattern("film");
     private static final Pattern WORD_CINEMA = wordPattern("cinema");
     private static final Pattern WORD_MOVIE = wordPattern("movie");
@@ -126,8 +143,8 @@ public class EventPreferenceMapper {
                 out.add(MUSIC);
                 break;
             case ADVENTURE:
-                out.add(SPORTS);
-                break;
+                // Do not map to Sports — event searches should follow explicit interests / keywords,
+                // not a broad travel style that over-narrowed Ticketmaster to Sports-only.
             case RELAXATION:
             case FAMILY:
             case BACKPACKER:
@@ -151,8 +168,7 @@ public class EventPreferenceMapper {
         }
         String haystack = text.toLowerCase(Locale.ROOT);
 
-        if (LIVE_MUSIC.matcher(haystack).find() || WORD_MUSIC.matcher(haystack).find()
-                || WORD_CONCERT.matcher(haystack).find()) {
+        if (matchesMusicKeywords(haystack)) {
             out.add(MUSIC);
         }
         if (WORD_ART.matcher(haystack).find() || WORD_THEATER.matcher(haystack).find()
@@ -160,13 +176,37 @@ public class EventPreferenceMapper {
                 || WORD_OPERA.matcher(haystack).find() || WORD_BALLET.matcher(haystack).find()) {
             out.add(ARTS_THEATRE);
         }
-        if (WORD_SPORTS.matcher(haystack).find() || WORD_FOOTBALL.matcher(haystack).find()
-                || WORD_BASKETBALL.matcher(haystack).find()) {
+        if (matchesSportsKeywords(haystack)) {
             out.add(SPORTS);
         }
         if (WORD_FILM.matcher(haystack).find() || WORD_CINEMA.matcher(haystack).find()
                 || WORD_MOVIE.matcher(haystack).find()) {
             out.add(FILM);
         }
+    }
+
+    private static boolean matchesMusicKeywords(String haystack) {
+        return LIVE_MUSIC.matcher(haystack).find()
+                || WORD_MUSIC.matcher(haystack).find()
+                || WORD_CONCERT.matcher(haystack).find()
+                || WORD_RAVE.matcher(haystack).find()
+                || WORD_EDM.matcher(haystack).find()
+                || WORD_TECHNO.matcher(haystack).find()
+                || WORD_FESTIVAL.matcher(haystack).find()
+                || WORD_DJ.matcher(haystack).find()
+                || WORD_ELECTRONIC.matcher(haystack).find()
+                || WORD_CLUBBING.matcher(haystack).find();
+    }
+
+    private static boolean matchesSportsKeywords(String haystack) {
+        return WORD_SPORTS.matcher(haystack).find()
+                || WORD_SPOR_TR.matcher(haystack).find()
+                || WORD_FOOTBALL.matcher(haystack).find()
+                || WORD_SOCCER.matcher(haystack).find()
+                || WORD_BASKETBALL.matcher(haystack).find()
+                || WORD_VOLLEYBALL.matcher(haystack).find()
+                || WORD_FUTBOL_TR.matcher(haystack).find()
+                || WORD_BASKETBOL_TR.matcher(haystack).find()
+                || WORD_VOLEYBOL_TR.matcher(haystack).find();
     }
 }

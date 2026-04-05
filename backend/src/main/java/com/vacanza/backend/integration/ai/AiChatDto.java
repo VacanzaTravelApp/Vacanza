@@ -156,6 +156,20 @@ public final class AiChatDto {
         @JsonProperty("total_days")
         private int totalDays;
 
+        /**
+         * When {@code true}, event search uses the trip date range from weather/route (narrow). When {@code false}
+         * or {@code null}/omitted, search uses a ~30-day window from today (broad).
+         */
+        @JsonProperty("trip_dates_user_specified")
+        private Boolean tripDatesUserSpecified;
+
+        /**
+         * First calendar day of the trip when the user stated dates (ISO {@code YYYY-MM-DD}). Takes precedence over
+         * weather for event search and itinerary alignment.
+         */
+        @JsonProperty("trip_start_date")
+        private String tripStartDate;
+
         private List<DayPlan> days;
         private String notes;
 
