@@ -26,7 +26,7 @@ function formatForecastDate(iso) {
   const d = new Date(String(iso).slice(0, 10));
   return Number.isNaN(d.getTime())
     ? String(iso)
-    : d.toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" });
+    : d.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
 }
 
 /** Match day_parts row to active day (by date from daily row, else index). */
@@ -51,9 +51,9 @@ function pickDayPartForActiveDay(dayParts, weatherForecast, activeDay) {
 function formatDayPartHintLines(dayRow) {
   if (!dayRow) return [];
   const slots = [
-    { prop: "morning", label: "Sabah" },
-    { prop: "afternoon", label: "Öğleden sonra" },
-    { prop: "evening", label: "Akşam" },
+    { prop: "morning", label: "Morning" },
+    { prop: "afternoon", label: "Afternoon" },
+    { prop: "evening", label: "Evening" },
   ];
   const lines = [];
   for (const { prop, label } of slots) {
@@ -65,9 +65,9 @@ function formatDayPartHintLines(dayRow) {
       s.precipitation_probability_max_percent ?? s.precipitationProbabilityMaxPercent;
     const pct =
       precip != null && Number.isFinite(Number(precip))
-        ? ` (~%${Math.round(Number(precip))} yağış olasılığı)`
+        ? ` (~%${Math.round(Number(precip))} chance of rain)`
         : "";
-    lines.push(`${label}${pct}: dış mekânda uzun süre önerilmez.`);
+    lines.push(`${label}${pct}: not recommended for long outdoor activities.`);
     if (lines.length >= 2) break;
   }
   return lines;
@@ -111,13 +111,13 @@ export default function RoutePanel({
             <div className="route-panel-destination">{route.destination}</div>
           </div>
           <div className="route-panel-badges">
-            <span className="route-panel-days-badge">{totalDays} gün</span>
+            <span className="route-panel-days-badge">{totalDays} days</span>
             <Button
               type="text"
               icon={<CloseOutlined />}
               onClick={onClose}
               className="route-panel-close"
-              aria-label="Rotayı kapat"
+              aria-label="Close route"
             />
           </div>
         </div>
@@ -125,16 +125,16 @@ export default function RoutePanel({
 
       {!showWeatherBlock && route.destination && (
         <div className="route-panel-weather route-panel-weather--empty" role="status">
-          <div className="route-panel-weather-title">Hava tahmini</div>
+          <div className="route-panel-weather-title">Weather Forecast</div>
           <p className="route-panel-weather-empty-hint">
-            Bu rota verisinde günlük hava yok. Hava, rota oluşturulurken backend tarafından eklenir.
+            No daily weather forecast available for this route. Forecast is added when the AI creates the plan.
           </p>
         </div>
       )}
 
       {showWeatherBlock && (
         <div className="route-panel-weather" aria-label="Hava tahmini">
-          <div className="route-panel-weather-title">Hava tahmini (rota hedefi)</div>
+          <div className="route-panel-weather-title">Weather Forecast (destination)</div>
           {Array.isArray(weatherForecast) && weatherForecast.length > 0 && (
             <ul className="route-panel-weather-days">
               {weatherForecast.map((row, i) => {
@@ -153,7 +153,7 @@ export default function RoutePanel({
                         : "—"}
                     </span>
                     {precip != null && (
-                      <span className="route-panel-weather-rain">Yağış %{Math.round(precip)}</span>
+                      <span className="route-panel-weather-rain">Rain %{Math.round(precip)}</span>
                     )}
                   </li>
                 );
@@ -163,7 +163,7 @@ export default function RoutePanel({
           {dayPartHintLines.length > 0 && (
             <div
               className="route-panel-weather-dayparts"
-              aria-label="Seçili gün için gün içi hava ipucu"
+              aria-label="Hourly weather tips for selected day"
             >
               {dayPartHintLines.map((line, i) => (
                 <p key={i} className="route-panel-weather-dayparts-line">
@@ -173,13 +173,13 @@ export default function RoutePanel({
             </div>
           )}
           <p className="route-panel-weather-hint">
-            Tahmin, rotanın hedef bölgesine göredir.
+            Forecast is relative to the destination area.
           </p>
         </div>
       )}
 
       {(dayStartLocal || dayEndLocal) && (
-        <div className="route-panel-day-window" aria-label="Gün özeti">
+        <div className="route-panel-day-window" aria-label="Day summary">
           {dayStartLocal && dayEndLocal
             ? `${dayStartLocal} – ${dayEndLocal}`
             : dayStartLocal || dayEndLocal}
@@ -196,7 +196,7 @@ export default function RoutePanel({
               className={`route-panel-tab ${isActive ? "route-panel-tab-active" : ""}`}
               onClick={() => onDayChange(d.day)}
             >
-              <span className="route-panel-tab-label">Gün {d.day}</span>
+              <span className="route-panel-tab-label">Day {d.day}</span>
               {d.title && (
                 <span className="route-panel-tab-sublabel">
                   {d.title.length > 30 ? `${d.title.slice(0, 30)}...` : d.title}
@@ -209,7 +209,7 @@ export default function RoutePanel({
 
       <div className="route-panel-waypoints">
         {waypoints.length === 0 ? (
-          <div className="route-panel-empty">Bu güne ait waypoint bulunamadı.</div>
+          <div className="route-panel-empty">No waypoints found for this day.</div>
         ) : (
           <ul className="route-panel-timeline">
             {waypoints.map((wp, idx) => {
@@ -237,7 +237,7 @@ export default function RoutePanel({
                     <li className="route-panel-travel-leg">
                       <div className="route-panel-travel-line" />
                       <span className="route-panel-travel-label">
-                        Yürüyüş ~{travelMin} dk
+                        Walk ~{travelMin} min
                       </span>
                     </li>
                   )}
@@ -269,7 +269,7 @@ export default function RoutePanel({
                           {dwell != null && (
                             <span className="route-panel-waypoint-dwell">
                               {" "}
-                              (~{dwell} dk)
+                              (~{dwell} min)
                             </span>
                           )}
                         </div>
@@ -281,7 +281,7 @@ export default function RoutePanel({
                             !arrival &&
                             !departure && (
                               <span className="route-panel-waypoint-duration">
-                                ~{wp.estimated_duration_min ?? wp.estimatedDurationMin} dk
+                                ~{wp.estimated_duration_min ?? wp.estimatedDurationMin} min
                               </span>
                             )}
                         </div>
@@ -312,9 +312,9 @@ export default function RoutePanel({
       {(route.routeId ?? route.route_id) ? (
         <div className="route-panel-event-recs">
           <div className="route-panel-event-recs-head">
-            <span className="route-panel-event-recs-title">Etkinlik önerileri</span>
+            <span className="route-panel-event-recs-title">Event Recommendations</span>
             <span className="route-panel-event-recs-desc">
-              Ticketmaster — konser, spor, gösteri
+              Ticketmaster — concerts, sports, shows
             </span>
           </div>
           <EventRecommendations routeId={route.routeId ?? route.route_id} tripDay={activeDay} />
