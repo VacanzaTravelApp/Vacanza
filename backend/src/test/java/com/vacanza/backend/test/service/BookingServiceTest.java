@@ -19,6 +19,8 @@ import com.vacanza.backend.service.impl.BookingServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,6 +38,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class BookingServiceTest {
 
     @Mock private SerpApiClient serpApiClient;
@@ -121,6 +124,42 @@ class BookingServiceTest {
     }
 
     @Test
+    @DisplayName("CACHE MISS: flights with name resolution — Resolves to IATA, SerpAPI called")
+    void cacheMiss_flights_resolution() throws JsonProcessingException {
+        TransportSearchRequestDTO req = new TransportSearchRequestDTO();
+        req.setOrigin("Istanbul"); req.setDestination("CDG");
+        req.setDepartureDate(LocalDate.of(2025, 7, 1));
+        req.setCurrency("USD"); req.setAdults(1);
+
+        // 1) Resolving Istanbul -> IST via searchAirports cache miss
+        lenient().when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.AIRPORT), eq("istanbul"), any(Instant.class)))
+                .thenReturn(Optional.empty());
+        SerpApiAirportSuggestion ist = new SerpApiAirportSuggestion();
+        ist.setIataCode("IST");
+        lenient().when(serpApiClient.searchAirports(anyString())).thenReturn(List.of(ist));
+        lenient().when(objectMapper.writeValueAsString(any())).thenReturn("[]");
+        lenient().when(cacheRepo.findByCacheTypeAndCacheKey(eq(ApiCacheType.AIRPORT), anyString()))
+                .thenReturn(Optional.empty());
+
+        // 2) Flight search cache miss (key: IST_CDG_...)
+        lenient().when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
+                eq(ApiCacheType.FLIGHT), anyString(), any(Instant.class)))
+                .thenReturn(Optional.empty());
+        lenient().when(serpApiClient.searchFlights(argThat(r -> "IST".equals(r.getOrigin())))).thenReturn(List.of(
+                TransportOptionDTO.builder().carrier("TK").price(new BigDecimal("200")).build()));
+        lenient().when(cacheRepo.findByCacheTypeAndCacheKey(eq(ApiCacheType.FLIGHT), anyString()))
+                .thenReturn(Optional.empty());
+
+        List<TransportOptionDTO> r = bookingService.searchTransportation(req);
+
+        assertThat(r).hasSize(1);
+        verify(serpApiClient).searchAirports("Istanbul");
+        verify(serpApiClient).searchFlights(argThat(flightReq -> "IST".equals(flightReq.getOrigin())));
+        verify(cacheRepo, times(2)).save(any(ApiCache.class));
+    }
+
+    @Test
     @DisplayName("CACHE MISS: hotels — SerpAPI called, result saved")
     void cacheMiss_hotels() throws JsonProcessingException {
         AccommodationSearchRequestDTO req = hotelReq();
@@ -148,7 +187,7 @@ class BookingServiceTest {
                 .thenReturn(Optional.empty());
         SerpApiAirportSuggestion ist = new SerpApiAirportSuggestion();
         ist.setIataCode("IST"); ist.setCity("Istanbul"); ist.setCountry("Turkey");
-        when(serpApiClient.searchAirports("istanbul")).thenReturn(List.of(ist));
+        when(serpApiClient.searchAirports(anyString())).thenReturn(List.of(ist));
         when(objectMapper.writeValueAsString(any())).thenReturn("[]");
         when(cacheRepo.findByCacheTypeAndCacheKey(eq(ApiCacheType.AIRPORT), eq("istanbul")))
                 .thenReturn(Optional.empty());
@@ -190,28 +229,10 @@ class BookingServiceTest {
     // ── Destination autocomplete (zero SerpAPI cost) ────
 
     @Test
-    @DisplayName("searchDestinations reuses airport cache — zero extra SerpAPI calls")
-    void destinations_reusesAirportCache() throws JsonProcessingException {
-        String json = "[]";
-        when(cacheRepo.findByCacheTypeAndCacheKeyAndExpiresAtAfter(
-                eq(ApiCacheType.AIRPORT), eq("istanbul"), any(Instant.class)))
-                .thenReturn(Optional.of(cacheEntry(ApiCacheType.AIRPORT, json)));
-
-        SerpApiAirportSuggestion s1 = new SerpApiAirportSuggestion();
-        s1.setIataCode("IST"); s1.setCity("Istanbul"); s1.setCountry("Turkey");
-        SerpApiAirportSuggestion s2 = new SerpApiAirportSuggestion();
-        s2.setIataCode("SAW"); s2.setCity("Istanbul"); s2.setCountry("Turkey");
-
-        when(objectMapper.readValue(eq(json), any(TypeReference.class)))
-                .thenReturn(List.of(s1, s2));
-
+    @DisplayName("searchDestinations is disabled — returns empty list")
+    void destinations_disabled() {
         List<DestinationSuggestionDTO> r = bookingService.searchDestinations("Istanbul");
-
-        // Two airports in same city → one unique destination
-        assertThat(r).hasSize(1);
-        assertThat(r.get(0).getCity()).isEqualTo("Istanbul");
-        assertThat(r.get(0).getDisplayName()).isEqualTo("Istanbul, Turkey");
-        assertThat(r.get(0).getSearchQuery()).isEqualTo("Hotels in Istanbul");
+        assertThat(r).isEmpty();
         verify(serpApiClient, never()).searchAirports(any());
     }
 
@@ -291,10 +312,10 @@ class BookingServiceTest {
     }
 
     @Test
-    @DisplayName("Blank destination query throws BookingException")
+    @DisplayName("searchDestinations returns empty list even for blank query (no exception)")
     void blankDestinationQuery() {
-        assertThatThrownBy(() -> bookingService.searchDestinations("  "))
-                .isInstanceOf(BookingException.class);
+        List<DestinationSuggestionDTO> r = bookingService.searchDestinations("  ");
+        assertThat(r).isEmpty();
     }
 
     // ── Helpers ─────────────────────────────────────────

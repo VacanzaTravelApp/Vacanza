@@ -108,11 +108,11 @@ class FlightSearchMappingTest {
     // ═══════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("SerpApiAirportSuggestion — kgmid mapping")
-    class KgmidMappingTests {
+    @DisplayName("SerpApiAirportSuggestion — IATA mapping")
+    class IataMappingTests {
 
         @Test
-        @DisplayName("Sub-airport with IATA id gets iataCode set, kgmid null")
+        @DisplayName("Sub-airport with IATA id gets iataCode set")
         void subAirportWithIataCode() {
             AutocompleteResponse response = buildCityCluster(
                     "/m/0203v", "Istanbul",
@@ -127,13 +127,12 @@ class FlightSearchMappingTest {
                     .findFirst().orElseThrow();
 
             assertEquals("IST", ist.getIataCode());
-            assertNull(ist.getKgmid(), "IATA-based sub-airport should not have kgmid");
             assertEquals("Istanbul Airport", ist.getName());
         }
 
         @Test
-        @DisplayName("Sub-airport with kgmid gets kgmid set, iataCode null")
-        void subAirportWithKgmid() {
+        @DisplayName("Sub-airport with kgmid is ignored")
+        void subAirportWithKgmidIsIgnored() {
             AutocompleteResponse response = buildCityCluster(
                     "/m/0203v", "Istanbul",
                     List.of(subAirport("/m/abc123", "Some Regional Airport"),
@@ -141,20 +140,18 @@ class FlightSearchMappingTest {
 
             List<SerpApiAirportSuggestion> suggestions = SerpApiAirportSuggestion.fromResponse(response);
 
-            SerpApiAirportSuggestion regional = suggestions.stream()
-                    .filter(s -> "Some Regional Airport".equals(s.getName()))
-                    .findFirst().orElseThrow();
+            boolean hasRegional = suggestions.stream()
+                    .anyMatch(s -> "Some Regional Airport".equals(s.getName()));
 
-            assertNull(regional.getIataCode(), "kgmid-based sub-airport should not have iataCode");
-            assertEquals("/m/abc123", regional.getKgmid(), "kgmid should be set for kgmid-based sub-airport");
+            assertFalse(hasRegional, "kgmid-based sub-airport should be ignored");
         }
 
         @Test
-        @DisplayName("City-level 'All airports' entry gets kgmid set")
-        void cityLevelKgmidSet() {
+        @DisplayName("City-level Hub with IATA id gets iataCode set")
+        void cityLevelIataSet() {
             AutocompleteResponse response = buildCityCluster(
-                    "/m/0203v", "Istanbul",
-                    List.of(subAirport("IST", "Istanbul Airport")));
+                    "NYC", "New York",
+                    List.of(subAirport("JFK", "John F. Kennedy Airport")));
 
             List<SerpApiAirportSuggestion> suggestions = SerpApiAirportSuggestion.fromResponse(response);
 
@@ -162,28 +159,26 @@ class FlightSearchMappingTest {
                     .filter(s -> s.getName() != null && s.getName().startsWith("All airports"))
                     .findFirst().orElseThrow();
 
-            assertEquals("/m/0203v", allAirports.getKgmid());
-            assertNull(allAirports.getIataCode(), "City-level kgmid should not set iataCode");
+            assertEquals("NYC", allAirports.getIataCode());
         }
 
         @Test
-        @DisplayName("Direct airport entry with kgmid id")
-        void directAirportWithKgmid() {
+        @DisplayName("Direct airport entry with IATA id")
+        void directAirportWithIata() {
             AutocompleteResponse response = new AutocompleteResponse();
             AirportEntry entry = new AirportEntry();
-            entry.setId("/m/xyz789");
-            entry.setName("Small Regional Airport");
-            entry.setCity("SomeCity");
-            entry.setCountry("SomeCountry");
-            entry.setAirports(null); // no sub-airports
+            entry.setId("IST");
+            entry.setName("Istanbul Airport");
+            entry.setCity("Istanbul");
+            entry.setCountry("Turkey");
+            entry.setAirports(null); 
             response.setAirports(List.of(entry));
 
             List<SerpApiAirportSuggestion> suggestions = SerpApiAirportSuggestion.fromResponse(response);
 
             assertEquals(1, suggestions.size());
             SerpApiAirportSuggestion s = suggestions.get(0);
-            assertNull(s.getIataCode());
-            assertEquals("/m/xyz789", s.getKgmid());
+            assertEquals("IST", s.getIataCode());
         }
 
         @Test

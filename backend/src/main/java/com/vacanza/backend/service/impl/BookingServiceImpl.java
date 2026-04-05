@@ -78,7 +78,21 @@ public class BookingServiceImpl implements BookingService {
 
         @Override
         public List<TransportOptionDTO> searchTransportation(TransportSearchRequestDTO request) {
-                String key = CacheKeys.flight(request);
+                // If origin/destination are not IATA codes, try to resolve them
+                String resolvedOrigin = resolveToIata(request.getOrigin());
+                String resolvedDestination = resolveToIata(request.getDestination());
+
+                log.info("[FLIGHT] Resolved request: {}->{}", resolvedOrigin, resolvedDestination);
+                
+                // Create a temporary request for cache key generation with resolved codes
+                TransportSearchRequestDTO cacheReq = new TransportSearchRequestDTO(
+                        resolvedOrigin, resolvedDestination, 
+                        request.getDepartureDate(), request.getReturnDate(),
+                        request.getAdults(), request.getBudget(), 
+                        request.getCurrency(), request.getSortBy()
+                );
+
+                String key = CacheKeys.flight(cacheReq);
 
                 Optional<ApiCache> cached = cacheRepo
                         .findByCacheTypeAndCacheKeyAndExpiresAtAfter(
@@ -93,6 +107,10 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 log.info("[CACHE MISS] Flight: key={} — calling SerpAPI", key);
+                // Also update the original request for the client call
+                request.setOrigin(resolvedOrigin);
+                request.setDestination(resolvedDestination);
+                
                 List<TransportOptionDTO> results = serpApiClient.searchFlights(request);
 
                 if (!results.isEmpty()) {
@@ -101,6 +119,23 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 return applyBudgetAndSort(results, request);
+        }
+
+        private String resolveToIata(String input) {
+                if (input == null || input.isBlank()) return input;
+                if (SerpApiAirportSuggestion.isIataCode(input.toUpperCase())) {
+                        return input.toUpperCase();
+                }
+
+                log.info("[RESOLVE] '{}' is not an IATA code, searching...", input);
+                List<SerpApiAirportSuggestion> suggestions = searchAirports(input);
+                if (!suggestions.isEmpty()) {
+                        String firstIata = suggestions.get(0).getIataCode();
+                        log.info("[RESOLVE] '{}' -> {}", input, firstIata);
+                        return firstIata;
+                }
+                
+                return input; // Fallback to original
         }
 
         // ──────────────────────────────────────────────
@@ -145,41 +180,8 @@ public class BookingServiceImpl implements BookingService {
 
         @Override
         public List<DestinationSuggestionDTO> searchDestinations(String query) {
-                if (query == null || query.isBlank()) {
-                        throw new BookingException(
-                                "Destination search query must not be blank",
-                                HttpStatus.BAD_REQUEST);
-                }
-
-                // Reuse the same airport autocomplete (already cached with 30d TTL)
-                List<SerpApiAirportSuggestion> airports = searchAirports(query);
-
-                // Extract unique city+country pairs, build destination suggestions
-                Set<String> seen = new LinkedHashSet<>();
-                List<DestinationSuggestionDTO> destinations = new ArrayList<>();
-
-                for (SerpApiAirportSuggestion s : airports) {
-                        String city = s.getCity();
-                        String country = s.getCountry();
-                        if (city == null || city.isBlank()) continue;
-
-                        String uniqueKey = (city + "_" + (country != null ? country : "")).toLowerCase();
-                        if (!seen.add(uniqueKey)) continue;  // duplicate city+country
-
-                        String displayName = country != null && !country.isBlank()
-                                ? city + ", " + country
-                                : city;
-
-                        destinations.add(DestinationSuggestionDTO.builder()
-                                .city(city)
-                                .country(country)
-                                .displayName(displayName)
-                                .searchQuery("Hotels in " + city)
-                                .build());
-                }
-
-                log.info("[DESTINATION] '{}' → {} unique destinations", query, destinations.size());
-                return destinations;
+                log.info("[DESTINATION] Autocomplete disabled for hotels as requested. Query: {}", query);
+                return Collections.emptyList();
         }
 
         // ──────────────────────────────────────────────

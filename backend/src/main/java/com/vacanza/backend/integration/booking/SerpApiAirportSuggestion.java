@@ -33,22 +33,15 @@ public class SerpApiAirportSuggestion {
     /** Country name (e.g. "Turkey"). */
     private String country;
 
-    /**
-     * Google Knowledge Graph ID (e.g. "/m/0203v").
-     * Can be used as departure_id/arrival_id in Google Flights searches
-     * to represent an entire city (all airports).
-     */
-    private String kgmid;
-
     // ─── SerpApi response shape ───────────────────────────────────────────────
 
-    /** Raw SerpApi "airports" array wrapper. */
+    /** Raw SerpApi "suggestions" array wrapper. */
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AutocompleteResponse {
 
-        @JsonProperty("airports")
-        private List<AirportEntry> airports;
+        @JsonProperty("suggestions")
+        private List<AirportEntry> airports; // We keep the list name 'airports' if preferred, but map from 'suggestions'
     }
 
     /** Top-level entry — may represent a city cluster with child airports. */
@@ -109,53 +102,47 @@ public class SerpApiAirportSuggestion {
             if (entry.getAirports() != null && !entry.getAirports().isEmpty()) {
                 // City cluster: emit each sub-airport
                 for (SubAirport sub : entry.getAirports()) {
+                    if (!isIataCode(sub.getId())) continue; // Skip non-IATA (kgmid)
+
                     SerpApiAirportSuggestion s = new SerpApiAirportSuggestion();
-                    s.setIataCode(isIataCode(sub.getId()) ? sub.getId() : null);
-                    s.setKgmid(isKgmid(sub.getId()) ? sub.getId() : null);
+                    s.setIataCode(sub.getId());
                     s.setName(sub.getName());
                     s.setCity(entry.getCity() != null ? entry.getCity() : entry.getName());
                     s.setCountry(entry.getCountry());
                     suggestions.add(s);
                 }
-                // City-level "all airports" entry — kgmid goes to kgmid field, NOT iataCode
-                String cityName = entry.getCity() != null ? entry.getCity() : entry.getName();
-                SerpApiAirportSuggestion city = new SerpApiAirportSuggestion();
-                city.setIataCode(isIataCode(entry.getId()) ? entry.getId() : null);
-                city.setName("All airports — " + cityName);
-                city.setCity(cityName);
-                city.setCountry(entry.getCountry());
-                city.setKgmid(isKgmid(entry.getId()) ? entry.getId() : null);
-                suggestions.add(city);
+                // City-level Hub (e.g. NYC for all New York airports)
+                if (isIataCode(entry.getId())) {
+                    String cityName = entry.getCity() != null ? entry.getCity() : entry.getName();
+                    SerpApiAirportSuggestion city = new SerpApiAirportSuggestion();
+                    city.setIataCode(entry.getId());
+                    city.setName("All airports — " + cityName);
+                    city.setCity(cityName);
+                    city.setCountry(entry.getCountry());
+                    suggestions.add(city);
+                }
             } else {
                 // Direct airport entry
-                SerpApiAirportSuggestion s = new SerpApiAirportSuggestion();
-                if (isKgmid(entry.getId())) {
-                    // kgmid, not an IATA code — keep iataCode clean
-                    s.setIataCode(null);
-                    s.setKgmid(entry.getId());
-                } else {
+                if (isIataCode(entry.getId())) {
+                    SerpApiAirportSuggestion s = new SerpApiAirportSuggestion();
                     s.setIataCode(entry.getId());
+                    s.setName(entry.getName());
+                    s.setCity(entry.getCity());
+                    s.setCountry(entry.getCountry());
+                    suggestions.add(s);
                 }
-                s.setName(entry.getName());
-                s.setCity(entry.getCity());
-                s.setCountry(entry.getCountry());
-                suggestions.add(s);
             }
         }
 
         // Filter out entries that have neither a readable IATA code nor a name
         return suggestions.stream()
+                .filter(s -> s.getIataCode() != null && !s.getIataCode().isBlank())
                 .filter(s -> s.getName() != null && !s.getName().isBlank())
                 .toList();
     }
 
     /** IATA codes are 2-4 uppercase letters (e.g. IST, CDG, JFK). */
-    private static boolean isIataCode(String id) {
+    public static boolean isIataCode(String id) {
         return id != null && id.matches("^[A-Z]{2,4}$");
-    }
-
-    /** Google Knowledge Graph IDs start with /m/ or /g/ (e.g. /m/0203v). */
-    private static boolean isKgmid(String id) {
-        return id != null && (id.startsWith("/m/") || id.startsWith("/g/"));
     }
 }
