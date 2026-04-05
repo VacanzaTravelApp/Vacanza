@@ -98,24 +98,16 @@ public class AdminServiceImpl implements AdminService {
     private String determineComponentHealth(boolean systemUp, List<ApiUsageMetric> metrics, String... relatedApiNames) {
         if (!systemUp) return "DOWN";
         
-        long totalCalls = 0;
-        long totalErrors = 0;
-        
         for (ApiUsageMetric m : metrics) {
             for (String key : relatedApiNames) {
                 if (m.getApiName() != null && m.getApiName().toLowerCase().contains(key.toLowerCase())) {
-                    totalCalls += m.getTotalCalls();
-                    totalErrors += m.getErrorCount();
-                    // Break inner loop so we don't double count if a single apiName matches multiple keys
-                    break;
+                    // Circuit Breaker logic: If an API fails 3 times in a row, the component is down.
+                    // The moment it successfully responds once, it immediately returns to UP.
+                    if (m.getConsecutiveErrors() >= 3) {
+                        return "DOWN";
+                    }
                 }
             }
-        }
-        
-        // If there have been at least 3 recent calls to these dependencies, and 50% or more are failing,
-        // declare the specific service as globally DOWN for the monitoring dashboard.
-        if (totalCalls >= 3 && ((double) totalErrors / totalCalls) >= 0.5) {
-            return "DOWN";
         }
         
         return "UP";

@@ -47,6 +47,7 @@ public class ApiMetricsCollector {
                             .apiName(entry.getKey())
                             .totalCalls(total)
                             .errorCount(c.errorCount.sum())
+                            .consecutiveErrors(c.consecutiveErrors.sum())
                             .avgResponseMs(Math.round(avgMs * 100.0) / 100.0)
                             .build();
                 })
@@ -63,16 +64,19 @@ public class ApiMetricsCollector {
     private static class ApiCounter {
         final LongAdder totalCalls = new LongAdder();
         final LongAdder errorCount = new LongAdder();
+        final LongAdder consecutiveErrors = new LongAdder();
         final LongAdder totalResponseTimeMs = new LongAdder();
 
         void recordCall(long responseTimeMs) {
             totalCalls.increment();
+            consecutiveErrors.reset();
             totalResponseTimeMs.add(responseTimeMs);
         }
 
         void recordError() {
             totalCalls.increment();
             errorCount.increment();
+            consecutiveErrors.increment();
         }
     }
 }
