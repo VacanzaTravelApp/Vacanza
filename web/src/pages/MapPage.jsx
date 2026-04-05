@@ -240,7 +240,6 @@ const UI_CATEGORIES = [
       "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish", "religious_buddhist"
     ],
     icon: <MonumentIcon />,
-    emoji: "🏛️",
     pill: "rgba(99, 102, 241, 0.15)",
     fill: "rgba(99, 102, 241, 1)",
     ring: "#4338ca",
@@ -255,7 +254,6 @@ const UI_CATEGORIES = [
       "botanical_garden", "natural"
     ],
     icon: <ParkIcon />,
-    emoji: "🌲",
     pill: "rgba(34, 197, 94, 0.15)",
     fill: "rgba(34, 197, 94, 1)",
     ring: "#15803d",
@@ -273,7 +271,6 @@ const UI_CATEGORIES = [
       "theme_park_attraction", "fair_grounds"
     ],
     icon: <AttractionIcon />,
-    emoji: "🎡",
     pill: "rgba(168, 85, 247, 0.15)",
     fill: "rgba(168, 85, 247, 1)",
     ring: "#7e22ce",
@@ -290,7 +287,6 @@ const UI_CATEGORIES = [
       "biergarten"
     ],
     icon: <BarIcon />,
-    emoji: "🍸",
     pill: "rgba(236, 72, 153, 0.15)",
     fill: "rgba(236, 72, 153, 1)",
     ring: "#be185d",
@@ -312,7 +308,6 @@ const UI_CATEGORIES = [
       "home_repair", "baby_goods_shop", "variety_store", "pop_up_shop", "clothing", "shopping_mall", "department_store"
     ],
     icon: <ShoppingIcon />,
-    emoji: "🛍️",
     pill: "rgba(245, 158, 11, 0.15)",
     fill: "rgba(245, 158, 11, 1)",
     ring: "#b45309",
@@ -323,7 +318,6 @@ const UI_CATEGORIES = [
     label: "Hotels",
     aliases: ["hotel", "motel", "hostel", "apartment", "guest_house", "accommodation", "lodging", "bed_and_breakfast", "vacation_rental", "resort", "campground", "campsite"],
     icon: <HotelIcon />,
-    emoji: "🏨",
     pill: "rgba(14, 165, 233, 0.15)",
     fill: "rgba(14, 165, 233, 1)",
     ring: "#0369a1",
@@ -340,7 +334,6 @@ const UI_CATEGORIES = [
       "train", "bus", "rail", "subway"
     ],
     icon: <TransportIcon />,
-    emoji: "🚉",
     pill: "rgba(71, 85, 105, 0.15)",
     fill: "rgba(71, 85, 105, 1)",
     ring: "#334155",
@@ -366,7 +359,6 @@ const UI_CATEGORIES = [
       "chiropractor", "physiotherapist", "alternative_healthcare", "assisted_living_facility"
     ],
     icon: <GlobalOutlined />,
-    emoji: "🌐",
     pill: "rgba(100, 116, 139, 0.1)",
     fill: "rgba(100, 116, 139, 1)",
     ring: "#475569",
@@ -390,11 +382,10 @@ function poiIconByCategory(category) {
   const found = UI_CATEGORIES.find((x) => x.aliases.includes(c));
   if (!found) return null;
   return {
-    emoji: found.emoji,
     ring: found.ring,
     fill: found.fill,
     uiKey: found.key,
-    icon: found.icon // Added this
+    icon: found.icon
   };
 }
 
@@ -1124,7 +1115,7 @@ export default function MapPage() {
   const submitPolygonRoute = useCallback(
     async (values) => {
       if (!selection?.polygon || selection.polygon.length < 3) {
-        message.error("Geçerli bir alan seçin.");
+        message.warning("Please select a valid area first.");
         return;
       }
       const ring = selection.polygon.map((p) => [p.lng, p.lat]);
@@ -1157,16 +1148,16 @@ export default function MapPage() {
           }
           const summary = res.route_summary_message || res.routeSummaryMessage;
           if (summary) message.success(summary);
-          else message.success("Rota haritada gösteriliyor.");
+          else message.success("Route is being displayed on the map.");
         } else {
-          message.warning("Rota verisi alınamadı.");
+          message.warning("Could not retrieve route data.");
         }
       } catch (e) {
         const msg =
           e?.response?.data?.message ||
           e?.friendlyMessage ||
           e?.message ||
-          "Rota oluşturulamadı.";
+          "Failed to create route.";
         message.error(msg);
       } finally {
         setPolygonRouteSubmitting(false);
@@ -1181,28 +1172,28 @@ export default function MapPage() {
     setFreehandEnabled(true);
     message.info({
       content:
-        "Haritada alan çiz → sağdaki rota panelinden gün seç → üstteki turuncu banttan o günü güncelle.",
+        "Draw an area on the map → select a day from the route panel on the right → update that day from the orange banner at the top.",
       duration: 8,
     });
   }, []);
 
   const submitReplanDayFromPolygon = useCallback(async () => {
     if (!selection?.polygon || selection.polygon.length < 3) {
-      message.error("Geçerli bir alan çizin.");
+      message.error("Please draw a valid area.");
       return;
     }
     const convId = mapChatConversationId || getSessionConversationId();
     if (!convId) {
-      message.error("Önce sohbetten bir rota açın veya haritadan oluşturulan rotaya bağlı sohbeti seçin.");
+      message.error("Open a route from the chat first or select the chat associated with the route created from the map.");
       return;
     }
     if (!activeRoute?.days?.length) {
-      message.error("Yeniden planlanacak rota yok.");
+      message.error("No route available to replan.");
       return;
     }
     const td = Number(activeRoute.total_days || activeRoute.totalDays || activeRoute.days.length);
     if (!Number.isFinite(activeDay) || activeDay < 1 || activeDay > td) {
-      message.error("Geçerli bir gün seçin.");
+      message.error("Please select a valid day.");
       return;
     }
     const ring = selection.polygon.map((p) => [p.lng, p.lat]);
@@ -1227,16 +1218,16 @@ export default function MapPage() {
         setChatConversationRefreshNonce((n) => n + 1);
         const summary = res.route_summary_message || res.routeSummaryMessage;
         if (summary) message.success(summary);
-        else message.success(`Gün ${activeDay} çizime göre güncellendi. Sohbete bakabilirsin.`);
+        else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
       } else {
-        message.warning("Rota verisi alınamadı.");
+        message.warning("Could not retrieve route data.");
       }
     } catch (e) {
       const msg =
         e?.response?.data?.message ||
         e?.friendlyMessage ||
         e?.message ||
-        "Gün yeniden planlanamadı.";
+        "Failed to replan day.";
       message.error(msg);
     } finally {
       setReplanDaySubmitting(false);
@@ -1858,35 +1849,48 @@ export default function MapPage() {
               })}
             </div>
 
-            <div style={{ maxHeight: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4 }}>
-              {resultsPois.map(p => (
-                <div key={p.poiId} style={{
-                  display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
-                  borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
-                  marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
-                  backdropFilter: "blur(4px)"
-                }}>
-                  <div style={{
-                    width: 48, height: 48, borderRadius: 14,
-                    background: "rgba(255,255,255,0.05)",
-                    display: "grid", placeItems: "center",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                    border: "1px solid rgba(255,255,255,0.1)"
+            <div style={{ height: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4, display: "flex", flexDirection: "column" }}>
+              {poiLoading ? (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, opacity: 0.8 }}>
+                   <Spin size="large" />
+                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sub)" }}>Finding nearby gems...</div>
+                </div>
+              ) : resultsPois.length > 0 ? (
+                resultsPois.map(p => (
+                  <div key={p.poiId} style={{
+                    display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
+                    borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
+                    marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
+                    backdropFilter: "blur(4px)",
+                    flexShrink: 0
                   }}>
                     <div style={{
-                      color: poiIconByCategory(p.category)?.ring,
-                      fontSize: 20,
-                      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                      width: 48, height: 48, borderRadius: 14,
+                      background: "rgba(255,255,255,0.05)",
+                      display: "grid", placeItems: "center",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      border: "1px solid rgba(255,255,255,0.1)"
                     }}>
-                      {poiIconByCategory(p.category)?.icon}
+                      <div style={{
+                        color: poiIconByCategory(p.category)?.ring,
+                        fontSize: 20,
+                        filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                      }}>
+                        {poiIconByCategory(p.category)?.icon}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p.category)}</div>
                     </div>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p.category)}</div>
-                  </div>
+                ))
+              ) : (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
+                   <GlobalOutlined style={{ fontSize: 32, marginBottom: 12 }} />
+                   <div style={{ fontSize: 14, fontWeight: 600 }}>No results in this area</div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         )}

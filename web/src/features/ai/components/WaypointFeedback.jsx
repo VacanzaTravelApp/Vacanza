@@ -82,9 +82,9 @@ export default function WaypointFeedback({ waypoint, storageKey }) {
       } else {
         await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
       }
-      message.success("Teşekkürler, tercihin kaydedildi.");
+      message.success("Thanks, your preference has been saved.");
     } catch (e) {
-      message.error(e?.friendlyMessage || "Geri bildirim gönderilemedi.");
+      message.error(e?.friendlyMessage || "Failed to send feedback.");
     } finally {
       setSending(false);
     }
@@ -96,7 +96,7 @@ export default function WaypointFeedback({ waypoint, storageKey }) {
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
       role="group"
-      aria-label="Durak geri bildirimi"
+      aria-label="Waypoint feedback"
     >
       <Button
         type="text"
@@ -105,7 +105,7 @@ export default function WaypointFeedback({ waypoint, storageKey }) {
         icon={vote === "up" ? <LikeFilled /> : <LikeOutlined />}
         loading={sending}
         onClick={() => send("THUMBS_UP")}
-        aria-label="Beğendim"
+        aria-label="I like it"
         aria-pressed={vote === "up"}
       />
       <Button
@@ -115,7 +115,7 @@ export default function WaypointFeedback({ waypoint, storageKey }) {
         icon={vote === "down" ? <DislikeFilled /> : <DislikeOutlined />}
         loading={sending}
         onClick={() => send("THUMBS_DOWN")}
-        aria-label="Beğenmedim"
+        aria-label="I don't like it"
         aria-pressed={vote === "down"}
       />
     </div>

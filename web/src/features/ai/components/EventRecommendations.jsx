@@ -73,14 +73,13 @@ export default function EventRecommendations({ routeId, tripDay, refreshKey = 0 
       ? events.slice(0, INITIAL_BROAD_VISIBLE)
       : events;
 
-  const headerText = data.message && String(data.message).trim() ? data.message : "Etkinlik önerileri";
+  const headerText = data.message && String(data.message).trim() ? data.message : "Event recommendations";
 
   return (
     <div className="event-recommendations-section event-rec-loaded">
       {isBroadWindow && (
         <p className="event-rec-window-hint" role="status">
-          Tarih belirtmediğin için yaklaşık bir aylık etkinlik listeleniyor. Sohbette gün veya hafta
-          söylersen öneriler daha isabetli olur.
+          Showing events for about a month since no specific date was provided. Mention a day or week in chat for more accurate suggestions.
         </p>
       )}
       <div className="event-recommendations-header">
@@ -89,9 +88,9 @@ export default function EventRecommendations({ routeId, tripDay, refreshKey = 0 
           type="button"
           className="event-rec-refresh-btn"
           onClick={() => setInternalRefresh((n) => n + 1)}
-          aria-label="Etkinlik önerilerini yeniden yükle"
+          aria-label="Reload event recommendations"
         >
-          Yenile
+          Refresh
         </button>
       </div>
       <div className="event-recommendations-list">
@@ -107,7 +106,7 @@ export default function EventRecommendations({ routeId, tripDay, refreshKey = 0 
               className="event-rec-show-more-btn"
               onClick={() => setShowAllBroad(true)}
             >
-              Tümünü göster ({events.length})
+              Show all ({events.length})
             </button>
           ) : (
             <button
@@ -115,7 +114,7 @@ export default function EventRecommendations({ routeId, tripDay, refreshKey = 0 
               className="event-rec-show-more-btn"
               onClick={() => setShowAllBroad(false)}
             >
-              Daha az göster
+              Show less
             </button>
           )}
         </div>

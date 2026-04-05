@@ -85,7 +85,6 @@ function looksLikeItineraryRouteReply(text) {
   if (/^i['']?m here to help\b/i.test(lower)) return false;
   if (/here is your .+ itinerary\b/i.test(lower)) return true;
   if (/\bitinerary\b/i.test(lower) && /here is\b/i.test(lower)) return true;
-  if (/işte|rotanız|seyahat plan|tatil planınız|günlük plan/i.test(s)) return true;
   return false;
 }
 
@@ -98,7 +97,6 @@ function looksLikeRouteRelatedReply(text) {
   if (/day\s+\d+\s+is\s+updated\b/i.test(s)) return true;
   if (/updated\s+for\s+your\s+map\s+area/i.test(lower)) return true;
   if (/---\s*route_json\s*---/i.test(s)) return true;
-  if (/işte\s+(güncellenmiş\s+)?rotan|gün\s+\d+.*(güncell|yenil)/i.test(s)) return true;
   return false;
 }
 
@@ -206,10 +204,7 @@ function RouteWeatherStrip({ rd }) {
   if (parts.length === 0) return null;
   return (
     <div className="route-card-weather-strip" role="status">
-      <span className="route-card-weather-strip-icon" aria-hidden>
-        🌤️
-      </span>
-      <span className="route-card-weather-strip-text">Hava (1. gün): {parts.join(" · ")}</span>
+      <span className="route-card-weather-strip-text">Weather (Day 1): {parts.join(" · ")}</span>
     </div>
   );
 }
@@ -250,8 +245,8 @@ function formatConversationDate(value) {
   if (days === 0) {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
-  if (days === 1) return "Dün";
-  if (days < 7) return `${days} gün önce`;
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
@@ -310,10 +305,10 @@ function mapHistoryMessage(m) {
   const type = role === "user" ? "user" : "ai";
   let text = m.content ?? "";
   if (type === "user" && isPolygonMapRouteUserMessage(text)) {
-    text = "Haritada çizilen alandan rota oluşturuldu.";
+    text = "Route created from the area drawn on the map.";
   }
   if (type === "user" && isReplanDayMapUserMessage(text)) {
-    text = "Haritada çizilen alana göre seçili gün yeniden planlandı.";
+    text = "Selected day was replanned based on the area drawn on the map.";
   }
   return {
     id: String(m.id ?? `${Date.now()}-${Math.random()}`),
@@ -328,7 +323,7 @@ function mapHistoryMessage(m) {
 const GREETING = {
   id: "greeting",
   type: "ai",
-  text: "Merhaba, ben Vacanza AI. Bugün nereyi keşfetmek istersin?",
+  text: "Hello, I'm Vacanza AI. Where would you like to explore today?",
   time: "",
 };
 
@@ -391,7 +386,7 @@ export default function VacanzaChat({
       setTicketRowsByKey((prev) => ({ ...prev, [key]: Array.isArray(rows) ? rows : [] }));
     } catch (e) {
       console.error(e);
-      message.error("Bilet fiyatları yüklenemedi. Bağlantınızı kontrol edip tekrar deneyin.");
+      message.error("Failed to load ticket prices. Please check your connection and try again.");
       setTicketRowsByKey((prev) => ({ ...prev, [key]: [] }));
     } finally {
       setTicketLoadingByKey((prev) => ({ ...prev, [key]: false }));
@@ -407,8 +402,8 @@ export default function VacanzaChat({
   const activeTitle = useMemo(() => {
     if (!conversationId) return "Vacanza AI";
     const c = conversations.find((x) => x.id === conversationId);
-    if (!c) return "Yeni sohbet";
-    return c.title || "Yeni sohbet";
+    if (!c) return "New chat";
+    return c.title || "New chat";
   }, [conversations, conversationId]);
 
   const refreshConversations = useCallback(async () => {
@@ -494,7 +489,7 @@ export default function VacanzaChat({
           {
             id: "error",
             type: "ai",
-            text: "Şu anda bağlantı kurulamıyor. Lütfen bir süre sonra tekrar deneyin.",
+            text: "Connection failed. Please try again later.",
             time: t,
           },
         ]);
@@ -527,10 +522,10 @@ export default function VacanzaChat({
     setMessagesLoading(true);
     setConversationId(id);
     try {
-      await loadMessagesForConversation(id);
+      const history = await loadMessagesForConversation(id);
     } catch (e) {
       console.error(e);
-      message.error("Mesajlar yüklenemedi.");
+      message.error("Failed to load messages.");
     } finally {
       setMessagesLoading(false);
     }
@@ -561,7 +556,7 @@ export default function VacanzaChat({
       }
     } catch (e) {
       console.error(e);
-      message.error("Sohbet başlatılamadı.");
+      message.error("Failed to start chat.");
       setLoading(false);
       return;
     }
@@ -627,14 +622,14 @@ export default function VacanzaChat({
             extractedPrefs.length > 2 ? ` (+${extractedPrefs.length - 2})` : "";
           message.success(
             snippets.length > 0
-              ? `Tercihlerin kaydedildi: ${snippets.join(" · ")}${more}`
-              : `${extractedPrefs.length} tercih profiline kaydedildi.`
+              ? `Preferences saved: ${snippets.join(" · ")}${more}`
+              : `${extractedPrefs.length} preferences saved to your profile.`
           );
         }
       }
       await refreshConversations();
     } catch {
-      message.error("Şu an yoğunuz. Birkaç saniye sonra tekrar deneyin.");
+      message.error("We are currently busy. Please try again in a few seconds.");
     } finally {
       setLoading(false);
     }
@@ -666,7 +661,7 @@ export default function VacanzaChat({
           <button
             type="button"
             className={`chat-header-icon-btn ${historyPanelOpen ? "chat-header-icon-btn-active" : ""}`}
-            title="Geçmiş sohbetler"
+            title="Chat history"
             aria-expanded={historyPanelOpen}
             aria-controls="vacanza-chat-history"
             onClick={() => {
@@ -679,7 +674,7 @@ export default function VacanzaChat({
           >
             <HistoryOutlined />
           </button>
-          <button type="button" className="chat-header-icon-btn" title="Yeni sohbet" onClick={handleNewChat}>
+          <button type="button" className="chat-header-icon-btn" title="New chat" onClick={handleNewChat}>
             <PlusOutlined />
           </button>
           <button type="button" className="chat-header-icon-btn" title="Kapat" onClick={onClose}>
@@ -696,15 +691,12 @@ export default function VacanzaChat({
           aria-label="Geçmiş sohbetler"
         >
           <div className="chat-history-full-scroll">
-            <div className="chat-history-full-heading">Geçmiş sohbetler</div>
+            <div className="chat-history-full-heading">Chat history</div>
             {!conversations.length ? (
               <div className="chat-history-full-empty">
-                <span className="chat-history-full-empty-icon" aria-hidden>
-                  💬
-                </span>
-                <p className="chat-history-full-empty-title">Henüz kayıtlı sohbet yok</p>
+                <p className="chat-history-full-empty-title">No saved chats yet</p>
                 <p className="chat-history-full-empty-hint">
-                  Aşağıdan bir rota isteği yazın; geçmiş burada listelenecek.
+                  Write a route request below to see your history here.
                 </p>
               </div>
             ) : (
@@ -718,7 +710,7 @@ export default function VacanzaChat({
                         className={`chat-conv-row ${selected ? "chat-conv-row-active" : ""}`}
                         onClick={() => handleSelectConversation(c.id)}
                       >
-                        <span className="chat-conv-row-title">{c.title || "Sohbet"}</span>
+                        <span className="chat-conv-row-title">{c.title || "Chat"}</span>
                         <span className="chat-conv-row-meta">{formatConversationDate(c.updatedAt)}</span>
                       </button>
                     </li>
@@ -739,7 +731,7 @@ export default function VacanzaChat({
       >
         {showMessageSpinner ? (
           <div className="chat-loading-center">
-            <Spin tip="Yükleniyor..." />
+            <Spin tip="Loading..." />
           </div>
         ) : (
           <>
@@ -761,36 +753,35 @@ export default function VacanzaChat({
                         role="note"
                       >
                         <div className="route-card-preface-row">
-                          <span className="route-card-preface-label">Yeniden çiz</span>
+                          <span className="route-card-preface-label">Redraw</span>
                           <button
                             type="button"
                             className="route-draw-edit-btn"
-                            aria-label="Haritada alan çizerek günü yeniden planla"
+                            aria-label="Replan the day by drawing an area on the map"
                             onClick={() => {
                               onRequestDrawToEdit();
                               onClose();
                             }}
                           >
                             <EditOutlined aria-hidden />
-                            Haritada çiz
+                            Draw on map
                           </button>
                         </div>
                         <p className="route-card-preface-copy">
-                          Haritada alan çiz, sağ panelden günü seç; turuncu banttan o günü seçtiğin alana göre
-                          <strong> yenilersin</strong>.
+                          Draw an area on the map and select the day from the right panel to <strong>reschedule</strong> that day.
                         </p>
                       </div>
                     ) : null}
                     <div className="route-card">
                     <div className="route-card-title">{rd.title}</div>
                     <div className="route-card-meta">
-                      {rd.destination} &middot; {rd.total_days || rd.totalDays} gün &middot;{" "}
-                      {(rd.days || []).reduce((sum, d) => sum + (d.waypoints?.length || 0), 0)} yer
+                      {rd.destination} &middot; {rd.total_days || rd.totalDays} days &middot;{" "}
+                      {(rd.days || []).reduce((sum, d) => sum + (d.waypoints?.length || 0), 0)} places
                     </div>
                     <div className="route-card-days">
                       {(rd.days || []).map((d) => (
                         <div key={d.day} className="route-card-day-row">
-                          <span className="route-card-day-badge">Gün {d.day}</span>
+                          <span className="route-card-day-badge">Day {d.day}</span>
                           <span className="route-card-day-text">{(d.waypoints || []).map((w) => w.name).join(", ")}</span>
                         </div>
                       ))}
@@ -815,7 +806,7 @@ export default function VacanzaChat({
                         onClose();
                       }}
                     >
-                      Rotayı Haritada Göster
+                      Show Route on Map
                     </button>
                     {(() => {
                       const routeIdForCard = msg.routeIdList?.[rIdx];
@@ -842,9 +833,9 @@ export default function VacanzaChat({
                       return (
                         <div className="route-card-subsection route-card-subsection--viator">
                           <div className="route-card-subsection-head">
-                            <span className="route-card-subsection-title">Müze &amp; tur fiyatları</span>
+                            <span className="route-card-subsection-title">Museum &amp; tour prices</span>
                             <span className="route-card-subsection-desc">
-                              Viator — rota duraklarına göre müze / tur ürünleri
+                              Viator — museum / tour products based on route stops
                             </span>
                           </div>
                           <div className="route-ticket-section">
@@ -861,17 +852,17 @@ export default function VacanzaChat({
                               onClick={() => handleTicketSearch(routeIdForCard, msg.id, rIdx)}
                               disabled={ticketLoading || messagesLoading}
                             >
-                              Fiyatları göster
+                              Show prices
                             </button>
                           ) : (
-                            <Tooltip title="Bu rota için route_id gelmediği için Viator fiyatları sorgulanamıyor.">
+                            <Tooltip title="Viator prices cannot be queried because no route_id was received for this route.">
                               <span className="route-tickets-btn-wrap">
                                 <button
                                   type="button"
                                   className="route-tickets-btn"
                                   disabled
                                 >
-                                  Fiyatları göster
+                                  Show prices
                                 </button>
                               </span>
                             </Tooltip>
@@ -879,12 +870,12 @@ export default function VacanzaChat({
                           {ticketLoading ? (
                             <div className="ticket-loading-wrap" aria-live="polite">
                               <Spin size="small" />
-                              <span className="ticket-loading-label">Fiyatlar yükleniyor…</span>
+                              <span className="ticket-loading-label">Loading prices...</span>
                             </div>
                           ) : null}
                           {showTicketEmpty ? (
                             <div className="ticket-empty" role="status">
-                              Uygun müze / tur fiyatı bulunamadı
+                              No suitable museum / tour prices found
                             </div>
                           ) : null}
                           {showTicketCards ? (
@@ -896,7 +887,7 @@ export default function VacanzaChat({
                                 >
                                   <div className="ticket-card-head">
                                     <span className="ticket-waypoint-name">{row.waypointName}</span>
-                                    <span className="ticket-day">Gün {row.day}</span>
+                                    <span className="ticket-day">Day {row.day}</span>
                                   </div>
                                   {(() => {
                                     const priceLine = formatTicketPriceLine(row);
@@ -918,7 +909,7 @@ export default function VacanzaChat({
                                         window.open(row.bookingUrl, "_blank", "noopener,noreferrer")
                                       }
                                     >
-                                      Bilet Al
+                                      Get Tickets
                                     </button>
                                   ) : null}
                                 </li>
@@ -945,7 +936,7 @@ export default function VacanzaChat({
                 ))}
                 {msg.type === "ai" && msg.noRouteHint && routeList.length === 0 ? (
                   <div className="route-card route-card-hint">
-                    <span>Rota verisi alınamadı. Yukarıdaki hızlı butonlardan birini tekrar deneyin.</span>
+                    <span>Could not retrieve route data. Try one of the quick buttons above again.</span>
                   </div>
                 ) : null}
               </div>
@@ -955,7 +946,7 @@ export default function VacanzaChat({
               <div className="chat-row ai-row">
                 <div className="message-bubble ai-bubble chat-typing-bubble">
                   <Spin size="small" />
-                  <span className="chat-typing-label">Yanıt hazırlanıyor…</span>
+                  <span className="chat-typing-label">Preparing response...</span>
                 </div>
               </div>
             )}
@@ -967,14 +958,14 @@ export default function VacanzaChat({
       {!initialLoading && (
         <div className="chat-footer-refined">
           <div className="chat-quick-actions">
-            <span className="chat-quick-label">Rota planla:</span>
+            <span className="chat-quick-label">Plan a route:</span>
             <button
               type="button"
               className="chat-quick-chip"
-              onClick={() => handleSendMessage("3 günlük İstanbul planı yap")}
+              onClick={() => handleSendMessage("Plan a 3-day trip to Istanbul")}
               disabled={loading || messagesLoading}
             >
-              3 gün İstanbul
+              3-day Istanbul
             </button>
             <button
               type="button"
@@ -982,21 +973,21 @@ export default function VacanzaChat({
               onClick={() => handleSendMessage("Plan a 2-day trip to Rome")}
               disabled={loading || messagesLoading}
             >
-              2 gün Roma
+              2-day Rome
             </button>
             <button
               type="button"
               className="chat-quick-chip"
-              onClick={() => handleSendMessage("Bana 4 günlük Antalya tatil planı oluştur")}
+              onClick={() => handleSendMessage("Create a 4-day Antalya vacation plan for me")}
               disabled={loading || messagesLoading}
             >
-              4 gün Antalya
+              4-day Antalya
             </button>
           </div>
           <div className="chat-input-field-group">
             <input
               type="text"
-              placeholder="Rota planı için örn: 3 günlük Paris planı yap..."
+              placeholder="For a route plan, e.g.: plan a 3-day trip to Paris..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
