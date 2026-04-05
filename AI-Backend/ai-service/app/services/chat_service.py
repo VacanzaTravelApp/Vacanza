@@ -29,9 +29,25 @@ ITINERARY_RAG_TOP_K = 4
 ITINERARY_RAG_MAX_CHARS_PER_MSG = 120
 ROUTE_JSON_SEPARATOR = "---ROUTE_JSON---"
 
-TURN1_SYSTEM = """You are a travel planning assistant.
-When the user asks for an itinerary, respond ONLY with a JSON tool call.
-Do not write anything else.
+TURN1_SYSTEM = """You are a travel planning assistant. The backend will run a POI search only for a **specific, local** destination.
+
+You have TWO possible outputs — pick exactly one:
+
+---
+
+## A) Destination too broad — ask first (plain text ONLY)
+
+Use this when the user names only a **whole country**, a **whole US state** without a city, or a multi-day "country tour" without a focus city — e.g. "Türkiye turu", "Amerika'da gezi", "California trip", "one day in Turkey" with no city. Same-day routes cannot span Istanbul + Ankara + İzmir; that is invalid.
+
+Respond with **short plain text only** (no JSON, no `{` `}` characters, no tool call). Same language as the user. Max ~60 words.
+- Ask which **city or smaller region** they want to focus on (or US state + city). One or two example cities optional.
+- Do NOT run search_pois until they name a concrete city/town OR the thread already contains one.
+
+---
+
+## B) Destination is specific enough — JSON tool call ONLY
+
+When the user (or recent conversation) names at least one **city, town, or well-defined local area** suitable for POI search, respond with **ONLY** this JSON (no other text):
 
 Format:
 {
@@ -44,10 +60,15 @@ Format:
 }
 
 Destination rules (CRITICAL):
-- destination MUST be the place the user asked for (city/town/region + country if provided or clearly implied).
-- NEVER default to "Rome" or any other city.
+- "destination" MUST be a **single local area**: e.g. "Istanbul, Turkey", "Los Angeles, United States", "Cappadocia, Turkey" — NOT "Turkey", "United States", "Europe" alone.
+- NEVER default to "Rome", "Ankara", or any city not tied to this request.
 - If the user specifies a smaller place (town/village), keep it (e.g., "Kas, Turkey", "Hallstatt, Austria").
-- If the user provides multiple places, pick the PRIMARY destination they want the itinerary for.
+- Recency: if several places appear over time, use the **most recently stated** city for this trip. Follow-ups like "rota oluştur" without a new place → use the **last named city** in the thread.
+- If the user provides multiple places in one message, pick the PRIMARY destination for the itinerary.
+
+### Fallback when user refuses to pick a city but wants a plan
+
+Only if they insist on "whole country" or stay vague after you asked: output **search_pois** with **ONE** coherent anchor city that matches travel_style and profile (e.g. "Istanbul, Turkey" for a broad Turkey ask — not Ankara unless they said Ankara). Never use a country name alone as "destination".
 
 Dining POIs (CRITICAL — temporary):
 - Do NOT request restaurant, cafe, market, bar, food, or nightlife as categories. Dining on the map is disabled until a dedicated API exists; the backend also strips these if present.
@@ -65,7 +86,10 @@ TURN1_TOOL_CONTEXT_RULES = """Tool-call context (use the User context block belo
 - Align travel_style with interests: food/dining emphasis → still use travel_style "food" if useful for tone, but NEVER add restaurant/cafe/market categories (dining POIs disabled).
 - Museums/culture/history → art or history; outdoors → nature; otherwise general.
 - Choose categories to match pace, activity level, dietary and accessibility needs; respect avoid_categories (omit types the user dislikes).
-- If the user's current message explicitly conflicts with older notes, prioritize the current message."""
+- If the user's current message explicitly conflicts with older notes, prioritize the current message.
+- Destination (priority): (1) city/region named in the **latest** user turn if they name one; (2) else the **most recent** explicit trip city in the thread; (3) profile/RAG only when the conversation does not name a place. Never let an older turn (e.g. a country) or a generic profile hint replace a **newer** city (e.g. user said Istanbul after discussing elsewhere).
+- Trip length and dates: if the latest message only says "redraw" / "new route" but earlier turns name days or dates, keep those; for destination, use the destination priority rule above.
+- Country/state-only requests: if the user still names only "Turkey", "USA", a whole state, etc., use plain-text clarification (mode A in system prompt) — do NOT emit search_pois with a country as destination."""
 
 # Shown after TURN2_SYSTEM when user profile / AI prefs / RAG are present (POI → route JSON turn).
 TURN2_TOOL_CONTEXT_RULES = """User context (use the block below when choosing POIs and building each day):
@@ -74,7 +98,9 @@ TURN2_TOOL_CONTEXT_RULES = """User context (use the block below when choosing PO
 - Balance days to trip pace: SLOW/low activity → later day_start_local and longer estimated_duration_min per stop; FAST/high activity → earlier start and slightly shorter dwell times where sensible.
 - Set day_start_local per day from trip_pace and activity (examples: SLOW ~10:00, MODERATE ~09:00, FAST ~08:30) — never default every trip to 09:00 without reason.
 - estimated_duration_min must vary by venue type (e.g. large museums 90–120, small sites 45–60, parks 40–75, quick landmarks 25–45). Do not use 60 for every stop.
-- Keep geographic efficiency; preferences override only when choosing among nearby alternatives."""
+- Keep geographic efficiency; preferences override only when choosing among nearby alternatives.
+- Trip calendar dates: read the conversation turns above (not only the last line). If the user already stated a first trip day, set trip_dates_user_specified and trip_start_date in the route JSON.
+- If POIs span multiple distant metros, drop outliers so each day remains locally coherent."""
 
 # Shown whenever weather payload is present. Legacy list = daily rows only; object may include "daily" only or "daily" + "day_parts".
 TURN2_WEATHER_RULES_DAILY = """Destination weather forecast (use only this data; do not invent numbers):
@@ -107,6 +133,7 @@ Available POIs:
 Rules:
 - Select the best POIs for a {days}-day {travel_style} trip
 - Do NOT include restaurant, cafe, bar, market, or other dining-only stops as waypoints (even if they appear in the POI list). Sightseeing-only itineraries until dining API is available.
+- Geographic realism (CRITICAL): Each day must stay in **one** metro area or region — realistic same-day travel only (local transit, short drives). If the POI list mixes distant cities (e.g. Istanbul-area + Ankara + İzmir), use **only** POIs from **one** geographic cluster (pick the largest tight cluster by coordinates); ignore far-outliers. Never schedule same-day morning in one city and evening in another hundreds of km away.
 - Group nearby POIs on the same day
 - Order each day logically (minimize walking distance)
 - Each day: 4-6 POIs maximum
@@ -121,7 +148,7 @@ OUTPUT FORMAT (MANDATORY — the map will NOT work without the JSON):
 
 Do NOT output a long formatted list with coordinates. The JSON is the ONLY format the app reads.
 
-route_data format (preserve trip_dates_user_specified and trip_start_date from the user's message if they gave dates):
+route_data format (preserve trip_dates_user_specified and trip_start_date if the user gave dates anywhere in the conversation above):
 {{
   "title": "...",
   "destination": "...",
@@ -921,18 +948,20 @@ Vacanza app features (mention ONLY when directly relevant):
 - Search for flights, hotels, and current prices.
 
 Route generation (CRITICAL — follow exactly):
-When the user asks for a trip plan, vacation plan, itinerary, or route (e.g. "plan 3 days in Rome", "tatil planla", "rota oluştur", "3 günlük plan", "create an itinerary"), you MUST:
+When the user asks for a trip plan, vacation plan, itinerary, or route (e.g. "plan 3 days in Rome", "tatil planla", "rota oluştur", "3 günlük plan", "create an itinerary"), follow steps 0 then 1–3 as applicable:
+0. Scope check: If they name only a **whole country** or **whole state** without a city (e.g. "Türkiye turu", "USA trip") and have not picked a focus city in the thread, **stop**: reply briefly asking which city or region they want (no ---ROUTE_JSON---). Same-day plans cannot jump between distant cities. If they explicitly ask you to choose the city, skip this and use one anchor city in steps 1–3.
 1. Write a VERY SHORT text summary: MAX 40 words, 2-3 sentences only. Do NOT list places in the text — the JSON contains them. Example: "İstanbul'da 3 günlük plan: tarihi yarımada, müzeler ve Boğaz. Aşağıda günlük program."
 2. On the next line, write EXACTLY this separator (no spaces, no markdown, no bold): ---ROUTE_JSON---
 3. On the next line, write a single valid JSON object (no markdown, no code block) with this structure:
 {"title":"...","destination":"City, Country","total_days":N,"trip_dates_user_specified":true,"trip_start_date":"2026-06-20","days":[{"day":1,"title":"Day 1: ...","waypoints":[{"name":"Place Name","description":"Short description","category":"museum","day":1,"order":1,"latitude":null,"longitude":null,"estimated_duration_min":60,"time_slot":"morning"}]}],"notes":"Optional tips"}
 
 trip_dates_user_specified + trip_start_date (CRITICAL for tickets/events):
-- If the user states ANY concrete trip dates in the same request (e.g. "20 21 Haziran", "June 20-21", "15-17 Nisan", "next weekend" as specific days), set trip_dates_user_specified to true AND trip_start_date to the FIRST trip day as ISO YYYY-MM-DD (e.g. 2026-06-20). Infer the year: use the next occurrence if the month/day is still ahead this year, else next year.
-- If they give duration/destination only with no calendar dates, set trip_dates_user_specified to false and omit trip_start_date.
+- If the user states ANY concrete trip dates in the current conversation (including earlier turns — e.g. "20 21 Haziran", "June 20-21", "25 Haziran", "15-17 Nisan", "next weekend" as specific days), set trip_dates_user_specified to true AND trip_start_date to the FIRST trip day as ISO YYYY-MM-DD (e.g. 2026-06-20). Infer the year: use the next occurrence if the month/day is still ahead this year, else next year.
+- If they give duration/destination only with no calendar dates anywhere in the thread, set trip_dates_user_specified to false and omit trip_start_date.
 - Never omit trip_start_date when trip_dates_user_specified is true and dates are known.
 
 Route generation rules:
+- Each day must stay geographically coherent: do not put morning in one city and evening in another far city; use one metro area per day unless multi-day road-trip is explicit.
 - category must be one of: museum, beach, park, monument, landmark, hotel, mosque, church, palace, square, bridge, theater, zoo, aquarium, spa, sports (do not use restaurant, cafe, market, bar, nightlife for waypoints)
 - time_slot must be one of: morning, afternoon, evening
 - ALWAYS set latitude and longitude to null for all waypoints. The app resolves coordinates via geocoding — do NOT guess or provide coordinates.
@@ -987,8 +1016,9 @@ Route generation rules:
                     f"{turn2_system}\n\n{TURN2_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
                 )
             turn2 = await llm.ainvoke(
-                [
-                    SystemMessage(content=turn2_system),
+                [SystemMessage(content=turn2_system)]
+                + history
+                + [
                     HumanMessage(
                         content=f"Replace only day {_day_n} using the polygon POIs; keep all other days identical."
                     ),
@@ -1011,7 +1041,16 @@ Route generation rules:
                     f"{turn2_system}\n\n{TURN2_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
                 )
             turn2 = await llm.ainvoke(
-                [SystemMessage(content=turn2_system), HumanMessage(content="Build itinerary from provided POIs.")]
+                [SystemMessage(content=turn2_system)]
+                + history
+                + [
+                    HumanMessage(
+                        content=(
+                            "Build the itinerary JSON from the POIs in your system instructions. "
+                            "Use trip dates from the conversation above when setting trip_dates_user_specified and trip_start_date."
+                        )
+                    ),
+                ]
             )
         raw_ai_content = str(turn2.content)
         ai_content, route_data = _parse_route_from_response(raw_ai_content)
@@ -1025,7 +1064,9 @@ Route generation rules:
             turn1_system = (
                 f"{TURN1_SYSTEM}\n\n{TURN1_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
             )
-        turn1 = await llm.ainvoke([SystemMessage(content=turn1_system), HumanMessage(content=user_content)])
+        turn1 = await llm.ainvoke(
+            [SystemMessage(content=turn1_system)] + history + [HumanMessage(content=user_content)]
+        )
         raw_ai_content = str(turn1.content)
         ai_content = raw_ai_content.strip()
         route_data = None
