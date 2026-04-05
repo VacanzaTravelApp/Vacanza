@@ -86,17 +86,17 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
         /* ignore */
       }
       setVote(v);
-      message.success("Teşekkürler, rota tercihin kaydedildi.");
+      message.success("Thanks, your route preference has been saved.");
     } catch (e) {
-      message.error(e?.friendlyMessage || "Geri bildirim gönderilemedi.");
+      message.error(e?.friendlyMessage || "Failed to send feedback.");
     } finally {
       setSending(false);
     }
   };
 
   return (
-    <div className="route-card-feedback" role="group" aria-label="Rota genel geri bildirimi">
-      <span className="route-card-feedback-label">Bu öneri:</span>
+    <div className="route-card-feedback" role="group" aria-label="General route feedback">
+      <span className="route-card-feedback-label">Feedback:</span>
       <Button
         type="text"
         size="small"
@@ -104,7 +104,7 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
         icon={vote === "up" ? <LikeFilled /> : <LikeOutlined />}
         loading={sending}
         onClick={() => send("THUMBS_UP")}
-        aria-label="Rota önerisini beğendim"
+        aria-label="I like this route recommendation"
         aria-pressed={vote === "up"}
       />
       <Button
@@ -114,7 +114,7 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
         icon={vote === "down" ? <DislikeFilled /> : <DislikeOutlined />}
         loading={sending}
         onClick={() => send("THUMBS_DOWN")}
-        aria-label="Rota önerisini beğenmedim"
+        aria-label="I don't like this route recommendation"
         aria-pressed={vote === "down"}
       />
     </div>

@@ -210,9 +210,18 @@ const ProfileCharacterCard = ({ name, role, level, xp, progress, imageUrl }) => 
 );
 
 const InfoRow = ({ label, value }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, alignItems: "flex-start" }}>
-        <span style={{ fontSize: 14, color: "var(--card-subtext, #9ca3af)", fontWeight: 700 }}>{label}</span>
-        <span style={{ fontSize: 15, color: "var(--card-text, #1c1c1e)", fontWeight: 800, textAlign: "right", maxWidth: "60%" }}>{value || "—"}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, alignItems: "flex-start", gap: 12 }}>
+        <span style={{ fontSize: 14, color: "var(--card-subtext, #9ca3af)", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ 
+            fontSize: 15, 
+            color: "var(--card-text, #1c1c1e)", 
+            fontWeight: 800, 
+            textAlign: "right", 
+            maxWidth: "70%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+        }} title={value}>{value || "—"}</span>
     </div>
 );
 
@@ -305,13 +314,16 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
                 icon={<ClockCircleOutlined />}
                 iconBg="var(--vivid-coral, #FF6B6B)"
             >
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 0, marginTop: 8, minHeight: checkins?.length > 0 ? 'auto' : 160, justifyContent: "center" }}>
                     {checkins?.length > 0 ? (
                         checkins.slice(0, 3).map((item, idx) => (
                             <CheckinItem key={item.checkInId || idx} name={item.poiName} category={item.category} date={item.checkedInAt} />
                         ))
                     ) : (
-                        <div style={{ textAlign: "center", padding: "16px 0", color: "var(--card-subtext, #9ca3af)", fontSize: 14, fontWeight: 600 }}>No check-ins yet</div>
+                        <div style={{ textAlign: "center", padding: "32px 0", color: "var(--card-subtext, #9ca3af)", fontSize: 14, fontWeight: 600, display: "flex", flexDirection: "column", alignItems: "center", justifyItems: "center", gap: 8 }}>
+                            <EnvironmentOutlined style={{ opacity: 0.5, fontSize: 32 }} />
+                            No check-ins yet
+                        </div>
                     )}
                 </div>
             </SectionCard>
@@ -323,19 +335,19 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
                 iconBg="var(--vivid-teal, #00B4D8)"
             >
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-                    <div style={{ background: "var(--card-bg, rgba(128,128,128,0.06))", borderRadius: 20, padding: 16 }}>
+                    <div style={{ background: "var(--card-bg, rgba(128,128,128,0.06))", borderRadius: 20, padding: 16, minHeight: 88, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                         <div style={{ fontSize: 20, fontWeight: 900, color: "var(--card-text, #1c1c1e)" }}>{stats?.visitedPoisCount || 0}</div>
                         <div style={{ fontSize: 12, color: "var(--card-subtext, #9ca3af)", fontWeight: 700, marginTop: 4 }}>Total places visited</div>
                     </div>
-                    <div style={{ background: "var(--card-bg, rgba(128,128,128,0.06))", borderRadius: 20, padding: 16 }}>
+                    <div style={{ background: "var(--card-bg, rgba(128,128,128,0.06))", borderRadius: 20, padding: 16, minHeight: 88, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                         <div style={{ fontSize: 15, fontWeight: 800, color: "var(--card-text, #1c1c1e)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{stats?.lastVisitPoiName || "—"}</div>
-                        <div style={{ fontSize: 12, color: "var(--card-subtext, #9ca3af)", fontWeight: 700, marginTop: 4 }}>{stats?.lastVisitDate ? dayjs(stats.lastVisitDate).format('MMM D, YYYY') : "—"}</div>
+                        <div style={{ fontSize: 12, color: "var(--card-subtext, #9ca3af)", fontWeight: 700, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{stats?.lastVisitDate ? dayjs(stats.lastVisitDate).format('MMM D, YYYY') : "—"}</div>
                     </div>
-                    <div style={{ background: "var(--card-bg, rgba(128,128,128,0.06))", borderRadius: 20, padding: 16 }}>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--card-text, #1c1c1e)", textTransform: "capitalize" }}>{stats?.favoriteCategory || "—"}</div>
+                    <div style={{ background: "var(--card-bg, rgba(128,128,128,0.06))", borderRadius: 20, padding: 16, minHeight: 88, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--card-text, #1c1c1e)", textTransform: "capitalize", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{stats?.favoriteCategory || "—"}</div>
                         <div style={{ fontSize: 12, color: "var(--card-subtext, #9ca3af)", fontWeight: 700, marginTop: 4 }}>Favorite category</div>
                     </div>
-                    <div style={{ background: "var(--card-bg, rgba(128,128,128,0.06))", borderRadius: 20, padding: 16 }}>
+                    <div style={{ background: "var(--card-bg, rgba(128,128,128,0.06))", borderRadius: 20, padding: 16, minHeight: 88, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                         <div style={{ fontSize: 20, fontWeight: 900, color: "var(--card-text, #1c1c1e)" }}>{stats?.distinctCategoriesCount || 0}</div>
                         <div style={{ fontSize: 12, color: "var(--card-subtext, #9ca3af)", fontWeight: 700, marginTop: 4 }}>Categories explored</div>
                     </div>
@@ -797,7 +809,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode }) => {
         mutationFn: (values) => userApi.updateProfile(values),
         onSuccess: () => {
             queryClient.invalidateQueries(["user", "profile"]);
-            message.success("Your profile is all set! ✨");
+            message.success("Your profile is all set!");
             setView('MAIN');
         },
         onError: (err) => {

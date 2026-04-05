@@ -81,7 +81,7 @@ export default function EventCard({ event }) {
         ) : null}
         {matchedDay != null && Number.isFinite(Number(matchedDay)) ? (
           <span className="event-card-badge event-card-badge--day">
-            Gün {matchedDay}
+            Day {matchedDay}
           </span>
         ) : null}
         {category ? (
