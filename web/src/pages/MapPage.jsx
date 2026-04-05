@@ -781,6 +781,10 @@ export default function MapPage() {
   const handleMapIdle = useCallback(() => {
     if (!mapRef.current) return;
     const map = mapRef.current.getMap();
+    if (map.getZoom() < 12) {
+      setMapboxPois([]);
+      return;
+    }
 
     // Standard Mapbox layers for diverse POIs
     const poiLayers = [
@@ -816,13 +820,7 @@ export default function MapPage() {
       };
     }).filter(p => !!p.name);
 
-    setMapboxPois(prev => {
-      const existingIds = new Set(prev.map(p => p.id));
-      const newPois = discovered.filter(p => !existingIds.has(p.id));
-      const combined = [...prev, ...newPois];
-      // Limit to 1000 for performance vs density balance
-      return combined.length > 1000 ? combined.slice(-1000) : combined;
-    });
+    setMapboxPois(discovered);
   }, []);
 
   const getViewportBbox = useCallback(() => {
@@ -882,6 +880,11 @@ export default function MapPage() {
 
     debounceRef.current = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      const map = mapRef.current?.getMap?.();
+      if (map && map.getZoom() < 12) {
+        setPoisRaw([]);
+        return;
+      }
       const bbox = getViewportBbox();
       if (bbox) fetchPois({ selectionType: "BBOX", bbox });
     }, 500);
@@ -899,6 +902,11 @@ export default function MapPage() {
 
     const t = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      const map = mapRef.current?.getMap?.();
+      if (map && map.getZoom() < 12) {
+        setPoisRaw([]);
+        return;
+      }
       const bbox = getViewportBbox();
       if (bbox) fetchPois({ selectionType: "BBOX", bbox });
     }, 600);
@@ -911,6 +919,11 @@ export default function MapPage() {
     if (!MAPBOX_TOKEN || !user) return;
     if (mode !== "VIEWPORT") return;
 
+    const map = mapRef.current?.getMap?.();
+    if (map && map.getZoom() < 12) {
+      setPoisRaw([]);
+      return;
+    }
     const bbox = getViewportBbox();
     if (bbox) fetchPois({ selectionType: "BBOX", bbox });
   }, [selectedBackendCats, MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
