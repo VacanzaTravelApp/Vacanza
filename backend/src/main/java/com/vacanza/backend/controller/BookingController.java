@@ -5,7 +5,6 @@ import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
 import com.vacanza.backend.dto.response.DestinationSuggestionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
-import com.vacanza.backend.exceptions.BookingException;
 import com.vacanza.backend.integration.booking.SerpApiAirportSuggestion;
 import com.vacanza.backend.service.BookingService;
 import jakarta.validation.Valid;
@@ -88,15 +87,6 @@ public class BookingController {
         log.info("Destination autocomplete request: q='{}'", q);
         List<DestinationSuggestionDTO> results = bookingService.searchDestinations(q);
         return ResponseEntity.ok(results);
-    }
-
-    @ExceptionHandler(BookingException.class)
-    public ResponseEntity<Map<String, String>> handleBookingException(BookingException ex) {
-        log.error("Booking error: {} ({})", ex.getMessage(), ex.getStatus());
-        return ResponseEntity.status(ex.getStatus())
-                .body(Map.of(
-                        "error", ex.getStatus().getReasonPhrase(),
-                        "message", ex.getMessage()));
     }
 
     @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
