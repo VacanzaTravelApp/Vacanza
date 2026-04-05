@@ -71,6 +71,7 @@ public class ApiMetricsCollector {
         }
 
         void recordError() {
+            totalCalls.increment();
             errorCount.increment();
         }
     }
