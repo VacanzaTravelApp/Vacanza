@@ -581,6 +581,8 @@ export default function VacanzaChat({
       if (response && response.content) {
         const routeData = response.route_data || response.routeData || null;
         const wasRouteRequest = /plan|rota|gün|tatil|itinerary|day/i.test(textToSend);
+        const aiAskedFollowUp = !routeData && wasRouteRequest &&
+          /\?|hangi|which|where|nere|kaç gün|how many/i.test(response.content || "");
         if (routeData) {
           const allWps = (routeData.days || []).flatMap((d) => d.waypoints || []);
           console.log("[VacanzaChat] route_data received:", {
@@ -590,7 +592,7 @@ export default function VacanzaChat({
             waypointCoords: allWps.map((w) => ({ name: w.name, lat: w.latitude, lon: w.longitude })),
           });
         }
-        if (!routeData && wasRouteRequest) {
+        if (!routeData && wasRouteRequest && !aiAskedFollowUp) {
           console.warn("[VacanzaChat] Rota isteği gönderildi ama route_data gelmedi:", response);
         }
         const routeSummaryMessage = response.route_summary_message ?? response.routeSummaryMessage;
@@ -607,7 +609,7 @@ export default function VacanzaChat({
           routeDataList: norm ? [norm] : undefined,
           routeIdList: norm ? [routeIdFromResponse ?? null] : undefined,
           routeFeedbackList: norm ? [null] : undefined,
-          noRouteHint: !routeData && wasRouteRequest,
+          noRouteHint: !routeData && wasRouteRequest && !aiAskedFollowUp,
           time: formatMessageTime(new Date()),
         };
         setMessages((prev) => [...prev, aiMsg]);

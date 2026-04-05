@@ -76,6 +76,7 @@ public class RouteTimelineService {
             wp.setTravelFromPreviousMin(travelMin);
             wp.setArrivalTimeLocal(HH_MM.format(arrival));
             wp.setDepartureTimeLocal(HH_MM.format(departure));
+            wp.setTimeSlot(resolveTimeSlot(arrival, wp.getCategory()));
 
             cursor = departure;
             prev = wp;
@@ -84,6 +85,52 @@ public class RouteTimelineService {
         if (prev != null && prev.getDepartureTimeLocal() != null) {
             day.setDayEndLocal(prev.getDepartureTimeLocal());
         }
+    }
+
+    private static final java.util.Set<String> DINING_CATEGORIES = java.util.Set.of(
+            "restaurant", "cafe", "bar", "fast_food", "bakery", "pub",
+            "nightclub", "nightlife", "market", "food");
+
+    private static boolean isDiningCategory(String category) {
+        if (category == null || category.isBlank()) {
+            return false;
+        }
+        String key = category.trim().toLowerCase(Locale.ROOT);
+        return DINING_CATEGORIES.contains(key);
+    }
+
+    /**
+     * Derive time_slot from the actual computed arrival time AND the POI category.
+     * Dining venues get meal-specific labels; sightseeing gets time-of-day labels.
+     */
+    private static String resolveTimeSlot(LocalTime arrival, String category) {
+        int hour = arrival.getHour();
+        if (isDiningCategory(category)) {
+            if (hour < 11) {
+                return "morning";
+            }
+            if (hour < 14) {
+                return "lunch";
+            }
+            if (hour < 17) {
+                return "afternoon";
+            }
+            if (hour < 21) {
+                return "dinner";
+            }
+            return "night";
+        }
+        // Sightseeing / non-dining
+        if (hour < 12) {
+            return "morning";
+        }
+        if (hour < 17) {
+            return "afternoon";
+        }
+        if (hour < 21) {
+            return "evening";
+        }
+        return "night";
     }
 
     private static boolean hasCoords(AiChatDto.RouteWaypoint w) {

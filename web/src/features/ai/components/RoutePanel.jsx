@@ -8,8 +8,11 @@ import "../styles/routePanel.css";
 
 const TIME_SLOT_LABELS = {
   morning: "Sabah",
-  afternoon: "Öğle",
+  lunch: "Öğle Yemeği",
+  afternoon: "Öğleden Sonra",
   evening: "Akşam",
+  dinner: "Akşam Yemeği",
+  night: "Gece",
 };
 
 function formatTimeSlot(slot) {
