@@ -8,6 +8,9 @@ import {
   HeatMapOutlined,
   UnorderedListOutlined,
   CloseOutlined,
+  InfoCircleOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
@@ -16,6 +19,7 @@ import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
+import { useUserProfile } from "../hooks/useUserProfileData";
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
 import VacanzaChat, {
@@ -24,15 +28,13 @@ import VacanzaChat, {
 } from "../features/ai/components/VacanzaChat";
 import RoutePanel from "../features/ai/components/RoutePanel";
 import ProfileModal from "./ProfileModal";
+import PreferencesModal from "./PreferencesModal";
 import http from "../api/http";
 import { aiApi } from "../api/aiApi";
 import { normalizeRouteForMap } from "../features/ai/utils/routeMap";
+import "./MapPage.css";
 
-import cafeImg from "../assets/poi/poi_cafe.png";
-import museumImg from "../assets/poi/poi_museum.png";
-import monumentImg from "../assets/poi/poi_monument.png";
-import parkImg from "../assets/poi/poi_park.png";
-import restaurantImg from "../assets/poi/poi_restaurant.png";
+
 
 const { Header, Content, Footer } = Layout;
 
@@ -45,12 +47,104 @@ const INITIAL_VIEW_STATE = {
 };
 
 const STYLES = [
-  "mapbox://styles/mapbox/outdoors-v12",
-  "mapbox://styles/mapbox/streets-v12",
-  "mapbox://styles/mapbox/navigation-preview-night-v4",
-  "mapbox://styles/mapbox/satellite-streets-v12",
-  "mapbox://styles/mapbox/monochrome",
+  "mapbox://styles/mapbox/streets-v12",          // 0: Day (Streets)
+  "mapbox://styles/mapbox/dark-v11",             // 1: Night (Dark)
+  "mapbox://styles/mapbox/satellite-streets-v12" // 2: Live (Satellite + Labels)
 ];
+
+const RestaurantIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path>
+    <path d="M7 2v20"></path>
+    <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path>
+  </svg>
+);
+
+const CafeIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 8h1a4 4 0 1 1 0 8h-1" /><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z" /><line x1="6" y1="2" x2="6" y2="4" /><line x1="10" y1="2" x2="10" y2="4" /><line x1="14" y1="2" x2="14" y2="4" />
+  </svg>
+);
+
+const MuseumIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 22h20" /><path d="M4 22V10" /><path d="M10 22V10" /><path d="M14 22V10" /><path d="M20 22V10" /><path d="M2 10l10-8 10 8" />
+  </svg>
+);
+
+const MonumentIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m12 2-8 8v12h16V10Z" /><path d="M8 22v-4a4 4 0 1 1 8 0v4" /><path d="m11 11.5 1-1 1 1" />
+  </svg>
+);
+
+const ParkIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22v-6"></path>
+    <path d="M5 16l7-9 7 9H5z"></path>
+    <path d="M7 11l5-7 5 7H7z"></path>
+  </svg>
+);
+
+const AttractionIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><path d="M12 8v8" /><path d="M8 12h8" />
+  </svg>
+);
+
+const BarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 2h18" /><path d="M18 20a1 1 0 0 0 1-1V5H5v14a1 1 0 0 0 1 1h12z" /><path d="M12 11h.01" /><path d="M12 7h.01" /><path d="M12 15h.01" />
+  </svg>
+);
+
+const ShoppingIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" />
+  </svg>
+);
+
+const HotelIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 22h20" /><path d="M7 22v-5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v5" /><path d="M9 10h6" /><path d="M11 14h2" /><path d="M11 6h2" /><path d="M5 22V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v18" />
+  </svg>
+);
+
+const TransportIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="3" width="16" height="16" rx="2" /><path d="M9 22h6" /><path d="M8 7h8" /><path d="M12 3v16" />
+  </svg>
+);
+
+const PencilIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" />
+  </svg>
+);
+
+const LayerIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" />
+  </svg>
+);
+
+const CubeIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />
+  </svg>
+);
+
+const LogoutIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
 
 // Results panel haritayı kapatmasın diye padding hesabında kullanıyoruz
 const RESULTS_PANEL_APPROX_HEIGHT_DESKTOP = 320;
@@ -85,63 +179,146 @@ const UI_CATEGORIES = [
     label: "Restaurants",
     geo: "catering.restaurant",
     aliases: ["restaurant", "restaurants", "catering.restaurant"],
-    emoji: "🍽️",
-    img: restaurantImg,
-    ring: "#FFB020",
-    fill: "#FFF7E6",
-    pill: "#FFF3E0",
+    icon: <RestaurantIcon />,
+    pill: "rgba(255, 107, 107, 0.15)",
+    fill: "rgba(255, 107, 107, 1)",
+    ring: "#FF6B6B",
+    uiKey: "restaurant",
   },
   {
     key: "cafe",
     label: "Cafes",
     geo: "catering.cafe",
     aliases: ["cafe", "cafes", "catering.cafe"],
-    emoji: "☕",
-    img: cafeImg,
-    ring: "#6F4E37",
-    fill: "#F5F5DC",
-    pill: "#EFEBE9",
+    icon: <CafeIcon />,
+    pill: "rgba(255, 179, 71, 0.15)",
+    fill: "rgba(255, 179, 71, 1)",
+    ring: "#FFB347",
+    uiKey: "cafe",
   },
   {
     key: "museum",
     label: "Museums",
-    geo: "entertainment.museum",
-    aliases: ["museum", "museums", "entertainment.museum"],
-    emoji: "🖼️",
-    img: museumImg,
-    ring: "#9B51E0",
-    fill: "#F3EBFF",
-    pill: "#F3EBFF",
+    geo: "tourism.attraction.museum",
+    aliases: ["museum", "museums", "tourism.attraction.museum"],
+    icon: <MuseumIcon />,
+    pill: "rgba(0, 180, 216, 0.15)",
+    fill: "rgba(0, 180, 216, 1)",
+    ring: "#00B4D8",
+    uiKey: "museum",
   },
   {
     key: "monuments",
-    label: "Monuments",
-    geo: "tourism.attraction",
-    aliases: ["monument", "monuments", "tourism.attraction"],
+    label: "Monuments/Arts",
+    aliases: ["monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre", "art_gallery", "gallery"],
+    icon: <MonumentIcon />,
     emoji: "🏛️",
-    img: monumentImg,
-    ring: "#FF7A45",
-    fill: "#FFF1E8",
-    pill: "#FFF1E8",
+    pill: "rgba(99, 102, 241, 0.15)",
+    fill: "rgba(99, 102, 241, 1)",
+    ring: "#4338ca",
+    uiKey: "monuments",
   },
   {
-    key: "parks",
+    key: "park",
     label: "Parks",
-    geo: "leisure.park",
-    aliases: ["park", "parks", "leisure.park"],
-    emoji: "🌿",
-    img: parkImg,
-    ring: "#27AE60",
-    fill: "#E9F9EF",
-    pill: "#E9F9EF",
+    aliases: ["park", "garden", "forest", "nature_reserve", "wood", "leisure.park", "recreation_ground", "national_park"],
+    icon: <ParkIcon />,
+    emoji: "🌲",
+    pill: "rgba(34, 197, 94, 0.15)",
+    fill: "rgba(34, 197, 94, 1)",
+    ring: "#15803d",
+    uiKey: "park",
   },
+  {
+    key: "attraction",
+    label: "Attractions",
+    aliases: ["attraction", "viewpoint", "theme_park", "zoo", "aquarium", "historic", "scenic_viewpoint"],
+    icon: <AttractionIcon />,
+    emoji: "🎡",
+    pill: "rgba(168, 85, 247, 0.15)",
+    fill: "rgba(168, 85, 247, 1)",
+    ring: "#7e22ce",
+    uiKey: "attraction",
+  },
+  {
+    key: "bar",
+    label: "Nightlife",
+    aliases: ["bar", "pub", "night_club", "liquor_store", "alcohol", "wine_bar", "beer_garden"],
+    icon: <BarIcon />,
+    emoji: "🍸",
+    pill: "rgba(236, 72, 153, 0.15)",
+    fill: "rgba(236, 72, 153, 1)",
+    ring: "#be185d",
+    uiKey: "bar",
+  },
+  {
+    key: "shopping",
+    label: "Shopping",
+    aliases: ["shop", "mall", "supermarket", "marketplace", "clothing_store", "bakery", "convenience", "electronics"],
+    icon: <ShoppingIcon />,
+    emoji: "🛍️",
+    pill: "rgba(245, 158, 11, 0.15)",
+    fill: "rgba(245, 158, 11, 1)",
+    ring: "#b45309",
+    uiKey: "shopping",
+  },
+  {
+    key: "hotel",
+    label: "Hotels/Stay",
+    aliases: ["hotel", "motel", "hostel", "apartment", "guest_house", "accommodation", "lodging"],
+    icon: <HotelIcon />,
+    emoji: "🏨",
+    pill: "rgba(14, 165, 233, 0.15)",
+    fill: "rgba(14, 165, 233, 1)",
+    ring: "#0369a1",
+    uiKey: "hotel",
+  },
+  {
+    key: "transport",
+    label: "Transport/Transit",
+    aliases: ["station", "airport", "bus_stop", "subway_entrance", "train_station", "ferry_terminal", "transit_stop", "stop_area"],
+    icon: <TransportIcon />,
+    emoji: "🚉",
+    pill: "rgba(71, 85, 105, 0.15)",
+    fill: "rgba(71, 85, 105, 1)",
+    ring: "#334155",
+    uiKey: "transport",
+  },
+  {
+    key: "others",
+    label: "Others/Misc",
+    aliases: ["poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy", "hospital", "clinic"],
+    icon: <GlobalOutlined />,
+    emoji: "🌐",
+    pill: "rgba(100, 116, 139, 0.1)",
+    fill: "rgba(100, 116, 139, 1)",
+    ring: "#475569",
+    uiKey: "others",
+  }
 ];
+
+function hideTrafficLayers(map) {
+  if (!map) return;
+  const style = map.getStyle();
+  if (!style || !style.layers) return;
+  style.layers.forEach((layer) => {
+    if (layer.id.includes("traffic")) {
+      map.setLayoutProperty(layer.id, "visibility", "none");
+    }
+  });
+}
 
 function poiIconByCategory(category) {
   const c = normalizeCategory(category);
   const found = UI_CATEGORIES.find((x) => x.aliases.includes(c));
   if (!found) return null;
-  return { emoji: found.emoji, img: found.img, ring: found.ring, fill: found.fill, uiKey: found.key };
+  return {
+    emoji: found.emoji,
+    ring: found.ring,
+    fill: found.fill,
+    uiKey: found.key,
+    icon: found.icon // Added this
+  };
 }
 
 function labelByCategory(category) {
@@ -306,15 +483,52 @@ export default function MapPage() {
   const navigate = useNavigate();
   const mapRef = useRef(null);
   const isMobile = useIsMobile(768);
+  const { data: profile } = useUserProfile();
   const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
     useGamificationProfile();
 
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
-  const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
-  const [styleIndex, setStyleIndex] = useState(1);
+  const [viewState, setViewState] = useState({
+    longitude: 32.8597,
+    latitude: 39.9334,
+    zoom: 12,
+    pitch: 0,
+    bearing: 0,
+  });
+
+  // Attempt to center map on user's current location on mount
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setViewState((prev) => ({
+            ...prev,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            zoom: 13, // Slightly closer on user location
+          }));
+        },
+        (err) => {
+          console.log("[MapPage] Geolocation denied or failed, using default center.", err);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    }
+  }, []);
+
+  const initialDarkMode = (() => {
+    const saved = localStorage.getItem('vacanza-theme');
+    if (saved) return saved === 'night';
+    const hour = new Date().getHours();
+    return hour < 6 || hour >= 20;
+  })();
+
+  const [styleIndex, setStyleIndex] = useState(initialDarkMode ? 1 : 0);
+  const [isDarkMode, setIsDarkMode] = useState(initialDarkMode);
   const [is3D, setIs3D] = useState(false);
+  const [mapboxPois, setMapboxPois] = useState([]);
 
   const [mode, setMode] = useState("VIEWPORT"); // VIEWPORT | SELECTION
   const [selection, setSelection] = useState({ mode: null, polygon: [] });
@@ -327,7 +541,7 @@ export default function MapPage() {
   const [poisRaw, setPoisRaw] = useState([]);
   const [poiLoading, setPoiLoading] = useState(false);
 
-  const [filterOpen, setFilterOpen] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const [selectedCats, setSelectedCats] = useState(() => {
     const all = {};
@@ -339,6 +553,7 @@ export default function MapPage() {
   const [resultsTab, setResultsTab] = useState("all");
   const [bookingOpen, setBookingOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeRoute, setActiveRoute] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
@@ -354,10 +569,101 @@ export default function MapPage() {
   /** Sohbet–harita bağlantısı (replan gün); VacanzaChat onConversationIdChange ile güncellenir. */
   const [mapChatConversationId, setMapChatConversationId] = useState(null);
   const [replanDaySubmitting, setReplanDaySubmitting] = useState(false);
-  // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [fabExpanded, setFabExpanded] = useState(false);
+
+  // 1. Initial State Calculation (Clock-driven unless manual)
+  // (isDarkMode is now initialized above)
+
+  const [isManual, setIsManual] = useState(() => localStorage.getItem('vacanza-manual') === 'true');
+
   useEffect(() => {
-    if (resultsOpen) setFilterOpen(false);
-  }, [resultsOpen]);
+    const syncTheme = () => {
+      if (!isManual) {
+        const hour = new Date().getHours();
+        const shouldBeDark = hour < 6 || hour >= 20;
+        if (shouldBeDark !== isDarkMode) {
+          setIsDarkMode(shouldBeDark);
+          setStyleIndex(shouldBeDark ? 1 : 0);
+        }
+      }
+    };
+
+    const timer = setInterval(syncTheme, 60000);
+    return () => clearInterval(timer);
+  }, [isManual, isDarkMode]);
+
+  const toggleTheme = () => {
+    const nextVal = !isDarkMode;
+    setIsDarkMode(nextVal);
+    setIsManual(true);
+    setStyleIndex(nextVal ? 1 : 0);
+    localStorage.setItem('vacanza-theme', nextVal ? 'night' : 'day');
+    localStorage.setItem('vacanza-manual', 'true');
+  };
+
+  const themeClass = isDarkMode ? "theme-night" : "theme-day";
+  const mapStyleIndex = isDarkMode ? 1 : 0; 
+
+  const [formattedTime, setFormattedTime] = useState("");
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes().toString().padStart(2, '0');
+      const hours12 = h % 12 || 12;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      setFormattedTime(`${hours12}:${m} ${ampm}`);
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 60000);
+    return () => clearInterval(timer);
+  }, []);
+  // Mutual exclusion for ALL panels to avoid overlaps - fixed logic
+  useEffect(() => {
+    if (resultsOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+      if (fabExpanded) setFabExpanded(false);
+    }
+  }, [resultsOpen]); // Only react when resultsOpen changes
+
+  useEffect(() => {
+    if (filterOpen) {
+      if (resultsOpen) setResultsOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+    }
+  }, [filterOpen]);
+
+  useEffect(() => {
+    if (isChatOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (resultsOpen) setResultsOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+    }
+  }, [isChatOpen]);
+
+  useEffect(() => {
+    if (bookingOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (resultsOpen) setResultsOpen(false);
+      if (fabExpanded) setFabExpanded(false);
+    }
+  }, [bookingOpen]);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+      if (resultsOpen) setResultsOpen(false);
+      if (fabExpanded) setFabExpanded(false);
+    }
+  }, [sidebarOpen]);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
   const mapStyle = useMemo(() => STYLES[styleIndex], [styleIndex]);
@@ -476,6 +782,51 @@ export default function MapPage() {
     }
   }, [navigate]);
 
+  const handleMapIdle = useCallback(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current.getMap();
+    if (map.getZoom() < 12) {
+      setMapboxPois([]);
+      return;
+    }
+
+    // Standard Mapbox layers for diverse POIs
+    const poiLayers = [
+      'poi-label',
+      'settlement-label',
+      'medical-label',
+      'transit-label',
+      'airport-label',
+      'natural-label',
+      'park-label',
+      'place-label'
+    ];
+
+    // Safety check: only query layers that exist in current style
+    const styleLayers = map.getStyle().layers.map(l => l.id);
+    const validLayers = poiLayers.filter(id => styleLayers.includes(id));
+
+    const features = map.queryRenderedFeatures({ layers: validLayers });
+    if (!features || features.length === 0) return;
+
+    const discovered = features.map(f => {
+      const p = f.properties;
+      const name = p.name_en || p.name;
+      const type = p.type || p.maki || p.class || p.category || p.category_en || "poi";
+      const [lng, lat] = f.geometry.coordinates;
+
+      return {
+        id: `mb-${name}-${lng.toFixed(5)}-${lat.toFixed(5)}`,
+        name: name,
+        category: type.toLowerCase(),
+        location: { lat, lng },
+        source: 'mapbox'
+      };
+    }).filter(p => !!p.name);
+
+    setMapboxPois(discovered);
+  }, []);
+
   const getViewportBbox = useCallback(() => {
     const map = mapRef.current?.getMap?.();
     if (!map) return null;
@@ -533,6 +884,11 @@ export default function MapPage() {
 
     debounceRef.current = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      const map = mapRef.current?.getMap?.();
+      if (map && map.getZoom() < 12) {
+        setPoisRaw([]);
+        return;
+      }
       const bbox = getViewportBbox();
       if (bbox) fetchPois({ selectionType: "BBOX", bbox });
     }, 500);
@@ -550,6 +906,11 @@ export default function MapPage() {
 
     const t = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      const map = mapRef.current?.getMap?.();
+      if (map && map.getZoom() < 12) {
+        setPoisRaw([]);
+        return;
+      }
       const bbox = getViewportBbox();
       if (bbox) fetchPois({ selectionType: "BBOX", bbox });
     }, 600);
@@ -562,6 +923,11 @@ export default function MapPage() {
     if (!MAPBOX_TOKEN || !user) return;
     if (mode !== "VIEWPORT") return;
 
+    const map = mapRef.current?.getMap?.();
+    if (map && map.getZoom() < 12) {
+      setPoisRaw([]);
+      return;
+    }
     const bbox = getViewportBbox();
     if (bbox) fetchPois({ selectionType: "BBOX", bbox });
   }, [selectedBackendCats, MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
@@ -596,6 +962,23 @@ export default function MapPage() {
 
     setFilterOpen(true);
   }, [fetchPois, getViewportBbox]);
+
+  const handleSelectAllFilters = useCallback(() => {
+    const all = {};
+    UI_CATEGORIES.forEach((c) => (all[c.key] = true));
+    setSelectedCats(all);
+  }, []);
+
+  const handleDeselectAllFilters = useCallback(() => {
+    const all = {};
+    UI_CATEGORIES.forEach((c) => (all[c.key] = false));
+    setSelectedCats(all);
+  }, []);
+
+  const handleResetFilters = useCallback(async () => {
+    handleSelectAllFilters();
+    await clearSelectionOnly();
+  }, [handleSelectAllFilters, clearSelectionOnly]);
 
   const onMouseDownFreehand = useCallback(
     (e) => {
@@ -645,8 +1028,8 @@ export default function MapPage() {
     setSelection({ mode: "polygon", polygon: poly });
 
     await fetchPois({ selectionType: "POLYGON", polygon: poly });
-    setFilterOpen(true);
 
+    // Crucial: The useEffect will handle closing others when resultsOpen becomes true
     setResultsOpen(true);
     setResultsTab("all");
 
@@ -811,36 +1194,59 @@ export default function MapPage() {
 
   // 3D toggle: pitch + gerçek 3D layerlar
   const handleToggle2D3D = useCallback(() => {
-    const nextIs3D = !is3D;
-    setIs3D(nextIs3D);
-
+    const next = !is3D;
+    setIs3D(next);
     const map = mapRef.current?.getMap?.();
     if (map) {
-      map.easeTo({ pitch: nextIs3D ? 60 : 0, duration: 650 });
-      ensureMapbox3D(map, nextIs3D);
+      map.easeTo({ pitch: next ? 60 : 0, duration: 650 });
+      ensureMapbox3D(map, next);
     }
-
-    setViewState((prev) => ({ ...prev, pitch: nextIs3D ? 60 : 0 }));
+    setViewState((prev) => ({ ...prev, pitch: next ? 60 : 0 }));
   }, [is3D]);
 
   const handleStyleChange = useCallback(() => {
     setStyleIndex((i) => (i + 1) % STYLES.length);
   }, []);
 
-  // Map load + style reload => 3D tekrar ekle
-  const onMapLoad = useCallback(() => {
-    const map = mapRef.current?.getMap?.();
-    if (map) ensureMapbox3D(map, is3D);
+  // Map load + style reload => 3D tekrar ekle + traffic sakla
+  const onMapLoad = useCallback((e) => {
+    const map = e?.target || mapRef.current?.getMap?.();
+    if (map) {
+      ensureMapbox3D(map, is3D);
+      hideTrafficLayers(map);
+    }
   }, [is3D]);
 
-  const onStyleData = useCallback(() => {
-    const map = mapRef.current?.getMap?.();
-    if (map) ensureMapbox3D(map, is3D);
+  const onStyleData = useCallback((e) => {
+    const map = e?.target || mapRef.current?.getMap?.();
+    if (map) {
+      ensureMapbox3D(map, is3D);
+      hideTrafficLayers(map);
+    }
   }, [is3D]);
 
   // POI'ler: polygon içi filtre + UI filtre
+  // Combined POI list (Backend + Mapbox Discoveries)
   const pois = useMemo(() => {
-    let list = poisRaw;
+    const all = [...poisRaw];
+    const poiCoords = new Set(poisRaw.map(p => `${p.latitude?.toFixed(4)},${p.longitude?.toFixed(4)}`));
+
+    mapboxPois.forEach(mbp => {
+      const coordKey = `${mbp.location.lat.toFixed(4)},${mbp.location.lng.toFixed(4)}`;
+      if (!poiCoords.has(coordKey)) {
+        all.push({
+          poiId: mbp.id,
+          latitude: mbp.location.lat,
+          longitude: mbp.location.lng,
+          name: mbp.name,
+          category: mbp.category,
+          source: 'mapbox'
+        });
+        poiCoords.add(coordKey);
+      }
+    });
+
+    let list = all;
 
     if (mode === "SELECTION" && selection?.mode === "polygon" && selection.polygon.length >= 3) {
       list = list.filter((p) => isPointInsidePolygon(p.latitude, p.longitude, selection.polygon));
@@ -853,7 +1259,7 @@ export default function MapPage() {
       if (!icon) return true;
       return activeKeys.has(icon.uiKey);
     });
-  }, [poisRaw, mode, selection, selectedCats]);
+  }, [poisRaw, mapboxPois, mode, selection, selectedCats]);
 
   const resultsPois = useMemo(() => {
     if (!resultsOpen) return [];
@@ -1046,8 +1452,8 @@ export default function MapPage() {
     const bbox = polygonToBbox(selection.polygon);
     if (!bbox) return;
 
-    const bottomPad = isMobile ? 300 : RESULTS_PANEL_APPROX_HEIGHT_DESKTOP + 60;
-    const rightPad = isMobile ? 16 : filterOpen ? FILTER_PANEL_APPROX_WIDTH_DESKTOP + 60 : 90;
+    const bottomPad = isMobile ? 340 : 380; // Optimized for lowered list sheet
+    const rightPad = isMobile ? 16 : filterOpen ? (FILTER_PANEL_APPROX_WIDTH_DESKTOP + 60) : 90;
 
     map.fitBounds(
       [
@@ -1055,9 +1461,9 @@ export default function MapPage() {
         [bbox.maxLng, bbox.maxLat],
       ],
       {
-        duration: 650,
+        duration: 800,
         padding: {
-          top: isMobile ? 90 : 90,
+          top: isMobile ? 80 : 100,
           left: isMobile ? 16 : 90,
           right: rightPad,
           bottom: bottomPad,
@@ -1088,859 +1494,374 @@ export default function MapPage() {
   const userCardWidth = isMobile ? 220 : 280;
 
   return (
-    <Layout style={{ height: "100vh", overflow: "hidden", background: "#f0f2f5" }}>
-      <Header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: isMobile ? "0 12px" : "0 20px",
-          height: headerHeight,
-          background: "#fff",
-          borderBottom: "1px solid #f0f0f0",
-          position: "fixed",
-          width: "100%",
-          zIndex: 100,
-        }}
-      >
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
-          onClick={() => window.location.reload()}
-        >
-          <GlobalOutlined style={{ fontSize: isMobile ? 20 : 24, color: "#1890ff" }} />
-          <span style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700 }}>Vacanza Map</span>
+    <div className={`vivid-map-page ${themeClass} ${sidebarOpen ? "sidebar-open" : ""}`}>
+
+      {/* 1. Header (TOPBAR) */}
+      <header className={`vivid-map-header ${themeClass}`}>
+        <div className="header-left">
+          <button className="hamburger-btn vivid-interactive" onClick={() => setSidebarOpen(true)}>
+            <div className="line" />
+            <div className="line" />
+            <div className="line" />
+          </button>
+          <div className="brand-logo vivid-brand">Vacanza</div>
+        </div>
+        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div 
+              className="vivid-theme-toggle" 
+              onClick={toggleTheme}
+              title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
+            >
+              <button className={`toggle-btn ${isDarkMode ? 'is-night' : 'is-day'}`}>
+                {isDarkMode ? <SunOutlined /> : <MoonOutlined />}
+              </button>
+            </div>
+        </div>
+      </header>
+
+      {/* 2. Sidebar (Hamburger Menu Content) */}
+      <div className="vivid-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      <aside className="vivid-sidebar">
+        <div className="sidebar-header" style={{ marginBottom: 24 }}>
+          <span className="brand-logo" style={{ marginLeft: 0, fontSize: 24 }}>Settings</span>
         </div>
 
-        <Button size={isMobile ? "small" : "middle"} icon={<LogoutOutlined />} onClick={handleLogout}>
-          {isMobile ? "" : "Log Out"}
-        </Button>
-      </Header>
+        <div className="sidebar-user-section">
+          <div className="sidebar-avatar-wrapper">
+            <Avatar size={90} icon={<UserOutlined />} src={user?.photoURL} className="sidebar-avatar" />
+          </div>
+          <div className="sidebar-info" style={{ textAlign: "center" }}>
+            <div className="sidebar-username">{profile?.preferredName || profile?.firstName || user?.displayName || "Adventurer"}</div>
+            <div className="sidebar-role">{gamification?.levelText || "Level 1 Explorer"}</div>
+          </div>
 
-      <Content style={{
-        marginTop: headerHeight,
-        padding: contentPadding,
-        position: "relative",
-        height: `calc(100vh - ${headerHeight}px)`,
-        overflow: "hidden"
-      }}>
-        <div
-          style={{
-            height: mapContainerHeight,
-            borderRadius: mapContainerRadius,
-            overflow: "hidden",
-            boxShadow: isMobile ? "none" : "0 4px 12px rgba(0,0,0,0.1)",
-            background: "#f5f5f5",
-            position: "relative",
-          }}
+          <div className="sidebar-xp-container">
+            <div className="xp-label">
+              <span>Level Progress</span>
+              <span>{gamification?.xpProgressPercent || 0}%</span>
+            </div>
+            <div className="sidebar-xp-bar">
+              <div className="sidebar-xp-fill" style={{ width: `${gamification?.xpProgressPercent || 0}%` }} />
+            </div>
+          </div>
+        </div>
+
+        <nav className="sidebar-menu">
+          <button className="sidebar-item vivid-interactive" onClick={() => { setProfileModalOpen(true); setSidebarOpen(false); }}>
+            <UserOutlined /> Account Profile
+          </button>
+
+          <button className="sidebar-item vivid-interactive" onClick={() => { setPreferencesModalOpen(true); setSidebarOpen(false); }}>
+            <SettingsIcon /> Preferences
+          </button>
+
+          <button className="sidebar-item logout vivid-interactive" onClick={handleLogout}>
+            <LogoutIcon /> Sign Out
+          </button>
+        </nav>
+      </aside>
+
+      {/* 3. Main Content (MAP) */}
+      <main className="map-layout-content">
+        <Map
+          ref={mapRef}
+          {...viewState}
+          onMove={(evt) => setViewState(evt.viewState)}
+          onIdle={handleMapIdle}
+          onMoveEnd={() => { if (mode === "VIEWPORT" && !freehandEnabled) scheduleViewportFetch(); }}
+          mapStyle={mapStyle}
+          mapboxAccessToken={MAPBOX_TOKEN}
+          onMouseDown={onMouseDownFreehand}
+          onMouseMove={onMouseMoveFreehand}
+          onMouseUp={onMouseUpFreehand}
+          onLoad={onMapLoad}
+          onStyleData={onStyleData}
+          style={{ width: "100%", height: "100%" }}
+          dragPan={!freehandEnabled}
+          cursor={freehandEnabled ? "crosshair" : "grab"}
+          attributionControl={false}
         >
-          {user &&
-            selection?.mode === "polygon" &&
-            selection.polygon.length >= 3 &&
-            !activeRoute &&
-            !polygonRouteBannerDismissed && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: 12,
-                  right: isMobile ? "auto" : 80, // Desktop'ta butonların (Fabs) yanına yasla
-                  left: isMobile ? "50%" : "auto",
-                  transform: isMobile ? "translateX(-50%)" : "none",
-                  width: isMobile ? "calc(100% - 24px)" : "max-content",
-                  maxWidth: isMobile ? "none" : "calc(100% - 420px)", // Profil kartına (320px) çarpmaması için güvenli alan
-                  zIndex: 90, // Profil kartıyla (100) çakışsa da görünür kalsın veya hemen altına insin
-                  display: "flex",
-                  justifyContent: "center",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                  pointerEvents: "auto", // Butonlara tıklanabilsin
-                  boxSizing: "border-box",
-                }}
-              >
-                <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
-                  <Card
-                    size="small"
-                    styles={{ body: { padding: "10px 12px" } }}
-                    style={{
-                      borderRadius: 12,
-                      boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                      background: "rgba(255,255,255,0.96)",
-                      backdropFilter: "blur(8px)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: isMobile ? "column" : "row",
-                        alignItems: isMobile ? "stretch" : "flex-start",
-                        justifyContent: "space-between",
-                        gap: 10,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 13,
-                          color: "#333",
-                          lineHeight: 1.45,
-                          flex: isMobile ? "none" : "1 1 0",
-                          minWidth: 0,
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        Bu alan için rota oluşturabilirsin. Önce haritayı ve sonuçları inceleyebilirsin; hazır olunca{" "}
-                        <b>Rota oluştur</b> ile devam et.
-                      </span>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          flexShrink: 0,
-                          alignSelf: isMobile ? "stretch" : "auto",
-                        }}
-                      >
-                        <Button type="primary" size="small" onClick={openPolygonRouteParams}>
-                          Rota oluştur
-                        </Button>
-                        <Tooltip title="Bandı gizle (alan aynı kalır; rota için sonuç panelindeki düğmeyi kullan)">
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={<CloseOutlined />}
-                            onClick={() => setPolygonRouteBannerDismissed(true)}
-                            aria-label="Rota isteğini gizle"
-                          />
-                        </Tooltip>
+          <NavigationControl position="bottom-left" />
+          <GeolocateControl position="bottom-left" />
+
+          <Source id="selection-src" type="geojson" data={selectionGeoJSON}>
+            <Layer {...selectionFillLayer} />
+          </Source>
+          <Source id="selection-outline-src" type="geojson" data={selectionOutlineGeoJSON} lineMetrics>
+            <Layer {...selectionOutlineGlowLayer} />
+            <Layer {...selectionOutlineMainLayer} />
+          </Source>
+          <Source id="preview-src" type="geojson" data={previewGeoJSON} lineMetrics>
+            <Layer {...previewGlowLayer} />
+            <Layer {...previewMainLayer} />
+          </Source>
+          {pois.map((p) => {
+            const icon = poiIconByCategory(p.category);
+            const catKey = icon?.uiKey || "others";
+            if (!selectedCats[catKey]) return null;
+
+            const title = getSafePoiTitle(p);
+            const catInfo = UI_CATEGORIES.find(c => c.key === catKey);
+            const markerBg = catInfo?.fill || "rgba(100, 116, 139, 1)";
+
+            return (
+              <Marker key={p.poiId || `${p.latitude}-${p.longitude}-${title}`} longitude={p.longitude} latitude={p.latitude} anchor="bottom">
+                <Tooltip title={title}>
+                  <div style={{ cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.25))" }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: "50% 50% 50% 0", transform: "rotate(-45deg)",
+                      background: markerBg, border: "2.5px solid white",
+                      display: "grid", placeItems: "center",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                      position: "relative"
+                    }}>
+                      <div style={{
+                        transform: "rotate(45deg)", color: "white",
+                        display: "grid", placeItems: "center",
+                        width: 22, height: 22,
+                        fontSize: 16,
+                        lineHeight: 0,
+                      }}>
+                        {icon?.icon || <GlobalOutlined />}
                       </div>
                     </div>
-                  </Card>
-                </div>
-              </div>
-            )}
-
-          {showReplanDayBanner && (
-            <div
-              style={{
-                position: "absolute",
-                top: 12,
-                left: 12,
-                right: 12,
-                zIndex: 25,
-                display: "flex",
-                justifyContent: "center",
-                pointerEvents: "none",
-                boxSizing: "border-box",
-              }}
-            >
-              <div style={{ width: "100%", maxWidth: 640, pointerEvents: "auto" }}>
-                <Card
-                  size="small"
-                  styles={{ body: { padding: "10px 12px" } }}
-                  style={{
-                    borderRadius: 12,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                    background: "rgba(255,248,240,0.98)",
-                    backdropFilter: "blur(8px)",
-                    border: "1px solid rgba(249,115,22,0.35)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: isMobile ? "column" : "row",
-                      alignItems: isMobile ? "stretch" : "flex-start",
-                      justifyContent: "space-between",
-                      gap: 10,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: 13,
-                        color: "#333",
-                        lineHeight: 1.45,
-                        flex: isMobile ? "none" : "1 1 0",
-                        minWidth: 0,
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      <b>Gün {activeDay}</b> — Haritada çizdiğin alandaki mekânlara göre durakları güncelle. Bunun için
-                      sohbet veya harita rotasına bağlı bir oturum gerekir.
-                    </span>
-                    <Button
-                      type="primary"
-                      size="small"
-                      loading={replanDaySubmitting}
-                      onClick={submitReplanDayFromPolygon}
-                      style={{
-                        background: "#ea580c",
-                        borderColor: "#c2410c",
-                        flexShrink: 0,
-                        alignSelf: isMobile ? "stretch" : "flex-start",
-                        whiteSpace: isMobile ? "normal" : "nowrap",
-                      }}
-                    >
-                      {isMobile ? "Çizime göre güncelle" : "Günü çizime göre yenile"}
-                    </Button>
-                  </div>
-                </Card>
-              </div>
-            </div>
-          )}
-
-          <Map
-            ref={mapRef}
-            {...viewState}
-            onMove={(e) => setViewState(e.viewState)}
-            onMoveEnd={() => {
-              if (mode === "VIEWPORT" && !freehandEnabled) scheduleViewportFetch();
-            }}
-            style={{ width: "100%", height: "100%" }}
-            mapStyle={mapStyle}
-            mapboxAccessToken={MAPBOX_TOKEN}
-            attributionControl={false}
-            onMouseDown={onMouseDownFreehand}
-            onMouseMove={onMouseMoveFreehand}
-            onMouseUp={onMouseUpFreehand}
-            dragPan={!freehandEnabled}
-            cursor={freehandEnabled ? "crosshair" : "grab"}
-            onLoad={onMapLoad}
-            onStyleData={onStyleData}
-          >
-            <NavigationControl position="bottom-right" showCompass={false} />
-            <GeolocateControl position="bottom-right" />
-
-            {freehandEnabled && (
-              <Source id="p-src" type="geojson" data={previewGeoJSON} lineMetrics>
-                <Layer {...previewGlowLayer} />
-                <Layer {...previewMainLayer} />
-              </Source>
-            )}
-
-            {selection?.mode === "polygon" && (
-              <>
-                <Source id="f-src" type="geojson" data={selectionGeoJSON}>
-                  <Layer {...selectionFillLayer} />
-                </Source>
-                <Source id="o-src" type="geojson" data={selectionOutlineGeoJSON} lineMetrics>
-                  <Layer {...selectionOutlineGlowLayer} />
-                  <Layer {...selectionOutlineMainLayer} />
-                </Source>
-              </>
-            )}
-
-            {!activeRoute && pois.map((p) => {
-              const icon = poiIconByCategory(p.category);
-              const title = getSafePoiTitle(p);
-
-              const ring = icon?.ring || "#64748B";
-              const fill = icon?.fill || "#F1F5F9";
-              const emoji = icon?.emoji || "📍";
-
-              return (
-                <Marker key={p.poiId || `${p.latitude}-${p.longitude}`} longitude={p.longitude} latitude={p.latitude} anchor="center">
-                  <Tooltip title={title} placement="top">
-                    {icon?.img ? (
-                      <div
-                        style={{
-                          width: 64,
-                          height: 64,
-                          cursor: "pointer",
-                          transition: "transform 0.2s",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
-                        }}
-                        onClick={(e) => {
-                          e.originalEvent.stopPropagation();
-                        }}
-                      >
-                        <img src={icon.img} alt={title} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          background: fill,
-                          border: `2px solid ${ring}`,
-                          borderRadius: "50%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer",
-                          boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
-                          transition: "transform 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
-                        }}
-                        onClick={(e) => {
-                          e.originalEvent.stopPropagation();
-                        }}
-                      >
-                        <span style={{ fontSize: 14 }}>{emoji}</span>
-                      </div>
-                    )}
-                  </Tooltip>
-                </Marker>
-              );
-            })}
-
-            {activeWaypoints.length >= 2 && (
-              <Source id="route-src" type="geojson" data={routeLineGeoJSON} lineMetrics>
-                <Layer {...routeGlowLayer} />
-                <Layer {...routeMainLayer} />
-              </Source>
-            )}
-
-            {activeWaypoints.map((wp, idx) => (
-              <Marker
-                key={`route-wp-${wp.day}-${wp.order}`}
-                longitude={wp.longitude}
-                latitude={wp.latitude}
-                anchor="center"
-              >
-                <Tooltip title={wp.name} placement="top">
-                  <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: "50%",
-                      background: "linear-gradient(135deg, #F97316, #EF4444)",
-                      border: "2.5px solid white",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: 13,
-                      fontWeight: 800,
-                      boxShadow: "0 2px 8px rgba(249,115,22,0.4)",
-                      cursor: "pointer",
-                      transition: "transform 0.2s",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.2)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-                  >
-                    {idx + 1}
                   </div>
                 </Tooltip>
               </Marker>
-            ))}
-          </Map>
+            );
+          })}
 
-          {showCompactPolygonRouteCta && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 20,
-                left: 12,
-                zIndex: 24,
-              }}
-            >
-              <Button type="primary" size="middle" onClick={openPolygonRouteParams}>
-                Rota oluştur
-              </Button>
-            </div>
+          {activeWaypoints.length >= 2 && (
+            <Source id="route-src" type="geojson" data={routeLineGeoJSON} lineMetrics>
+              <Layer {...routeGlowLayer} />
+              <Layer {...routeMainLayer} />
+            </Source>
           )}
 
-          {activeRoute && (
-            <RoutePanel
-              route={activeRoute}
-              activeDay={activeDay}
-              onDayChange={setActiveDay}
-              onClose={() => {
-                setActiveRoute(null);
-                setActiveDay(1);
-                setMapChatConversationId(null);
-                setFilterOpen(true);
-              }}
-              onWaypointClick={(wp) => {
-                if (!Number.isFinite(wp.longitude) || !Number.isFinite(wp.latitude)) return;
-                mapRef.current?.getMap?.()?.flyTo({
-                  center: [wp.longitude, wp.latitude],
-                  zoom: 15,
-                  duration: 800,
-                });
-              }}
-            />
-          )}
-
-          <Card
-            onClick={() => setProfileModalOpen(true)}
-            style={{
-              position: "fixed",
-              top: isMobile ? headerHeight + 10 : headerHeight + contentPadding + 20,
-              left: isMobile ? 12 : contentPadding + 20,
-              zIndex: 100,
-              width: isMobile ? 240 : 280,
-              borderRadius: 20,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-              cursor: "pointer",
-              background: "rgba(255, 255, 255, 0.95)",
-              backdropFilter: "blur(8px)",
-              transition: "transform 0.2s ease",
-              border: "none"
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
-            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <Avatar
-                size={48}
-                src={user?.photoURL}
-                icon={<UserOutlined />}
-                style={{ border: "2px solid #e6f7ff" }}
-              />
-              <div>
-                <b style={{ fontSize: 16, display: "block" }}>{user?.displayName || "Gezgin"}</b>
-                <span style={{ fontSize: 13, color: "#8c8c8c" }}>{gamification?.roleText || "Newbie"}</span>
-              </div>
-            </div>
-
-            <div style={{ background: "#f5f5f5", padding: "12px", borderRadius: "14px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: "600", color: "#1890ff" }}>
-                  {gamification?.levelText || "Level 1"}
-                </span>
-              </div>
-
-              <div style={{ width: "100%", height: 6, background: "#e8e8e8", borderRadius: 10, overflow: "hidden", marginBottom: 6 }}>
+          {activeWaypoints.map((wp, idx) => (
+            <Marker key={`route-wp-${wp.day}-${wp.order}`} longitude={wp.longitude} latitude={wp.latitude} anchor="center">
+              <Tooltip title={wp.name} placement="top">
                 <div style={{
-                  width: `${gamification?.xpProgressPercent || 0}%`,
-                  height: "100%",
-                  background: "linear-gradient(90deg, #1890ff, #69c0ff)",
-                  transition: "width 0.5s ease-in-out"
-                }} />
-              </div>
+                  width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, #F97316, #EF4444)",
+                  border: "2.5px solid white", display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "white", fontSize: 13, fontWeight: 800, boxShadow: "0 2px 8px rgba(249,115,22,0.4)", cursor: "pointer"
+                }}>{idx + 1}</div>
+              </Tooltip>
+            </Marker>
+          ))}
+        </Map>
 
-              <div style={{ fontSize: 11, color: "#595959", textAlign: "center" }}>
-                {gamification?.totalXp || 0} XP - {gamification?.xpProgressPercent || 0}% to next level
-              </div>
+        {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel is closed */}
+        {!canShowResultsPanel && (
+          <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
+            setFilterOpen(false);
+            setFabExpanded(false);
+            setIsChatOpen(true);
+          }}>
+            <div className="pill-content">
+              <CompassOutlined className="pill-icon" />
+              <span className="pill-text">Ask Vacanza AI</span>
             </div>
-          </Card>
-          {/* sağdaki butonlar */}
-          <div
-            style={{
-              position: "fixed",
-              top: isMobile ? headerHeight + 12 : headerHeight + contentPadding + 18,
-              right: isMobile ? 12 : contentPadding + 18,
-              zIndex: 60,
-              display: "flex",
-              flexDirection: "column",
-              gap: fabGap,
-            }}
-          >
-            <Tooltip title="Vacanza AI ile sohbet" placement="left">
-              <Button
-                shape="circle"
-                icon={<CompassOutlined />}
-                onClick={() => {
-                  setIsChatOpen(true);
-                  setFilterOpen(false);
-                }}
-                aria-label="Vacanza AI sohbetini aç"
-                style={{
-                  width: fabSize,
-                  height: fabSize,
-                  fontSize: isMobile ? "17px" : "18px",
-                  background: "linear-gradient(145deg, #3da8c8 0%, #2c9eb8 55%, #2563eb 100%)",
-                  border: "none",
-                  color: "white",
-                  boxShadow: "0 4px 14px rgba(61, 168, 200, 0.45)",
-                }}
-              />
-            </Tooltip>
+          </button>
+        )}
 
+        {/* 5. Unified Action FAB (RIGHT) */}
+        <div className="vivid-fab-group">
+          <Tooltip title={fabExpanded ? "Close" : "Actions"} placement="left">
+            <button className={`main-fab vivid-interactive ${fabExpanded ? "expanded" : ""}`} onClick={() => {
+              const next = !fabExpanded;
+              if (next) {
+                setFilterOpen(false);
+                setIsChatOpen(false);
+              }
+              setFabExpanded(next);
+            }}>
+              {fabExpanded ? <CloseOutlined /> : <CompassOutlined style={{ fontSize: 24 }} />}
+            </button>
+          </Tooltip>
+
+          <div className={`fab-sub-actions ${fabExpanded ? "visible" : ""}`}>
+            <Tooltip title="Local Filters" placement="left">
+              <button className="sub-fab vivid-interactive" onClick={() => {
+                const next = !filterOpen;
+                if (next) setIsChatOpen(false);
+                setFilterOpen(next);
+                setFabExpanded(false);
+              }}>
+                <UnorderedListOutlined />
+              </button>
+            </Tooltip>
             <Tooltip title="Draw Area" placement="left">
-              <Button
-                shape="circle"
-                onClick={startFreehand}
-                style={{
-                  width: fabSize,
-                  height: fabSize,
-                  border: freehandEnabled ? "2px solid #1890ff" : "none",
-                }}
-              >
-                ✏️
-              </Button>
+              <button className="sub-fab vivid-interactive" onClick={() => { startFreehand(); setFabExpanded(false); }}>
+                <PencilIcon />
+              </button>
             </Tooltip>
-
-            <Tooltip title="Toggle Filter" placement="left">
-              <Button
-                shape="circle"
-                icon={<UnorderedListOutlined />}
-                onClick={() => {
-                  setResultsOpen(false);
-                  setFilterOpen((v) => !v);
-                }}
-                style={{ width: fabSize, height: fabSize }}
-              />
+            <Tooltip title="Book Flights & Hotels" placement="left">
+              <button className="sub-fab vivid-interactive" onClick={() => { setBookingOpen(true); setFabExpanded(false); }}>
+                <CalendarOutlined />
+              </button>
             </Tooltip>
-
-            <Tooltip title={is3D ? "Switch to 2D View" : "Switch to 3D View"} placement="left">
-              <Button
-                shape="circle"
-                icon={<CompassOutlined />}
-                onClick={handleToggle2D3D}
-                style={{ width: fabSize, height: fabSize, color: is3D ? "#1890ff" : "#555" }}
-              />
+            <Tooltip title={is3D ? "Reset to 2D View" : "Enable 3D Perspective"} placement="left">
+              <button className="sub-fab vivid-interactive" onClick={() => { handleToggle2D3D(); /* No setFabExpanded(false) */ }}>
+                <CubeIcon />
+              </button>
             </Tooltip>
-
-            <Tooltip title="Change Map Style" placement="left">
-              <Button
-                shape="circle"
-                icon={<HeatMapOutlined />}
-                onClick={handleStyleChange}
-                style={{ width: fabSize, height: fabSize }}
-              />
-            </Tooltip>
-
-            <Tooltip title="Open Bookings" placement="left">
-              <Button
-                shape="circle"
-                icon={<CalendarOutlined />}
-                onClick={() => setBookingOpen(true)}
-                style={{
-                  width: fabSize,
-                  height: fabSize,
-                  border: "none",
-                  background: bookingOpen ? "#1890ff" : "rgba(255,255,255,0.95)",
-                  color: bookingOpen ? "#fff" : "#333",
-                  backdropFilter: "blur(8px)",
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-                }}
-              />
+            <Tooltip title="Switch Map Theme" placement="left">
+              <button className="sub-fab vivid-interactive" onClick={() => { handleStyleChange(); /* No setFabExpanded(false) */ }}>
+                <LayerIcon />
+              </button>
             </Tooltip>
           </div>
+        </div>
 
-          {/* Filter panel */}
-          {filterOpen && !activeRoute && (
-            <div
-              style={{
-                position: "fixed",
-                top: isMobile ? headerHeight + 10 : headerHeight + contentPadding + 28,
-                right: isMobile ? 12 : 78 + contentPadding,
-                zIndex: 70,
-                width: filterPanelWidth,
-                maxHeight: isMobile ? "62vh" : "unset",
-                overflow: isMobile ? "auto" : "visible",
-                background: "rgba(255,255,255,0.95)",
-                borderRadius: 16,
-                boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-                padding: 14,
-                backdropFilter: "blur(6px)",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                <b style={{ fontSize: 14 }}>Filter</b>
-                <Button type="text" icon={<CloseOutlined />} onClick={() => setFilterOpen(false)} />
+        {/* 5. Filter Panel (Glass) */}
+        {filterOpen && (
+          <div className="glass-panel filter-panel">
+            <div className="filter-header">
+              <span className="filter-title">Filter Places</span>
+              <div className="filter-header-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <Button size="small" type="link" onClick={handleSelectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>All</Button>
+                <div style={{ height: 12, width: 1, background: "rgba(0,0,0,0.1)" }} />
+                <Button size="small" type="link" onClick={handleDeselectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>None</Button>
+                <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setFilterOpen(false)} style={{ marginLeft: 4 }} />
               </div>
+            </div>
+            <div className="filter-body">
+              {UI_CATEGORIES.map((c) => (
+                <div key={c.key} className="cat-pill vivid-interactive" onClick={() => setSelectedCats(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
+                  style={{
+                    background: selectedCats[c.key] ? c.pill : "rgba(var(--vivid-navy-rgb, 26,35,50), 0.05)",
+                    border: selectedCats[c.key] ? `2.5px solid ${c.ring}` : "1.5px solid rgba(255,255,255,0.08)",
+                    opacity: selectedCats[c.key] ? 1 : 0.6
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div className="cat-pill-icon" style={{ color: selectedCats[c.key] ? c.ring : "var(--text-sub)" }}>{c.icon}</div>
+                    <span className="cat-pill-label">{c.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                <Button size="small" onClick={clearSelectionOnly}>
-                  Reset Area
-                </Button>
+        {/* 6. Results Sheet (Glass) */}
+        {canShowResultsPanel && (
+          <div className="glass-panel results-sheet">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 18 }}>Discover Local Gems</div>
+                <div style={{ fontSize: 13, color: "var(--text-sub)" }}>{resultsPois.length} curated spots found</div>
               </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {user && !activeRoute && (
+                  <Button type="primary" shape="round" onClick={openPolygonRouteParams} style={{ background: "var(--vivid-blue)", borderColor: "var(--vivid-blue)" }}>
+                    Create AI Route
+                  </Button>
+                )}
+                <Button type="text" icon={<CloseOutlined />} onClick={clearSelectionOnly} />
+              </div>
+            </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {UI_CATEGORIES.map((c) => (
-                  <button
-                    key={c.key}
-                    onClick={() => setSelectedCats((prev) => ({ ...prev, [c.key]: !prev[c.key] }))}
+            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
+              {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...UI_CATEGORIES].map(t => {
+                const active = resultsTab === t.key;
+                return (
+                  <button key={t.key} onClick={() => setResultsTab(t.key)}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      padding: 10,
-                      borderRadius: 10,
-                      border: selectedCats[c.key] ? `2px solid ${c.ring}` : "1px solid #eee",
-                      background: selectedCats[c.key] ? c.pill : "#fff",
-                      cursor: "pointer",
+                      flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
+                      border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
+                      background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
+                      color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      {c.img ? (
-                        <img src={c.img} alt={c.label} style={{ width: 32, height: 32, objectFit: "contain" }} />
-                      ) : (
-                        <span
-                          style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: 12,
-                            background: c.fill,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            border: `1px solid ${c.ring}`,
-                          }}
-                        >
-                          <span style={{ fontSize: 13 }}>{c.emoji}</span>
-                        </span>
-                      )}
-                      <b>{c.label}</b>
-                    </div>
-
-                    <span style={{ fontSize: 12, color: "#555" }}>
-                      {pois.filter((p) => poiIconByCategory(p.category)?.uiKey === c.key).length}
-                    </span>
+                    {t.icon || <GlobalOutlined />} {t.label}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
 
-          {/* Results bottom sheet */}
-          {canShowResultsPanel && (
-            <div
-              style={{
-                position: "fixed",
-                left: "50%",
-                transform: "translateX(-50%)",
-                bottom: resultsBottom,
-                zIndex: 80,
-                width: isMobile ? "calc(100% - 24px)" : "min(680px, calc(100% - 360px))",
-                paddingBottom: isMobile ? 0 : 20,
-              }}
-            >
-              <Card
-                style={{
-                  borderRadius: 18,
-                  boxShadow: "0 14px 40px rgba(0,0,0,0.18)",
-                  overflow: "hidden",
-                  background: "rgba(255,255,255,0.96)",
-                  backdropFilter: "blur(6px)",
-                }}
-                // ✅ antd warning fix: bodyStyle -> styles.body
-                styles={{ body: { padding: "8px 16px 12px" } }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <div style={{ fontWeight: 800, fontSize: 16 }}>Results in Your Area</div>
-                    <div style={{ fontSize: 12, color: "#777" }}>
-                      {resultsPois.length} place{resultsPois.length === 1 ? "" : "s"} found in your selected zone
+            <div style={{ maxHeight: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4 }}>
+              {resultsPois.map(p => (
+                <div key={p.poiId} style={{
+                  display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
+                  borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
+                  marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
+                  backdropFilter: "blur(4px)"
+                }}>
+                  <div style={{
+                    width: 48, height: 48, borderRadius: 14,
+                    background: "rgba(255,255,255,0.05)",
+                    display: "grid", placeItems: "center",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    border: "1px solid rgba(255,255,255,0.1)"
+                  }}>
+                    <div style={{
+                      color: poiIconByCategory(p.category)?.ring,
+                      fontSize: 20,
+                      filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                    }}>
+                      {poiIconByCategory(p.category)?.icon}
                     </div>
                   </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                    {user && !activeRoute && (
-                      <Button type="primary" size="small" onClick={openPolygonRouteParams}>
-                        Rota oluştur
-                      </Button>
-                    )}
-                    <Button
-                      type="text"
-                      icon={<CloseOutlined />}
-                      onClick={async () => {
-                        // ✅ alanı sil + VIEWPORT'a dön + tüm POI'leri getir
-                        setResultsOpen(false);
-                        setResultsTab("all");
-                        setSelection({ mode: null, polygon: [] });
-                        setMode("VIEWPORT");
-
-                        const bbox = getViewportBbox();
-                        if (bbox) {
-                          await fetchPois({ selectionType: "BBOX", bbox, categoriesOverride: [] });
-                        }
-
-                        setFilterOpen(true);
-                      }}
-                      aria-label="Close results"
-                    />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p.category)}</div>
                   </div>
                 </div>
-
-                <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 6 }}>
-                  {[{ key: "all", label: "All", emoji: "📍" }, ...UI_CATEGORIES].map(
-                    (t) => {
-                      const active = resultsTab === t.key;
-                      return (
-                        <button
-                          key={t.key}
-                          onClick={() => setResultsTab(t.key)}
-                          style={{
-                            flex: "0 0 auto",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "6px 12px",
-                            borderRadius: 999,
-                            border: active ? "1px solid #1890ff" : "1px solid #e6e6e6",
-                            background: active ? "rgba(24,144,255,0.10)" : "#fff",
-                            cursor: "pointer",
-                            fontWeight: 700,
-                            fontSize: 13,
-                            color: active ? "#1677ff" : "#444",
-                          }}
-                        >
-                          {t.img ? (
-                            <img src={t.img} alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />
-                          ) : (
-                            t.emoji ? <span style={{ fontSize: 20, lineHeight: 1 }}>{t.emoji}</span> : null
-                          )}
-                          <span>{t.label}</span>
-                        </button>
-                      );
-                    }
-                  )}
-                </div>
-
-                <div style={{ marginTop: 10, maxHeight: resultsMaxHeight, overflowY: "auto", paddingRight: 6 }}>
-                  {poiLoading ? (
-                    <div style={{ padding: 10, color: "#777" }}>Loading results...</div>
-                  ) : resultsPois.length === 0 ? (
-                    <div style={{ padding: 10, color: "#777" }}>No places found for the current filter.</div>
-                  ) : (
-                    resultsPois.map((p) => {
-                      const title = getSafePoiTitle(p);
-                      const icon = poiIconByCategory(p.category);
-                      const subtitle = labelByCategory(p.category) || "POI";
-
-                      return (
-                        <div
-                          key={p.poiId || `${p.latitude}-${p.longitude}-${title}`}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            padding: 12,
-                            borderRadius: 14,
-                            border: "1px solid #f0f0f0",
-                            marginBottom: 10,
-                            background: "#fff",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                            <div
-                              style={{
-                                width: 38,
-                                height: 38,
-                                borderRadius: 12,
-                                display: "grid",
-                                placeItems: "center",
-                                background: icon?.fill || "#F1F5F9",
-                                border: `1px solid ${icon?.ring || "#CBD5E1"}`,
-                                flex: "0 0 auto",
-                                overflow: "hidden", // Görsel taşmasını önle
-                              }}
-                            >
-                              {icon?.img ? (
-                                <img src={icon.img} alt="" style={{ width: "80%", height: "80%", objectFit: "contain" }} />
-                              ) : (
-                                <span style={{ fontSize: 18 }}>{icon?.emoji || "📍"}</span>
-                              )}
-                            </div>
-
-                            <div style={{ display: "flex", flexDirection: "column" }}>
-                              <div style={{ fontWeight: 800, lineHeight: 1.15 }}>{title}</div>
-                              <div style={{ fontSize: 12, color: "#777" }}>{subtitle}</div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-              </Card>
+              ))}
             </div>
-          )}
-          {/* End of User card logic */}
-          <Modal
-            title="Rota ayarları"
-            open={polygonRouteParamsOpen}
-            onCancel={() => {
-              if (!polygonRouteSubmitting) setPolygonRouteParamsOpen(false);
-            }}
-            footer={null}
-            destroyOnHidden
-            maskClosable={!polygonRouteSubmitting}
-            zIndex={1100}
-          >
-            <Spin spinning={polygonRouteSubmitting}>
-              <Form
-                form={polygonRouteForm}
-                layout="vertical"
-                onFinish={submitPolygonRoute}
-                initialValues={{ totalDays: 3, travelStyle: "general" }}
-              >
-                <Form.Item
-                  name="totalDays"
-                  label="Gün sayısı"
-                  rules={[{ required: true, message: "Gün sayısı gerekli" }]}
-                >
-                  <InputNumber min={1} max={16} style={{ width: "100%" }} />
-                </Form.Item>
-                <Form.Item
-                  name="travelStyle"
-                  label="Stil"
-                  rules={[{ required: true, message: "Stil seçin" }]}
-                >
-                  <Select
-                    options={[
-                      { value: "general", label: "Genel" },
-                      { value: "history", label: "Tarih / kültür" },
-                      { value: "food", label: "Yemek" },
-                      { value: "nature", label: "Doğa" },
-                      { value: "art", label: "Sanat" },
-                    ]}
-                  />
-                </Form.Item>
-                <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
-                  Kategoriler, sağdaki filtrede seçili olanlarla gönderilir.
-                </div>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                  <Button onClick={() => setPolygonRouteParamsOpen(false)} disabled={polygonRouteSubmitting}>
-                    İptal
-                  </Button>
-                  <Button type="primary" htmlType="submit" loading={polygonRouteSubmitting}>
-                    Rota oluştur
-                  </Button>
-                </div>
-              </Form>
-            </Spin>
-          </Modal>
+          </div>
+        )}
 
-          <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
-          <VacanzaChat
-            isOpen={isChatOpen}
-            onClose={() => setIsChatOpen(false)}
-            externalConversationRefreshNonce={chatConversationRefreshNonce}
-            onConversationIdChange={(id) => setMapChatConversationId(id)}
-            onRequestDrawToEdit={handleRequestDrawToEditFromChat}
-            onRouteGenerated={(routeData, meta) => {
-              const merged =
-                meta?.routeId != null && meta.routeId !== ""
-                  ? { ...routeData, routeId: meta.routeId }
-                  : routeData;
-              setActiveRoute(merged);
-              setActiveDay(1);
-              if (meta?.conversationId) setMapChatConversationId(String(meta.conversationId));
-              setIsChatOpen(false);
-              setFilterOpen(false);
-            }}
-          />
-          <ProfileModal
-            open={profileModalOpen}
-            onClose={() => setProfileModalOpen(false)}
-            user={user}
-          />
-        </div>
-      </Content>
+        <Modal title="AI Route Parameters" open={polygonRouteParamsOpen} onCancel={() => setPolygonRouteParamsOpen(false)} footer={null} zIndex={1100}>
+          <Spin spinning={polygonRouteSubmitting}>
+            <Form form={polygonRouteForm} layout="vertical" onFinish={submitPolygonRoute}>
+              <Form.Item name="totalDays" label="Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
+              <Form.Item name="travelStyle" label="Travel Style"><Select options={[{ value: "general", label: "Balanced" }, { value: "history", label: "Historical" }, { value: "food", label: "Gourmet" }, { value: "nature", label: "Outdoors" }]} /></Form.Item>
+              <Button type="primary" block size="large" htmlType="submit" loading={polygonRouteSubmitting} style={{ borderRadius: 12 }}>Generate Smart Route</Button>
+            </Form>
+          </Spin>
+        </Modal>
 
-      {!isMobile && (
-        <Footer style={{ textAlign: "center", padding: "12px 50px", background: "#fff" }}>
-          Vacanza App ©{new Date().getFullYear()}
-        </Footer>
-      )}
-    </Layout>
+        <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
+        
+        {/* 7. Itinerary/Route Card (RoutePanel) - RESTORED */}
+        {activeRoute && (
+          <RoutePanel
+            route={activeRoute}
+            activeDay={activeDay}
+            onDayChange={setActiveDay}
+            onClose={() => setActiveRoute(null)}
+          />
+        )}
+
+        <VacanzaChat
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          externalConversationRefreshNonce={chatConversationRefreshNonce}
+          onConversationIdChange={setMapChatConversationId}
+          onRequestDrawToEdit={handleRequestDrawToEditFromChat}
+          onRouteGenerated={(routeData, meta) => {
+            setActiveRoute(normalizeRouteForMap(routeData));
+            setActiveDay(1);
+            setIsChatOpen(false);
+          }}
+        />
+        <ProfileModal 
+          open={profileModalOpen} 
+          onClose={() => setProfileModalOpen(false)} 
+          user={user} 
+          themeClass={themeClass}
+          isDarkMode={isDarkMode}
+        />
+        <PreferencesModal 
+          open={preferencesModalOpen} 
+          onClose={() => setPreferencesModalOpen(false)} 
+          themeClass={themeClass}
+          isDarkMode={isDarkMode}
+        />
+      </main>
+    </div>
   );
 }

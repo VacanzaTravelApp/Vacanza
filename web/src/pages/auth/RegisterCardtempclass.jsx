@@ -9,7 +9,6 @@ import {
   CloseCircleOutlined,
   CheckOutlined,
 } from '@ant-design/icons';
-import { MdFlightTakeoff } from 'react-icons/md';
 import './RegisterCard.css';
 import { useNavigate } from 'react-router-dom';
 
@@ -166,11 +165,7 @@ const RegisterCard = () => {
   return (
     <div className="register-card">
       <div className="card-header">
-        <span className="vacanza-logo">
-          <MdFlightTakeoff className="logo-icon" />
-          Vacanza
-        </span>
-        <h3>Create Your <span style={{ color: '#3da8c8' }}>Vacanza</span> Account</h3>
+        <h3>Sign Up</h3>
         <p className="header-subtext">
           Start your personalized journey today
         </p>
@@ -193,7 +188,7 @@ const RegisterCard = () => {
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="First Name"
+                placeholder="First Name *"
                 size="large"
                 autoComplete="given-name"
               />
@@ -206,7 +201,7 @@ const RegisterCard = () => {
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="Middle Name (Optional)"
+                placeholder="Middle Name"
                 size="large"
               />
             </Form.Item>
@@ -219,7 +214,7 @@ const RegisterCard = () => {
         >
           <Input
             prefix={<UserOutlined />}
-            placeholder="Last Name"
+            placeholder="Last Name *"
             size="large"
             autoComplete="family-name"
           />
@@ -254,7 +249,7 @@ const RegisterCard = () => {
         >
           <Input
             prefix={<MailOutlined />}
-            placeholder="Email address"
+            placeholder="Email address *"
             size="large"
             autoComplete="email"
           />
@@ -267,7 +262,7 @@ const RegisterCard = () => {
         >
           <Input.Password
             prefix={<LockOutlined />}
-            placeholder="Password"
+            placeholder="Password *"
             size="large"
             autoComplete="new-password"
           />
@@ -294,7 +289,7 @@ const RegisterCard = () => {
         >
           <Input.Password
             prefix={<LockOutlined />}
-            placeholder="Confirm Password"
+            placeholder="Confirm Password *"
             size="large"
             autoComplete="new-password"
           />
@@ -315,6 +310,11 @@ const RegisterCard = () => {
             I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
           </Checkbox>
         </Form.Item>
+
+        <div style={{ padding: "0 12px", fontSize: '11px', fontWeight: 700, color: '#455A64', opacity: 0.6, marginBottom: '20px' }}>
+          <span style={{ color: '#FF6B6B' }}>*</span> indicates a mandatory field
+        </div>
+
         <Form.Item>
           <Button
             type="primary"

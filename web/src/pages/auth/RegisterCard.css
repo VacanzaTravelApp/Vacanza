@@ -1,345 +1,220 @@
 .register-card {
-    background: rgba(246, 248, 250, 0.9);
-    /* Premium grimsı kırık beyaz */
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 40px;
-    border-radius: 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.3);
-    max-width: 400px;
-    width: 100%;
+  position: relative;
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 28px 24px;
+  border-radius: 24px;
+  border: 1px solid var(--card-border);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  max-width: 420px;
+  width: 100%;
+  animation: vivid-slideUp 0.6s ease-out;
+  transition: background 1.5s ease, border-color 1.5s ease, color 1.5s ease;
 }
 
 .card-header {
-    text-align: center;
-    margin-bottom: 12px;
-    /* Tightened header again */
+  text-align: center;
+  margin-bottom: 18px;
 }
 
-.vacanza-logo {
-    font-size: 28px;
-    font-weight: 800;
-    color: #3da8c8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    letter-spacing: 1px;
-    margin-bottom: 10px;
-}
-
-.vacanza-logo .logo-icon {
-    margin-right: 10px;
-    font-size: 32px;
-}
+.vacanza-logo { display: none; }
 
 .card-header h3 {
-    font-size: 20px;
-    color: #333;
-    margin-top: 8px;
-    margin-bottom: 4px;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--card-text);
+  margin: 0;
+  line-height: 1.15;
+  font-variation-settings: 'SOFT' 60, 'WONK' 1;
+  transition: color 1.5s ease;
 }
+
+.card-header h3 span { color: var(--vivid-coral) !important; }
 
 .header-subtext {
-    font-size: 13px;
-    color: #666;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--card-subtext);
+  margin-top: 4px;
+  transition: color 1.5s ease;
 }
 
-/* --- Ant Design Özelleştirmeleri --- */
-
-/* Input'ların varsayılan kenar ve büyüklüğünü ayarla */
-.ant-input-affix-wrapper,
-.ant-input-password {
-    border-radius: 24px !important;
-    padding: 12px 20px !important;
-    border: 1.4px solid #D8E6F0 !important;
-    background-color: #ffffff !important;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+.register-card .ant-input-affix-wrapper,
+.register-card .ant-input-password,
+.register-card .ant-input-affix-wrapper.ant-input-outlined {
+  background: var(--input-bg) !important;
+  border: 1.5px solid var(--input-border) !important;
+  border-radius: 12px !important;
+  padding: 8px 14px !important;
+  transition: background 0.25s ease, border-color 0.25s ease, filter 0.25s ease;
 }
 
-.ant-input-affix-wrapper:hover,
-.ant-input-password:hover {
-    border-color: #1DA1F2 !important;
+.register-card .ant-input-affix-wrapper:hover,
+.register-card .ant-input-password:hover,
+.register-card .ant-input-affix-wrapper-focused,
+.register-card .ant-input-affix-wrapper:focus,
+.register-card .ant-input-password-focused {
+  background: var(--input-bg) !important;
+  border-color: var(--vivid-teal) !important;
+  filter: brightness(1.05);
 }
 
-.ant-input-affix-wrapper-focused,
-.ant-input-password-focused {
-    border-color: #1DA1F2 !important;
-    box-shadow: 0 0 0 4px rgba(29, 161, 242, 0.15) !important;
-    background-color: #ffffff !important;
+.register-card .ant-input,
+.register-card .ant-input-password input {
+  background: transparent !important;
+  color: var(--card-text) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 13px !important;
 }
 
-.auth-form .ant-form-item {
-    margin-bottom: 6px !important;
-    /* Back to tighter spacing */
+.register-card .ant-input::placeholder,
+.register-card .ant-input-password input::placeholder { color: var(--input-placeholder) !important; }
+.register-card .ant-input-prefix, .register-card .ant-input-suffix { color: var(--card-subtext) !important; }
+
+.register-card .ant-form-item { margin-bottom: 12px !important; }
+.register-card .ant-form-item-label { padding-bottom: 2px !important; }
+.register-card .ant-form-item-label > label {
+  font-family: var(--font-sans) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--card-subtext) !important;
 }
 
-.auth-form .ant-form-item-label {
-    padding-bottom: 2px !important;
+.register-card .ant-form-item-explain-error { font-size: 11px !important; color: var(--vivid-coral) !important; }
+.register-card .ant-form-item-has-error .ant-input-affix-wrapper { border-color: var(--vivid-coral) !important; }
+
+.register-card .cta-button.ant-btn-primary {
+  width: 100%;
+  padding: 10px 24px;
+  background: var(--btn-primary-bg) !important;
+  border: none !important;
+  border-radius: 12px !important;
+  font-family: var(--font-display) !important;
+  font-weight: 700 !important;
+  font-size: 15px !important;
+  color: var(--vivid-white) !important;
+  box-shadow: 0 4px 16px var(--btn-primary-shadow);
+  margin-top: 4px;
+  transition: background 1.5s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 
-.auth-form .ant-form-item-label>label {
-    font-size: 13px !important;
-    font-weight: 600;
+.register-card .cta-button.ant-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px var(--btn-primary-hover-shadow);
+  filter: brightness(1.05);
 }
 
-/* --- NEW STYLES FOR ERROR STATES --- */
+.login-redirect { text-align: center; margin-top: 14px; font-size: 13px; font-family: var(--font-sans); color: var(--card-subtext); }
+.login-link { color: var(--vivid-teal) !important; font-weight: 600; cursor: pointer; margin-left: 4px; }
+.login-options-row { display: flex; justify-content: flex-end; margin-top: -6px; margin-bottom: 6px; }
+.forgot-password-link { font-size: 11px; cursor: pointer; transition: color 0.2s; font-family: var(--font-sans); color: var(--card-subtext); font-weight: 500;}
+.forgot-password-link:hover { color: var(--vivid-coral); }
 
-.ant-form-item-has-error .ant-input-affix-wrapper:not(.ant-input-affix-wrapper-disabled) {
-    border-color: #ff4d4f !important;
-    box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2) !important;
-}
+.password-checks-container { margin-bottom: 8px; }
+.password-check-item { font-size: 10px; color: var(--input-placeholder); font-family: var(--font-sans); display: flex; align-items: center;}
+.password-check-item.valid { color: var(--card-subtext); }
+.password-check-item.valid .check-indicator { color: var(--vivid-green) !important; }
 
-.ant-form-item-has-error .ant-input {
-    border-color: #ff4d4f !important;
-}
-
-.ant-form-item-has-error .ant-input-password input {
-    border-color: #ff4d4f !important;
-}
-
-.ant-form-item-has-error .ant-form-item-control-input-content .anticon-close-circle,
-.ant-form-item-has-error .ant-form-item-control-input-content .anticon-exclamation-circle {
-    color: #ff4d4f !important;
-}
-
-/* --- Registration Button (CTA) --- */
-/* Solid blue button for the registration form */
-.cta-button.ant-btn-primary {
-    width: 100%;
-    padding: 14px;
-    height: auto;
-    background-color: #1DA1F2;
-    border: none;
-    border-radius: 24px;
-    font-weight: 700;
-    font-size: 16px;
-    box-shadow: 0 4px 12px rgba(29, 161, 242, 0.25);
-    transition: all 0.2s ease;
-}
-
-.cta-button.ant-btn-primary:hover,
-.cta-button.ant-btn-primary:focus {
-    background-color: #0d91e3;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(29, 161, 242, 0.35);
-}
-
-.cta-button.ant-btn-primary:active {
-    transform: translateY(0) scale(0.98);
-}
-
-/* Gradient Style for Login Button */
-.cta-button.login-gradient-button {
-    background: linear-gradient(90deg, #1e90ff, #00c6ff);
-    border: none;
-    transition: all 0.3s;
-}
-
-.cta-button.login-gradient-button:hover,
-.cta-button.login-gradient-button:focus {
-    background: linear-gradient(90deg, #0d83e3, #00b0e5);
-}
-
-
-/* --- Alternative Navigation (Feature Buttons - Bottom Section) --- */
-
-.alt-nav {
-    display: flex;
-    justify-content: center;
-    margin-top: 25px;
-    padding-top: 20px;
-    border-top: 1px solid #eee;
-}
-
-.alt-nav-item {
-    background: none;
-    border: none;
-    color: #555;
-    font-size: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: default;
-    /* Bunlar butondan çok bilgi göstergesi */
-    padding: 0 10px;
-}
-
-.alt-nav-icon {
-    margin-bottom: 5px;
-    color: #1e90ff;
-    font-size: 20px;
-}
-
-
-/* --- Login Redirect --- */
-
-.login-redirect {
-    text-align: center;
-    margin-top: 12px;
-    /* Halved the margin to bring it closer */
-    font-size: 14px;
-    color: #777;
-}
-
-.login-link {
-    color: #1e90ff;
-    font-weight: 600;
-    cursor: pointer;
-    margin-left: 5px;
-}
-
-.login-link:hover {
-    text-decoration: underline;
-}
-
-
-/* --- Special Styles for Login Card (Forgot Password) --- */
-
-.login-options-row {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    width: 100%;
-    margin-top: -8px;
-    margin-bottom: 5px;
-}
-
-.forgot-password-link {
-    color: #1e90ff;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: color 0.2s;
-}
-
-.forgot-password-link:hover {
-    color: #0d83e3;
-    text-decoration: underline;
-}
-
-.remember-me-placeholder {
-    flex-grow: 1;
-}
-
-/* --- Password Checks (Registration Card Specific) --- */
-
-.password-checks {
-    margin-top: -5px;
-    margin-bottom: 15px;
-    padding: 5px 0;
-}
-
-.check-item {
-    display: flex;
-    align-items: center;
-    font-size: 13px;
-    line-height: 1.2;
-}
-
-.check-item svg {
-    margin-right: 5px;
-    font-size: 14px;
-}
-
-
-.password-checks-container {
-    /* Genel form alanıyla aynı hizada başlaması için sola bir miktar boşluk ekler. */
-    padding-left: 5px;
-    margin-bottom: 20px;
-    padding-top: 5px;
-}
-
-.password-check-item {
-    font-size: 12px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    padding: 3px 0;
-
-    /* Geçersiz maddelerin metin rengi (Hafif gri) */
-    color: #8c8c8c;
-}
-
-.check-indicator {
-    margin-right: 8px;
-    font-size: 14px;
-}
-
-/* 4. GEÇERLİ OLAN MADDELERİN STİLİ (Yeşil Renk) */
-.password-check-item.valid {
-    /* Geçerli maddelerin metin rengi (Koyu gri/siyah) */
-    color: #434343;
-}
-
-/* YENİ: YEŞİL RENGİN UYGULANMASI */
-/* İkonların (check-indicator) geçerli olduğunda yeşil olmasını sağlar */
-.password-check-item.valid .check-indicator {
-    color: #52c41a !important;
-    /* Mobil tasarımınızdaki yeşil tonu */
-}
-
-/* YENİ: GEÇERSİZLERİN RENGİNİ GRİ YAPMA */
-.password-check-item .check-indicator {
-    /* Geçersiz olanların simge rengini hafif gri yapar */
-    color: #bfbfbf;
-}
-
-.password-checks-container {
-    padding-left: 5px;
-    /* Sağa kaydırma */
-    margin-bottom: 20px;
-    padding-top: 5px;
-}
-
-.password-check-item {
-    font-size: 12px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    padding: 3px 0;
-    color: #8c8c8c;
-}
-
-/* --- Preferred Name (Custom Component) --- */
+.register-card .ant-checkbox-wrapper { font-size: 11px !important; color: var(--card-subtext) !important; font-family: var(--font-sans) !important;}
+.register-card .ant-checkbox-wrapper a { color: var(--vivid-teal) !important; font-weight: 500; }
+.register-card .ant-checkbox-checked .ant-checkbox-inner { background: var(--vivid-teal) !important; border-color: var(--vivid-teal) !important; }
 
 .preferred-name-options {
-    display: flex;
-    gap: 20px;
-    justify-content: flex-start;
-    /* Changed to match image */
-    margin-bottom: 5px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+  margin-bottom: 4px;
 }
 
 .pn-option {
-    padding: 8px 24px;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    cursor: pointer;
-    min-width: 60px;
-    text-align: center;
-    color: #455A64;
-    font-size: 14px;
-    background-color: #f5f5f5;
-    /* Unselected background slightly gray */
-    transition: all 0.3s ease;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  padding: 6px 16px;
+  border: 1.5px solid var(--input-border);
+  border-radius: 10px;
+  cursor: pointer;
+  min-width: 55px;
+  text-align: center;
+  font-family: var(--font-sans);
+  color: var(--card-subtext);
+  font-size: 12px;
+  background: var(--input-bg);
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, filter 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pn-option:hover {
-    background-color: #e8e8e8;
+  border-color: var(--vivid-teal);
+  filter: brightness(1.05);
 }
 
 .pn-option.selected {
-    border-color: #e8f0fe;
-    color: #1a202c;
-    /* Darker text for selected */
-    background-color: #e8f0fe;
-    /* Light blue background like image */
+  border-color: var(--vivid-teal);
+  color: var(--card-text);
+  background: rgba(0, 180, 216, 0.1);
 }
 
-/* Error state integration for custom options */
 .ant-form-item-has-error .pn-option {
-    border-color: #ff4d4f !important;
+  border-color: var(--vivid-coral) !important;
+}
+
+.ant-modal.register-modal .ant-modal-content {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid var(--card-border) !important;
+}
+
+.ant-modal.register-modal .ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--input-border) !important;
+}
+
+.ant-modal.register-modal .ant-modal-title {
+  font-family: var(--font-display) !important;
+  font-weight: 700 !important;
+  color: var(--card-text) !important;
+  font-variation-settings: 'SOFT' 50, 'WONK' 1 !important;
+}
+
+.ant-modal .ant-modal-body {
+  color: var(--card-subtext) !important;
+  font-family: var(--font-sans) !important;
+}
+
+.ant-modal .ant-modal-footer .ant-btn-primary {
+  background: var(--btn-primary-bg) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  font-family: var(--font-display) !important;
+  font-variation-settings: 'SOFT' 50, 'WONK' 1 !important;
+  color: var(--vivid-white) !important;
+  transition: background 1.5s ease;
+}
+
+.ant-modal .ant-modal-footer .ant-btn-default {
+  background: transparent !important;
+  border: 1.5px solid var(--input-border) !important;
+  color: var(--card-subtext) !important;
+  border-radius: 10px !important;
+  font-family: var(--font-sans) !important;
+}
+
+.ant-modal .ant-input-affix-wrapper {
+  background: var(--input-bg) !important;
+  border: 1.5px solid var(--input-border) !important;
+  border-radius: 12px !important;
+}
+
+.ant-modal .ant-input {
+  background: transparent !important;
+  color: var(--card-text) !important;
+  font-family: var(--font-sans) !important;
 }
