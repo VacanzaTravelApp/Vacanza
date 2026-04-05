@@ -750,4 +750,40 @@
     opacity: 0.9;
 }
 
+/* Map POI Markers */
+.vivid-poi-marker {
+    width: 32px;
+    height: 32px;
+    background: var(--marker-color, #ff4c4c);
+    border: 2.5px solid #fff;
+    border-radius: 50% 50% 50% 4px;
+    transform: rotate(-45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.22);
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+}
 
+.vivid-poi-marker:hover,
+.vivid-poi-marker.active {
+    transform: rotate(-45deg) scale(1.2);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    z-index: 1000;
+}
+
+.vivid-poi-icon-wrap {
+    transform: rotate(45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.vivid-poi-icon-wrap svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+    stroke-width: 2.5px;
+}
