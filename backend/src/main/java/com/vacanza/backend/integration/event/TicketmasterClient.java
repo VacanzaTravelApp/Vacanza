@@ -19,10 +19,21 @@ import java.util.List;
 /**
  * Ticketmaster Discovery API integration client.
  *
- * Uses the Discovery API v2:
- *   GET /events.json?apikey=...&city=...&startDateTime=...&classificationName=...
- *
- * API docs: https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/
+ * Uses the US Discovery API v2:
+ * {@code GET /discovery/v2/events.json?...}
+ * <p>
+ * Official reference: <a href="https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/">Discovery API v2</a>.
+ * Implementation notes:
+ * <ul>
+ *   <li>{@code classificationName} is an <strong>array</strong> (explode) in the OpenAPI spec — send one query param per
+ *       value, not a single comma-joined string.</li>
+ *   <li>{@code latlong} is <strong>deprecated</strong>; prefer {@code geoPoint} with the same {@code lat,lon} format.</li>
+ *   <li>{@code startDateTime} / {@code endDateTime} filter by event <em>start</em> time; use ISO-8601. Appending {@code Z}
+ *       without converting from the trip locale can shift the window (see TM docs for examples).</li>
+ *   <li>European inventory may be limited on the US Discovery host; Ticketmaster documents a separate International product.</li>
+ *   <li>When both {@code city} and {@code countryCode} are set, do not send {@code geoPoint} — combining them tends to
+ *       over-narrow results (e.g. one hit for İzmir); prefer city+country for metro-level discovery.</li>
+ * </ul>
  */
 @Slf4j
 @Component
@@ -50,8 +61,22 @@ public class TicketmasterClient {
      * @return list of events matching the search criteria
      */
     public List<EventDTO> searchEvents(EventSearchRequestDTO request) {
-        log.info("[TICKETMASTER] Searching events: city={}, dates={}/{}, category={}",
-                request.getCity(), request.getStartDate(), request.getEndDate(),
+        boolean cityAndCountry = request.getCity() != null && !request.getCity().isBlank()
+                && request.getCountryCode() != null && !request.getCountryCode().isBlank();
+        boolean useGeo = request.getGeoLatitude() != null && request.getGeoLongitude() != null && !cityAndCountry;
+
+        String geoLog = null;
+        if (request.getGeoLatitude() != null && request.getGeoLongitude() != null) {
+            geoLog = useGeo
+                    ? request.getGeoLatitude() + "," + request.getGeoLongitude()
+                    : "skipped (city+country set)";
+        }
+
+        log.info("[TICKETMASTER] Searching events: city={}, country={}, geoPoint={}, dates={}/{}, category={}",
+                request.getCity(),
+                request.getCountryCode(),
+                geoLog,
+                request.getStartDate(), request.getEndDate(),
                 request.getCategory());
 
         long startTime = System.currentTimeMillis();
@@ -69,6 +94,13 @@ public class TicketmasterClient {
                             builder.queryParam("countryCode", request.getCountryCode());
                         }
 
+                        // Geo: only when city/country missing — with both, TM+geoPoint over-narrows (AND semantics)
+                        if (useGeo) {
+                            builder.queryParam("geoPoint", request.getGeoLatitude() + "," + request.getGeoLongitude());
+                            builder.queryParam("radius", "50");
+                            builder.queryParam("unit", "km");
+                        }
+
                         // Date range filter — Ticketmaster expects ISO 8601 with 'Z':
                         // e.g. "2026-04-01T00:00:00Z"
                         if (request.getStartDate() != null) {
@@ -84,9 +116,14 @@ public class TicketmasterClient {
                             builder.queryParam("endDateTime", endDateTime);
                         }
 
-                        // Category filter (e.g., "music", "sports", "arts")
+                        // classificationName: OpenAPI type is array (explode) — one query param per segment name
                         if (request.getCategory() != null && !request.getCategory().isBlank()) {
-                            builder.queryParam("classificationName", request.getCategory());
+                            for (String segment : request.getCategory().split(",")) {
+                                String name = segment.trim();
+                                if (!name.isEmpty()) {
+                                    builder.queryParam("classificationName", name);
+                                }
+                            }
                         }
 
                         // Sort by date ascending for travel planning relevance
