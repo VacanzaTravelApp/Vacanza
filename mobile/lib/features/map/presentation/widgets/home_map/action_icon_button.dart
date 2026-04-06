@@ -18,8 +18,8 @@ class ActionIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.vacanzaTokens;
-    final vivid = t.vividBlue;
-    final vividHi = Color.lerp(vivid, Colors.white, 0.15)!;
+    final vivid = context.mapControlAccent;
+    final activeGradient = context.mapControlActiveGradientColors;
 
     final bgColor = isActive ? null : t.actionBarInactiveBg;
 
@@ -45,7 +45,7 @@ class ActionIconButton extends StatelessWidget {
                   ? LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [vivid, vividHi],
+                      colors: activeGradient,
                     )
                   : null,
               borderRadius: BorderRadius.circular(999),

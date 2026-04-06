@@ -13,11 +13,13 @@ class MapModeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vivid = context.vacanzaTokens.vividBlue;
+    final accent = context.mapControlAccent;
+    // Coral (gündüz) ve mavi (gece) rozet zemini üzerinde yüksek kontrast
+    const labelColor = Colors.white;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: vivid,
+        color: accent,
         borderRadius: BorderRadius.circular(999),
         boxShadow: [
           BoxShadow(
@@ -29,9 +31,9 @@ class MapModeBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
-          color: Colors.white,
+          color: labelColor,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.2,
         ),
