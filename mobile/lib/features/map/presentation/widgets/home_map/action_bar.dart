@@ -14,9 +14,6 @@ class ActionBar extends StatelessWidget {
   // ✅ UC1.8-MOB1: Booking entry point
   final VoidCallback onOpenBooking;
 
-  // ✅ Chatbot entry point
-  final VoidCallback onOpenChat;
-
   // ✅ NEW
   final VoidCallback onOpenFilters;
 
@@ -31,7 +28,6 @@ class ActionBar extends StatelessWidget {
     required this.onRecenter,
     required this.onToggleDrawing,
     required this.onOpenBooking, // ✅ UC1.8-MOB1
-    required this.onOpenChat, // ✅ Chatbot
     required this.onOpenFilters, // ✅ NEW
     required this.onOpenArMode, // UC1.11
   });
@@ -71,14 +67,6 @@ class ActionBar extends StatelessWidget {
           tooltip: 'Booking',
           icon: Icons.luggage_rounded,
           onPressed: onOpenBooking,
-        ),
-        const SizedBox(height: 16),
-
-        // ✅ Chatbot
-        ActionIconButton(
-          tooltip: 'AI Assistant',
-          icon: Icons.chat_bubble_rounded,
-          onPressed: onOpenChat,
         ),
         const SizedBox(height: 16),
 

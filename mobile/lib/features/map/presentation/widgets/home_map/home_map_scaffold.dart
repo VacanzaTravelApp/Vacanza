@@ -9,6 +9,7 @@ import 'package:mobile/core/navigation/navigation_service.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/mapbox/map_canvas_mapbox.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/action_bar.dart';
+import 'package:mobile/features/map/presentation/widgets/home_map/vacanza_chat_floating_pill.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/profile_badge.dart';
 import 'package:mobile/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:mobile/features/profile/presentation/bloc/profile_state.dart';
@@ -89,6 +90,9 @@ class HomeMapScaffold extends StatelessWidget {
     final showBlurPreview =
         showFilters && showResultsBlurUnderFilters && resultsSheet != null;
 
+    // Alt yüzen sohbet pill’i: sonuç / filtre / çizim modunda gizle.
+    final showChatPill = !showResults && !showFilters && !isDrawing;
+
     return Scaffold(
       extendBody: true,
       extendBodyBehindAppBar: true,
@@ -159,11 +163,21 @@ class HomeMapScaffold extends StatelessWidget {
               onRecenter: onRecenter,
               onToggleDrawing: onToggleDrawing,
               onOpenBooking: onOpenBooking,
-              onOpenChat: onOpenChat,
               onOpenFilters: onOpenFilters,
               onOpenArMode: onOpenArMode,
             ),
           ),
+
+          // ================= ASK VACANZA (floating pill, bottom) =================
+          if (showChatPill)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: padding.bottom + 18,
+              child: Center(
+                child: VacanzaChatFloatingPill(onPressed: onOpenChat),
+              ),
+            ),
 
           // ================= RESULTS SHEET (BLUR PREVIEW UNDER FILTER) =================
           if (showBlurPreview)
