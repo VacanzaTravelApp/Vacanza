@@ -79,6 +79,7 @@ class HomeMapScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final padding = MediaQuery.of(context).padding;
     final showFilters = isFiltersOpen && filtersPanel != null;
 
     // normal sheet: filter kapalıyken
@@ -89,130 +90,127 @@ class HomeMapScaffold extends StatelessWidget {
         showFilters && showResultsBlurUnderFilters && resultsSheet != null;
 
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // ================= MAP =================
-            const Positioned.fill(
-              child: MapCanvasMapbox(),
-            ),
+      extendBody: true,
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          // ================= MAP (tam ekran, safe area'yı aşar) =================
+          const Positioned.fill(
+            child: MapCanvasMapbox(),
+          ),
 
-            // ================= PROFILE (SOL ÜST) =================
-            Positioned(
-              top: 30,
-              left: 16,
-              child: BlocBuilder<ProfileBloc, ProfileState>(
-                buildWhen: (prev, curr) =>
-                    prev.profile != curr.profile ||
-                    prev.profilePhotoBytes != curr.profilePhotoBytes,
-                builder: (context, profileState) {
-                  final p = profileState.profile;
-                  final displayName = p != null
-                      ? (p.displayName.trim().isNotEmpty
-                          ? p.displayName
-                          : p.displayNameFallback)
-                      : '—';
-                  final profileBloc = context.read<ProfileBloc>();
-                  return ProfileBadge(
-                    name: displayName,
-                    subtitle: 'Traveler',
-                    profilePhotoBytes: profileState.profilePhotoBytes,
-                    imageUrl: p?.profileImageUrl,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BlocProvider.value(
-                            value: profileBloc,
-                            child: const ProfileScreen(),
-                          ),
+          // ================= PROFILE (SOL ÜST) =================
+          Positioned(
+            top: padding.top + 12,
+            left: 16,
+            child: BlocBuilder<ProfileBloc, ProfileState>(
+              buildWhen: (prev, curr) =>
+                  prev.profile != curr.profile ||
+                  prev.profilePhotoBytes != curr.profilePhotoBytes,
+              builder: (context, profileState) {
+                final p = profileState.profile;
+                final displayName = p != null
+                    ? (p.displayName.trim().isNotEmpty
+                        ? p.displayName
+                        : p.displayNameFallback)
+                    : '—';
+                final profileBloc = context.read<ProfileBloc>();
+                return ProfileBadge(
+                  name: displayName,
+                  subtitle: 'Traveler',
+                  profilePhotoBytes: profileState.profilePhotoBytes,
+                  imageUrl: p?.profileImageUrl,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BlocProvider.value(
+                          value: profileBloc,
+                          child: const ProfileScreen(),
                         ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-
-            // ================= LOGOUT (SAĞ ÜST) =================
-            Positioned(
-              top: 30,
-              right: 16,
-              child: IconButton(
-                tooltip: 'Logout',
-                icon: const Icon(Icons.logout_rounded),
-                color: Colors.black87,
-                onPressed: () => _handleLogout(context),
-              ),
-            ),
-
-            // ================= ACTION BAR (SAĞ) =================
-            Positioned(
-              top: 96,
-              right: 12,
-              child: ActionBar(
-                mode: mode,
-                isDrawing: isDrawing,
-                onToggleMode: onToggleMode,
-                onRecenter: onRecenter,
-                onToggleDrawing: onToggleDrawing,
-                onOpenBooking: onOpenBooking,
-                onOpenChat: onOpenChat,
-                onOpenFilters: onOpenFilters,
-                onOpenArMode: onOpenArMode,
-              ),
-            ),
-
-            // ================= RESULTS SHEET (BLUR PREVIEW UNDER FILTER) =================
-            // ================= RESULTS SHEET (BLUR PREVIEW UNDER FILTER) =================
-            if (showBlurPreview)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 16,
-                child: IgnorePointer(
-                  ignoring: true,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24), // sheet ile aynı
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 2.2, sigmaY: 2.2), // hafif blur
-                      child: Opacity(
-                        opacity: 0.55, // hafif soluk
-                        child: resultsSheet!,
                       ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+
+          // ================= LOGOUT (SAĞ ÜST) =================
+          Positioned(
+            top: padding.top + 12,
+            right: 16,
+            child: IconButton(
+              tooltip: 'Logout',
+              icon: const Icon(Icons.logout_rounded),
+              color: Colors.black87,
+              onPressed: () => _handleLogout(context),
+            ),
+          ),
+
+          // ================= ACTION BAR (SAĞ) =================
+          Positioned(
+            top: padding.top + 72,
+            right: 12,
+            child: ActionBar(
+              mode: mode,
+              isDrawing: isDrawing,
+              onToggleMode: onToggleMode,
+              onRecenter: onRecenter,
+              onToggleDrawing: onToggleDrawing,
+              onOpenBooking: onOpenBooking,
+              onOpenChat: onOpenChat,
+              onOpenFilters: onOpenFilters,
+              onOpenArMode: onOpenArMode,
+            ),
+          ),
+
+          // ================= RESULTS SHEET (BLUR PREVIEW UNDER FILTER) =================
+          if (showBlurPreview)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: padding.bottom + 16,
+              child: IgnorePointer(
+                ignoring: true,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 2.2, sigmaY: 2.2),
+                    child: Opacity(
+                      opacity: 0.55,
+                      child: resultsSheet!,
                     ),
                   ),
                 ),
               ),
+            ),
 
-            // ================= FILTER OVERLAY (SAĞDAN PANEL) =================
-            if (showFilters) ...[
-              // backdrop (dışına tıklayınca kapat)
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: onCloseFilters,
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.10),
-                  ),
+          // ================= FILTER OVERLAY (SAĞDAN PANEL) =================
+          if (showFilters) ...[
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: onCloseFilters,
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.10),
                 ),
               ),
+            ),
 
-              // panel
-              Positioned(
-                top: 110,
-                right: 16,
-                child: Material(
-                  color: Colors.transparent,
-                  child: filtersPanel!,
-                ),
+            Positioned(
+              top: padding.top + 86,
+              right: 16,
+              child: Material(
+                color: Colors.transparent,
+                child: filtersPanel!,
               ),
-            ],
-
-            // ================= RESULTS SHEET (BOTTOM) =================
-            if (showResults) resultsSheet!,
+            ),
           ],
-        ),
+
+          // ================= RESULTS SHEET (BOTTOM) =================
+          if (showResults) resultsSheet!,
+        ],
       ),
     );
   }

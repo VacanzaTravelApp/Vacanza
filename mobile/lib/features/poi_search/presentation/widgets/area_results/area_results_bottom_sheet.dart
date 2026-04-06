@@ -107,10 +107,12 @@ class AreaResultsSheet extends StatelessWidget {
 
     final chips = _normalizedSelectedCategories();
 
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Positioned(
       left: 16,
       right: 16,
-      bottom: 16,
+      bottom: bottomPadding + 16,
       child: Material(
         color: Colors.transparent,
         child: Container(
