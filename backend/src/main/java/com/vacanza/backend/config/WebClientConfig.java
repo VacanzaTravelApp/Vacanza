@@ -20,7 +20,7 @@ import reactor.netty.http.client.HttpClient;
 @Configuration
 @EnableConfigurationProperties({ FoursquareProperties.class, AiServiceProperties.class,
         SerpApiProperties.class, MapboxProperties.class, TicketmasterProperties.class,
-        OpenMeteoProperties.class, ViatorProperties.class })
+        OpenMeteoProperties.class, ViatorProperties.class, FrankfurterProperties.class })
 public class WebClientConfig {
 
     private final ApiMetricsCollector apiMetricsCollector;
@@ -117,6 +117,22 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .filter(apiMetricsAndLogFilter("OpenMeteo API", "[OPEN-METEO]"))
+                .build();
+    }
+
+    @Bean
+    @Qualifier("frankfurterWebClient")
+    public WebClient frankfurterWebClient(FrankfurterProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        return WebClient.builder()
+                .baseUrl(props.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(apiMetricsAndLogFilter("Frankfurter API", "[FRANKFURTER]"))
                 .build();
     }
 

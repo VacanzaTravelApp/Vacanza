@@ -162,14 +162,14 @@ public class GlobalExceptionHandler {
         systemLogCollector.recordError(request.getRequestURI(), "ViatorPartnerUnavailable: " + ex.getMessage());
         return new ResponseEntity<>(body, HttpStatus.SERVICE_UNAVAILABLE);
     }
-    
+
     /**
      * Catch-all for unhandled 500 errors.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAllExceptions(
             Exception ex, HttpServletRequest request) {
-            
+
         log.error("Unhandled exception at {}", request.getRequestURI(), ex);
 
         ErrorResponse body = ErrorResponse.of(

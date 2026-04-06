@@ -59,6 +59,13 @@ open-meteo:
   connect-timeout: 10s
   read-timeout: 30s
 
+# Frankfurter: free open-source exchange rate API, no API key (https://api.frankfurter.dev)
+frankfurter:
+  base-url: https://api.frankfurter.dev
+  connect-timeout: 10s
+  read-timeout: 30s
+
+
 viator:
   base-url: ${VIATOR_BASE_URL:https://api.sandbox.viator.com/partner}
   api-key: ${VIATOR_API_KEY:}
