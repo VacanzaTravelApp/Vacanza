@@ -8,6 +8,9 @@ class MapboxConfig {
   static const String styleStandard =
       'mapbox://styles/mapbox/streets-v12';
 
+  /// Dark v11 — web gece modu (MapPage STYLES[1]).
+  static const String styleDark = 'mapbox://styles/mapbox/dark-v11';
+
   /// Satellite + streets labels (web ile aynı).
   static const String styleStandardSatellite =
       'mapbox://styles/mapbox/satellite-streets-v12';
