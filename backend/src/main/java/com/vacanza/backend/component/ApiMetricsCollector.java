@@ -1,6 +1,7 @@
 package com.vacanza.backend.component;
 
 import com.vacanza.backend.dto.response.SystemMonitoringDTO.ApiUsageMetric;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,6 +18,14 @@ import java.util.concurrent.atomic.LongAdder;
 public class ApiMetricsCollector {
 
     private final Map<String, ApiCounter> counters = new ConcurrentHashMap<>();
+
+    /**
+     * Resets all API metrics bi-weekly (1st and 15th) to provide consistent performance data.
+     */
+    @Scheduled(cron = "0 0 0 1,15 * *")
+    public void resetMetrics() {
+        counters.clear();
+    }
 
     /**
      * Record a successful API call with its response time.

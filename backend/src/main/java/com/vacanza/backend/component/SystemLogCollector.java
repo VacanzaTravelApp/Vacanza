@@ -1,6 +1,7 @@
 package com.vacanza.backend.component;
 
 import com.vacanza.backend.dto.response.SystemMonitoringDTO.LogEntry;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -16,6 +17,14 @@ public class SystemLogCollector {
 
     private static final int MAX_LOGS = 100;
     private final ConcurrentLinkedDeque<LogEntry> logs = new ConcurrentLinkedDeque<>();
+
+    /**
+     * Resets the system log history bi-weekly (1st and 15th).
+     */
+    @Scheduled(cron = "0 0 0 1,15 * *")
+    public void resetLogs() {
+        logs.clear();
+    }
 
     public void recordError(String path, String message) {
         LogEntry entry = LogEntry.builder()
