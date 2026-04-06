@@ -132,6 +132,22 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
       ) async {
     if (!state.hasUsableArea) return;
 
+    // ✅ Hiç kategori seçilmediyse (None): haritada POI yok — backend "tümü" ile karışmasın.
+    if (state.selectedCategories.isEmpty) {
+      emit(
+        state.copyWith(
+          status: PoiSearchStatus.success,
+          count: 0,
+          pois: const [],
+          countsByCategory: const {},
+          page: 0,
+          errorCode: null,
+          errorMessage: null,
+        ),
+      );
+      return;
+    }
+
     final page = 0;
     final limit = state.limit.clamp(1, 500);
 
@@ -145,7 +161,8 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
     );
 
     try {
-      final categories = _categoriesForBackendRequest(state.selectedCategories);
+      // Composite repo: backend’e kategori gönderilmez; bu sadece istemci tarafı filtre.
+      final categories = _categoriesForClientFilter(state.selectedCategories);
 
       final res = await _repo.searchInArea(
         area: state.selectedArea,
@@ -190,10 +207,9 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
     // ops: şimdilik MVP dışı.
   }
 
-  /// Boş seçim → backend filtre yok. Tüm katalog anahtarları seçiliyse → `categories` gönderme;
-  /// böylece bbox içindeki tüm kayıtlar gelir (DB’de saklı kategori string’leri UI anahtarından
-  /// sapabildiği için `category IN (...)` çok sonuç kesiyordu).
-  static List<String>? _categoriesForBackendRequest(List<String> selected) {
+  /// [CompositePoiSearchRepository] istemci filtresi: boş seçim yok (None ayrı ele alınır).
+  /// Tüm katalog seçiliyse `null` → filtre yok (tüm POI’lar); aksi halde alt küme.
+  static List<String>? _categoriesForClientFilter(List<String> selected) {
     if (selected.isEmpty) return null;
 
     final selectedSet = selected.map((e) => e.trim().toLowerCase()).toSet();

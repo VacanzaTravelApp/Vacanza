@@ -32,9 +32,11 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
   }) async {
     PoiSearchInAreaResponseDto backendRes;
     try {
+      // Her zaman alan için tam veri — kategori daraltması istemcide (harita kayınca eski bbox
+      // sayılarına yapışmaması ve filtre paneli sayılarının tutarlı kalması için).
       backendRes = await _backend.searchInArea(
         area: area,
-        categories: categories,
+        categories: null,
         page: page,
         limit: limit,
         sort: sort,
@@ -68,20 +70,24 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
       log('[CompositePoiSearchRepository] style discovery failed: $e\n$st');
     }
 
-    final merged = _mergeAndFilter(
+    final mergedUnfiltered = _mergeWithoutCategoryFilter(
       area: area,
       backendPois: backendRes.pois,
       stylePois: stylePois,
-      categories: categories,
     );
 
     final counts = PoiCategoryCatalog.countsByUiKey(
-      merged.map((p) => p.category),
+      mergedUnfiltered.map((p) => p.category),
+    );
+
+    final filtered = _applyCategoryFilter(
+      mergedUnfiltered,
+      categories: categories,
     );
 
     return PoiSearchInAreaResponseDto(
-      count: merged.length,
-      pois: merged,
+      count: filtered.length,
+      pois: filtered,
       countsByCategory: counts,
     );
   }
@@ -96,12 +102,11 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
     );
   }
 
-  /// Web `pois` useMemo: backend + Mapbox, 4 ondalık dedupe, kategori + polygon filtresi.
-  List<Poi> _mergeAndFilter({
+  /// Backend + Mapbox, dedupe, polygon — kategori yok.
+  List<Poi> _mergeWithoutCategoryFilter({
     required SelectedArea area,
     required List<Poi> backendPois,
     required List<Poi> stylePois,
-    List<String>? categories,
   }) {
     final all = <Poi>[...backendPois];
     final poiCoords = <String>{
@@ -126,24 +131,8 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
       '(backend=${backendPois.length} style=${stylePois.length})',
     );
 
-    final selected = <String>{
-      if (categories != null)
-        for (final c in categories) c.trim().toLowerCase(),
-    };
-
-    // null veya boş => backend ile aynı: filtre kısıtı yok (tüm eşleşenler)
-    var filtered = all
-        .where(
-          (p) => PoiCategoryCatalog.passesCategoryFilter(
-            rawCategory: p.category,
-            selectedUiKeys: selected,
-            treatEmptySelectionAsShowAll: true,
-          ),
-        )
-        .toList();
-
     if (area is PolygonArea) {
-      filtered = filtered
+      return all
           .where(
             (p) => pointInsidePolygonLatLng(
               lat: p.latitude,
@@ -154,7 +143,28 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
           .toList();
     }
 
-    return filtered;
+    return all;
+  }
+
+  /// [categories] null => tümü (Bloc "hepsi seçili" ile uyumlu).
+  List<Poi> _applyCategoryFilter(
+    List<Poi> pois, {
+    List<String>? categories,
+  }) {
+    final selected = <String>{
+      if (categories != null)
+        for (final c in categories) c.trim().toLowerCase(),
+    };
+
+    return pois
+        .where(
+          (p) => PoiCategoryCatalog.passesCategoryFilter(
+            rawCategory: p.category,
+            selectedUiKeys: selected,
+            treatEmptySelectionAsShowAll: true,
+          ),
+        )
+        .toList();
   }
 
   static bool _poiInBbox(Poi p, BboxArea b) {
