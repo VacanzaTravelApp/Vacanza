@@ -1,142 +1,303 @@
-import React from "react";
-import { Card, Row, Col, Statistic, Alert, Typography, Timeline, Progress, Button, Space } from "antd";
+import React, { useState, useEffect } from "react";
+import { Card, Row, Col, Statistic, Alert, Typography, Timeline, Progress, Button, Space, Tag, Spin } from "antd";
 import {
-    SmileOutlined,
     ThunderboltOutlined,
-    MessageOutlined,
     SyncOutlined,
-    BellOutlined,
     ArrowRightOutlined,
-    RocketOutlined,
+    GlobalOutlined,
     SecurityScanOutlined,
-    LineChartOutlined
+    LineChartOutlined,
+    CheckCircleFilled,
+    HistoryOutlined,
+    RocketOutlined,
+    CloudServerOutlined,
+    DatabaseOutlined,
+    LoadingOutlined,
+    NotificationOutlined,
+    WarningFilled,
+    BugFilled
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MdFlightTakeoff } from "react-icons/md";
+import http from "../api/http";
+import dayjs from "dayjs";
 
 const { Title, Paragraph, Text } = Typography;
 
+const THEME = {
+    primary: 'hsl(250, 89%, 66%)',
+    success: 'hsl(142, 70%, 45%)',
+    warning: 'hsl(38, 92%, 50%)',
+    error: 'hsl(0, 84%, 60%)',
+    info: 'hsl(199, 89%, 48%)',
+};
+
 export default function Home() {
     const navigate = useNavigate();
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const response = await http.get("/admin/monitoring");
+                setData(response.data);
+            } catch (err) {
+                console.error("Home fetch error:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+        const interval = setInterval(fetchData, 60000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const container = {
+        hidden: { opacity: 0 },
+        show: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
+
+    const item = {
+        hidden: { y: 20, opacity: 0 },
+        show: { y: 0, opacity: 1 }
+    };
+
+    if (loading && !data) return (
+        <div style={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Spin indicator={<LoadingOutlined style={{ fontSize: 40, color: THEME.primary }} spin />} />
+        </div>
+    );
+
+    const healthPercent = Math.round((data?.systemHealth || 0) * 100);
+    const avgLatency = data?.apiMetrics?.length > 0
+        ? Math.round(data.apiMetrics.reduce((acc, curr) => acc + curr.avgResponseMs, 0) / data.apiMetrics.length)
+        : 0;
 
     return (
         <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="dashboard-container"
             style={{ padding: "12px" }}
         >
-            <Alert
-                title={<Text strong>System Health Check: ALL SYSTEMS OPERATIONAL</Text>}
-                description="Last verified performance audit was completed 10 minutes ago."
-                type="success"
-                showIcon
-                closable
-                style={{ marginBottom: "24px", borderRadius: 8 }}
-            />
+            {/* Status Alert */}
+            <motion.div variants={item}>
+                <Alert
+                    title={
+                        <Space>
+                            {healthPercent > 90 ? <CheckCircleFilled style={{ color: THEME.success }} /> : <WarningFilled style={{ color: THEME.warning }} />}
+                            <Text strong style={{ color: healthPercent > 90 ? '#065f46' : '#92400e' }}>
+                                {healthPercent > 90 ? 'ADMINISTRATIVE OVERRIDE: ALL SYSTEMS OPERATIONAL' : 'SYSTEM ALERT: PERFORMANCE DEGRADATION DETECTED'}
+                            </Text>
+                        </Space>
+                    }
+                    description={
+                        <Text style={{ color: healthPercent > 90 ? '#065f46' : '#92400e', opacity: 0.8 }}>
+                            {healthPercent > 90
+                                ? `System integrity validated at ${healthPercent}%. Global performance audit completed successfully.`
+                                : `Health index dropped to ${healthPercent}%. Some nodes are reporting latency spikes.`
+                            }
+                        </Text>
+                    }
+                    type={healthPercent > 90 ? "success" : "warning"}
+                    showIcon={false}
+                    closable
+                    style={{
+                        marginBottom: "32px",
+                        borderRadius: '16px',
+                        background: healthPercent > 90 ? 'hsla(142, 70%, 45%, 0.1)' : 'hsla(38, 92%, 50%, 0.1)',
+                        border: `1px solid ${healthPercent > 90 ? 'hsla(142, 70%, 45%, 0.2)' : 'hsla(38, 92%, 50%, 0.2)'}`
+                    }}
+                />
+            </motion.div>
 
-            <div style={{ marginBottom: 32 }}>
-                <Title level={2}><MdFlightTakeoff style={{ color: '#1677ff', marginRight: 8 }} /> Vacanza Admin Dashboard</Title>
-                <Paragraph type="secondary">Real-time control center for user management, system diagnostics, and strategic analytics.</Paragraph>
-            </div>
+            {/* Welcome Header */}
+            <motion.div variants={item} style={{ marginBottom: 40 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+                    <div style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: '16px',
+                        background: THEME.primary,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        boxShadow: `0 8px 16px ${THEME.primary}44`
+                    }}>
+                        <MdFlightTakeoff style={{ fontSize: '32px', color: 'white' }} />
+                    </div>
+                    <div>
+                        <Title level={1} style={{ margin: 0, letterSpacing: -1.2, fontWeight: 800 }}>Command Center</Title>
+                        <Text type="secondary" style={{ fontSize: 16 }}>Real-time orchestration of user growth, system telemetry, and strategic assets.</Text>
+                    </div>
+                </div>
+            </motion.div>
 
             <Row gutter={[24, 24]}>
-                <Col span={16}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-                        <Card
-                            hoverable
-                            className="action-card"
-                            onClick={() => navigate('/monitoring')}
-                            style={{ borderLeft: '4px solid #faad14', borderRadius: 12 }}
-                            cover={
-                                <div style={{ padding: '24px 24px 0', fontSize: 32, color: '#faad14' }}>
-                                    <SecurityScanOutlined />
-                                </div>
-                            }
-                        >
-                            <Title level={4}>UC2.1: Monitoring</Title>
-                            <Text type="secondary">Live API latency, database status, and health metrics.</Text>
-                            <div style={{ marginTop: 16 }}>
-                                <Button type="link" style={{ padding: 0 }}>Launch Monitor <ArrowRightOutlined /></Button>
-                            </div>
-                        </Card>
+                <Col xs={24} lg={16}>
+                    <Row gutter={[24, 24]}>
+                        <Col xs={24} sm={12}>
+                            <motion.div variants={item} whileHover={{ y: -8 }} transition={{ type: 'spring', stiffness: 300 }}>
+                                <Card
+                                    hoverable
+                                    className="glass-card"
+                                    onClick={() => navigate('/monitoring')}
+                                    style={{ borderRadius: 20, height: '100%' }}
+                                    bodyStyle={{ padding: '32px' }}
+                                >
+                                    <div style={{
+                                        width: 48,
+                                        height: 48,
+                                        borderRadius: 12,
+                                        background: `${THEME.warning}15`,
+                                        color: THEME.warning,
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        marginBottom: 24,
+                                        fontSize: 24
+                                    }}>
+                                        <ThunderboltOutlined />
+                                    </div>
+                                    <Title level={3} style={{ margin: '0 0 12px' }}>System Matrix</Title>
+                                    <Paragraph type="secondary" style={{ height: 48, fontSize: 14 }}>
+                                        Real-time telemetry, provider node health, and granular performance metrics.
+                                    </Paragraph>
+                                    <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Button type="primary" style={{ background: THEME.warning, border: 'none', borderRadius: 8 }}>
+                                            Launch Console
+                                        </Button>
+                                        <ArrowRightOutlined style={{ color: THEME.warning }} />
+                                    </div>
+                                </Card>
+                            </motion.div>
+                        </Col>
 
-                        <Card
-                            hoverable
-                            className="action-card"
-                            onClick={() => navigate('/analytics')}
-                            style={{ borderLeft: '4px solid #1677ff', borderRadius: 12 }}
-                            cover={
-                                <div style={{ padding: '24px 24px 0', fontSize: 32, color: '#1677ff' }}>
-                                    <LineChartOutlined />
-                                </div>
-                            }
-                        >
-                            <Title level={4}>UC2.2: Analytics</Title>
-                            <Text type="secondary">Generate comprehensive reports on user growth and POI engagement.</Text>
-                            <div style={{ marginTop: 16 }}>
-                                <Button type="link" style={{ padding: 0 }}>View Reports <ArrowRightOutlined /></Button>
-                            </div>
-                        </Card>
-                    </div>
+                        <Col xs={24} sm={12}>
+                            <motion.div variants={item} whileHover={{ y: -8 }} transition={{ type: 'spring', stiffness: 300 }}>
+                                <Card
+                                    hoverable
+                                    className="glass-card"
+                                    onClick={() => navigate('/analytics')}
+                                    style={{ borderRadius: 20, height: '100%' }}
+                                    bodyStyle={{ padding: '32px' }}
+                                >
+                                    <div style={{
+                                        width: 48,
+                                        height: 48,
+                                        borderRadius: 12,
+                                        background: `${THEME.primary}15`,
+                                        color: THEME.primary,
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        marginBottom: 24,
+                                        fontSize: 24
+                                    }}>
+                                        <GlobalOutlined />
+                                    </div>
+                                    <Title level={3} style={{ margin: '0 0 12px' }}>Analytics Core</Title>
+                                    <Paragraph type="secondary" style={{ height: 48, fontSize: 14 }}>
+                                        Deep-dive behavioral patterns, revenue trajectory, and asset engagement ranking.
+                                    </Paragraph>
+                                    <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Button type="primary" style={{ background: THEME.primary, border: 'none', borderRadius: 8 }}>
+                                            Open Insights
+                                        </Button>
+                                        <ArrowRightOutlined style={{ color: THEME.primary }} />
+                                    </div>
+                                </Card>
+                            </motion.div>
+                        </Col>
+                    </Row>
 
-                    <Card title="Engagement Overview" style={{ marginTop: 24, borderRadius: 12 }} variant="borderless">
-                        <Row gutter={16}>
-                            <Col span={12}>
-                                <Statistic title="Session Retention" value={92} suffix="%" styles={{ content: { color: '#52c41a' } }} />
-                                <div style={{ marginTop: 12 }}>
-                                    <Progress percent={92} size="small" strokeColor="#52c41a" />
-                                </div>
-                            </Col>
-                            <Col span={12}>
-                                <Statistic title="Peak Concurrency" value={8420} styles={{ content: { color: '#1677ff' } }} />
-                                <div style={{ marginTop: 12 }}>
-                                    <Progress percent={64} size="small" status="active" />
-                                </div>
-                            </Col>
-                        </Row>
-                    </Card>
+                    <motion.div variants={item} style={{ marginTop: 24 }}>
+                        <Card
+                            title={<Space><RocketOutlined style={{ color: THEME.primary }} /> Operational Overview</Space>}
+                            className="glass-card"
+                            bordered={false}
+                            bodyStyle={{ padding: '32px' }}
+                        >
+                            <Row gutter={[32, 24]}>
+                                <Col xs={24} sm={12}>
+                                    <div style={{ marginBottom: 20 }}>
+                                        <Statistic
+                                            title={<Text type="secondary" style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>Global Service Health</Text>}
+                                            value={healthPercent}
+                                            suffix="%"
+                                            valueStyle={{ fontWeight: 800, color: healthPercent > 90 ? THEME.success : THEME.warning }}
+                                        />
+                                        <Progress percent={healthPercent} size="small" strokeColor={healthPercent > 90 ? THEME.success : THEME.warning} showInfo={false} style={{ marginTop: 8 }} />
+                                    </div>
+                                    <Text type="secondary" size="small">Computed reliability across all {data?.services?.length || 0} active provider nodes.</Text>
+                                </Col>
+                                <Col xs={24} sm={12}>
+                                    <div style={{ marginBottom: 20 }}>
+                                        <Statistic
+                                            title={<Text type="secondary" style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>Average Latency</Text>}
+                                            value={avgLatency}
+                                            suffix="ms"
+                                            valueStyle={{ fontWeight: 800, color: avgLatency < 200 ? THEME.success : THEME.primary }}
+                                        />
+                                        <Progress percent={Math.min(100, (avgLatency / 1000) * 100)} strokeColor={avgLatency < 200 ? THEME.success : THEME.primary} size="small" showInfo={false} style={{ marginTop: 8 }} />
+                                    </div>
+                                    <Text type="secondary" size="small">Global average inter-service communication stable.</Text>
+                                </Col>
+                            </Row>
+                        </Card>
+                    </motion.div>
                 </Col>
 
-                <Col span={8}>
-                    <Card title="System Timeline" style={{ borderRadius: 12, height: '100%' }} variant="borderless">
-                        <Timeline
-                            items={[
-                                {
-                                    color: 'green',
+                <Col xs={24} lg={8}>
+                    <motion.div variants={item} style={{ height: '100%' }}>
+                        <Card
+                            title={<Space><NotificationOutlined style={{ color: THEME.primary }} /> Recent System Events</Space>}
+                            className="glass-card"
+                            bordered={false}
+                            style={{ height: '100%' }}
+                            bodyStyle={{ padding: '24px 24px 32px' }}
+                        >
+                            <Timeline
+                                mode="start"
+                                style={{ marginTop: 12 }}
+                                items={data?.logs?.slice(0, 5).map((log, idx) => ({
+                                    color: log.level === 'ERROR' ? THEME.error : log.level === 'WARN' ? THEME.warning : THEME.success,
+                                    icon: log.level === 'ERROR' ? <BugFilled style={{ fontSize: 14 }} /> :
+                                        log.level === 'WARN' ? <WarningFilled style={{ fontSize: 14 }} /> :
+                                            <CheckCircleFilled style={{ fontSize: 14 }} />,
                                     content: (
-                                        <>
-                                            <Text strong>UC2.1 Monitoring Active</Text>
-                                            <p style={{ fontSize: 12, color: 'gray' }}>Continuous health check enabled at 09:00 AM</p>
-                                        </>
-                                    ),
-                                },
-                                {
-                                    color: 'blue',
-                                    content: (
-                                        <>
-                                            <Text strong>UC2.2 Report Generated</Text>
-                                            <p style={{ fontSize: 12, color: 'gray' }}>Weekly POI analysis exported to PDF</p>
-                                        </>
-                                    ),
-                                },
-                                {
-                                    color: 'gold',
-                                    content: (
-                                        <>
-                                            <Text strong>Maintenance Warning</Text>
-                                            <p style={{ fontSize: 12, color: 'gray' }}>Database optimization scheduled for 02:00 AM</p>
-                                        </>
-                                    ),
-                                },
-                                {
-                                    color: 'red',
-                                    content: 'Critical: AI Service Outage Detected',
-                                },
-                            ]}
-                        />
-                    </Card>
+                                        <div style={{ marginBottom: 16 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                <Text strong style={{ fontSize: 13, display: 'block' }}>{log.message}</Text>
+                                            </div>
+                                            <Tag bordered={false} style={{ marginTop: 6, fontSize: 10, background: 'rgba(0,0,0,0.03)' }}>
+                                                {dayjs(log.timestamp).format('HH:mm:ss')}
+                                            </Tag>
+                                        </div>
+                                    )
+                                })) || [
+                                        { color: 'gray', content: <Text type="secondary">Waiting for events...</Text> }
+                                    ]}
+                            />
+                            {data?.logs?.length > 5 && (
+                                <Button
+                                    type="link"
+                                    onClick={() => navigate('/monitoring')}
+                                    style={{ padding: 0, marginTop: 8, fontSize: 12 }}
+                                >
+                                    View all activity <ArrowRightOutlined style={{ fontSize: 10 }} />
+                                </Button>
+                            )}
+                        </Card>
+                    </motion.div>
                 </Col>
             </Row>
         </motion.div>
