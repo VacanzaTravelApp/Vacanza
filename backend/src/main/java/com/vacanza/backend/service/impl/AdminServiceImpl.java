@@ -78,21 +78,39 @@ public class AdminServiceImpl implements AdminService {
         // Baseline: The Spring Boot application must be up.
         boolean systemUp = healthEndpoint.health().getStatus().equals(Status.UP);
 
+        // Core Internal Services
         services.add(ServiceStatus.builder()
                 .name("Auth Service").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /auth")).build());
         services.add(ServiceStatus.builder()
                 .name("User Service").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /user")).build());
         services.add(ServiceStatus.builder()
                 .name("Gamification Engine").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /gamification")).build());
-        
+
+        // External Data Providers (Third-Party)
         services.add(ServiceStatus.builder()
-                .name("POI / Maps API").status(determineComponentHealth(systemUp, apiMetrics, "Mapbox", "Foursquare", "Internal: /poi")).build());
+                .name("Maps & Geocoding (Mapbox)").status(determineComponentHealth(systemUp, apiMetrics, "Mapbox")).build());
         services.add(ServiceStatus.builder()
-                .name("Booking System").status(determineComponentHealth(systemUp, apiMetrics, "SerpApi", "Ticketmaster", "Viator", "Internal: /booking")).build());
+                .name("Local Places (Foursquare)").status(determineComponentHealth(systemUp, apiMetrics, "Foursquare")).build());
         services.add(ServiceStatus.builder()
-                .name("AI Recommendation API").status(determineComponentHealth(systemUp, apiMetrics, "AI")).build());
+                .name("Hotel Search (SerpApi)").status(determineComponentHealth(systemUp, apiMetrics, "SerpApi")).build());
         services.add(ServiceStatus.builder()
-                .name("Utility Services (Currency/Weather)").status(determineComponentHealth(systemUp, apiMetrics, "Frankfurter", "OpenMeteo", "Internal: /currency", "Internal: /weather")).build());
+                .name("Events (Ticketmaster)").status(determineComponentHealth(systemUp, apiMetrics, "Ticketmaster")).build());
+        services.add(ServiceStatus.builder()
+                .name("Tours/Activities (Viator)").status(determineComponentHealth(systemUp, apiMetrics, "Viator")).build());
+        services.add(ServiceStatus.builder()
+                .name("Currency Exchange (Frankfurter)").status(determineComponentHealth(systemUp, apiMetrics, "Frankfurter")).build());
+        services.add(ServiceStatus.builder()
+                .name("Weather Service (OpenMeteo)").status(determineComponentHealth(systemUp, apiMetrics, "OpenMeteo")).build());
+
+        // Advanced Logic Components
+        services.add(ServiceStatus.builder()
+                .name("AI Recommendation Engine").status(determineComponentHealth(systemUp, apiMetrics, "AI")).build());
+
+        // Internal Endpoint Health
+        services.add(ServiceStatus.builder()
+                .name("Internal: Booking Controllers").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /booking")).build());
+        services.add(ServiceStatus.builder()
+                .name("Internal: POI Controllers").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /poi")).build());
 
         return services;
     }
