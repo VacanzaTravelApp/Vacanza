@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+
 import '../../data/repositories/booking_repository.dart';
 import '../cubit/booking_cubit.dart';
 import '../cubit/booking_state.dart';
@@ -42,12 +44,15 @@ class BookingBottomSheet extends StatelessWidget {
         maxChildSize: 0.85,
         expand: false,
         builder: (context, scrollController) {
+          final t = context.vacanzaTokens;
+          final cs = Theme.of(context).colorScheme;
           return Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.95),
+              color: cs.surface.withValues(alpha: 0.98),
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(_sheetRadius),
               ),
+              border: Border.all(color: t.cardBorder.withValues(alpha: 0.6)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.15),
@@ -69,7 +74,7 @@ class BookingBottomSheet extends StatelessWidget {
                         width: _handleWidth,
                         height: _handleHeight,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300.withValues(alpha: 0.5),
+                          color: cs.outline.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(100),
                         ),
                       ),
@@ -80,7 +85,7 @@ class BookingBottomSheet extends StatelessWidget {
                 // ─── Header ──────────────────────────────────────
                 _SheetHeader(onClose: () => Navigator.of(context).pop()),
 
-                const Divider(height: 1, thickness: 0.5),
+                Divider(height: 1, thickness: 0.5, color: cs.outline.withValues(alpha: 0.35)),
 
                 // ─── State-driven body ───────────────────────────
                 Expanded(
@@ -146,6 +151,7 @@ class _SheetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
@@ -172,13 +178,13 @@ class _SheetHeader extends StatelessWidget {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF2F2F2),
+                          color: cs.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(100),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.chevron_left_rounded,
                           size: 24,
-                          color: Color(0xFF666666),
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -186,10 +192,10 @@ class _SheetHeader extends StatelessWidget {
                   ],
                   Text(
                     _headerTitle(state),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                      color: cs.onSurface,
                     ),
                   ),
                 ],
@@ -202,13 +208,13 @@ class _SheetHeader extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F2),
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Icon(
                 Icons.close,
                 size: 20,
-                color: Colors.grey.shade500,
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -240,14 +246,15 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       children: [
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFFEF2F2),
-            border: Border.all(color: const Color(0xFFFECACA)),
+            color: cs.errorContainer.withValues(alpha: 0.65),
+            border: Border.all(color: cs.error.withValues(alpha: 0.35)),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -256,15 +263,15 @@ class _ErrorView extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEE2E2),
+                  color: cs.error.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(100),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     '!',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFEF4444),
+                      color: cs.error,
                     ),
                   ),
                 ),
@@ -274,20 +281,20 @@ class _ErrorView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Unable to load results',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF7F1D1D),
+                        color: cs.onErrorContainer,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       message,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFFB91C1C),
+                        color: cs.onErrorContainer.withValues(alpha: 0.9),
                       ),
                     ),
                   ],
@@ -295,12 +302,12 @@ class _ErrorView extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: onRetry,
-                child: const Text(
+                child: Text(
                   'Retry',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFDC2626),
+                    color: cs.error,
                   ),
                 ),
               ),
