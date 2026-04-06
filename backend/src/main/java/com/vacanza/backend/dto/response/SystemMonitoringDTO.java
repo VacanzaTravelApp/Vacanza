@@ -57,6 +57,7 @@ public class SystemMonitoringDTO {
         private String apiName;         // e.g. "Ticketmaster", "SerpApi"
         private long totalCalls;        // total API calls today
         private long errorCount;        // 4xx + 5xx responses today
+        private long consecutiveErrors; // current streak of consecutive errors
         private double avgResponseMs;   // average response time in ms
     }
 

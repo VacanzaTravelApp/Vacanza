@@ -1,6 +1,7 @@
 package com.vacanza.backend.service.impl;
 
 import com.vacanza.backend.component.ApiMetricsCollector;
+import com.vacanza.backend.component.SystemLogCollector;
 import com.vacanza.backend.dto.response.AdminAnalyticsDTO;
 import com.vacanza.backend.dto.response.AdminAnalyticsDTO.*;
 import com.vacanza.backend.dto.response.SystemMonitoringDTO;
@@ -37,6 +38,7 @@ public class AdminServiceImpl implements AdminService {
     private final CheckInRepository checkInRepository;
     private final UserLoginHistoryRepository loginHistoryRepository;
     private final ApiMetricsCollector apiMetricsCollector;
+    private final SystemLogCollector systemLogCollector;
     private final HealthEndpoint healthEndpoint;
 
     // ── UC2.1: System Monitoring ────────────────────────────────
@@ -45,18 +47,19 @@ public class AdminServiceImpl implements AdminService {
     public SystemMonitoringDTO getSystemMonitoring() {
         log.info("Fetching system monitoring data");
 
-        // Service statuses from Actuator health
-        List<ServiceStatus> services = buildServiceStatuses();
+        // API usage metrics
+        List<ApiUsageMetric> apiMetrics = apiMetricsCollector.getMetrics();
 
-        // Calculate overall health score
+        // Service statuses derived from Actuator health and live API performance
+        List<ServiceStatus> services = buildServiceStatuses(apiMetrics);
+
+        // Calculate overall health score based on derived microservice statuses
+
         long upCount = services.stream()
                 .filter(s -> "UP".equals(s.getStatus()))
                 .count();
         double systemHealth = services.isEmpty() ? 0.0
                 : Math.round(((double) upCount / services.size()) * 100.0) / 100.0;
-
-        // API usage metrics
-        List<ApiUsageMetric> apiMetrics = apiMetricsCollector.getMetrics();
 
         // Recent logs from login history
         List<LogEntry> logs = buildRecentLogs();
@@ -69,31 +72,49 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    private List<ServiceStatus> buildServiceStatuses() {
+    private List<ServiceStatus> buildServiceStatuses(List<ApiUsageMetric> apiMetrics) {
         List<ServiceStatus> services = new ArrayList<>();
 
-        // Check overall system health from Actuator
+        // Baseline: The Spring Boot application must be up.
         boolean systemUp = healthEndpoint.health().getStatus().equals(Status.UP);
 
-        // We define our known services and derive their status
         services.add(ServiceStatus.builder()
-                .name("Auth Service").status(systemUp ? "UP" : "DOWN").build());
+                .name("Auth Service").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /auth")).build());
         services.add(ServiceStatus.builder()
-                .name("User Service").status(systemUp ? "UP" : "DOWN").build());
+                .name("User Service").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /user")).build());
         services.add(ServiceStatus.builder()
-                .name("Gamification Engine").status(systemUp ? "UP" : "DOWN").build());
+                .name("Gamification Engine").status(determineComponentHealth(systemUp, apiMetrics, "Internal: /gamification")).build());
+        
         services.add(ServiceStatus.builder()
-                .name("POI / Maps API").status(systemUp ? "UP" : "DOWN").build());
+                .name("POI / Maps API").status(determineComponentHealth(systemUp, apiMetrics, "Mapbox", "Foursquare", "Internal: /poi")).build());
         services.add(ServiceStatus.builder()
-                .name("Booking System").status(systemUp ? "UP" : "DOWN").build());
+                .name("Booking System").status(determineComponentHealth(systemUp, apiMetrics, "SerpApi", "Ticketmaster", "Viator", "Internal: /booking")).build());
         services.add(ServiceStatus.builder()
-                .name("AI Recommendation API").status(systemUp ? "UP" : "DOWN").build());
+                .name("AI Recommendation API").status(determineComponentHealth(systemUp, apiMetrics, "AI")).build());
 
         return services;
     }
 
+    private String determineComponentHealth(boolean systemUp, List<ApiUsageMetric> metrics, String... relatedApiNames) {
+        if (!systemUp) return "DOWN";
+        
+        for (ApiUsageMetric m : metrics) {
+            for (String key : relatedApiNames) {
+                if (m.getApiName() != null && m.getApiName().toLowerCase().contains(key.toLowerCase())) {
+                    // Circuit Breaker logic: If an API fails 3 times in a row, the component is down.
+                    // The moment it successfully responds once, it immediately returns to UP.
+                    if (m.getConsecutiveErrors() >= 3) {
+                        return "DOWN";
+                    }
+                }
+            }
+        }
+        
+        return "UP";
+    }
+
     private List<LogEntry> buildRecentLogs() {
-        return loginHistoryRepository.findTop50ByOrderByLoginTimeDesc().stream()
+        List<LogEntry> loginLogs = loginHistoryRepository.findTop50ByOrderByLoginTimeDesc().stream()
                 .map(lh -> LogEntry.builder()
                         .timestamp(lh.getLoginTime().toString())
                         .level("INFO")
@@ -102,6 +123,24 @@ public class AdminServiceImpl implements AdminService {
                         .source("AUTH")
                         .build())
                 .collect(Collectors.toList());
+
+        List<LogEntry> systemLogs = systemLogCollector.getRecentLogs();
+
+        List<LogEntry> allLogs = new ArrayList<>();
+        allLogs.addAll(loginLogs);
+        allLogs.addAll(systemLogs);
+
+        allLogs.sort((l1, l2) -> {
+            try {
+                Instant t1 = Instant.parse(l1.getTimestamp());
+                Instant t2 = Instant.parse(l2.getTimestamp());
+                return t2.compareTo(t1);
+            } catch (Exception e) {
+                return 0;
+            }
+        });
+
+        return allLogs.stream().limit(50).collect(Collectors.toList());
     }
 
     // ── UC2.2: Analytics Report ─────────────────────────────────
