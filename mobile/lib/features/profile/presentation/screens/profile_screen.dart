@@ -108,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       },
       child: Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
@@ -152,9 +152,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
                         'Profile: $msg',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFFB00020),
+                          color: Theme.of(context).colorScheme.error,
                         ),
                       ),
                     );
@@ -168,9 +168,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(
                         '$name · ${p.email}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF2C3E50),
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     );
@@ -250,12 +250,12 @@ class _ProfileHeaderSection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'Profile',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF2C3E50),
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],
@@ -420,7 +420,9 @@ class _TravelPreferencesCard extends StatelessWidget {
                       Icon(
                         is404 ? Icons.info_outline : Icons.error_outline,
                         size: 20,
-                        color: is404 ? ProfileUIColors.profileGray500 : const Color(0xFFB00020),
+                        color: is404
+                            ? ProfileUIColors.profileGray500
+                            : Theme.of(context).colorScheme.error,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -428,7 +430,9 @@ class _TravelPreferencesCard extends StatelessWidget {
                           msg,
                           style: TextStyle(
                             fontSize: 14,
-                            color: is404 ? ProfileUIColors.profileGray500 : const Color(0xFFB00020),
+                            color: is404
+                                ? ProfileUIColors.profileGray500
+                                : Theme.of(context).colorScheme.error,
                           ),
                         ),
                       ),
@@ -660,12 +664,19 @@ class _TravelStatisticsCard extends StatelessWidget {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    const Icon(Icons.error_outline, size: 20, color: Color(0xFFB00020)),
+                    Icon(
+                      Icons.error_outline,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         msg,
-                        style: const TextStyle(fontSize: 14, color: Color(0xFFB00020)),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
                     TextButton(
@@ -954,12 +965,19 @@ class _CheckInHistoryCard extends StatelessWidget {
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    const Icon(Icons.error_outline, size: 20, color: Color(0xFFB00020)),
+                    Icon(
+                      Icons.error_outline,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         msg,
-                        style: const TextStyle(fontSize: 14, color: Color(0xFFB00020)),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ),
                     TextButton(
@@ -1186,10 +1204,10 @@ class _SectionCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF2C3E50),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
