@@ -7,6 +7,7 @@ import com.vacanza.backend.dto.response.AdminAnalyticsDTO.*;
 import com.vacanza.backend.dto.response.SystemMonitoringDTO;
 import com.vacanza.backend.dto.response.SystemMonitoringDTO.*;
 import com.vacanza.backend.repo.CheckInRepository;
+import com.vacanza.backend.repo.PointOfInterestRepository;
 import com.vacanza.backend.repo.UserLoginHistoryRepository;
 import com.vacanza.backend.repo.UserRepository;
 import com.vacanza.backend.service.AdminService;
@@ -37,6 +38,7 @@ public class AdminServiceImpl implements AdminService {
     private final UserRepository userRepository;
     private final CheckInRepository checkInRepository;
     private final UserLoginHistoryRepository loginHistoryRepository;
+    private final PointOfInterestRepository poiRepository;
     private final ApiMetricsCollector apiMetricsCollector;
     private final SystemLogCollector systemLogCollector;
     private final HealthEndpoint healthEndpoint;
@@ -169,31 +171,34 @@ public class AdminServiceImpl implements AdminService {
     public AdminAnalyticsDTO getAnalytics(LocalDate startDate, LocalDate endDate) {
         log.info("Fetching analytics report: startDate={}, endDate={}", startDate, endDate);
 
-        // Total users
-        long totalUsers = userRepository.count();
+        // Matrix Users: Total users in range (or total users as a baseline)
+        long matrixUsers = userRepository.count();
 
-        // Active sessions (logins within last 30 minutes)
-        long activeSessions = loginHistoryRepository
-                .countByLoginTimeAfter(Instant.now().minus(Duration.ofMinutes(30)));
+        // Global Revenue: Placeholder for actual booking financial volume
+        // Since we don't have a 'confirmed_bookings' table yet, we return 0.0 or a safe mock.
+        double globalRevenue = 0.0;
 
-        // Total check-ins
-        long totalCheckins = checkInRepository.count();
+        // Active Nodes: Total POIs in the database
+        long activeNodes = poiRepository.count();
 
-        // Growth trends (last 6 months)
-        List<GrowthMetric> growthTrends = buildGrowthTrends();
+        // Avg. Duration: Mocking average session duration (e.g. 1.5 hours)
+        double avgDuration = 1.5;
 
-        // Category distribution
-        List<CategoryMetric> categoryDist = checkInRepository.findCategoryDistribution().stream()
+        // Growth Trajectory (last 6 months)
+        List<GrowthMetric> growthTrajectory = buildGrowthTrends();
+
+        // Category Breakdown
+        List<CategoryMetric> categoryBreakdown = checkInRepository.findCategoryDistribution().stream()
                 .map(row -> CategoryMetric.builder()
                         .category((String) row[0])
                         .count((Long) row[1])
                         .build())
                 .collect(Collectors.toList());
 
-        // Top POIs (limit to 10)
-        List<TopPoiMetric> topPois = checkInRepository.findTopPois().stream()
+        // High Performance Asset Ranking (Top POIs)
+        List<HighPerformanceAssetMetric> highPerformanceAssets = checkInRepository.findTopPois().stream()
                 .limit(10)
-                .map(row -> TopPoiMetric.builder()
+                .map(row -> HighPerformanceAssetMetric.builder()
                         .name((String) row[0])
                         .category((String) row[1])
                         .visitCount((Long) row[2])
@@ -201,12 +206,13 @@ public class AdminServiceImpl implements AdminService {
                 .collect(Collectors.toList());
 
         return AdminAnalyticsDTO.builder()
-                .totalUsers(totalUsers)
-                .activeSessions(activeSessions)
-                .totalCheckins(totalCheckins)
-                .growthTrends(growthTrends)
-                .categoryDistribution(categoryDist)
-                .topPois(topPois)
+                .matrixUsers(matrixUsers)
+                .globalRevenue(globalRevenue)
+                .activeNodes(activeNodes)
+                .avgDuration(avgDuration)
+                .growthTrajectory(growthTrajectory)
+                .categoryBreakdown(categoryBreakdown)
+                .highPerformanceAssets(highPerformanceAssets)
                 .build();
     }
 

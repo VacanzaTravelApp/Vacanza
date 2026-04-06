@@ -17,12 +17,13 @@ import java.util.List;
 @Builder
 public class AdminAnalyticsDTO {
 
-    private long totalUsers;
-    private long activeSessions;
-    private long totalCheckins;
-    private List<GrowthMetric> growthTrends;
-    private List<CategoryMetric> categoryDistribution;
-    private List<TopPoiMetric> topPois;
+    private long matrixUsers;
+    private double globalRevenue;
+    private long activeNodes;
+    private double avgDuration;
+    private List<GrowthMetric> growthTrajectory;
+    private List<CategoryMetric> categoryBreakdown;
+    private List<HighPerformanceAssetMetric> highPerformanceAssets;
 
     // ── Inner DTOs ──────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ public class AdminAnalyticsDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
-    public static class TopPoiMetric {
+    public static class HighPerformanceAssetMetric {
         private String name;
         private String category;
         private long visitCount;
