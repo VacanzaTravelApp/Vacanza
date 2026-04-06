@@ -46,4 +46,21 @@ abstract final class AppTheme {
 extension VacanzaTokensX on BuildContext {
   VacanzaTokens get vacanzaTokens =>
       Theme.of(this).extension<VacanzaTokens>() ?? VacanzaTokens.light;
+
+  /// Harita rozetleri / aktif action: sabah web coral (AI pill), gece mavi.
+  Color get mapControlAccent {
+    final t = vacanzaTokens;
+    return Theme.of(this).brightness == Brightness.light
+        ? t.vividCoral
+        : t.vividBlue;
+  }
+
+  /// [ActionIconButton] `isActive` (kalem/3D) ile aynı doğrusal gradyan uçları.
+  List<Color> get mapControlActiveGradientColors {
+    final vivid = mapControlAccent;
+    final vividHi = Theme.of(this).brightness == Brightness.light
+        ? const Color(0xFFEE5253)
+        : Color.lerp(vivid, Colors.white, 0.15)!;
+    return <Color>[vivid, vividHi];
+  }
 }
