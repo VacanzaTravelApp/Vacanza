@@ -787,3 +787,52 @@
     display: block;
     stroke-width: 2.5px;
 }
+
+/* 6. Standard Mapbox Control Refinements */
+.mapboxgl-ctrl-bottom-left {
+    bottom: 24px !important;
+    left: 24px !important;
+    z-index: 1000 !important;
+}
+
+/* Hide Compass */
+.mapboxgl-ctrl-compass {
+    display: none !important;
+}
+
+/* Custom premium look for standard buttons */
+.mapboxgl-ctrl-group {
+    background: var(--card-bg) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid var(--card-border) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin-bottom: 8px !important;
+}
+
+.mapboxgl-ctrl-group button {
+    width: 28px !important;
+    height: 28px !important;
+    background-color: transparent !important;
+    border: none !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+    background-color: rgba(var(--vivid-coral-rgb, 255,107,107), 0.08) !important;
+}
+
+/* Disable buttons at zoom limits */
+.zoom-at-max .mapboxgl-ctrl-zoom-in,
+.zoom-at-min .mapboxgl-ctrl-zoom-out {
+    opacity: 0.25 !important;
+    pointer-events: none !important;
+    filter: grayscale(1);
+}
+
+/* Globe View Fix: Sometimes Mapbox needs background for better contrast */
+.vivid-map-page.theme-night .mapboxgl-map {
+    background-color: #06080b !important;
+}

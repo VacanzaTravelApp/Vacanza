@@ -460,6 +460,13 @@ function ensureMapbox3D(map, enabled) {
     if (map.getSource(id)) map.removeSource(id);
   };
 
+  // Force globe projection EARLY and ALWAYS
+  try {
+    map.setProjection("globe");
+  } catch (e) {
+    // ignore
+  }
+
   if (!enabled) {
     try {
       map.setTerrain(null);
@@ -1282,6 +1289,19 @@ export default function MapPage() {
     if (map) {
       ensureMapbox3D(map, is3D);
       hideTrafficLayers(map);
+      try {
+        map.setProjection("globe");
+        map.setFog({ "horizon-blend": 0.1, "space-color": "#000000", "star-intensity": 0.0 });
+      } catch (err) {
+        // ignore
+      }
+      
+      // Secondary delay ensures projection sticks for styles that might override it
+      setTimeout(() => {
+        try {
+          if (map) map.setProjection("globe");
+        } catch(e) {}
+      }, 500);
     }
   }, [is3D]);
 
@@ -1290,12 +1310,36 @@ export default function MapPage() {
     if (map) {
       ensureMapbox3D(map, is3D);
       hideTrafficLayers(map);
+      
+      // Force Globe forcefully
+      try {
+        map.setProjection({ name: "globe" });
+        map.setFog({
+          "horizon-blend": 0.1,
+          "space-color": "#000000",
+          "star-intensity": 0.1,
+        });
+      } catch (err) {
+        // ignore
+      }
+
+      // Reinforce after style data settle
+      setTimeout(() => {
+        try {
+          if (map) {
+             map.setProjection({ name: "globe" });
+          }
+        } catch(e) {}
+      }, 300);
     }
   }, [is3D]);
 
   // POI'ler: polygon içi filtre + UI filtre
   // Combined POI list (Backend + Mapbox Discoveries)
   const pois = useMemo(() => {
+    // 1. Performance Rule: Hide POIs at low zoom levels to prevent clutter
+    if (viewState.zoom <= 10) return [];
+
     const all = [...poisRaw];
     const poiCoords = new Set(poisRaw.map(p => `${p.latitude?.toFixed(4)},${p.longitude?.toFixed(4)}`));
 
@@ -1322,12 +1366,15 @@ export default function MapPage() {
 
     const activeKeys = new Set(UI_CATEGORIES.filter((c) => selectedCats[c.key]).map((c) => c.key));
 
-    return list.filter((p) => {
+    const out = list.filter((p) => {
       const icon = poiIconByCategory(p.category);
       if (!icon) return true;
       return activeKeys.has(icon.uiKey);
     });
-  }, [poisRaw, mapboxPois, mode, selection, selectedCats]);
+
+    // 2. Performance Rule: Cap at 1000 POIs to prevent memory bloating
+    return out.slice(0, 1000);
+  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom]);
 
   const resultsPois = useMemo(() => {
     if (!resultsOpen) return [];
@@ -1630,7 +1677,7 @@ export default function MapPage() {
       </aside>
 
       {/* 3. Main Content (MAP) */}
-      <main className="map-layout-content">
+      <main className={`map-layout-content ${viewState.zoom >= 20 ? "zoom-at-max" : viewState.zoom <= 1.5 ? "zoom-at-min" : ""}`}>
         <Map
           ref={mapRef}
           {...viewState}
@@ -1644,12 +1691,16 @@ export default function MapPage() {
           onMouseUp={onMouseUpFreehand}
           onLoad={onMapLoad}
           onStyleData={onStyleData}
+          projection="globe"
+          renderWorldCopies={false}
           style={{ width: "100%", height: "100%" }}
           dragPan={!freehandEnabled}
           cursor={freehandEnabled ? "crosshair" : "grab"}
           attributionControl={false}
+          minZoom={1.5}
+          maxZoom={20}
         >
-          <NavigationControl position="bottom-left" />
+          <NavigationControl position="bottom-left" showCompass={false} />
           <GeolocateControl position="bottom-left" />
 
           <Source id="selection-src" type="geojson" data={selectionGeoJSON}>
