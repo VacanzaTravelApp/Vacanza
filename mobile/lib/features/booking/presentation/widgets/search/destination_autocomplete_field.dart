@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 import '../../../data/models/destination_autocomplete_slot.dart';
 import '../../../data/models/destination_suggestion.dart';
@@ -35,7 +36,6 @@ class DestinationAutocompleteField extends StatefulWidget {
 
 class _DestinationAutocompleteFieldState extends State<DestinationAutocompleteField>
     with WidgetsBindingObserver {
-  static const _accent = Color(0xFF0096FF);
   static const _debounceMs = 400;
 
   final FocusNode _focus = FocusNode();
@@ -168,6 +168,8 @@ class _DestinationAutocompleteFieldState extends State<DestinationAutocompleteFi
       },
       child: BlocBuilder<BookingCubit, BookingState>(
         builder: (context, state) {
+          final cs = Theme.of(context).colorScheme;
+          final accent = context.mapControlAccent;
           final slot = state is BookingSearch ? state.hotelDestination : null;
 
           Widget? panel;
@@ -186,7 +188,7 @@ class _DestinationAutocompleteFieldState extends State<DestinationAutocompleteFi
                   padding: const EdgeInsets.only(left: 4, bottom: 4),
                   child: Text(
                     widget.label,
-                    style: BookingSearchFieldStyles.fieldLabel,
+                    style: BookingSearchFieldStyles.fieldLabel(context),
                   ),
                 ),
                 TextField(
@@ -194,40 +196,44 @@ class _DestinationAutocompleteFieldState extends State<DestinationAutocompleteFi
                   focusNode: _focus,
                   scrollPadding: bookingFieldScrollPadding(context),
                   textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF1A1A1A),
+                    color: cs.onSurface,
                   ),
                   decoration: InputDecoration(
                     hintText: widget.placeholder,
-                    hintStyle: const TextStyle(
-                      color: Color(0xFFBBBBBB),
+                    hintStyle: TextStyle(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.85),
                       fontWeight: FontWeight.w400,
                     ),
                     prefixIcon: Icon(
                       widget.icon,
                       size: 20,
-                      color: const Color(0xFFAAAAAA),
+                      color: cs.onSurfaceVariant,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFFAFAFA),
+                    fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 14,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                      borderSide: BorderSide(
+                        color: cs.outline.withValues(alpha: 0.35),
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                      borderSide: BorderSide(
+                        color: cs.outline.withValues(alpha: 0.35),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _accent,
+                      borderSide: BorderSide(
+                        color: accent,
                         width: 1.5,
                       ),
                     ),
@@ -248,9 +254,9 @@ class _DestinationAutocompleteFieldState extends State<DestinationAutocompleteFi
                     padding: const EdgeInsets.only(top: 6, left: 4),
                     child: Text(
                       slot.suggestionError!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFFB00020),
+                        color: cs.error,
                       ),
                     ),
                   ),
