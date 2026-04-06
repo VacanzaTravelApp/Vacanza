@@ -149,6 +149,7 @@ class PoiCategoryCatalog {
       iconData: Icons.account_balance_rounded,
       aliases: <String>[
         'monument',
+        'monuments',
         'memorial',
         'castle',
         'fort',
