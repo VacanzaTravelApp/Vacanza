@@ -40,6 +40,7 @@ class ArPoiSourceFromPoiSearch implements ArPoiSource {
     final out = <ArPoi>[];
 
     for (final poi in res.pois) {
+      if (!poi.isEligibleForBackendCheckin) continue;
       final d = distanceMeters(
         lat1: lat,
         lng1: lng,

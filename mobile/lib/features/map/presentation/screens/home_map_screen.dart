@@ -23,8 +23,10 @@ import '../../../gamification/presentation/cubit/gamification_cubit.dart';
 import '../../../poi_search/data/api/poi_search_api_client.dart';
 import '../../../poi_search/data/models/area_source.dart';
 import '../../../poi_search/data/models/selected_area.dart';
+import '../../../poi_search/data/repositories/composite_poi_search_repository.dart';
 import '../../../poi_search/data/repositories/poi_search_repository.dart';
 import '../../../poi_search/data/repositories/poi_search_repository_impl.dart';
+import '../../../poi_search/data/services/style_poi_discovery_binding.dart';
 import '../../../poi_search/presentation/bloc/area_query_bloc.dart';
 import '../../../poi_search/presentation/bloc/area_query_event.dart' as aq;
 import '../../../poi_search/presentation/bloc/area_query_state.dart';
@@ -54,8 +56,14 @@ class HomeMapScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
+        RepositoryProvider<StylePoiDiscoveryBinding>(
+          create: (_) => StylePoiDiscoveryBinding(),
+        ),
         RepositoryProvider<PoiSearchRepository>(
-          create: (ctx) => PoiSearchRepositoryImpl(ctx.read<PoiSearchApiClient>()),
+          create: (ctx) => CompositePoiSearchRepository(
+            backend: PoiSearchRepositoryImpl(ctx.read<PoiSearchApiClient>()),
+            styleBinding: ctx.read<StylePoiDiscoveryBinding>(),
+          ),
         ),
         RepositoryProvider<LocationService>(create: (_) => LocationService()),
         RepositoryProvider<CheckinApiClient>(create: (ctx) => CheckinApiClient(ctx.read<Dio>())),
