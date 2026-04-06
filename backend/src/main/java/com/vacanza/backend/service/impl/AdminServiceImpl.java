@@ -91,6 +91,8 @@ public class AdminServiceImpl implements AdminService {
                 .name("Booking System").status(determineComponentHealth(systemUp, apiMetrics, "SerpApi", "Ticketmaster", "Viator", "Internal: /booking")).build());
         services.add(ServiceStatus.builder()
                 .name("AI Recommendation API").status(determineComponentHealth(systemUp, apiMetrics, "AI")).build());
+        services.add(ServiceStatus.builder()
+                .name("Utility Services (Currency/Weather)").status(determineComponentHealth(systemUp, apiMetrics, "Frankfurter", "OpenMeteo", "Internal: /currency", "Internal: /weather")).build());
 
         return services;
     }
