@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
 
+import 'package:mobile/core/theme/app_theme.dart';
 import '../../../../../poi_search/data/models/geo_point.dart';
 import '../../../../../poi_search/data/models/selected_area.dart';
 import 'freehand_painter.dart';
@@ -86,6 +87,26 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
         ? _drawingScreenPath
         : (showSelectionPath ? _selectionScreenPath : const <Offset>[]);
 
+    final t = context.vacanzaTokens;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    // Gündüz: sıcak mercan–amber–pembe; gece: koyu mavi → gök mavi → indigo/mor
+    final strokeStops = isLight
+        ? <Color>[
+            t.vividCoral,
+            t.vividAmber,
+            const Color(0xFFFF8C42),
+            const Color(0xFFFFAB91),
+            const Color(0xFFF472B6),
+          ]
+        : <Color>[
+            const Color(0xFF0F172A),
+            const Color(0xFF1E3A8A),
+            const Color(0xFF2563EB),
+            t.vividBlue,
+            const Color(0xFF4F46E5),
+            const Color(0xFF7C3AED),
+          ];
+
     return Positioned.fill(
       child: Stack(
         children: [
@@ -94,7 +115,10 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
             child: IgnorePointer(
               ignoring: true,
               child: CustomPaint(
-                painter: FreehandPainter(List<Offset>.of(pathToDraw)),
+                painter: FreehandPainter(
+                  List<Offset>.of(pathToDraw),
+                  strokeStops: strokeStops,
+                ),
               ),
             ),
           ),
