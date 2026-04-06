@@ -49,3 +49,20 @@ export function useUserCheckins() {
         enabled: isReady,
     });
 }
+
+export function useProfilePhoto(hasPhoto) {
+    const isReady = useAuthReady();
+    return useQuery({
+        queryKey: ["user", "photo"],
+        queryFn: async () => {
+            const blob = await userApi.getProfilePhoto();
+            if (!blob || blob.size === 0) return null;
+            return URL.createObjectURL(blob);
+        },
+        enabled: isReady && !!hasPhoto,
+        staleTime: 1000 * 60 * 60, // 1 hour
+        gcTime: 1000 * 60 * 60 * 2, // 2 hours
+    });
+}
+
+

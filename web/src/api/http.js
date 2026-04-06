@@ -68,7 +68,12 @@ http.interceptors.response.use(
       error.friendlyMessage = message || "Invalid request. Please check your input.";
     } else if (status === 409) {
       error.friendlyMessage = message || "This email is already registered.";
+    } else if (status === 502) {
+      error.friendlyMessage = "Search service is temporarily unavailable. Please try again later.";
+    } else if (status === 503) {
+      error.friendlyMessage = "Rate limit exceeded. Please wait a moment before trying again.";
     }
+
 
     return Promise.reject(error);
   }

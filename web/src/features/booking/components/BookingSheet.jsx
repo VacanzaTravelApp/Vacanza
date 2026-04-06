@@ -6,11 +6,20 @@ import '../styles/bookingSheet.css';
 
 const formatFriendlyDate = (dateStr) => {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${days[d.getDay()]}`;
+  try {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+
+  } catch (err) {
+    return dateStr;
+  }
 };
+
 
 const formatTime = (timeStr) => {
   if (!timeStr) return '--:--';
@@ -30,8 +39,11 @@ const formatDateShort = (dateStr) => {
 
 export default function BookingSheet({ open, onClose }) {
   const [state, dispatch] = useReducer(bookingReducer, initialState);
-  const [airportResults, setAirportResults] = useState([]);
+  const [originResults, setOriginResults] = useState([]);
+  const [destResults, setDestResults] = useState([]);
   const [activeSearchField, setActiveSearchField] = useState(null);
+
+
   const [searchQuery, setSearchQuery] = useState("");
   const [originLabel, setOriginLabel] = useState("");
   const [destLabel, setDestLabel] = useState("");
@@ -47,7 +59,8 @@ export default function BookingSheet({ open, onClose }) {
   useEffect(() => {
     if (!open) {
       dispatch({ type: "RESET_STATE" });
-      setAirportResults([]);
+      setOriginResults([]);
+      setDestResults([]);
       setActiveSearchField(null);
       setSearchQuery("");
       setOriginLabel("");
@@ -56,51 +69,78 @@ export default function BookingSheet({ open, onClose }) {
     }
   }, [open]);
 
+  // Clear local input labels/queries when switching between Hotels/Flights
   useEffect(() => {
-    const delayDebounce = setTimeout(async () => {
-      const q = searchQuery.trim();
-      const shouldSearch = q.length >= 2 &&
-        (activeSearchField === 'origin' || activeSearchField === 'destination') &&
-        isTypingRef.current &&
-        state.bookingType !== 'hotels';
+    setSearchQuery("");
+    setOriginLabel("");
+    setDestLabel("");
+    setOriginResults([]);
+    setDestResults([]);
+    setIsSearching(false);
+  }, [state.bookingType]);
 
-      if (shouldSearch) {
-        setIsSearching(true);
-        let results = [];
-        try {
-          const airportReq = searchAirports(q);
-          if (state.bookingType === 'hotels') {
-            const [airports, dests] = await Promise.all([
-              airportReq,
-              searchDestinations(q)
-            ]);
-            results = [...(dests || []), ...(airports || [])];
-          } else {
-            results = await airportReq;
-          }
-        } finally {
-          setAirportResults(results || []);
-          setIsSearching(false);
-          isTypingRef.current = false;
+
+  useEffect(() => {
+    let cancelled = false;
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      if (activeSearchField === 'origin') setOriginResults([]);
+      if (activeSearchField === 'destination') setDestResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      if (q === originLabel || q === destLabel) return;
+      if (state.bookingType === 'hotels') return; // Disable for hotels again
+
+      setIsSearching(true);
+      try {
+        let results = await searchAirports(q);
+        if (!cancelled) {
+          if (activeSearchField === 'origin') setOriginResults(results || []);
+          if (activeSearchField === 'destination') setDestResults(results || []);
         }
-      } else {
-        setAirportResults([]);
-        setIsSearching(false);
+      } catch (err) {
+        console.error("Autocomplete search failed:", err);
+      } finally {
+        if (!cancelled) setIsSearching(false);
       }
-    }, 600);
-    return () => clearTimeout(delayDebounce);
-  }, [searchQuery, activeSearchField, state.bookingType]);
+    }, 400);
+
+
+
+
+    return () => {
+      cancelled = true;
+      clearTimeout(delayDebounce);
+    };
+  }, [searchQuery, activeSearchField, state.bookingType, originLabel, destLabel]);
+
+
+
+
+
 
   const handleSearch = async () => {
     const newErrors = {};
-    if (!state.searchParams.destination) newErrors.destination = "Required";
-    if (!state.searchParams.dates) newErrors.dates = "Required";
-    if (state.bookingType === 'flights') {
-      if (!state.searchParams.origin) newErrors.origin = "Required";
-      if (!state.searchParams.destination) newErrors.destination = "Required";
-      if (state.searchParams.isRoundTrip && !state.searchParams.checkOutDate) {
-        newErrors.checkOutDate = "Required";
+    const { searchParams, bookingType, sortBy } = state;
+
+    if (bookingType === 'hotels') {
+      if (!searchParams.destination) newErrors.destination = "Search query is required (e.g. 'Hotels in Istanbul')";
+      if (!searchParams.dates) newErrors.dates = "Check-in date is required";
+      if (!searchParams.checkOutDate) newErrors.checkOutDate = "Check-out date is required";
+    } else {
+      if (!searchParams.origin) newErrors.origin = "Origin is required (e.g. IST)";
+      if (!searchParams.destination) newErrors.destination = "Destination is required (e.g. PAR)";
+      if (!searchParams.dates) newErrors.dates = "Departure date is required";
+      if (searchParams.isRoundTrip && !searchParams.checkOutDate) {
+        newErrors.checkOutDate = "Return date is required";
       }
+    }
+
+    if (!searchParams.adults || searchParams.adults < 1) {
+      newErrors.adults = "At least 1 adult is required";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -112,26 +152,29 @@ export default function BookingSheet({ open, onClose }) {
     setActiveSearchField(null);
     try {
       let response;
-      if (state.bookingType === 'hotels') {
+      if (bookingType === 'hotels') {
         response = await searchHotels({
-          query: state.searchParams.destination,
-          checkInDate: state.searchParams.dates,
-          checkOutDate: state.searchParams.checkOutDate,
-          adults: state.searchParams.adults,
-          budget: state.searchParams.budget ? parseFloat(state.searchParams.budget) : null,
-          sortBy: state.sortBy === 'low' ? 'PRICE_ASC' : 'PRICE_DESC'
+          query: searchParams.destination,
+          checkInDate: searchParams.dates,
+          checkOutDate: searchParams.checkOutDate,
+          adults: searchParams.adults,
+          budget: searchParams.budget ? parseFloat(searchParams.budget) : null,
+          sortBy: sortBy === 'low' ? 'PRICE_ASC' : sortBy === 'high' ? 'PRICE_DESC' : 'RATING_DESC',
+          currency: 'USD'
         });
       } else {
         response = await searchFlights({
-          origin: state.searchParams.origin ? state.searchParams.origin.toUpperCase() : "",
-          destination: state.searchParams.destination ? state.searchParams.destination.toUpperCase() : "",
-          departureDate: state.searchParams.dates,
-          returnDate: state.searchParams.isRoundTrip ? state.searchParams.checkOutDate : null,
-          adults: state.searchParams.adults,
-          budget: state.searchParams.budget ? parseFloat(state.searchParams.budget) : null,
-          sortBy: state.sortBy === 'low' ? 'PRICE_ASC' : 'PRICE_DESC'
+          origin: searchParams.origin,
+          destination: searchParams.destination,
+          departureDate: searchParams.dates,
+          returnDate: searchParams.isRoundTrip ? searchParams.checkOutDate : null,
+          adults: searchParams.adults,
+          budget: searchParams.budget ? parseFloat(searchParams.budget) : null,
+          sortBy: sortBy === 'low' ? 'PRICE_ASC' : 'PRICE_DESC',
+          currency: 'USD'
         });
       }
+
       if (response.success) {
         dispatch({ type: "SEARCH_SUCCESS", payload: response.data || [] });
       } else {
@@ -142,6 +185,7 @@ export default function BookingSheet({ open, onClose }) {
       dispatch({ type: "SEARCH_ERROR", payload: { message: "Unexpected error occurred." } });
     }
   };
+
 
   const filteredAndSortedItems = useMemo(() => {
     let list = [...state.items];
@@ -216,29 +260,32 @@ export default function BookingSheet({ open, onClose }) {
                       <div className="airport-dropdown-refined">
                         {isSearching ? (
                           <div className="dropdown-status-msg">Searching...</div>
-                        ) : airportResults.length > 0 ? (
-                          airportResults.map((item, i) => (
+                        ) : originResults.length > 0 ? (
+                          originResults.map((item, i) => (
                             <div key={i} className="airport-item" onClick={() => {
                               const searchId = item.iataCode ?? item.kgmid;
                               dispatch({ type: "UPDATE_PARAM", payload: { origin: searchId } });
-                              setOriginLabel(item.kgmid ? `All airports — ${item.city}` : `${item.city} (${item.iataCode})`);
-                              setAirportResults([]); setActiveSearchField(null);
+                              const display = item.iataCode ? `${item.city} (${item.iataCode})` : (item.displayName || item.name || item.city);
+                              setOriginLabel(display);
+                              setOriginResults([]); setActiveSearchField(null);
                             }}>
                               <div className="airport-item-row">
                                 <span className="airport-type-icon">{item.kgmid ? <MdLocationCity /> : <MdLocalAirport />}</span>
                                 <div className="airport-item-info">
-                                  <span className="aname">{item.name}</span>
-                                  <span className="city">{item.city}, {item.country}</span>
+                                  <span className="aname">{item.displayName || item.name}</span>
+                                  <span className="city">{item.city}{item.country ? `, ${item.country}` : ''}</span>
                                 </div>
-                                {!item.kgmid && <span className="iata-badge">{item.iataCode}</span>}
+                                {item.iataCode && <span className="iata-badge">{item.iataCode}</span>}
                               </div>
                             </div>
                           ))
                         ) : (
-                          <div className="dropdown-status-msg">No suggestions found</div>
+                          <div className="dropdown-status-msg">No results found</div>
                         )}
                       </div>
                     )}
+
+
                     {renderError('origin')}
                   </div>
                 )}
@@ -268,44 +315,50 @@ export default function BookingSheet({ open, onClose }) {
                       }}
                     />
                   </div>
-                  {activeSearchField === 'destination' && state.bookingType !== 'hotels' && (searchQuery.length > 0 || isSearching) && (
+                  {state.bookingType !== 'hotels' && activeSearchField === 'destination' && (searchQuery.length > 0 || isSearching) && (
+
+
+
                     <div className="airport-dropdown-refined">
                       {isSearching ? (
                         <div className="dropdown-status-msg">Searching...</div>
-                      ) : airportResults.length > 0 ? (
-                        airportResults.map((item, i) => (
+                      ) : destResults.length > 0 ? (
+                        destResults.map((item, i) => (
                           <div key={i} className="airport-item" onClick={() => {
                             if (state.bookingType === 'hotels') {
-                              if (item.iataCode || item.kgmid) {
-                                const q = `Hotels in ${item.city || item.name}`;
-                                dispatch({ type: "UPDATE_PARAM", payload: { destination: q } });
-                                setDestLabel(item.name);
-                              } else {
-                                dispatch({ type: "UPDATE_PARAM", payload: { destination: item.searchQuery } });
-                                setDestLabel(item.displayName);
-                              }
+                              // Use the searchQuery as the raw destination string
+                              const targetVal = item.searchQuery || item.name || item.displayName || "";
+                              dispatch({ type: "UPDATE_PARAM", payload: { destination: targetVal } });
+                              setDestLabel(item.displayName || item.name || item.city || "");
                             } else {
                               const searchId = item.iataCode ?? item.kgmid;
                               dispatch({ type: "UPDATE_PARAM", payload: { destination: searchId } });
-                              setDestLabel(item.kgmid ? `All airports — ${item.city}` : `${item.city} (${item.iataCode})`);
+                              const display = item.iataCode ? `${item.city} (${item.iataCode})` : (item.displayName || item.name || item.city);
+                              setDestLabel(display);
                             }
-                            setAirportResults([]); setActiveSearchField(null);
+                            setDestResults([]); setActiveSearchField(null);
                           }}>
                             <div className="airport-item-row">
-                              <span className="airport-type-icon">{item.kgmid ? <MdLocationCity /> : <MdLocalAirport />}</span>
+                              <span className="airport-type-icon">
+                                {state.bookingType === 'hotels' ? <MdLocationCity /> : (item.kgmid ? <MdLocationCity /> : <MdLocalAirport />)}
+                              </span>
                               <div className="airport-item-info">
-                                <span className="aname">{item.name}</span>
-                                <span className="city">{item.city}, {item.country}</span>
+                                <span className="aname">{item.displayName || item.name}</span>
+                                <span className="city">
+                                  {item.city}{item.country ? `, ${item.country}` : ''}
+                                </span>
                               </div>
-                              {!item.kgmid && <span className="iata-badge">{item.iataCode}</span>}
+                              {!item.searchQuery && item.iataCode && <span className="iata-badge">{item.iataCode}</span>}
                             </div>
                           </div>
                         ))
                       ) : (
-                        <div className="dropdown-status-msg">No suggestions found</div>
+                        <div className="dropdown-status-msg">No results found</div>
                       )}
                     </div>
                   )}
+
+
                   {renderError('destination')}
                 </div>
 
@@ -379,8 +432,10 @@ export default function BookingSheet({ open, onClose }) {
                   >
                     <option value="low">Price: Low to High</option>
                     <option value="high">Price: High to Low</option>
+                    {state.bookingType === 'hotels' && <option value="rating">Best Rated</option>}
                   </select>
                 </div>
+
               </div>
               <div className="search-footer-modern">
                 {state.status === 'error' && (
@@ -403,9 +458,10 @@ export default function BookingSheet({ open, onClose }) {
                   <h3 className="results-count-text">{filteredAndSortedItems.length} {state.bookingType === 'hotels' ? 'Hotels' : 'Flights'} Found</h3>
                   <span className="results-summary-sub">
                     {state.bookingType === 'hotels'
-                      ? `${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)} – ${formatFriendlyDate(state.searchParams.checkOutDate)} · ${state.searchParams.adults} adult`
-                      : `${state.searchParams.origin}→${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)} · ${state.searchParams.adults} adult`}
+                      ? `${state.searchParams.destination} • ${formatFriendlyDate(state.searchParams.dates)} – ${formatFriendlyDate(state.searchParams.checkOutDate)} • ${state.searchParams.adults} adult`
+                      : `${state.searchParams.origin} • ${state.searchParams.destination} • ${formatFriendlyDate(state.searchParams.dates)} – ${formatFriendlyDate(state.searchParams.checkOutDate)} • ${state.searchParams.adults} adult`}
                   </span>
+
                 </div>
                 <button className="filter-tune-btn" onClick={() => dispatch({ type: "OPEN_FILTERS" })}><MdTune /></button>
               </div>
@@ -487,8 +543,10 @@ export default function BookingSheet({ open, onClose }) {
                   <h3 className="results-count-text" style={{ fontSize: 18, marginBottom: 4 }}>Filters</h3>
                   <span className="results-summary-sub" style={{ color: '#888' }}>
                     {state.bookingType === 'hotels'
-                      ? `${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)}`
-                      : `${state.searchParams.origin}→${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)}`}
+                      ? `${state.searchParams.destination} • ${formatFriendlyDate(state.searchParams.dates)}`
+                      : `${state.searchParams.origin} • ${state.searchParams.destination} • ${formatFriendlyDate(state.searchParams.dates)}`}
+
+
                   </span>
                 </div>
               </div>

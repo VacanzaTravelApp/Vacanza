@@ -336,8 +336,12 @@ input:checked+.toggle-slider:before {
 }
 
 .filter-tune-btn {
-  width: 36px;
-  height: 36px;
+  position: absolute;
+  right: 21px;
+  top: 50px;
+
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: 1px solid #e5e5e5;
   background: white;
@@ -346,9 +350,13 @@ input:checked+.toggle-slider:before {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 15px;
   transition: all 0.2s;
+  z-index: 1001;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
+
+
 
 .filter-tune-btn:hover {
   background: #f9f9f9;
@@ -592,19 +600,27 @@ input:checked+.toggle-slider:before {
 }
 
 .hotel-book-btn-mobile {
-  padding: 8px 14px;
-  border-radius: 10px;
+  padding: 6px 12px;
+  border-radius: 8px;
   background: rgba(0, 150, 255, 0.08);
   color: #0096ff;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
   border: none;
   cursor: pointer;
   transition: all 0.2s;
 }
 
+
 .hotel-book-btn-mobile:hover {
   background: rgba(0, 150, 255, 0.15);
+}
+
+.hotel-provider-text {
+  font-size: 10px;
+  color: #888;
+  margin-top: 4px;
+  display: block;
 }
 
 .no-photo-box {
@@ -903,6 +919,7 @@ input:checked+.toggle-slider:before {
   flex-shrink: 0;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
+
 .round-trip-toggle-mobile {
   display: flex;
   align-items: center;

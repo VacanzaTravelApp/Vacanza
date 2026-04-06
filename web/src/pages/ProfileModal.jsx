@@ -31,16 +31,17 @@ import {
     UpOutlined,
     DownOutlined,
     ControlOutlined,
-    RocketOutlined, 
-    CoffeeOutlined, 
+    RocketOutlined,
+    CoffeeOutlined,
     ShopOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useUserPreferences } from "../hooks/useUserPreferences";
-import { useUserProfile, useUserStats, useUserCheckins } from "../hooks/useUserProfileData";
+import { useUserProfile, useUserStats, useUserCheckins, useProfilePhoto } from "../hooks/useUserProfileData";
 import { useGamificationProfile } from "../gamification/useGamificationProfile";
 import { userApi } from "../api/userApi";
+
 import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
@@ -81,30 +82,30 @@ const AccountListItem = ({ icon, label, onClick, color = "#1c1c1e", bgColor = "#
     <div
         onClick={onClick}
         className="vivid-interactive"
-        style={{ 
+        style={{
             display: "flex", alignItems: "center", gap: 14, padding: "12px 10px",
             borderBottom: isLast ? "none" : "1px solid rgba(255,255,255,0.05)", cursor: "pointer",
             borderRadius: 14,
             transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
         }}
     >
-        <div style={{ 
-            width: 38, 
-            height: 38, 
-            borderRadius: 11, 
-            background: bgColor, 
-            display: "flex", 
-            alignItems: "center", 
+        <div style={{
+            width: 38,
+            height: 38,
+            borderRadius: 11,
+            background: bgColor,
+            display: "flex",
+            alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
             border: "1px solid rgba(0,0,0,0.03)"
         }}>
             {React.cloneElement(icon, { style: { fontSize: 18, color: color } })}
         </div>
-        <span style={{ 
-            flex: 1, 
-            fontSize: 15, 
-            fontWeight: 800, 
+        <span style={{
+            flex: 1,
+            fontSize: 15,
+            fontWeight: 800,
             color: color === "#ff3b30" ? "#ff3b30" : (color.includes("var") ? color : "var(--card-text)"),
             letterSpacing: "-0.2px"
         }}>{label}</span>
@@ -119,13 +120,13 @@ const GrabHandle = () => (
 );
 
 const SectionCard = ({ title, subtitle, children, icon, iconBg, onClick }) => (
-    <div 
+    <div
         className={`profile-section-card ${onClick ? 'vivid-interactive' : ''}`}
-        onClick={onClick} 
-        style={{ 
-            background: "var(--card-bg, #fff)", 
-            borderRadius: 24, 
-            padding: 24, 
+        onClick={onClick}
+        style={{
+            background: "var(--card-bg, #fff)",
+            borderRadius: 24,
+            padding: 24,
             marginBottom: 16,
             border: "1px solid var(--card-border, #f1f3f5)",
             cursor: onClick ? "pointer" : "default",
@@ -156,67 +157,89 @@ const SectionCard = ({ title, subtitle, children, icon, iconBg, onClick }) => (
     </div>
 );
 
-const ProfileCharacterCard = ({ name, role, level, xp, progress, imageUrl }) => (
-    <div style={{
-        background: "var(--card-bg, #fff)",
-        borderRadius: 24,
-        padding: "24px",
-        marginBottom: 24,
-        position: "relative",
-        border: "1px solid var(--card-border, #f1f3f5)"
-    }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-            <div style={{ position: "relative" }}>
-                <div style={{
-                    width: 72, height: 72, padding: 3, borderRadius: "50%",
-                    background: "linear-gradient(135deg, #0cebeb 0%, #20e3b2 50%, #29ffc6 100%)",
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.08)"
-                }}>
-                    <div style={{
-                        width: "100%", height: "100%", borderRadius: "50%",
-                        border: "2px solid var(--card-bg, white)", overflow: "hidden", background: "rgba(128,128,128,0.1)",
-                        display: "flex", alignItems: "center", justifyContent: "center"
-                    }}>
-                        {imageUrl ? <img src={imageUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UserOutlined style={{ fontSize: 32, color: "var(--card-subtext, #9ca3af)" }} />}
-                    </div>
-                </div>
-                <div style={{
-                    position: "absolute", bottom: -2, right: -2,
-                    width: 24, height: 24, borderRadius: "50%",
-                    background: "#ffcc00", color: "#fff",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 10, fontWeight: 900, border: "2px solid var(--card-bg, white)",
-                    boxShadow: "0 4px 8px rgba(0,0,0,0.1)"
-                }}>{level}</div>
-            </div>
+const ProfileAvatarWithBinary = ({ imageUrl, hasProfilePhoto, size = 100 }) => {
+    const { data: binaryPhotoUrl } = useProfilePhoto(hasProfilePhoto);
+    const finalImageUrl = binaryPhotoUrl || imageUrl;
 
-            <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 19, fontWeight: 850, color: "var(--card-text, #2c3e50)" }}>{name}</div>
-                <div style={{
-                    display: "inline-block", padding: "4px 12px", borderRadius: 20,
-                    background: "var(--card-bg, #fff)", border: "1px solid var(--card-border, #f1f3f5)",
-                    fontSize: 13, color: "#5F7A8F", marginTop: 4, fontWeight: 700
-                }}>
-                    {role || "—"}
+    return (
+        <Avatar
+            size={size}
+            src={finalImageUrl}
+            icon={!finalImageUrl && <UserOutlined />}
+            style={{
+                border: "3px solid rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.05)",
+                boxShadow: size > 50 ? "0 12px 30px rgba(0,0,0,0.3)" : "none"
+            }}
+        />
+    );
+};
+
+const ProfileCharacterCard = ({ name, role, level, xp, progress, imageUrl, hasProfilePhoto }) => {
+    return (
+        <div style={{
+            background: "var(--card-bg, #fff)",
+            borderRadius: 24,
+            padding: "24px",
+            marginBottom: 24,
+            position: "relative",
+            border: "1px solid var(--card-border, #f1f3f5)"
+        }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                <div style={{ position: "relative" }}>
+                    <div style={{
+                        width: 72, height: 72, padding: 3, borderRadius: "50%",
+                        background: "linear-gradient(135deg, #0cebeb 0%, #20e3b2 50%, #29ffc6 100%)",
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.08)"
+                    }}>
+                        <div style={{
+                            width: "100%", height: "100%", borderRadius: "50%",
+                            border: "2px solid var(--card-bg, white)", overflow: "hidden", background: "rgba(128,128,128,0.1)",
+                            display: "flex", alignItems: "center", justifyContent: "center"
+                        }}>
+                            <ProfileAvatarWithBinary imageUrl={imageUrl} hasProfilePhoto={hasProfilePhoto} size={64} />
+                        </div>
+                    </div>
+                    <div style={{
+                        position: "absolute", bottom: -2, right: -2,
+                        width: 24, height: 24, borderRadius: "50%",
+                        background: "#ffcc00", color: "#fff",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 10, fontWeight: 900, border: "2px solid var(--card-bg, white)",
+                        boxShadow: "0 4px 8px rgba(0,0,0,0.1)"
+                    }}>{level}</div>
                 </div>
-                <div style={{
-                    fontSize: 13, fontWeight: 800, color: "var(--vivid-blue, #0096FF)", marginTop: 8
-                }}>
-                    Level {level} • {new Intl.NumberFormat().format(xp)} XP
+
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 19, fontWeight: 850, color: "var(--card-text, #2c3e50)" }}>{name}</div>
+                    <div style={{
+                        display: "inline-block", padding: "4px 12px", borderRadius: 20,
+                        background: "var(--card-bg, #fff)", border: "1px solid var(--card-border, #f1f3f5)",
+                        fontSize: 13, color: "#5F7A8F", marginTop: 4, fontWeight: 700
+                    }}>
+                        {role || "—"}
+                    </div>
+                    <div style={{
+                        fontSize: 13, fontWeight: 800, color: "var(--vivid-blue, #0096FF)", marginTop: 8
+                    }}>
+                        Level {level} • {new Intl.NumberFormat().format(xp)} XP
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
+
+
 
 const InfoRow = ({ label, value }) => (
     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, alignItems: "flex-start", gap: 12 }}>
         <span style={{ fontSize: 14, color: "var(--card-subtext, #9ca3af)", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</span>
-        <span style={{ 
-            fontSize: 15, 
-            color: "var(--card-text, #1c1c1e)", 
-            fontWeight: 800, 
-            textAlign: "right", 
+        <span style={{
+            fontSize: 15,
+            color: "var(--card-text, #1c1c1e)",
+            fontWeight: 800,
+            textAlign: "right",
             maxWidth: "70%",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -247,12 +270,12 @@ const CheckinItem = ({ name, category, date }) => (
 
 const MainView = ({ profile, gamification, stats, checkins, user, setView, onClose, isDarkMode = true }) => (
     <div style={{ background: "var(--bg-main, #0D1526)", flex: 1, overflowY: "auto", paddingBottom: 40, borderRadius: 40 }}>
-        <div style={{ 
-            padding: "0 24px", 
-            position: "sticky", 
-            top: 0, 
-            zIndex: 10, 
-            background: "var(--bg-main, #0D1526)", 
+        <div style={{
+            padding: "0 24px",
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+            background: "var(--bg-main, #0D1526)",
             paddingBottom: "12px",
             borderBottom: "1px solid transparent"
         }}>
@@ -280,7 +303,9 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
                 xp={gamification?.totalXp || 0}
                 progress={gamification?.xpProgressPercent || 0}
                 imageUrl={profile?.profileImageUrl || user?.photoURL}
+                hasProfilePhoto={profile?.hasProfilePhoto}
             />
+
 
             <SectionCard
                 title="Edit Profile"
@@ -297,11 +322,11 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
             >
                 <div style={{ padding: "12px 16px 4px" }}>
                     <InfoRow label="Email" value={profile?.email || user?.email} />
-                    <InfoRow 
-                        label="Joined" 
-                        value={profile?.createdAt || user?.metadata?.creationTime 
-                            ? dayjs(profile?.createdAt || user?.metadata?.creationTime).format('MMMM D, YYYY') 
-                            : "—"} 
+                    <InfoRow
+                        label="Joined"
+                        value={profile?.createdAt || user?.metadata?.creationTime
+                            ? dayjs(profile?.createdAt || user?.metadata?.creationTime).format('MMMM D, YYYY')
+                            : "—"}
                     />
                     <InfoRow label="Country" value={profile?.country} />
                     <InfoRow label="Gender" value={profile?.gender ? (profile.gender.replace(/_/g, ' ').charAt(0).toUpperCase() + profile.gender.replace(/_/g, ' ').slice(1).toLowerCase()) : null} />
@@ -369,12 +394,12 @@ const GamificationView = ({ gamification, setView, onClose, isDarkMode = true })
     const levelNum = gamification?.levelText ? parseInt(gamification.levelText.replace(/\D/g, ''), 10) : 1;
     return (
         <div style={{ background: "var(--bg-main, #0D1526)", flex: 1, overflowY: "auto", paddingBottom: 40, borderRadius: 40 }}>
-            <div style={{ 
-                padding: "0 24px", 
-                position: "sticky", 
-                top: 0, 
-                zIndex: 10, 
-                background: "var(--bg-main, #0D1526)", 
+            <div style={{
+                padding: "0 24px",
+                position: "sticky",
+                top: 0,
+                zIndex: 10,
+                background: "var(--bg-main, #0D1526)",
                 paddingBottom: "12px",
                 borderBottom: "1px solid var(--card-border, #FFFFFF)"
             }}>
@@ -456,7 +481,7 @@ const GamificationView = ({ gamification, setView, onClose, isDarkMode = true })
                                 <div style={{
                                     width: 56, height: 56, background: badge.earned ? bgColor : "var(--card-border, #f3f4f6)",
                                     borderRadius: '50%', display: "flex", alignItems: "center", justifyContent: "center",
-                                    margin: "0 auto 12px", fontSize: 24, color: "#fff", 
+                                    margin: "0 auto 12px", fontSize: 24, color: "#fff",
                                     boxShadow: badge.earned ? `0 8px 16px ${bgColor}50` : "none"
                                 }}>
                                     {getBadgeIcon(badge.key)}
@@ -512,6 +537,8 @@ const GenderSelector = ({ value, onChange, isDarkMode = true }) => {
 const EditProfileView = ({ profile, user, setView, onClose, updateMutation, isDarkMode = true }) => {
     const [form] = Form.useForm();
     const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
+    const queryClient = useQueryClient();
+
 
     useEffect(() => {
         if (profile || user) {
@@ -530,12 +557,12 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, isDa
     return (
         <div style={{ background: "var(--bg-main, #0D1526)", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: 40 }}>
             {/* STICKY HEADER */}
-            <div style={{ 
-                padding: "0 24px", 
-                position: "sticky", 
-                top: 0, 
-                zIndex: 10, 
-                background: "var(--bg-main, #0D1526)", 
+            <div style={{
+                padding: "0 24px",
+                position: "sticky",
+                top: 0,
+                zIndex: 10,
+                background: "var(--bg-main, #0D1526)",
                 paddingBottom: "12px",
                 borderBottom: "1px solid var(--card-border, rgba(255,255,255,0.1))"
             }}>
@@ -570,30 +597,77 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, isDa
             <div style={{ flex: 1, overflowY: "auto", padding: "12px 24px 24px" }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 32 }}>
                     <div style={{ position: "relative" }}>
-                        <Avatar
-                            size={100}
-                            src={profile?.profileImageUrl || user?.photoURL}
-                            style={{ 
-                                border: "3px solid rgba(255,255,255,0.1)", 
-                                background: "rgba(255,255,255,0.05)", 
-                                boxShadow: "0 12px 30px rgba(0,0,0,0.3)"
-                            }}
+                        <ProfileAvatarWithBinary
+                            imageUrl={profile?.profileImageUrl || user?.photoURL}
+                            hasProfilePhoto={profile?.hasProfilePhoto}
                         />
-                        <div style={{
-                            position: "absolute", bottom: 2, right: 2, width: 32, height: 32,
-                            background: "#38BDF8", borderRadius: "50%", border: "3px solid #0D1526",
-                            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"
-                        }}>
+                        <div
+                            style={{
+                                position: "absolute", bottom: 2, right: 2, width: 32, height: 32,
+                                background: "#38BDF8", borderRadius: "50%", border: "3px solid #0D1526",
+                                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"
+                            }}
+                            onClick={() => document.getElementById('profile-photo-upload').click()}
+                        >
                             <CameraFilled style={{ color: "#fff", fontSize: 14 }} />
                         </div>
+                        <input
+                            type="file"
+                            id="profile-photo-upload"
+                            style={{ display: 'none' }}
+                            accept="image/*"
+                            onChange={async (e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                    if (file.size > 2 * 1024 * 1024) {
+                                        message.error("File too large — max 2 MB allowed");
+                                        return;
+                                    }
+                                    try {
+                                        const hide = message.loading("Uploading photo...", 0);
+                                        await userApi.uploadProfilePhoto(file);
+                                        hide();
+                                        message.success("Profile photo updated");
+                                        // Refresh profile and photo queries
+                                        queryClient.invalidateQueries(["user", "profile"]);
+                                        queryClient.invalidateQueries(["user", "photo"]);
+
+                                    } catch (err) {
+                                        message.error(err.friendlyMessage || "Upload failed");
+                                    }
+                                }
+                            }}
+                        />
                     </div>
+                    {profile?.hasProfilePhoto && (
+                        <Button
+                            type="link"
+                            danger
+                            size="small"
+                            style={{ marginTop: 12, fontWeight: 700 }}
+                            onClick={async () => {
+                                try {
+                                    await userApi.deleteProfilePhoto();
+                                    message.success("Profile photo deleted");
+                                    queryClient.invalidateQueries(["user", "profile"]);
+                                    queryClient.invalidateQueries(["user", "photo"]);
+                                } catch (err) {
+
+                                    message.error("Failed to delete photo");
+                                }
+                            }}
+                        >
+                            Remove Photo
+                        </Button>
+                    )}
                 </div>
 
-                <div style={{ 
-                    background: "var(--vivid-subtle-bg, rgba(255,255,255,0.03))", 
-                    borderRadius: 24, 
-                    padding: "24px", 
-                    marginBottom: 32, 
+
+                <div style={{
+                    background: "var(--vivid-subtle-bg, rgba(255,255,255,0.03))",
+                    borderRadius: 24,
+                    padding: "24px",
+                    marginBottom: 32,
                     border: "1px solid var(--card-border, rgba(255,255,255,0.05))"
                 }}>
                     <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
@@ -615,25 +689,25 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, isDa
                         <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 10, fontWeight: 900, color: "var(--text-sub, rgba(255,255,255,0.4))", letterSpacing: "1px", marginBottom: 2 }}>MEMBER SINCE</div>
                             <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-main, #FFFFFF)" }}>
-                                {profile?.createdAt || user?.metadata?.creationTime 
-                                    ? dayjs(profile?.createdAt || user?.metadata?.creationTime).format('MMMM D, YYYY') 
+                                {profile?.createdAt || user?.metadata?.creationTime
+                                    ? dayjs(profile?.createdAt || user?.metadata?.creationTime).format('MMMM D, YYYY')
                                     : "—"}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                    <div style={{ fontSize: 12, fontWeight: 900, color: "var(--card-subtext)", letterSpacing: "1.5px", marginBottom: 20, marginLeft: 12, textTransform: "uppercase", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <span>Personal Info</span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "none", letterSpacing: "0" }}>
-                            <span style={{ color: "#FF6B6B" }}>*</span> indicates a mandatory field
-                        </span>
-                    </div>
+                <div style={{ fontSize: 12, fontWeight: 900, color: "var(--card-subtext)", letterSpacing: "1.5px", marginBottom: 20, marginLeft: 12, textTransform: "uppercase", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span>Personal Info</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "none", letterSpacing: "0" }}>
+                        <span style={{ color: "#FF6B6B" }}>*</span> indicates a mandatory field
+                    </span>
+                </div>
 
-                    <ConfigProvider theme={{ token: { colorTextPlaceholder: 'rgba(255,255,255,0.5)' } }}>
-                        <Form
-                            form={form}
-                            layout="vertical"
+                <ConfigProvider theme={{ token: { colorTextPlaceholder: 'rgba(255,255,255,0.5)' } }}>
+                    <Form
+                        form={form}
+                        layout="vertical"
                         initialValues={{
                             ...profile,
                             birthDate: profile?.birthDate ? dayjs(profile.birthDate) : null
@@ -686,98 +760,98 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, isDa
 
                         <Divider style={{ margin: "32px 0", borderColor: "var(--card-border, rgba(255,255,255,0.05))" }} />
 
-                    <div 
-                        onClick={() => setShowAdditionalInfo(!showAdditionalInfo)} 
-                        style={{ 
-                            fontSize: 12, 
-                            fontWeight: 900, 
-                            color: "var(--card-subtext, rgba(255,255,255,0.4))", 
-                            letterSpacing: "1.5px", 
-                            textTransform: "uppercase", 
-                            marginLeft: 12, 
-                            marginBottom: 20, 
-                            display: "flex", 
-                            justifyContent: "space-between", 
-                            alignItems: "center", 
-                            cursor: "pointer",
-                            padding: "8px 0"
-                        }}
-                    >
-                        <span>Additional Info</span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#38BDF8", fontSize: 11, fontWeight: 800, textTransform: "none", letterSpacing: "0" }}>
-                            {showAdditionalInfo ? "Hide" : "Expand"} 
-                            {showAdditionalInfo ? <UpOutlined style={{ fontSize: 10 }} /> : <DownOutlined style={{ fontSize: 10 }} />}
-                        </div>
-                    </div>
-
-                    {showAdditionalInfo && (
-                        <div style={{ marginBottom: 32 }}>
-                            <Form.Item
-                                label={<span style={{ fontSize: 14, fontWeight: 900, color: "var(--text-main, #FFFFFF)", opacity: 0.9 }}>Origin Country</span>}
-                                name="country"
-                                style={{ marginBottom: 28 }}
-                            >
-                                <Input
-                                    placeholder="Enter origin country"
-                                    style={{
-                                        borderRadius: 16,
-                                        height: 60,
-                                        background: "var(--vivid-subtle-bg, rgba(255,255,255,0.05))",
-                                        border: "2px solid var(--card-border, rgba(255,255,255,0.1))",
-                                        fontSize: 16,
-                                        fontWeight: 600,
-                                        color: "var(--text-main, #FFFFFF)"
-                                    }}
-                                />
-                            </Form.Item>
-                            
-                            <div style={{ marginBottom: 28 }}>
-                                <div style={{ fontSize: 14, fontWeight: 900, color: "var(--text-main, #FFFFFF)", opacity: 0.9, marginBottom: 8 }}>Date of Birth</div>
-                                <ConfigProvider
-                                    theme={{
-                                        token: {
-                                            colorBgElevated: isDarkMode ? '#1A2333' : '#FFFFFF',
-                                            colorText: isDarkMode ? '#FFFFFF' : '#1A2332',
-                                            colorTextPlaceholder: isDarkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.4)',
-                                            colorBorder: 'transparent',
-                                            colorPrimary: '#38BDF8',
-                                            colorIcon: isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)',
-                                            colorTextHeading: isDarkMode ? '#FFFFFF' : '#1A2332',
-                                        }
-                                    }}
-                                >
-                                    <div style={{ border: "2px solid var(--card-border, rgba(255,255,255,0.1))", borderRadius: 16, background: "var(--vivid-subtle-bg, rgba(255,255,255,0.05))" }}>
-                                        <Form.Item name="birthDate" noStyle>
-                                            <DatePicker
-                                                variant="borderless"
-                                                inputReadOnly={true}
-                                                style={{
-                                                    width: "100%",
-                                                    height: 56,
-                                                    fontSize: 16,
-                                                    fontWeight: 600,
-                                                    color: "var(--text-main, #FFFFFF)",
-                                                    background: "transparent",
-                                                    border: "none",
-                                                    boxShadow: "none"
-                                                }}
-                                            />
-                                        </Form.Item>
-                                    </div>
-                                </ConfigProvider>
+                        <div
+                            onClick={() => setShowAdditionalInfo(!showAdditionalInfo)}
+                            style={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: "var(--card-subtext, rgba(255,255,255,0.4))",
+                                letterSpacing: "1.5px",
+                                textTransform: "uppercase",
+                                marginLeft: 12,
+                                marginBottom: 20,
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                cursor: "pointer",
+                                padding: "8px 0"
+                            }}
+                        >
+                            <span>Additional Info</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#38BDF8", fontSize: 11, fontWeight: 800, textTransform: "none", letterSpacing: "0" }}>
+                                {showAdditionalInfo ? "Hide" : "Expand"}
+                                {showAdditionalInfo ? <UpOutlined style={{ fontSize: 10 }} /> : <DownOutlined style={{ fontSize: 10 }} />}
                             </div>
-
-                            <Form.Item
-                                label={<span style={{ fontSize: 14, fontWeight: 900, color: "var(--text-main, #FFFFFF)", opacity: 0.9 }}>Gender Identity</span>}
-                                name="gender"
-                                style={{ marginBottom: 0 }}
-                            >
-                                <GenderSelector isDarkMode={isDarkMode} />
-                            </Form.Item>
                         </div>
-                    )}
+
+                        {showAdditionalInfo && (
+                            <div style={{ marginBottom: 32 }}>
+                                <Form.Item
+                                    label={<span style={{ fontSize: 14, fontWeight: 900, color: "var(--text-main, #FFFFFF)", opacity: 0.9 }}>Origin Country</span>}
+                                    name="country"
+                                    style={{ marginBottom: 28 }}
+                                >
+                                    <Input
+                                        placeholder="Enter origin country"
+                                        style={{
+                                            borderRadius: 16,
+                                            height: 60,
+                                            background: "var(--vivid-subtle-bg, rgba(255,255,255,0.05))",
+                                            border: "2px solid var(--card-border, rgba(255,255,255,0.1))",
+                                            fontSize: 16,
+                                            fontWeight: 600,
+                                            color: "var(--text-main, #FFFFFF)"
+                                        }}
+                                    />
+                                </Form.Item>
+
+                                <div style={{ marginBottom: 28 }}>
+                                    <div style={{ fontSize: 14, fontWeight: 900, color: "var(--text-main, #FFFFFF)", opacity: 0.9, marginBottom: 8 }}>Date of Birth</div>
+                                    <ConfigProvider
+                                        theme={{
+                                            token: {
+                                                colorBgElevated: isDarkMode ? '#1A2333' : '#FFFFFF',
+                                                colorText: isDarkMode ? '#FFFFFF' : '#1A2332',
+                                                colorTextPlaceholder: isDarkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.4)',
+                                                colorBorder: 'transparent',
+                                                colorPrimary: '#38BDF8',
+                                                colorIcon: isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)',
+                                                colorTextHeading: isDarkMode ? '#FFFFFF' : '#1A2332',
+                                            }
+                                        }}
+                                    >
+                                        <div style={{ border: "2px solid var(--card-border, rgba(255,255,255,0.1))", borderRadius: 16, background: "var(--vivid-subtle-bg, rgba(255,255,255,0.05))" }}>
+                                            <Form.Item name="birthDate" noStyle>
+                                                <DatePicker
+                                                    variant="borderless"
+                                                    inputReadOnly={true}
+                                                    style={{
+                                                        width: "100%",
+                                                        height: 56,
+                                                        fontSize: 16,
+                                                        fontWeight: 600,
+                                                        color: "var(--text-main, #FFFFFF)",
+                                                        background: "transparent",
+                                                        border: "none",
+                                                        boxShadow: "none"
+                                                    }}
+                                                />
+                                            </Form.Item>
+                                        </div>
+                                    </ConfigProvider>
+                                </div>
+
+                                <Form.Item
+                                    label={<span style={{ fontSize: 14, fontWeight: 900, color: "var(--text-main, #FFFFFF)", opacity: 0.9 }}>Gender Identity</span>}
+                                    name="gender"
+                                    style={{ marginBottom: 0 }}
+                                >
+                                    <GenderSelector isDarkMode={isDarkMode} />
+                                </Form.Item>
+                            </div>
+                        )}
                     </Form>
-                    </ConfigProvider>
+                </ConfigProvider>
             </div>
 
             {/* FIXED FOOTER */}
@@ -881,32 +955,32 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode }) => {
                 )}
             >
                 {view === 'MAIN' && (
-                    <MainView 
+                    <MainView
                         isDarkMode={isDarkMode}
-                        profile={profile} 
-                        gamification={gamification} 
-                        stats={stats} 
-                        checkins={checkins} 
+                        profile={profile}
+                        gamification={gamification}
+                        stats={stats}
+                        checkins={checkins}
                         user={user}
                         setView={setView}
                         onClose={onClose}
                     />
                 )}
                 {view === 'GAMIFICATION' && (
-                    <GamificationView 
+                    <GamificationView
                         isDarkMode={isDarkMode}
-                        gamification={gamification} 
-                        setView={setView} 
-                        onClose={onClose} 
+                        gamification={gamification}
+                        setView={setView}
+                        onClose={onClose}
                     />
                 )}
                 {view === 'EDIT_PROFILE' && (
-                    <EditProfileView 
+                    <EditProfileView
                         isDarkMode={isDarkMode}
-                        profile={profile} 
-                        user={user} 
-                        setView={setView} 
-                        onClose={onClose} 
+                        profile={profile}
+                        user={user}
+                        setView={setView}
+                        onClose={onClose}
                         updateMutation={updateProfileMutation}
                     />
                 )}

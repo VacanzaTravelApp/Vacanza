@@ -17,6 +17,17 @@ export const userApi = {
   getProfile: () => http.get("/users/me/profile"),
   updateProfile: (body) => http.put("/users/me/profile", body),
 
+  // Profile Photo (New)
+  uploadProfilePhoto: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    // ⚠️ DO NOT set Content-Type header manually for multipart/form-data, 
+    // axios/browser will handle it with the correct boundary.
+    return http.post("/users/me/profile/photo", formData);
+  },
+  getProfilePhoto: () => http.get("/users/me/profile/photo", { responseType: "blob" }),
+  deleteProfilePhoto: () => http.delete("/users/me/profile/photo"),
+
   // Preferences
   getPreferences: () => http.get("/users/me/preferences"),
   updatePreferences: (body) => http.put("/users/me/preferences", body),

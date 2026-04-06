@@ -11,15 +11,21 @@ import {
   InfoCircleOutlined,
   SunOutlined,
   MoonOutlined,
+  SwapOutlined,
+  DollarOutlined,
 } from "@ant-design/icons";
+
 import { useNavigate } from "react-router-dom";
 
 import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
+import { useUserProfile, useUserStats, useUserCheckins, useProfilePhoto } from "../hooks/useUserProfileData";
 import { useGamificationProfile } from "../gamification/useGamification";
-import { useUserProfile } from "../hooks/useUserProfileData";
+import { userApi } from "../api/userApi";
+
+
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
 import VacanzaChat, {
@@ -32,7 +38,11 @@ import PreferencesModal from "./PreferencesModal";
 import http from "../api/http";
 import { aiApi } from "../api/aiApi";
 import { normalizeRouteForMap } from "../features/ai/utils/routeMap";
+import CalendarModal from "../features/calendar/components/CalendarModal";
+
+
 import "./MapPage.css";
+
 
 
 
@@ -134,7 +144,14 @@ const CubeIcon = () => (
   </svg>
 );
 
+const SidebarAvatar = ({ imageUrl, hasProfilePhoto }) => {
+  const { data: binaryPhotoUrl } = useProfilePhoto(hasProfilePhoto);
+  const finalImageUrl = binaryPhotoUrl || imageUrl;
+  return <Avatar size={90} icon={<UserOutlined />} src={finalImageUrl} className="sidebar-avatar" />;
+};
+
 const LogoutIcon = () => (
+
   <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
   </svg>
@@ -185,16 +202,16 @@ const UI_CATEGORIES = [
     label: "Restaurants",
     geo: "catering.restaurant",
     aliases: [
-      "restaurant", "restaurants", "catering.restaurant", "fast_food", "food_court", 
-      "pizza_restaurant", "mexican_restaurant", "indian_restaurant", "asian_restaurant", 
-      "burger_restaurant", "diner_restaurant", "noodle_restaurant", "sushi_restaurant", 
-      "buffet_restaurant", "ramen_restaurant", "tapas_restaurant", "steakhouse", 
-      "turkish_restaurant", "japanese_restaurant", "chinese_restaurant", "seafood_restaurant", 
-      "italian_restaurant", "hawaiian_restaurant", "korean_barbeque_restaurant", 
-      "portuguese_restaurant", "latin_american_restaurant", "vietnamese_restaurant", 
-      "french_restaurant", "african_restaurant", "brazilian_restaurant", "filipino_restaurant", 
-      "german_restaurant", "carribean_restaurant", "middle_eastern_restaurant", 
-      "mediterranean_restaurant", "creole_restaurant", "peruvian_restaurant", "wings_joint", 
+      "restaurant", "restaurants", "catering.restaurant", "fast_food", "food_court",
+      "pizza_restaurant", "mexican_restaurant", "indian_restaurant", "asian_restaurant",
+      "burger_restaurant", "diner_restaurant", "noodle_restaurant", "sushi_restaurant",
+      "buffet_restaurant", "ramen_restaurant", "tapas_restaurant", "steakhouse",
+      "turkish_restaurant", "japanese_restaurant", "chinese_restaurant", "seafood_restaurant",
+      "italian_restaurant", "hawaiian_restaurant", "korean_barbeque_restaurant",
+      "portuguese_restaurant", "latin_american_restaurant", "vietnamese_restaurant",
+      "french_restaurant", "african_restaurant", "brazilian_restaurant", "filipino_restaurant",
+      "german_restaurant", "carribean_restaurant", "middle_eastern_restaurant",
+      "mediterranean_restaurant", "creole_restaurant", "peruvian_restaurant", "wings_joint",
       "hot_dog_stand", "food_truck", "food", "food_and_drink", "deli"
     ],
     icon: <RestaurantIcon />,
@@ -208,9 +225,9 @@ const UI_CATEGORIES = [
     label: "Cafes",
     geo: "catering.cafe",
     aliases: [
-      "cafe", "cafes", "catering.cafe", "coffee", "coffee_shop", "teahouse", "bakery", 
-      "dessert_shop", "ice_cream", "confectionery", "juice_bar", "bubble_tea", "donut_shop", 
-      "bagel_shop", "frozen_yogurt_shop", "waffle_shop", "turkish_coffeehouse", 
+      "cafe", "cafes", "catering.cafe", "coffee", "coffee_shop", "teahouse", "bakery",
+      "dessert_shop", "ice_cream", "confectionery", "juice_bar", "bubble_tea", "donut_shop",
+      "bagel_shop", "frozen_yogurt_shop", "waffle_shop", "turkish_coffeehouse",
       "coffee_roaster", "snack_bar", "tea_house"
     ],
     icon: <CafeIcon />,
@@ -234,9 +251,9 @@ const UI_CATEGORIES = [
     key: "monuments",
     label: "Culture",
     aliases: [
-      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre", 
-      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture", 
-      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema", 
+      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre",
+      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture",
+      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema",
       "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish", "religious_buddhist"
     ],
     icon: <MonumentIcon />,
@@ -249,8 +266,8 @@ const UI_CATEGORIES = [
     key: "park",
     label: "Parks/Nature",
     aliases: [
-      "park", "garden", "forest", "nature_reserve", "wood", "leisure.park", 
-      "recreation_ground", "national_park", "playground", "dog_park", "picnic_shelter", 
+      "park", "garden", "forest", "nature_reserve", "wood", "leisure.park",
+      "recreation_ground", "national_park", "playground", "dog_park", "picnic_shelter",
       "botanical_garden", "natural"
     ],
     icon: <ParkIcon />,
@@ -263,11 +280,11 @@ const UI_CATEGORIES = [
     key: "attraction",
     label: "Attractions",
     aliases: [
-      "attraction", "viewpoint", "theme_park", "zoo", "aquarium", "historic", 
-      "scenic_viewpoint", "tourist_attraction", "lighthouse", "waterfall", "dam", 
-      "cave", "island", "mountain", "mountain_hut", "beach", "stadium", "soccer_stadium", 
-      "basketball_stadium", "football_stadium", "hockey_stadium", "baseball_stadium", 
-      "tennis_stadium", "racetrack", "racecourse", "casino", "amusement_park", 
+      "attraction", "viewpoint", "theme_park", "zoo", "aquarium", "historic",
+      "scenic_viewpoint", "tourist_attraction", "lighthouse", "waterfall", "dam",
+      "cave", "island", "mountain", "mountain_hut", "beach", "stadium", "soccer_stadium",
+      "basketball_stadium", "football_stadium", "hockey_stadium", "baseball_stadium",
+      "tennis_stadium", "racetrack", "racecourse", "casino", "amusement_park",
       "theme_park_attraction", "fair_grounds"
     ],
     icon: <AttractionIcon />,
@@ -280,10 +297,10 @@ const UI_CATEGORIES = [
     key: "bar",
     label: "Nightlife",
     aliases: [
-      "bar", "pub", "night_club", "nightclub", "nightlife", "liquor_store", "alcohol", 
-      "wine_bar", "beer_garden", "cocktail_bar", "lounge", "karaoke_bar", "gay_bar", 
-      "beach_bar", "dive_bar", "stripclub", "brewery", "speakeasy", "champagne_bar", 
-      "sake_bar", "beer_bar", "hookah_lounge", "whiskey_bar", "tiki_bar", "gastropub", 
+      "bar", "pub", "night_club", "nightclub", "nightlife", "liquor_store", "alcohol",
+      "wine_bar", "beer_garden", "cocktail_bar", "lounge", "karaoke_bar", "gay_bar",
+      "beach_bar", "dive_bar", "stripclub", "brewery", "speakeasy", "champagne_bar",
+      "sake_bar", "beer_bar", "hookah_lounge", "whiskey_bar", "tiki_bar", "gastropub",
       "biergarten"
     ],
     icon: <BarIcon />,
@@ -296,15 +313,15 @@ const UI_CATEGORIES = [
     key: "shopping",
     label: "Shopping",
     aliases: [
-      "shop", "mall", "supermarket", "marketplace", "clothing_store", "bakery", 
-      "convenience_store", "convenience", "electronics", "electronics_shop", 
-      "hardware_store", "furniture_store", "jewelry_store", "flower_shop", "book_store", 
-      "gift_shop", "toy_store", "pet_store", "pharmacy", "cosmetics_shop", "beauty_store", 
-      "optician", "bicycle_shop", "liquor_store", "alcohol_shop", "vape_shop", 
-      "tobacco_shop", "smoke_shop", "camera_shop", "watch_store", "hobby_shop", 
-      "antique_shop", "thrift_shop", "pawnshop", "duty_free_shop", "outlet_store", 
-      "luggage_store", "music_shop", "fabric_store", "frame_store", "paper_goods_store", 
-      "kitchen_store", "mattress_store", "lighting_store", "arts_and_craft_store", 
+      "shop", "mall", "supermarket", "marketplace", "clothing_store", "bakery",
+      "convenience_store", "convenience", "electronics", "electronics_shop",
+      "hardware_store", "furniture_store", "jewelry_store", "flower_shop", "book_store",
+      "gift_shop", "toy_store", "pet_store", "pharmacy", "cosmetics_shop", "beauty_store",
+      "optician", "bicycle_shop", "liquor_store", "alcohol_shop", "vape_shop",
+      "tobacco_shop", "smoke_shop", "camera_shop", "watch_store", "hobby_shop",
+      "antique_shop", "thrift_shop", "pawnshop", "duty_free_shop", "outlet_store",
+      "luggage_store", "music_shop", "fabric_store", "frame_store", "paper_goods_store",
+      "kitchen_store", "mattress_store", "lighting_store", "arts_and_craft_store",
       "home_repair", "baby_goods_shop", "variety_store", "pop_up_shop", "clothing", "shopping_mall", "department_store"
     ],
     icon: <ShoppingIcon />,
@@ -327,10 +344,10 @@ const UI_CATEGORIES = [
     key: "transport",
     label: "Transport",
     aliases: [
-      "station", "airport", "bus_stop", "subway_entrance", "train_station", 
-      "ferry_terminal", "transit_stop", "stop_area", "railway_station", "bus_station", 
-      "subway_station", "light_rail_station", "public_transportation_station", "taxi", 
-      "car_rental", "parking_lot", "parking", "gas_station", "charging_station", 
+      "station", "airport", "bus_stop", "subway_entrance", "train_station",
+      "ferry_terminal", "transit_stop", "stop_area", "railway_station", "bus_station",
+      "subway_station", "light_rail_station", "public_transportation_station", "taxi",
+      "car_rental", "parking_lot", "parking", "gas_station", "charging_station",
       "train", "bus", "rail", "subway"
     ],
     icon: <TransportIcon />,
@@ -343,19 +360,19 @@ const UI_CATEGORIES = [
     key: "others",
     label: "Services",
     aliases: [
-      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy", 
-      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist", 
-      "veterinarian", "police_station", "fire_station", "government_offices", "library", 
-      "school", "university", "college", "community_center", "mosque", "church", 
-      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners", 
-      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio", 
-      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course", 
-      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio", 
-      "recording_studio", "television_studio", "radio_studio", "design_studio", 
-      "coworking_space", "event_space", "conference_center", "offices", "factory", 
-      "warehouse", "storage", "services", "it", "consulting", "advertising_agency", 
-      "notary", "lawyer", "photographer", "event_planner", "copyshop", "employment_agency", 
-      "medical_laboratory", "care_services", "rehabilitation_center", "psychotherapist", 
+      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy",
+      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist",
+      "veterinarian", "police_station", "fire_station", "government_offices", "library",
+      "school", "university", "college", "community_center", "mosque", "church",
+      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners",
+      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio",
+      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course",
+      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio",
+      "recording_studio", "television_studio", "radio_studio", "design_studio",
+      "coworking_space", "event_space", "conference_center", "offices", "factory",
+      "warehouse", "storage", "services", "it", "consulting", "advertising_agency",
+      "notary", "lawyer", "photographer", "event_planner", "copyshop", "employment_agency",
+      "medical_laboratory", "care_services", "rehabilitation_center", "psychotherapist",
       "chiropractor", "physiotherapist", "alternative_healthcare", "assisted_living_facility"
     ],
     icon: <GlobalOutlined />,
@@ -627,7 +644,11 @@ export default function MapPage() {
   const [resultsOpen, setResultsOpen] = useState(false);
   const [resultsTab, setResultsTab] = useState("all");
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+
+
   const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeRoute, setActiveRoute] = useState(null);
@@ -679,7 +700,7 @@ export default function MapPage() {
   };
 
   const themeClass = isDarkMode ? "theme-night" : "theme-day";
-  const mapStyleIndex = isDarkMode ? 1 : 0; 
+  const mapStyleIndex = isDarkMode ? 1 : 0;
 
   const [formattedTime, setFormattedTime] = useState("");
   useEffect(() => {
@@ -701,8 +722,10 @@ export default function MapPage() {
       if (filterOpen) setFilterOpen(false);
       if (isChatOpen) setIsChatOpen(false);
       if (bookingOpen) setBookingOpen(false);
+      if (currencyOpen) setCurrencyOpen(false);
       if (fabExpanded) setFabExpanded(false);
     }
+
   }, [resultsOpen]); // Only react when resultsOpen changes
 
   useEffect(() => {
@@ -710,7 +733,9 @@ export default function MapPage() {
       if (resultsOpen) setResultsOpen(false);
       if (isChatOpen) setIsChatOpen(false);
       if (bookingOpen) setBookingOpen(false);
+      if (currencyOpen) setCurrencyOpen(false);
     }
+
   }, [filterOpen]);
 
   useEffect(() => {
@@ -718,7 +743,9 @@ export default function MapPage() {
       if (filterOpen) setFilterOpen(false);
       if (resultsOpen) setResultsOpen(false);
       if (bookingOpen) setBookingOpen(false);
+      if (currencyOpen) setCurrencyOpen(false);
     }
+
   }, [isChatOpen]);
 
   useEffect(() => {
@@ -1295,12 +1322,12 @@ export default function MapPage() {
       } catch (err) {
         // ignore
       }
-      
+
       // Secondary delay ensures projection sticks for styles that might override it
       setTimeout(() => {
         try {
           if (map) map.setProjection("globe");
-        } catch(e) {}
+        } catch (e) { }
       }, 500);
     }
   }, [is3D]);
@@ -1310,7 +1337,7 @@ export default function MapPage() {
     if (map) {
       ensureMapbox3D(map, is3D);
       hideTrafficLayers(map);
-      
+
       // Force Globe forcefully
       try {
         map.setProjection({ name: "globe" });
@@ -1327,9 +1354,9 @@ export default function MapPage() {
       setTimeout(() => {
         try {
           if (map) {
-             map.setProjection({ name: "globe" });
+            map.setProjection({ name: "globe" });
           }
-        } catch(e) {}
+        } catch (e) { }
       }, 300);
     }
   }, [is3D]);
@@ -1622,15 +1649,15 @@ export default function MapPage() {
           <div className="brand-logo vivid-brand">Vacanza</div>
         </div>
         <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div 
-              className="vivid-theme-toggle" 
-              onClick={toggleTheme}
-              title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
-            >
-              <button className={`toggle-btn ${isDarkMode ? 'is-night' : 'is-day'}`}>
-                {isDarkMode ? <SunOutlined /> : <MoonOutlined />}
-              </button>
-            </div>
+          <div
+            className="vivid-theme-toggle"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
+          >
+            <button className={`toggle-btn ${isDarkMode ? 'is-night' : 'is-day'}`}>
+              {isDarkMode ? <SunOutlined /> : <MoonOutlined />}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1643,8 +1670,9 @@ export default function MapPage() {
 
         <div className="sidebar-user-section">
           <div className="sidebar-avatar-wrapper">
-            <Avatar size={90} icon={<UserOutlined />} src={user?.photoURL} className="sidebar-avatar" />
+            <SidebarAvatar imageUrl={user?.photoURL} hasProfilePhoto={profile?.hasProfilePhoto} />
           </div>
+
           <div className="sidebar-info" style={{ textAlign: "center" }}>
             <div className="sidebar-username">{profile?.preferredName || profile?.firstName || user?.displayName || "Adventurer"}</div>
             <div className="sidebar-role">{gamification?.levelText || "Level 1 Explorer"}</div>
@@ -1666,7 +1694,12 @@ export default function MapPage() {
             <UserOutlined /> Account Profile
           </button>
 
+          <button className="sidebar-item vivid-interactive" onClick={() => { setCalendarOpen(true); setSidebarOpen(false); }}>
+            <CalendarOutlined /> My Calendar
+          </button>
+
           <button className="sidebar-item vivid-interactive" onClick={() => { setPreferencesModalOpen(true); setSidebarOpen(false); }}>
+
             <SettingsIcon /> Preferences
           </button>
 
@@ -1815,7 +1848,9 @@ export default function MapPage() {
                 <PencilIcon />
               </button>
             </Tooltip>
+
             <Tooltip title="Book Flights & Hotels" placement="left">
+
               <button className="sub-fab vivid-interactive" onClick={() => { setBookingOpen(true); setFabExpanded(false); }}>
                 <CalendarOutlined />
               </button>
@@ -1864,7 +1899,12 @@ export default function MapPage() {
           </div>
         )}
 
+        {/* 8. Trip Calendar */}
+        <CalendarModal open={calendarOpen} onClose={() => setCalendarOpen(false)} />
+
         {/* 6. Results Sheet (Glass) */}
+
+
         {canShowResultsPanel && (
           <div className="glass-panel results-sheet">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -1903,8 +1943,8 @@ export default function MapPage() {
             <div style={{ height: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4, display: "flex", flexDirection: "column" }}>
               {poiLoading ? (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, opacity: 0.8 }}>
-                   <Spin size="large" />
-                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sub)" }}>Finding nearby gems...</div>
+                  <Spin size="large" />
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sub)" }}>Finding nearby gems...</div>
                 </div>
               ) : resultsPois.length > 0 ? (
                 resultsPois.map(p => (
@@ -1938,8 +1978,8 @@ export default function MapPage() {
                 ))
               ) : (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
-                   <GlobalOutlined style={{ fontSize: 32, marginBottom: 12 }} />
-                   <div style={{ fontSize: 14, fontWeight: 600 }}>No results in this area</div>
+                  <GlobalOutlined style={{ fontSize: 32, marginBottom: 12 }} />
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>No results in this area</div>
                 </div>
               )}
             </div>
@@ -1957,7 +1997,7 @@ export default function MapPage() {
         </Modal>
 
         <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
-        
+
         {/* 7. Itinerary/Route Card (RoutePanel) - RESTORED */}
         {activeRoute && (
           <RoutePanel
@@ -1980,16 +2020,16 @@ export default function MapPage() {
             setIsChatOpen(false);
           }}
         />
-        <ProfileModal 
-          open={profileModalOpen} 
-          onClose={() => setProfileModalOpen(false)} 
-          user={user} 
+        <ProfileModal
+          open={profileModalOpen}
+          onClose={() => setProfileModalOpen(false)}
+          user={user}
           themeClass={themeClass}
           isDarkMode={isDarkMode}
         />
-        <PreferencesModal 
-          open={preferencesModalOpen} 
-          onClose={() => setPreferencesModalOpen(false)} 
+        <PreferencesModal
+          open={preferencesModalOpen}
+          onClose={() => setPreferencesModalOpen(false)}
           themeClass={themeClass}
           isDarkMode={isDarkMode}
         />
