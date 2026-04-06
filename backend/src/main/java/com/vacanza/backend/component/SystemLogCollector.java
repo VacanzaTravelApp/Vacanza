@@ -27,9 +27,17 @@ public class SystemLogCollector {
     }
 
     public void recordError(String path, String message) {
+        addLog("ERROR", path, message);
+    }
+
+    public void recordWarning(String path, String message) {
+        addLog("WARN", path, message);
+    }
+
+    private void addLog(String level, String path, String message) {
         LogEntry entry = LogEntry.builder()
                 .timestamp(Instant.now().toString())
-                .level("ERROR")
+                .level(level)
                 .message(message)
                 .source(path != null && !path.isBlank() ? path : "SYSTEM")
                 .build();
