@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
-/// Mode butonunun altında görünen küçük rozet.
-/// Aktif map view mode'u kısa etiketle gösterir (2D/3D/SAT).
+/// Harita butonlarının altında görünen küçük rozet.
+/// Basemap (STR/DARK/SAT) veya perspektif (2D/3D) etiketi.
 class MapModeBadge extends StatelessWidget {
   final String label;
 
@@ -12,14 +13,15 @@ class MapModeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vivid = context.vacanzaTokens.vividBlue;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xFF0096FF),
+        color: vivid,
         borderRadius: BorderRadius.circular(999),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
+            color: Colors.black.withValues(alpha: 0.10),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),

@@ -37,6 +37,8 @@ import '../../../poi_search/presentation/bloc/poi_search_state.dart';
 import '../../../poi_search/presentation/widgets/area_results/area_results_bottom_sheet.dart';
 import '../../../poi_search/presentation/widgets/poi_filter_panel.dart';
 
+import 'package:mobile/core/theme/theme_cubit.dart';
+
 import '../../../../features/booking/presentation/widgets/booking_bottom_sheet.dart';
 
 import '../../../chat/presentation/screens/chat_screen.dart';
@@ -413,9 +415,13 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
           );
 
           return HomeMapScaffold(
-            mode: state.viewMode,
+            basemap: state.basemap,
+            perspective: state.perspective,
             isDrawing: state.isDrawing,
-            onToggleMode: () => context.read<MapBloc>().add(const ToggleViewModePressed()),
+            onCycleBasemap: () =>
+                context.read<MapBloc>().add(const CycleBasemapPressed()),
+            onTogglePerspective: () =>
+                context.read<MapBloc>().add(const TogglePerspectivePressed()),
             onRecenter: () => context.read<MapBloc>().add(const RecenterPressed()),
             onToggleDrawing: () {
               final isDrawingNow = context.read<MapBloc>().state.isDrawing;
@@ -462,6 +468,8 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             onOpenChat: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
             },
+
+            onToggleTheme: () => context.read<ThemeCubit>().toggle(),
 
             // ===== Filters overlay =====
             isFiltersOpen: _filtersOpen,
