@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+
 import '../../../data/models/sort_criteria.dart';
 import '../../cubit/booking_cubit.dart';
 import '../../cubit/booking_state.dart';
@@ -18,8 +20,6 @@ class BookingFiltersView extends StatefulWidget {
 }
 
 class _BookingFiltersViewState extends State<BookingFiltersView> {
-  static const _accent = Color(0xFF0096FF);
-
   late final TextEditingController _budgetCtrl;
   late SortCriteria? _sort;
 
@@ -63,6 +63,9 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
+    final gradientColors = context.mapControlActiveGradientColors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -70,12 +73,12 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Filters',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1A1A1A),
+                color: cs.onSurface,
               ),
             ),
             GestureDetector(
@@ -85,13 +88,15 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
                 height: 32,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFF5F5F5),
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  color: cs.surfaceContainerHighest,
+                  border: Border.all(
+                    color: cs.outline.withValues(alpha: 0.35),
+                  ),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.close_rounded,
                   size: 16,
-                  color: Color(0xFF888888),
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),
@@ -100,15 +105,18 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
         const SizedBox(height: 6),
         Text(
           widget.filters.summary,
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
         ),
 
         const SizedBox(height: 24),
 
         // Budget field
-        _sectionLabel(widget.filters.type == BookingType.hotels
-            ? 'Budget per night'
-            : 'Budget'),
+        _sectionLabel(
+          context,
+          widget.filters.type == BookingType.hotels
+              ? 'Budget per night'
+              : 'Budget',
+        ),
         const SizedBox(height: 6),
         TextFormField(
           controller: _budgetCtrl,
@@ -117,22 +125,22 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
           ],
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF1A1A1A),
+            color: cs.onSurface,
           ),
           decoration: InputDecoration(
             hintText: 'No limit',
-            hintStyle: const TextStyle(
-              color: Color(0xFFBBBBBB),
+            hintStyle: TextStyle(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.85),
               fontSize: 13,
             ),
-            prefixIcon: const Padding(
-              padding: EdgeInsets.only(left: 14, right: 4),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.only(left: 14, right: 4),
               child: Text(
                 '\$',
-                style: TextStyle(fontSize: 15, color: Color(0xFFAAAAAA)),
+                style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant),
               ),
             ),
             prefixIconConstraints:
@@ -141,37 +149,37 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
               margin: const EdgeInsets.only(right: 10),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFFE5E5E5),
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Text(
+              child: Text(
                 'USD',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF666666),
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),
             suffixIconConstraints:
                 const BoxConstraints(minWidth: 0, minHeight: 0),
             filled: true,
-            fillColor: const Color(0xFFFAFAFA),
+            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 14,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+              borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+              borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: _accent, width: 1.5),
+              borderSide: BorderSide(color: accent, width: 1.5),
             ),
           ),
         ),
@@ -179,12 +187,12 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
         const SizedBox(height: 24),
 
         // Sort chips
-        _sectionLabel('Sort by'),
+        _sectionLabel(context, 'Sort by'),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: _options.map((s) => _sortChip(s)).toList(),
+          children: _options.map((s) => _sortChip(context, s)).toList(),
         ),
 
         const SizedBox(height: 32),
@@ -195,13 +203,11 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0096FF), Color(0xFF00C6FF)],
-              ),
+              gradient: LinearGradient(colors: gradientColors),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: _accent.withValues(alpha: 0.3),
+                  color: accent.withValues(alpha: 0.3),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
@@ -233,21 +239,21 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
+              color: cs.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.refresh_rounded,
-                    size: 16, color: Color(0xFF888888)),
-                SizedBox(width: 8),
+                    size: 16, color: cs.onSurfaceVariant),
+                const SizedBox(width: 8),
                 Text(
                   'Reset Filters',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF666666),
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -258,21 +264,24 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
     );
   }
 
-  Widget _sectionLabel(String text) {
+  Widget _sectionLabel(BuildContext context, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w500,
-          color: Color(0xFF999999),
+          color: cs.onSurfaceVariant,
         ),
       ),
     );
   }
 
-  Widget _sortChip(SortCriteria criteria) {
+  Widget _sortChip(BuildContext context, SortCriteria criteria) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
     final selected = _sort == criteria;
     final label = switch (criteria) {
       SortCriteria.priceAsc => 'Price ↑',
@@ -286,10 +295,10 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? _accent : const Color(0xFFFAFAFA),
+          color: selected ? accent : cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? _accent : const Color(0xFFE5E5E5),
+            color: selected ? accent : cs.outline.withValues(alpha: 0.35),
           ),
         ),
         child: Text(
@@ -297,7 +306,7 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: selected ? Colors.white : const Color(0xFF555555),
+            color: selected ? Colors.white : cs.onSurfaceVariant,
           ),
         ),
       ),
