@@ -41,8 +41,8 @@ public class AdminAnalyticsDTO {
     @AllArgsConstructor
     @Builder
     public static class CategoryMetric {
-        private String category;  // e.g. "History", "Nature", "Culture"
-        private long count;
+        private String name;   // e.g. "History", "Nature", "Culture"
+        private long value;
     }
 
     @Data
@@ -52,6 +52,6 @@ public class AdminAnalyticsDTO {
     public static class HighPerformanceAssetMetric {
         private String name;
         private String category;
-        private long visitCount;
+        private double score;
     }
 }

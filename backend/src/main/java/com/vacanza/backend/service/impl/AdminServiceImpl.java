@@ -17,7 +17,7 @@ import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -139,7 +139,7 @@ public class AdminServiceImpl implements AdminService {
         List<LogEntry> loginLogs = loginHistoryRepository.findTop50ByOrderByLoginTimeDesc().stream()
                 .map(lh -> LogEntry.builder()
                         .timestamp(lh.getLoginTime().toString())
-                        .level("INFO")
+                        .level("SUCCESS")
                         .message("User login via " + lh.getLoginProvider()
                                 + (lh.getIpAddress() != null ? " from " + lh.getIpAddress() : ""))
                         .source("AUTH")
@@ -190,19 +190,32 @@ public class AdminServiceImpl implements AdminService {
         // Category Breakdown
         List<CategoryMetric> categoryBreakdown = checkInRepository.findCategoryDistribution().stream()
                 .map(row -> CategoryMetric.builder()
-                        .category((String) row[0])
-                        .count((Long) row[1])
+                        .name((String) row[0])
+                        .value((Long) row[1])
                         .build())
                 .collect(Collectors.toList());
 
         // High Performance Asset Ranking (Top POIs)
-        List<HighPerformanceAssetMetric> highPerformanceAssets = checkInRepository.findTopPois().stream()
+        // Normalize visit counts to a 0-10 score scale
+        List<Object[]> topPoiRows = checkInRepository.findTopPois().stream()
                 .limit(10)
-                .map(row -> HighPerformanceAssetMetric.builder()
-                        .name((String) row[0])
-                        .category((String) row[1])
-                        .visitCount((Long) row[2])
-                        .build())
+                .collect(Collectors.toList());
+
+        long maxVisits = topPoiRows.stream()
+                .mapToLong(row -> (Long) row[2])
+                .max()
+                .orElse(1L);
+
+        List<HighPerformanceAssetMetric> highPerformanceAssets = topPoiRows.stream()
+                .map(row -> {
+                    long visits = (Long) row[2];
+                    double score = Math.round(((double) visits / maxVisits) * 100.0) / 10.0;
+                    return HighPerformanceAssetMetric.builder()
+                            .name((String) row[0])
+                            .category((String) row[1])
+                            .score(score)
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         return AdminAnalyticsDTO.builder()
