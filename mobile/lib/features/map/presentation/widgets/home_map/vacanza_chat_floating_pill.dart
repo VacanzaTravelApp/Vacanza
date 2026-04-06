@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 
-/// Floating “Ask Vacanza” entry — soft, airy pill above the map (bottom center).
+/// Aktif kalem / harita kontrolü ile aynı gradyan ([mapControlActiveGradientColors]).
 class VacanzaChatFloatingPill extends StatelessWidget {
   const VacanzaChatFloatingPill({
     super.key,
@@ -12,36 +12,31 @@ class VacanzaChatFloatingPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.vacanzaTokens;
-    final accent = t.vividBlue;
+    final gradientColors = context.mapControlActiveGradientColors;
+    final shadowColor = context.mapControlAccent;
+
     return Material(
       color: Colors.transparent,
       elevation: 0,
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(999),
-        splashColor: accent.withValues(alpha: 0.12),
-        highlightColor: accent.withValues(alpha: 0.06),
+        splashColor: Colors.white.withValues(alpha: 0.15),
+        highlightColor: Colors.white.withValues(alpha: 0.08),
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            color: t.pillSurface,
-            border: Border.all(
-              color: t.pillBorder,
-              width: 1.2,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradientColors,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.07),
-                blurRadius: 28,
+                color: shadowColor.withValues(alpha: 0.32),
+                blurRadius: 24,
                 offset: const Offset(0, 10),
                 spreadRadius: -4,
-              ),
-              BoxShadow(
-                color: t.pillShadowAccent,
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-                spreadRadius: -8,
               ),
             ],
           ),
@@ -50,19 +45,19 @@ class VacanzaChatFloatingPill extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.auto_awesome_rounded,
                   size: 20,
-                  color: accent.withValues(alpha: 0.95),
+                  color: Colors.white,
                 ),
                 const SizedBox(width: 10),
                 Text(
                   'Ask Vacanza',
                   style: TextStyle(
                     fontSize: 15.5,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: -0.2,
-                    color: t.textMain.withValues(alpha: 0.92),
+                    color: Colors.white.withValues(alpha: 0.98),
                   ),
                 ),
               ],

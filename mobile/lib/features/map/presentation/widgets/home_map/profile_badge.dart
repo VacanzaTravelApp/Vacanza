@@ -31,7 +31,7 @@ class ProfileBadge extends StatelessWidget {
 
   static const double _avatarSize = 38;
 
-  Widget _buildAvatar() {
+  Widget _buildAvatar(BuildContext context) {
     final hasBytes =
         profilePhotoBytes != null && profilePhotoBytes!.isNotEmpty;
     if (hasBytes) {
@@ -44,7 +44,7 @@ class ProfileBadge extends StatelessWidget {
             fit: BoxFit.cover,
             alignment: Alignment.center,
             filterQuality: FilterQuality.medium,
-            errorBuilder: (_, __, ___) => _placeholderAvatar(),
+            errorBuilder: (ctx, __, ___) => _placeholderAvatar(ctx),
           ),
         ),
       );
@@ -61,11 +61,11 @@ class ProfileBadge extends StatelessWidget {
             fit: BoxFit.cover,
             alignment: Alignment.center,
             filterQuality: FilterQuality.medium,
-            loadingBuilder: (_, child, loadingProgress) {
+            loadingBuilder: (ctx, child, loadingProgress) {
               if (loadingProgress == null) return child;
-              return _placeholderAvatar();
+              return _placeholderAvatar(ctx);
             },
-            errorBuilder: (_, __, ___) => _placeholderAvatar(),
+            errorBuilder: (ctx, __, ___) => _placeholderAvatar(ctx),
           ),
         ),
       );
@@ -83,19 +83,20 @@ class ProfileBadge extends StatelessWidget {
         ),
       );
     }
-    return _placeholderAvatar();
+    return _placeholderAvatar(context);
   }
 
-  Widget _placeholderAvatar() {
+  Widget _placeholderAvatar(BuildContext context) {
+    final colors = context.mapControlActiveGradientColors;
     return Container(
       width: _avatarSize,
       height: _avatarSize,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0096FF), Color(0xFF2ECC71)],
+          colors: colors,
         ),
       ),
       child: const Icon(Icons.person, color: Colors.white, size: 20),
@@ -122,7 +123,7 @@ class ProfileBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildAvatar(),
+          _buildAvatar(context),
           const SizedBox(width: 10),
 
           // Texts
@@ -141,7 +142,11 @@ class ProfileBadge extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: TextStyle(fontSize: 11, color: t.vividBlue),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: context.mapControlAccent,
+                ),
               ),
             ],
           ),

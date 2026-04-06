@@ -237,7 +237,13 @@ class HomeMapScaffold extends StatelessWidget {
           ],
 
           // ================= RESULTS SHEET (BOTTOM) =================
-          if (showResults) resultsSheet!,
+          if (showResults)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: padding.bottom + 16,
+              child: resultsSheet!,
+            ),
         ],
       ),
     );
