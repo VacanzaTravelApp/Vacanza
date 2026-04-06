@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+
 import '../../../data/models/booking_utils.dart';
 import '../../../data/models/transport_option.dart';
 import '../booking_url_launcher.dart';
@@ -17,10 +19,10 @@ class FlightCard extends StatefulWidget {
 class _FlightCardState extends State<FlightCard> {
   bool _isLaunching = false;
 
-  static const _accent = Color(0xFF0096FF);
-
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
     final flight = widget.flight;
     final depTime = formatTime(flight.departureTime);
     final arrTime = formatTime(flight.arrivalTime);
@@ -32,12 +34,12 @@ class _FlightCardState extends State<FlightCard> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFF0F0F0)),
+        color: cs.surface,
+        border: Border.all(color: cs.outline.withValues(alpha: 0.25)),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: cs.shadow.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -51,9 +53,11 @@ class _FlightCardState extends State<FlightCard> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
+                  color: cs.surfaceContainerHighest,
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFF0F0F0)),
+                  border: Border.all(
+                    color: cs.outline.withValues(alpha: 0.2),
+                  ),
                   image: flight.airlineLogo != null &&
                           flight.airlineLogo!.isNotEmpty
                       ? DecorationImage(
@@ -69,10 +73,10 @@ class _FlightCardState extends State<FlightCard> {
                           flight.carrier,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF888888),
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                       )
@@ -85,10 +89,10 @@ class _FlightCardState extends State<FlightCard> {
                   children: [
                     Text(
                       '$depTime – $arrTime',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
+                        color: cs.onSurface,
                       ),
                     ),
                     Text(
@@ -100,7 +104,7 @@ class _FlightCardState extends State<FlightCard> {
                       ].join(' · '),
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade500,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -111,10 +115,10 @@ class _FlightCardState extends State<FlightCard> {
                 children: [
                   Text(
                     '\$${flight.price.toStringAsFixed(0)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: _accent,
+                      color: accent,
                     ),
                   ),
                   if (flight.travelClass != null &&
@@ -127,15 +131,15 @@ class _FlightCardState extends State<FlightCard> {
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
+                          color: accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           flight.travelClass!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF1D4ED8),
+                            color: accent,
                           ),
                         ),
                       ),
@@ -150,9 +154,9 @@ class _FlightCardState extends State<FlightCard> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(flight.origin, style: _routeLabel),
-                  Text(dur, style: _routeLabel),
-                  Text(flight.destination, style: _routeLabel),
+                  Text(flight.origin, style: _routeLabel(context)),
+                  Text(dur, style: _routeLabel(context)),
+                  Text(flight.destination, style: _routeLabel(context)),
                 ],
               ),
               const SizedBox(height: 4),
@@ -162,7 +166,7 @@ class _FlightCardState extends State<FlightCard> {
                   Container(
                     height: 2,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE0E0E0),
+                      color: cs.outline.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(1),
                     ),
                   ),
@@ -171,10 +175,10 @@ class _FlightCardState extends State<FlightCard> {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cs.surface,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFFAAAAAA),
+                          color: cs.onSurfaceVariant,
                           width: 2,
                         ),
                       ),
@@ -186,8 +190,8 @@ class _FlightCardState extends State<FlightCard> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: flight.stops == 0
-                      ? const Color(0xFFF0FFF4)
-                      : const Color(0xFFFFF7ED),
+                      ? const Color(0xFF22C55E).withValues(alpha: 0.12)
+                      : const Color(0xFFF97316).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -221,8 +225,10 @@ class _FlightCardState extends State<FlightCard> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFAFAFA),
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                  border: Border.all(
+                    color: cs.outline.withValues(alpha: 0.35),
+                  ),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -230,17 +236,17 @@ class _FlightCardState extends State<FlightCard> {
                   children: [
                     Text(
                       _isLaunching ? 'Opening…' : 'Open in Google Flights',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF555555),
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Icon(
+                    Icon(
                       Icons.arrow_forward_rounded,
                       size: 14,
-                      color: Color(0xFF555555),
+                      color: cs.onSurfaceVariant,
                     ),
                   ],
                 ),
@@ -252,8 +258,11 @@ class _FlightCardState extends State<FlightCard> {
     );
   }
 
-  static const _routeLabel = TextStyle(
-    fontSize: 11,
-    color: Color(0xFF999999),
-  );
+  TextStyle _routeLabel(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return TextStyle(
+      fontSize: 11,
+      color: cs.onSurfaceVariant,
+    );
+  }
 }
