@@ -15,6 +15,7 @@ class AdultsStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -22,31 +23,33 @@ class AdultsStepper extends StatelessWidget {
           padding: const EdgeInsets.only(left: 4, bottom: 4),
           child: Text(
             'Adults',
-            style: BookingSearchFieldStyles.fieldLabel,
+            style: BookingSearchFieldStyles.fieldLabel(context),
           ),
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFFFAFAFA),
-            border: Border.all(color: const Color(0xFFE5E5E5)),
+            color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+            border: Border.all(
+              color: cs.outline.withValues(alpha: 0.35),
+            ),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
-              _button(Icons.remove, value > 1, () => onChanged(value - 1)),
+              _button(context, Icons.remove, value > 1, () => onChanged(value - 1)),
               Expanded(
                 child: Text(
                   '$value',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF1A1A1A),
+                    color: cs.onSurface,
                   ),
                 ),
               ),
-              _button(Icons.add, value < 10, () => onChanged(value + 1)),
+              _button(context, Icons.add, value < 10, () => onChanged(value + 1)),
             ],
           ),
         ),
@@ -54,18 +57,24 @@ class AdultsStepper extends StatelessWidget {
     );
   }
 
-  Widget _button(IconData icon, bool enabled, VoidCallback onTap) {
+  Widget _button(
+    BuildContext context,
+    IconData icon,
+    bool enabled,
+    VoidCallback onTap,
+  ) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Container(
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cs.surface,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: cs.shadow.withValues(alpha: 0.06),
               blurRadius: 3,
               offset: const Offset(0, 1),
             ),
@@ -74,7 +83,7 @@ class AdultsStepper extends StatelessWidget {
         child: Icon(
           icon,
           size: 18,
-          color: enabled ? const Color(0xFF666666) : const Color(0xFFCCCCCC),
+          color: enabled ? cs.onSurfaceVariant : cs.outline,
         ),
       ),
     );

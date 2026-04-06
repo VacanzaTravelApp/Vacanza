@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+
 import '../../cubit/booking_state.dart';
 
 /// Segmented toggle for Hotels / Flights.
@@ -13,14 +15,15 @@ class BookingTypeToggle extends StatelessWidget {
     required this.onChanged,
   });
 
-  static const _accent = Color(0xFF0096FF);
-
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
+    final track = cs.surfaceContainerHighest.withValues(alpha: 0.9);
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5).withValues(alpha: 0.8),
+        color: track,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Stack(
@@ -37,11 +40,11 @@ class BookingTypeToggle extends StatelessWidget {
               child: Container(
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cs.surface,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
+                      color: cs.shadow.withValues(alpha: 0.08),
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
@@ -53,8 +56,10 @@ class BookingTypeToggle extends StatelessWidget {
           // Buttons
           Row(
             children: [
-              _tab(BookingType.hotels, Icons.hotel_rounded, 'Hotels'),
-              _tab(BookingType.flights, Icons.flight_rounded, 'Flights'),
+              _tab(context, BookingType.hotels, Icons.hotel_rounded, 'Hotels',
+                  accent, cs),
+              _tab(context, BookingType.flights, Icons.flight_rounded, 'Flights',
+                  accent, cs),
             ],
           ),
         ],
@@ -62,8 +67,16 @@ class BookingTypeToggle extends StatelessWidget {
     );
   }
 
-  Widget _tab(BookingType type, IconData icon, String label) {
+  Widget _tab(
+    BuildContext context,
+    BookingType type,
+    IconData icon,
+    String label,
+    Color accent,
+    ColorScheme cs,
+  ) {
     final isActive = selected == type;
+    final inactiveMuted = cs.onSurfaceVariant;
     return Expanded(
       child: GestureDetector(
         onTap: () => onChanged(type),
@@ -76,7 +89,7 @@ class BookingTypeToggle extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: isActive ? _accent : const Color(0xFF64748B),
+                color: isActive ? accent : inactiveMuted,
               ),
               const SizedBox(width: 6),
               Text(
@@ -84,7 +97,7 @@ class BookingTypeToggle extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: isActive ? _accent : const Color(0xFF475569),
+                  color: isActive ? accent : inactiveMuted,
                 ),
               ),
             ],
