@@ -72,7 +72,7 @@ class _AppTextFieldState extends State<AppTextField> {
       borderColor = Colors.red;
       shadows = [
         BoxShadow(
-          color: Colors.red.withOpacity(0.22),
+          color: Colors.red.withValues(alpha: 0.22),
           blurRadius: 3,
           spreadRadius: 0,
           offset: const Offset(0, 1),
@@ -82,7 +82,7 @@ class _AppTextFieldState extends State<AppTextField> {
       borderColor = AppColors.primary;
       shadows = [
         BoxShadow(
-          color: AppColors.primary.withOpacity(0.20),
+          color: AppColors.primary.withValues(alpha: 0.20),
           blurRadius: 3,
           spreadRadius: 0,
           offset: const Offset(0, 1),
@@ -123,6 +123,15 @@ class _AppTextFieldState extends State<AppTextField> {
             keyboardType: widget.keyboardType,
             validator: widget.validator,
             onChanged: widget.onChanged,
+            // Auth ekranları hâlâ açık (Figma) input paletini kullanıyor; tema [dark]
+            // iken Material varsayılan yazı rengi [onSurface] açık kalıyor — beyaz
+            // fill üzerinde görünmez oluyor. Sabit koyu metin rengi gerekli.
+            style: const TextStyle(
+              color: AppColors.textHeading,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            cursorColor: AppColors.primary,
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 20,
