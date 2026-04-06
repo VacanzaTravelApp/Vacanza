@@ -15,6 +15,7 @@ import '../bloc/profile_event.dart';
 import '../bloc/profile_section.dart';
 import '../bloc/profile_state.dart';
 import '../styles/profile_ui_style.dart';
+import '../widgets/appearance_settings_sheet.dart';
 import '../widgets/edit_preferences_sheet.dart';
 import '../widgets/edit_profile_sheet.dart';
 import '../widgets/profile_character_card.dart';
@@ -213,6 +214,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           );
                       _openEditPreferencesSheet(context, initial);
                     },
+                    onAppearance: () => showAppearanceSettingsSheet(context),
                   );
                 },
               ),
@@ -1035,10 +1037,12 @@ class _CheckInHistoryCard extends StatelessWidget {
 class _AccountActionsSection extends StatelessWidget {
   final VoidCallback onEditProfile;
   final VoidCallback onEditPreferences;
+  final VoidCallback onAppearance;
 
   const _AccountActionsSection({
     required this.onEditProfile,
     required this.onEditPreferences,
+    required this.onAppearance,
   });
 
   InkWell _accountRow({
@@ -1108,6 +1112,23 @@ class _AccountActionsSection extends StatelessWidget {
               icon: Icons.tune,
             ),
             title: 'Edit Preferences',
+            titleStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: ProfileUIColors.profileGray800,
+            ),
+            chevronColor: ProfileUIColors.profileGray400,
+          ),
+          Divider(height: 1, thickness: 1, color: ProfileUIColors.profileGray100),
+          _accountRow(
+            context: context,
+            onTap: onAppearance,
+            iconContainer: profileAccountIconContainer(
+              backgroundColor: ProfileUIColors.profileOrange.withValues(alpha: 0.12),
+              iconColor: ProfileUIColors.profileOrange,
+              icon: Icons.dark_mode_outlined,
+            ),
+            title: 'Appearance',
             titleStyle: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
