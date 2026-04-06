@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -8,7 +9,8 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
 import '../../../../../poi_search/data/models/area_source.dart';
 import '../../../../../poi_search/data/models/selected_area.dart';
 import '../../../../../poi_search/presentation/bloc/area_query_bloc.dart';
-import '../../../../../poi_search/presentation/bloc/area_query_event.dart' as aq;
+import '../../../../../poi_search/presentation/bloc/area_query_event.dart'
+    as aq;
 import '../../../../../poi_search/presentation/bloc/area_query_state.dart';
 import '../../../../../poi_search/presentation/bloc/poi_search_bloc.dart';
 import '../../../../../poi_search/presentation/bloc/poi_search_state.dart';
@@ -26,6 +28,7 @@ import '../markers/poi_markers_controller.dart';
 import '../markers/poi_markers_listener.dart';
 import 'mapbox_view.dart';
 import 'package:mobile/core/config/mapbox_config.dart';
+import '../../../../../poi_search/data/services/style_poi_discovery_binding.dart';
 
 class MapCanvasMapbox extends StatefulWidget {
   const MapCanvasMapbox({super.key});
@@ -37,26 +40,28 @@ class MapCanvasMapbox extends StatefulWidget {
 class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   mb.MapboxMap? _map;
   PoiMarkersController? _poiMarkers;
+  StylePoiDiscoveryBinding? _styleBinding;
 
-  /// en son yüklenen style
   String? _lastStyleUri;
 
-  /// mode switch / recenter sırasında viewport bbox event'lerini dondur
   bool _suspendViewportUpdates = false;
-
   Timer? _resumeTimer;
 
-  /// Map idle oldukça (user selection varsa) polygon screen path'i rebuild etmek için tick
   int _selectionRebuildTick = 0;
-
-  /// Annotation manager yeniden oluşturulunca widget tree'yi rebuild etmek için key
   int _markerControllerKey = 0;
 
   @override
   void dispose() {
     _resumeTimer?.cancel();
-    unawaited(_poiMarkers?.dispose()); // unawaited
+    _styleBinding?.detachMap();
+    unawaited(_poiMarkers?.dispose());
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _styleBinding = context.read<StylePoiDiscoveryBinding>();
   }
 
   void _suspendViewportFor({required int ms}) {
@@ -66,8 +71,66 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     _resumeTimer = Timer(Duration(milliseconds: ms), () {
       if (!mounted) return;
       _suspendViewportUpdates = false;
+      unawaited(_emitCurrentViewportBbox());
     });
   }
+
+  Future<void> _emitCurrentViewportBbox() async {
+    final map = _map;
+    if (map == null) return;
+    if (!mounted) return;
+
+    try {
+      final cs = await map.getCameraState();
+      final cb = await map.coordinateBoundsForCamera(
+        mb.CameraOptions(
+          center: cs.center,
+          zoom: cs.zoom,
+          bearing: cs.bearing,
+          pitch: cs.pitch,
+        ),
+      );
+
+      final sw = cb.southwest.coordinates;
+      final ne = cb.northeast.coordinates;
+
+      final bbox = BboxArea(
+        minLat: (sw[1] as num).toDouble(),
+        minLng: (sw[0] as num).toDouble(),
+        maxLat: (ne[1] as num).toDouble(),
+        maxLng: (ne[0] as num).toDouble(),
+      );
+
+      if (!mounted) return;
+      final areaCtx = context.read<AreaQueryBloc>().state.context;
+      if (areaCtx.areaSource == AreaSource.userSelection) return;
+
+      context.read<AreaQueryBloc>().add(aq.ViewportChanged(bbox));
+      log('[MapCanvas] Viewport bbox re-emitted after suspend');
+    } catch (e) {
+      log('[MapCanvas] _emitCurrentViewportBbox failed: $e');
+    }
+  }
+
+  // ── Native location puck (minimal settings) ───────────────────────
+
+  Future<void> _enableLocationPuck(mb.MapboxMap map) async {
+    try {
+      await map.location.updateSettings(
+        mb.LocationComponentSettings(
+          enabled: true,
+          pulsingEnabled: true,
+          showAccuracyRing: true,
+          puckBearingEnabled: true,
+        ),
+      );
+      log('[MapCanvas] Location puck enabled (minimal)');
+    } catch (e, st) {
+      log('[MapCanvas] Location puck failed: $e\n$st');
+    }
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -77,197 +140,247 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     final areaCtx = areaState.context;
 
     final PolygonArea? activeSelectionPolygon =
-    (areaCtx.areaSource == AreaSource.userSelection && areaCtx.area is PolygonArea)
-        ? (areaCtx.area as PolygonArea)
-        : null;
+        (areaCtx.areaSource == AreaSource.userSelection &&
+                areaCtx.area is PolygonArea)
+            ? (areaCtx.area as PolygonArea)
+            : null;
 
-    return MultiBlocListener(
-      listeners: [
-        // ViewMode değişimi
-        BlocListener<MapBloc, MapState>(
-          listenWhen: (prev, next) => prev.viewMode != next.viewMode,
-          listener: (context, state) async {
-            final map = _map;
-            if (map == null) return;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final h = constraints.maxHeight;
+        if (w.isFinite && h.isFinite && w >= 16 && h >= 16) {
+          _styleBinding?.updateViewportSize(Size(w, h));
+        }
 
-            log('[MapCanvas] ViewMode changing to ${state.viewMode.label}');
+        return MultiBlocListener(
+          listeners: [
+            // ── ViewMode change ──────────────────────────────────────
+            BlocListener<MapBloc, MapState>(
+              listenWhen: (prev, next) => prev.viewMode != next.viewMode,
+              listener: (context, state) async {
+                final map = _map;
+                if (map == null) return;
 
-            _suspendViewportFor(ms: 900);
+                log('[MapCanvas] ViewMode changing to ${state.viewMode.label}');
 
-            final bool styleChanged = await _applyViewMode(state.viewMode);
+                _suspendViewportFor(ms: 900);
 
-            // Style değiştiyse annotation manager'ı tamamen yeniden oluştur
-            if (styleChanged) {
-              log('[MapCanvas] Style changed -> recreating PoiMarkersController');
+                final bool styleChanged = await _applyViewMode(state.viewMode);
 
-              final oldController = _poiMarkers;
-              if (oldController != null) {
-                await oldController.dispose();
-              }
+                if (styleChanged) {
+                  log(
+                    '[MapCanvas] Style changed -> recreating PoiMarkersController',
+                  );
 
-              final newController = PoiMarkersController(map);
-              await newController.init();
+                  final oldController = _poiMarkers;
+                  if (oldController != null) {
+                    await oldController.dispose();
+                  }
 
-              // ✅ init fail olduysa state'e basma
-              if (!newController.isReady) {
-                log('[MapCanvas] PoiMarkersController init failed after style change');
-                if (!mounted) return;
-                setState(() {
-                  _poiMarkers = null;
-                  _markerControllerKey++;
-                });
-                return;
-              }
+                  final newController = PoiMarkersController(map);
+                  await newController.init();
 
-              if (!mounted) return;
-              setState(() {
-                _poiMarkers = newController;
-                _markerControllerKey++;
-              });
+                  if (!newController.isReady) {
+                    log(
+                      '[MapCanvas] PoiMarkersController init failed after style change',
+                    );
+                    if (!mounted) return;
+                    setState(() {
+                      _poiMarkers = null;
+                      _markerControllerKey++;
+                    });
+                    return;
+                  }
 
-              log('[MapCanvas] New controller created key=$_markerControllerKey');
+                  if (!mounted) return;
+                  setState(() {
+                    _poiMarkers = newController;
+                    _markerControllerKey++;
+                  });
 
-              // mevcut POI state'ini yeniden uygula (opsiyonel ama faydalı)
-              final poiState = context.read<PoiSearchBloc>().state;
+                  log(
+                    '[MapCanvas] New controller created key=$_markerControllerKey',
+                  );
 
-              if (poiState.status == PoiSearchStatus.success && poiState.pois.isNotEmpty) {
-                log('[MapCanvas] Reapplying ${poiState.pois.length} POIs to new controller');
-                await newController.setPois(poiState.pois);
-              } else {
-                await newController.clear();
-              }
-            }
-          },
-        ),
+                  final poiState = context.read<PoiSearchBloc>().state;
 
-        // Recenter → fly to latest GPS position (MOB-6)
-        BlocListener<MapBloc, MapState>(
-          listenWhen: (prev, next) => prev.recenterTick != next.recenterTick,
-          listener: (context, state) async {
-            final map = _map;
-            if (map == null) return;
+                  if (poiState.status == PoiSearchStatus.success &&
+                      poiState.pois.isNotEmpty) {
+                    log(
+                      '[MapCanvas] Reapplying ${poiState.pois.length} POIs to new controller',
+                    );
+                    await newController.setPois(poiState.pois);
+                  } else {
+                    await newController.clear();
+                  }
+                }
 
-            final loc = context.read<LocationBloc>().state;
+                // Re-enable puck after style change
+                if (mounted) {
+                  await _enableLocationPuck(map);
+                }
+              },
+            ),
 
-            if (loc.latitude == null || loc.longitude == null) {
-              log('[MapCanvas] Recenter — no GPS fix yet, showing fallback message');
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Location not available'),
-                  duration: Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-              return;
-            }
+            // ── Recenter → fly to latest GPS position (MOB-6) ────────
+            BlocListener<MapBloc, MapState>(
+              listenWhen:
+                  (prev, next) => prev.recenterTick != next.recenterTick,
+              listener: (context, state) async {
+                final map = _map;
+                if (map == null) return;
 
-            log('[MapCanvas] Recenter to GPS lat=${loc.latitude} lng=${loc.longitude}');
-            _suspendViewportFor(ms: 800);
+                final loc = context.read<LocationBloc>().state;
 
-            await map.flyTo(
-              mb.CameraOptions(
-                center: mb.Point(
-                  coordinates: mb.Position(loc.longitude!, loc.latitude!),
-                ),
-                zoom: 15.0,
-                pitch: 0,
-                bearing: 0,
-              ),
-              mb.MapAnimationOptions(duration: 600, startDelay: 0),
-            );
-          },
-        ),
+                if (loc.latitude == null || loc.longitude == null) {
+                  log(
+                    '[MapCanvas] Recenter — no GPS fix yet',
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Location not available'),
+                      duration: Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
 
-        // ================= First GPS fix → center camera once (MOB-6) =================
-        BlocListener<LocationBloc, LocationState>(
-          listenWhen: (prev, next) => !prev.isFirstFix && next.isFirstFix,
-          listener: (context, state) async {
-            final map = _map;
-            if (map == null) return;
-            if (state.latitude == null || state.longitude == null) return;
+                log(
+                  '[MapCanvas] Recenter to GPS lat=${loc.latitude} lng=${loc.longitude}',
+                );
+                _suspendViewportFor(ms: 800);
 
-            log('[MapCanvas] ★ first GPS fix — flying camera to '
-                'lat=${state.latitude}, lng=${state.longitude}');
-
-            _suspendViewportFor(ms: 800);
-
-            await map.flyTo(
-              mb.CameraOptions(
-                center: mb.Point(
-                  coordinates: mb.Position(
-                    state.longitude!,
-                    state.latitude!,
+                await map.flyTo(
+                  mb.CameraOptions(
+                    center: mb.Point(
+                      coordinates: mb.Position(loc.longitude!, loc.latitude!),
+                    ),
+                    zoom: 15.0,
+                    pitch: 0,
+                    bearing: 0,
                   ),
-                ),
-                zoom: 15.0,
-                pitch: 0,
-                bearing: 0,
+                  mb.MapAnimationOptions(duration: 600, startDelay: 0),
+                );
+              },
+            ),
+
+            // ── First GPS fix → center camera once (MOB-6) ──────────
+            BlocListener<LocationBloc, LocationState>(
+              listenWhen: (prev, next) => !prev.isFirstFix && next.isFirstFix,
+              listener: (context, state) async {
+                final map = _map;
+                if (map == null) return;
+                if (state.latitude == null || state.longitude == null) return;
+
+                log(
+                  '[MapCanvas] ★ first GPS fix — flying camera to '
+                  'lat=${state.latitude}, lng=${state.longitude}',
+                );
+
+                _suspendViewportFor(ms: 800);
+
+                await map.flyTo(
+                  mb.CameraOptions(
+                    center: mb.Point(
+                      coordinates: mb.Position(
+                        state.longitude!,
+                        state.latitude!,
+                      ),
+                    ),
+                    zoom: 15.0,
+                    pitch: 0,
+                    bearing: 0,
+                  ),
+                  mb.MapAnimationOptions(duration: 600, startDelay: 0),
+                );
+              },
+            ),
+          ],
+          child: Stack(
+            children: [
+              MapboxView(
+                ignoreGestures: isDrawing,
+                onMapCreated: _onMapCreated,
+                onMapIdle: () {
+                  if (_map == null) return;
+                  if (isDrawing) return;
+
+                  final ctx = context.read<AreaQueryBloc>().state.context;
+                  if (ctx.areaSource != AreaSource.userSelection) return;
+                  if (ctx.area is! PolygonArea) return;
+
+                  if (!mounted) return;
+                  setState(() => _selectionRebuildTick++);
+                },
+                onViewportBbox: (bbox) {
+                  if (_suspendViewportUpdates) return;
+
+                  final ctx = context.read<AreaQueryBloc>().state.context;
+                  if (ctx.areaSource == AreaSource.userSelection) return;
+
+                  context.read<AreaQueryBloc>().add(aq.ViewportChanged(bbox));
+                },
               ),
-              mb.MapAnimationOptions(duration: 600, startDelay: 0),
-            );
-          },
-        ),
-      ],
-      child: Stack(
-        children: [
-          MapboxView(
-            ignoreGestures: isDrawing,
-            onMapCreated: _onMapCreated,
-            onMapIdle: () {
-              if (_map == null) return;
-              if (isDrawing) return;
 
-              final ctx = context.read<AreaQueryBloc>().state.context;
-              if (ctx.areaSource != AreaSource.userSelection) return;
-              if (ctx.area is! PolygonArea) return;
+              PoiMarkersListener(
+                key: ValueKey(_markerControllerKey),
+                poiMarkers: _poiMarkers,
+              ),
 
-              if (!mounted) return;
-              setState(() => _selectionRebuildTick++);
-            },
-            onViewportBbox: (bbox) {
-              if (_suspendViewportUpdates) return;
-
-              final ctx = context.read<AreaQueryBloc>().state.context;
-              if (ctx.areaSource == AreaSource.userSelection) return;
-
-              context.read<AreaQueryBloc>().add(aq.ViewportChanged(bbox));
-            },
+              MapDrawingOverlay(
+                isDrawing: isDrawing,
+                map: _map,
+                activeSelectionPolygon: activeSelectionPolygon,
+                rebuildTick: _selectionRebuildTick,
+                onPolygonFinished: (polygon) {
+                  context.read<AreaQueryBloc>().add(
+                    aq.UserSelectionChanged(polygon),
+                  );
+                  context.read<MapBloc>().add(SetDrawingEnabled(false));
+                },
+              ),
+            ],
           ),
-
-          // Key ile listener'ı yeniden oluştur
-          PoiMarkersListener(
-            key: ValueKey(_markerControllerKey),
-            poiMarkers: _poiMarkers,
-          ),
-
-          MapDrawingOverlay(
-            isDrawing: isDrawing,
-            map: _map,
-            activeSelectionPolygon: activeSelectionPolygon,
-            rebuildTick: _selectionRebuildTick,
-            onPolygonFinished: (polygon) {
-              context.read<AreaQueryBloc>().add(aq.UserSelectionChanged(polygon));
-              context.read<MapBloc>().add(SetDrawingEnabled(false));
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
+  // ── Map init ───────────────────────────────────────────────────────
+
   Future<void> _onMapCreated(mb.MapboxMap mapboxMap) async {
     _map = mapboxMap;
+    _styleBinding?.attachMap(mapboxMap);
 
     log('[MapCanvas] Map created');
 
-    _suspendViewportFor(ms: 800);
+    // Jump to GPS location instantly if already available.
+    if (mounted) {
+      final loc = context.read<LocationBloc>().state;
+      if (loc.latitude != null && loc.longitude != null) {
+        await mapboxMap.setCamera(
+          mb.CameraOptions(
+            center: mb.Point(
+              coordinates: mb.Position(loc.longitude!, loc.latitude!),
+            ),
+            zoom: 15.0,
+            pitch: 0,
+            bearing: 0,
+          ),
+        );
+        log('[MapCanvas] Camera set to GPS: lat=${loc.latitude}, lng=${loc.longitude}');
+      }
+    }
 
+    _lastStyleUri = MapboxConfig.styleStandard;
     await _applyViewMode(MapViewMode.mode2D);
 
+    // POI annotation manager first.
     final controller = PoiMarkersController(mapboxMap);
     await controller.init();
 
-    // ✅ init fail olduysa _poiMarkers null kalsın
     if (!controller.isReady) {
       log('[MapCanvas] PoiMarkersController init failed on map created');
       return;
@@ -283,16 +396,24 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       context.read<MapBloc>().add(MapInitialized(mapboxMap));
     }
 
+    // Native location puck AFTER annotation manager is fully set up.
+    await _enableLocationPuck(mapboxMap);
+
     log('[MapCanvas] Initialization complete');
   }
 
-  /// return true => style değişti (standard <-> satellite)
+  // ── Style / view-mode ──────────────────────────────────────────────
+
   Future<bool> _applyViewMode(MapViewMode mode) async {
     final map = _map;
     if (map == null) return false;
 
+    final cs = await map.getCameraState();
+
     final String targetStyleUri =
-    (mode == MapViewMode.satellite) ? MapboxConfig.styleStandardSatellite : MapboxConfig.styleStandard;
+        (mode == MapViewMode.satellite)
+            ? MapboxConfig.styleStandardSatellite
+            : MapboxConfig.styleStandard;
 
     bool styleChanged = false;
 
@@ -305,21 +426,67 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
     final bool enable3D = (mode == MapViewMode.mode3D);
 
-    if (targetStyleUri == MapboxConfig.styleStandard) {
-      await map.style.setStyleImportConfigProperties(
-        "basemap",
-        <String, Object>{"show3dObjects": enable3D},
-      );
-    }
+    // streets-v12: 3D binalar fill-extrusion katmanıyla eklenir.
+    await _toggle3DBuildings(map, enable3D);
 
-    final mb.CameraOptions camera = enable3D ? MapboxConfig.camera3D : MapboxConfig.camera2D;
+    final double targetPitch = switch (mode) {
+      MapViewMode.mode3D => MapboxConfig.pitch3D,
+      MapViewMode.mode2D || MapViewMode.satellite => 0,
+    };
+    final double targetZoom = enable3D
+        ? math.max(cs.zoom, MapboxConfig.zoomMin3D)
+        : cs.zoom;
 
     await map.easeTo(
-      camera,
+      mb.CameraOptions(
+        center: cs.center,
+        padding: cs.padding,
+        zoom: targetZoom,
+        pitch: targetPitch,
+        bearing: cs.bearing,
+      ),
       mb.MapAnimationOptions(duration: 450, startDelay: 0),
     );
 
     return styleChanged;
   }
 
+  static const String _buildingLayerId = '3d-buildings';
+
+  Future<void> _toggle3DBuildings(mb.MapboxMap map, bool enable) async {
+    try {
+      if (!enable) {
+        final exists = await map.style.styleLayerExists(_buildingLayerId);
+        if (exists) {
+          await map.style.removeStyleLayer(_buildingLayerId);
+        }
+        return;
+      }
+
+      final exists = await map.style.styleLayerExists(_buildingLayerId);
+      if (exists) return;
+
+      final layer = mb.FillExtrusionLayer(id: _buildingLayerId, sourceId: 'composite');
+      layer.sourceLayer = 'building';
+      layer.minZoom = 13;
+      layer.fillExtrusionColor = const Color(0xFFAAAAAA).value;
+      layer.fillExtrusionOpacity = 0.65;
+
+      await map.style.addLayer(layer);
+
+      await map.style.setStyleLayerProperty(
+        _buildingLayerId, 'filter', ['==', ['get', 'extrude'], 'true'],
+      );
+      await map.style.setStyleLayerProperty(
+        _buildingLayerId, 'fill-extrusion-height', ['get', 'height'],
+      );
+      await map.style.setStyleLayerProperty(
+        _buildingLayerId, 'fill-extrusion-base', ['get', 'min_height'],
+      );
+
+      log('[MapCanvas] 3D buildings layer added');
+    } catch (e) {
+      log('[MapCanvas] _toggle3DBuildings failed: $e');
+    }
+  }
 }
