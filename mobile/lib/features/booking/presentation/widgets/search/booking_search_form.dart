@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+
 import '../../../data/models/accommodation_search_request.dart';
 import '../../../data/models/airport_suggestion.dart';
 import '../../../data/models/booking_currency.dart';
@@ -28,8 +30,6 @@ class BookingSearchForm extends StatefulWidget {
 }
 
 class _BookingSearchFormState extends State<BookingSearchForm> {
-  static const _accent = Color(0xFF0096FF);
-
   late BookingType _type;
 
   // Hotels
@@ -222,6 +222,9 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
       initialRange = DateTimeRange(start: start, end: end);
     }
 
+    final accent = context.mapControlAccent;
+    final surface = Theme.of(context).colorScheme.surface;
+
     final picked = await showDateRangePicker(
       context: context,
       firstDate: firstDate,
@@ -232,16 +235,16 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         return Theme(
           data: baseTheme.copyWith(
             colorScheme: baseTheme.colorScheme.copyWith(
-              primary: _accent,
+              primary: accent,
               onPrimary: Colors.white,
             ),
             datePickerTheme: baseTheme.datePickerTheme.copyWith(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
-              headerBackgroundColor: _accent,
+              headerBackgroundColor: accent,
               headerForegroundColor: Colors.white,
-              backgroundColor: Colors.white,
+              backgroundColor: surface,
             ),
           ),
           child: child!,
@@ -358,17 +361,17 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
           onChanged: _onTypeChanged,
         ),
         const SizedBox(height: 20),
-        if (_type == BookingType.hotels) ..._hotelFields(),
-        if (_type == BookingType.flights) ..._flightFields(search),
+        if (_type == BookingType.hotels) ..._hotelFields(context),
+        if (_type == BookingType.flights) ..._flightFields(context, search),
         const SizedBox(height: 12),
-        _sharedFields(search),
+        _sharedFields(context, search),
         const SizedBox(height: 28),
-        _searchButton(search),
+        _searchButton(context, search),
       ],
     );
   }
 
-  List<Widget> _hotelFields() {
+  List<Widget> _hotelFields(BuildContext context) {
     final now = DateTime.now();
     return [
       DestinationAutocompleteField(
@@ -407,7 +410,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     ];
   }
 
-  List<Widget> _flightFields(BookingSearch? search) {
+  List<Widget> _flightFields(BuildContext context, BookingSearch? search) {
     final now = DateTime.now();
     final hint = _flightSelectionHint(search);
     return [
@@ -433,7 +436,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
       const SizedBox(height: 12),
 
       // Round-trip toggle
-      _roundTripToggle(),
+      _roundTripToggle(context),
       const SizedBox(height: 12),
 
       // Date row
@@ -464,7 +467,9 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     ];
   }
 
-  Widget _roundTripToggle() {
+  Widget _roundTripToggle(BuildContext context) {
+    final accent = context.mapControlAccent;
+    final outline = Theme.of(context).colorScheme.outline;
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -479,10 +484,10 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
             width: 20,
             height: 20,
             decoration: BoxDecoration(
-              color: _isRoundTrip ? _accent : Colors.transparent,
+              color: _isRoundTrip ? accent : Colors.transparent,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: _isRoundTrip ? _accent : const Color(0xFFCCCCCC),
+                color: _isRoundTrip ? accent : outline.withValues(alpha: 0.5),
                 width: 1.5,
               ),
             ),
@@ -492,16 +497,16 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
                 : null,
           ),
           const SizedBox(width: 8),
-          const Text(
+          Text(
             'Round trip',
-            style: BookingSearchFieldStyles.inlineControlLabel,
+            style: BookingSearchFieldStyles.inlineControlLabel(context),
           ),
         ],
       ),
     );
   }
 
-  Widget _sharedFields(BookingSearch? search) {
+  Widget _sharedFields(BuildContext context, BookingSearch? search) {
     return Column(
       children: [
         Row(
@@ -540,8 +545,11 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     );
   }
 
-  Widget _searchButton(BookingSearch? search) {
+  Widget _searchButton(BuildContext context, BookingSearch? search) {
     final enabled = _isValid(search);
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
+    final gradientColors = context.mapControlActiveGradientColors;
     return GestureDetector(
       onTap: enabled ? _onSearch : null,
       child: AnimatedContainer(
@@ -549,16 +557,18 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           gradient: enabled
-              ? const LinearGradient(
-                  colors: [Color(0xFF0096FF), Color(0xFF00C6FF)],
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
                 )
               : null,
-          color: enabled ? null : const Color(0xFFE0E0E0),
+          color: enabled ? null : cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           boxShadow: enabled
               ? [
                   BoxShadow(
-                    color: _accent.withValues(alpha: 0.3),
+                    color: accent.withValues(alpha: 0.3),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -571,7 +581,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
             Icon(
               Icons.search_rounded,
               size: 20,
-              color: enabled ? Colors.white : const Color(0xFFAAAAAA),
+              color: enabled ? Colors.white : cs.onSurfaceVariant,
             ),
             const SizedBox(width: 8),
             Text(
@@ -579,7 +589,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: enabled ? Colors.white : const Color(0xFFAAAAAA),
+                color: enabled ? Colors.white : cs.onSurfaceVariant,
               ),
             ),
           ],

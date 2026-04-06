@@ -1,34 +1,49 @@
 import 'package:flutter/material.dart';
 
-/// Shared labels for hotel / flight search fields (readable, modern contrast).
+import 'package:mobile/core/theme/app_theme.dart';
+
+/// Tema uyumlu booking arama alanı stilleri ([VacanzaTokens] / [ColorScheme]).
 abstract final class BookingSearchFieldStyles {
-  static const Color labelColor = Color(0xFF1E293B);
+  static TextStyle fieldLabel(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return TextStyle(
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.2,
+      height: 1.2,
+      color: cs.onSurface,
+    );
+  }
 
-  static const TextStyle fieldLabel = TextStyle(
-    fontSize: 12.5,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.2,
-    height: 1.2,
-    color: labelColor,
-  );
+  static TextStyle dropdownValue(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: cs.onSurface,
+    );
+  }
 
-  static const TextStyle dropdownValue = TextStyle(
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-    color: Color(0xFF0F172A),
-  );
+  static TextStyle dropdownMenuItem(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      color: cs.onSurface,
+    );
+  }
 
-  static const TextStyle dropdownMenuItem = TextStyle(
-    fontSize: 14,
-    fontWeight: FontWeight.w600,
-    color: Color(0xFF0F172A),
-  );
-
-  /// Checkbox / inline row labels (e.g. Round trip).
-  static const TextStyle inlineControlLabel = TextStyle(
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.1,
-    color: labelColor,
-  );
+  static TextStyle inlineControlLabel(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.1,
+      color: cs.onSurface,
+    );
+  }
 }
+
+/// Odak / vurgu rengi — harita ile aynı [mapControlAccent].
+Color bookingAccentColor(BuildContext context) =>
+    context.mapControlAccent;
