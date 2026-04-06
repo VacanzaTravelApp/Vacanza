@@ -10,16 +10,32 @@ class MapInitialized extends MapEvent {
   final MapboxMap controller;
   const MapInitialized(this.controller);
 }
-/// ✅ Right action bar: freehand drawing toggle
+
+/// Right action bar: freehand drawing toggle
 class ToggleDrawingPressed extends MapEvent {}
 
-/// ✅ Drawing otomatik bitince kapatmak için (toggle yerine garanti kapatma)
+/// Drawing otomatik bitince kapatmak için (toggle yerine garanti kapatma)
 class SetDrawingEnabled extends MapEvent {
   final bool enabled;
   SetDrawingEnabled(this.enabled);
 }
-class ToggleViewModePressed extends MapEvent {
-  const ToggleViewModePressed();
+
+/// Harita taban stilini döngüsel değiştirir: streets → dark → satellite.
+class CycleBasemapPressed extends MapEvent {
+  const CycleBasemapPressed();
+}
+
+/// 2D ↔ 3D (pitch + 3D binalar) — web `handleToggle2D3D`.
+class TogglePerspectivePressed extends MapEvent {
+  const TogglePerspectivePressed();
+}
+
+/// Uygulama gün/gece teması değişince haritayı önerilen basemap ile hizala
+/// (koyu → dark, açık → streets). Kullanıcı [CycleBasemapPressed] ile yine değiştirebilir.
+class SyncBasemapToAppTheme extends MapEvent {
+  const SyncBasemapToAppTheme({required this.isDark});
+
+  final bool isDark;
 }
 
 class RecenterPressed extends MapEvent {

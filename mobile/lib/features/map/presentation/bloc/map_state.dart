@@ -1,22 +1,23 @@
-import '../../data/models/map_view_mode.dart';
+import '../../data/models/map_basemap.dart';
+import '../../data/models/map_perspective.dart';
 
 /// Map ekranının state'i.
-/// Mapbox controller hazır olduğunda isMapReady true olur.
-/// recenterTick: her recenter basışında artar (listener tetiklemek için).
-/// flyToPoiTick: POI detaydan "Haritada göster" ile kamera hedefi (listener).
+/// Web ile aynı ayrım: [basemap] (streets/dark/satellite) × [perspective] (2D/3D) = 6 kombinasyon.
 class MapState {
-  final MapViewMode viewMode;
+  final MapBasemap basemap;
+  final MapPerspective perspective;
   final bool isMapReady;
   final int recenterTick;
-  /// Her artışta [MapCanvasMapbox] ilgili POI'de kamerayı uçurur.
   final int flyToPoiTick;
   final double? flyToPoiLat;
   final double? flyToPoiLng;
   final double flyToPoiZoom;
   final String? lastErrorMessage;
   final bool isDrawing;
+
   const MapState({
-    required this.viewMode,
+    required this.basemap,
+    required this.perspective,
     required this.isMapReady,
     required this.recenterTick,
     required this.flyToPoiTick,
@@ -28,19 +29,21 @@ class MapState {
   });
 
   factory MapState.initial() => const MapState(
-    viewMode: MapViewMode.mode2D,
-    isMapReady: false,
-    recenterTick: 0,
-    flyToPoiTick: 0,
-    flyToPoiLat: null,
-    flyToPoiLng: null,
-    flyToPoiZoom: 16.0,
-    lastErrorMessage: null,
-    isDrawing: false,
-  );
+        basemap: MapBasemap.streets,
+        perspective: MapPerspective.mode2D,
+        isMapReady: false,
+        recenterTick: 0,
+        flyToPoiTick: 0,
+        flyToPoiLat: null,
+        flyToPoiLng: null,
+        flyToPoiZoom: 16.0,
+        lastErrorMessage: null,
+        isDrawing: false,
+      );
 
   MapState copyWith({
-    MapViewMode? viewMode,
+    MapBasemap? basemap,
+    MapPerspective? perspective,
     bool? isMapReady,
     int? recenterTick,
     int? flyToPoiTick,
@@ -51,7 +54,8 @@ class MapState {
     bool? isDrawing,
   }) {
     return MapState(
-      viewMode: viewMode ?? this.viewMode,
+      basemap: basemap ?? this.basemap,
+      perspective: perspective ?? this.perspective,
       isMapReady: isMapReady ?? this.isMapReady,
       recenterTick: recenterTick ?? this.recenterTick,
       flyToPoiTick: flyToPoiTick ?? this.flyToPoiTick,
