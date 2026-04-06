@@ -35,11 +35,14 @@ public class MapboxPoiSearchClient {
     private static final Map<String, String> CATEGORY_MAP = Map.ofEntries(
             Map.entry("museum", "museum"),
             Map.entry("monument", "monument"),
+            Map.entry("memorial", "monument"),
             Map.entry("historic_site", "historic_site"),
             Map.entry("church", "place_of_worship"),
             Map.entry("mosque", "place_of_worship"),
             Map.entry("palace", "historic_site"),
             Map.entry("landmark", "landmark"),
+            Map.entry("attraction", "tourist_attraction"),
+            Map.entry("tourist_attraction", "tourist_attraction"),
             Map.entry("park", "park"),
             Map.entry("art_gallery", "art_gallery"),
             Map.entry("restaurant", "restaurant"),
@@ -120,7 +123,7 @@ public class MapboxPoiSearchClient {
                 .uri(uriBuilder -> uriBuilder
                         .path("/search/searchbox/v1/category/{category}")
                         .queryParam("bbox", minLon + "," + minLat + "," + maxLon + "," + maxLat)
-                        .queryParam("limit", 10)
+                        .queryParam("limit", 20)
                         .queryParam("language", "en")
                         .build(mapboxCategory))
                 .retrieve()
@@ -133,6 +136,38 @@ public class MapboxPoiSearchClient {
                             .toList();
                 })
                 .onErrorResume(e -> Mono.just(List.of()));
+    }
+
+    /**
+     * Forward (text) search for a specific place name within a bbox.
+     * Used to resolve must_visit landmarks that category search may miss.
+     */
+    public Mono<List<PoiResult>> forwardSearchPoi(String query,
+            double minLon, double minLat,
+            double maxLon, double maxLat) {
+        log.info("[POI FORWARD] query='{}' bbox={},{},{},{}", query, minLon, minLat, maxLon, maxLat);
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/search/searchbox/v1/forward")
+                        .queryParam("q", query)
+                        .queryParam("limit", 3)
+                        .queryParam("types", "poi")
+                        .queryParam("bbox", minLon + "," + minLat + "," + maxLon + "," + maxLat)
+                        .queryParam("language", "en")
+                        .build())
+                .retrieve()
+                .bodyToMono(FeatureCollection.class)
+                .map(resp -> {
+                    if (resp == null || resp.getFeatures() == null) return List.<PoiResult>of();
+                    return resp.getFeatures().stream()
+                            .map(f -> toPoiResult(f, "attraction"))
+                            .filter(x -> x != null)
+                            .toList();
+                })
+                .onErrorResume(e -> {
+                    log.warn("[POI FORWARD] failed for '{}': {}", query, e.getMessage());
+                    return Mono.just(List.of());
+                });
     }
 
     private static PoiResult toPoiResult(Feature f, String normalizedSearchCategory) {

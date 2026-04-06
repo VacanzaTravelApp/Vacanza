@@ -49,7 +49,7 @@ public class ChatProxyController {
          */
         private static final List<String> DEFAULT_POLYGON_CATEGORIES = List.of(
                         "museum", "monument", "historic_site", "church", "park", "neighborhood",
-                        "landmark", "art_gallery", "restaurant", "cafe", "bar");
+                        "landmark", "art_gallery", "tourist_attraction", "restaurant", "cafe", "bar");
 
         /** Resolve search categories from request or fall back to defaults. */
         private List<String> resolveSearchCategories(List<String> fromRequest) {
@@ -132,6 +132,7 @@ public class ChatProxyController {
                                         var exec = executePoiSearchWithWeather(
                                                         toolCall.destination,
                                                         toolCall.categories,
+                                                        toolCall.mustVisit,
                                                         toolCall.days,
                                                         profile,
                                                         user.getUserId());
@@ -445,6 +446,7 @@ public class ChatProxyController {
                         UserProfileForAi profile) {
                 try {
                         if (response != null && response.getRouteData() != null) {
+                                resolveNullCoordinates(response.getRouteData());
                                 if (routePlanningWeather != null && !routePlanningWeather.daily().isEmpty()) {
                                         response.getRouteData().setWeatherForecast(routePlanningWeather.daily());
                                 }
@@ -479,6 +481,41 @@ public class ChatProxyController {
                 return ResponseEntity.ok(list);
         }
 
+        /**
+         * Resolve waypoints that have null lat/lon via Mapbox forward search.
+         * LLM may add iconic landmarks not in the POI list with null coordinates.
+         */
+        private void resolveNullCoordinates(AiChatDto.RouteData routeData) {
+                if (routeData == null || routeData.getDays() == null) return;
+                String destination = routeData.getDestination();
+                for (AiChatDto.DayPlan dayPlan : routeData.getDays()) {
+                        if (dayPlan.getWaypoints() == null) continue;
+                        for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
+                                if (wp.getLatitude() != null && wp.getLongitude() != null) continue;
+                                if (wp.getName() == null || wp.getName().isBlank()) continue;
+                                try {
+                                        String query = wp.getName().contains(",")
+                                                        ? wp.getName()
+                                                        : wp.getName() + (destination != null ? ", " + destination : "");
+                                        var results = mapboxPoiSearchClient.forwardSearchPoi(query,
+                                                        -180, -90, 180, 90)
+                                                .blockOptional().orElse(List.of());
+                                        if (!results.isEmpty()) {
+                                                var best = results.get(0);
+                                                wp.setLatitude(best.getLat());
+                                                wp.setLongitude(best.getLon());
+                                                log.info("[RESOLVE NULL] '{}' -> ({}, {})", wp.getName(),
+                                                                best.getLat(), best.getLon());
+                                        } else {
+                                                log.warn("[RESOLVE NULL] No result for '{}'", wp.getName());
+                                        }
+                                } catch (Exception e) {
+                                        log.warn("[RESOLVE NULL] Failed for '{}': {}", wp.getName(), e.getMessage());
+                                }
+                        }
+                }
+        }
+
         private UUID saveRoute(User user, UUID conversationId, AiChatDto.RouteData routeData) {
                 try {
                         String routeJson = objectMapper.writeValueAsString(routeData);
@@ -495,7 +532,7 @@ public class ChatProxyController {
                 }
         }
 
-        private record PoiToolCall(String tool, String destination, Integer days, String travelStyle, List<String> categories) {}
+        private record PoiToolCall(String tool, String destination, Integer days, String travelStyle, List<String> categories, List<String> mustVisit) {}
 
         /**
          * Model output may include markdown fences or prose; extract the first JSON object for tool parsing.
@@ -553,7 +590,18 @@ public class ChatProxyController {
                                         }
                                 }
                         }
-                        return new PoiToolCall(tool, destination, days, travelStyle, cats);
+                        var mvNode = n.path("must_visit");
+                        List<String> mustVisit = List.of();
+                        if (mvNode != null && mvNode.isArray()) {
+                                mustVisit = new java.util.ArrayList<>();
+                                for (var mv : mvNode) {
+                                        if (mv != null && mv.isTextual()) {
+                                                String v = mv.asText();
+                                                if (v != null && !v.isBlank()) mustVisit.add(v);
+                                        }
+                                }
+                        }
+                        return new PoiToolCall(tool, destination, days, travelStyle, cats, mustVisit);
                 } catch (Exception e) {
                         log.debug("parseToolCallFromJson failed: {}", e.getMessage());
                         return null;
@@ -568,6 +616,7 @@ public class ChatProxyController {
         private PoiToolExecutionResult executePoiSearchWithWeather(
                         String destination,
                         List<String> categories,
+                        List<String> mustVisit,
                         Integer tripDays,
                         UserProfileForAi profile,
                         java.util.UUID userId) {
@@ -585,6 +634,9 @@ public class ChatProxyController {
                 if (cats.isEmpty()) {
                         return new PoiToolExecutionResult(List.of(), planning);
                 }
+                if (!cats.contains("tourist_attraction") && !cats.contains("attraction")) {
+                        cats.add("tourist_attraction");
+                }
 
                 List<PoiResult> all = new java.util.ArrayList<>();
                 for (String c : cats) {
@@ -594,6 +646,21 @@ public class ChatProxyController {
                                         .blockOptional()
                                         .orElse(List.of());
                         all.addAll(pois);
+                }
+
+                // Forward-search each must_visit landmark so iconic places are guaranteed in the pool
+                if (mustVisit != null) {
+                        for (String placeName : mustVisit) {
+                                if (placeName == null || placeName.isBlank()) continue;
+                                String query = placeName.contains(",") ? placeName : placeName + ", " + destination;
+                                var mvPois = mapboxPoiSearchClient.forwardSearchPoi(query,
+                                                dest.getMinLon(), dest.getMinLat(), dest.getMaxLon(), dest.getMaxLat())
+                                        .blockOptional().orElse(List.of());
+                                all.addAll(mvPois);
+                                if (!mvPois.isEmpty()) {
+                                        log.info("[MUST_VISIT] '{}' resolved to {} POI(s)", placeName, mvPois.size());
+                                }
+                        }
                 }
 
                 java.util.Map<String, PoiResult> dedup = new java.util.LinkedHashMap<>();
