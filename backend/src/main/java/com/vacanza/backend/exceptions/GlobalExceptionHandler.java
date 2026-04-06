@@ -163,6 +163,20 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
+    @ExceptionHandler(CurrencyException.class)
+    public ResponseEntity<ErrorResponse> handleCurrencyException(
+            CurrencyException ex, HttpServletRequest request) {
+
+        ErrorResponse body = ErrorResponse.of(
+                ex.getStatus().value(),
+                ex.getStatus().getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI());
+
+        systemLogCollector.recordError(request.getRequestURI(), "CurrencyException: " + ex.getMessage());
+        return new ResponseEntity<>(body, ex.getStatus());
+    }
+
     /**
      * Catch-all for unhandled 500 errors.
      */
