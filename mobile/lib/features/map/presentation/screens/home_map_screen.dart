@@ -408,6 +408,8 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
               setState(() => _activeChipKey = key); // null => All
             },
             onClose: _closeResultsAndResetToViewport,
+            hideZeroCountCategories:
+                poiState.areaSource == AreaSource.userSelection,
           );
 
           return HomeMapScaffold(
@@ -464,7 +466,11 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             // ===== Filters overlay =====
             isFiltersOpen: _filtersOpen,
             onCloseFilters: _closeFilters,
-            filtersPanel: PoiFilterPanel(onClose: _closeFilters),
+            filtersPanel: PoiFilterPanel(
+              onClose: _closeFilters,
+              hideZeroCountCategories:
+                  poiState.areaSource == AreaSource.userSelection,
+            ),
 
             // ===== Results sheet (normal) =====
             isResultsOpen: _resultsOpen,

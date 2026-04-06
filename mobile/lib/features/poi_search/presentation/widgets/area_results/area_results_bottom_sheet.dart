@@ -32,6 +32,10 @@ class AreaResultsSheet extends StatelessWidget {
   /// X’e basınca: selection temizlenip viewport’a dönülecek (A senaryosu)
   final VoidCallback onClose;
 
+  /// Alan çizimi (user selection) sonrası: 0 POI’lı chip’leri gösterme.
+  /// Viewport / genel harita akışında `false` — tüm seçili kategoriler chip’te kalır.
+  final bool hideZeroCountCategories;
+
   const AreaResultsSheet({
     super.key,
     required this.isVisible,
@@ -42,6 +46,7 @@ class AreaResultsSheet extends StatelessWidget {
     required this.activeChipKey,
     required this.onChipSelected,
     required this.onClose,
+    this.hideZeroCountCategories = false,
   });
 
   String _labelFor(String key) {
@@ -61,15 +66,16 @@ class AreaResultsSheet extends StatelessWidget {
         const Color(0xFF0096FF);
   }
 
-  List<String> _normalizedSelectedCategories() {
-    // güvenli normalize
+  int _countFor(String key) => countsByCategory[key] ?? 0;
+
+  /// Seçili kategoriler + sıra (count filtresi yok).
+  List<String> _normalizedSelectedCategoriesAll() {
     final set = <String>{};
     for (final c in selectedCategories) {
       final k = c.trim().toLowerCase();
       if (k.isNotEmpty) set.add(k);
     }
 
-    // Eğer bir sebeple boş geldiyse countsByCategory’den fallback
     if (set.isEmpty && countsByCategory.isNotEmpty) {
       set.addAll(countsByCategory.keys.map((e) => e.trim().toLowerCase()));
     }
@@ -88,11 +94,58 @@ class AreaResultsSheet extends StatelessWidget {
     return ordered;
   }
 
+  /// Sadece en az 1 POI olan kategoriler (alan çizimi akışı).
+  List<String> _normalizedSelectedCategoriesPositiveOnly() {
+    final set = <String>{};
+    for (final c in selectedCategories) {
+      final k = c.trim().toLowerCase();
+      if (k.isNotEmpty && _countFor(k) > 0) set.add(k);
+    }
+
+    if (set.isEmpty && countsByCategory.isNotEmpty) {
+      for (final e in countsByCategory.entries) {
+        final k = e.key.trim().toLowerCase();
+        if (k.isNotEmpty && _countFor(k) > 0) set.add(k);
+      }
+    }
+
+    final baseOrder =
+        PoiCategoryCatalog.all.map((e) => e.key).toList(growable: false);
+    final ordered = <String>[];
+
+    for (final k in baseOrder) {
+      if (set.contains(k) && _countFor(k) > 0) ordered.add(k);
+    }
+
+    final extras = set
+        .where((k) => !baseOrder.contains(k) && _countFor(k) > 0)
+        .toList()
+      ..sort();
+    ordered.addAll(extras);
+
+    return ordered;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!isVisible) return const SizedBox.shrink();
 
-    final activeKey = activeChipKey?.trim().toLowerCase();
+    final chips = hideZeroCountCategories
+        ? _normalizedSelectedCategoriesPositiveOnly()
+        : _normalizedSelectedCategoriesAll();
+
+    final rawActive = activeChipKey?.trim().toLowerCase();
+    final String? activeKey;
+    if (hideZeroCountCategories) {
+      activeKey = (rawActive != null &&
+              rawActive.isNotEmpty &&
+              chips.contains(rawActive))
+          ? rawActive
+          : null;
+    } else {
+      activeKey =
+          (rawActive != null && rawActive.isNotEmpty) ? rawActive : null;
+    }
     final allActive = activeKey == null || activeKey.isEmpty;
 
     // ✅ UI filtreleme: backend'e gitmeden mevcut pois içinde gez
@@ -104,8 +157,6 @@ class AreaResultsSheet extends StatelessWidget {
           }).toList();
 
     final visibleCount = visiblePois.length;
-
-    final chips = _normalizedSelectedCategories();
 
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 

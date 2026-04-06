@@ -8,22 +8,36 @@ import '../bloc/poi_search_state.dart';
 
 /// VACANZA-188: POI Filter Panel (Categories + countsByCategory)
 /// Web [UI_CATEGORIES] ile hizalı katalog.
+///
+/// [hideZeroCountCategories]: yalnızca alan çizimi (user selection) akışında `true` —
+/// viewport’ta tüm kategoriler listelenir; 0 gizleme sadece çizim sonrası için.
 class PoiFilterPanel extends StatelessWidget {
   final VoidCallback onClose;
+
+  /// Alan çizimi sonrası: bu alanda 0 POI olan satırları gösterme.
+  final bool hideZeroCountCategories;
 
   const PoiFilterPanel({
     super.key,
     required this.onClose,
+    this.hideZeroCountCategories = false,
   });
+
+  static List<String> _allCatalogKeys() =>
+      PoiCategoryCatalog.all.map((e) => e.key).toList(growable: false);
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<PoiSearchBloc, PoiSearchState>(
       builder: (context, state) {
         final counts = state.countsByCategory;
-        // Yalnızca katalogdaki 11 kategori; backend’den gelen yabancı count anahtarlarını gösterme.
-        final categories =
-            PoiCategoryCatalog.all.map((e) => e.key).toList(growable: false);
+        final allKeys = _allCatalogKeys();
+        // Çizim akışında: bu alanda gerçekten 0 POI olan satırları gösterme (sayılar tam listeden).
+        final categories = hideZeroCountCategories
+            ? allKeys
+                .where((key) => (counts[key] ?? 0) > 0)
+                .toList(growable: false)
+            : allKeys;
 
         final selected = state.selectedCategories.toSet();
 
@@ -75,31 +89,105 @@ class PoiFilterPanel extends StatelessWidget {
                 const SizedBox(height: 8),
                 Divider(height: 1, color: Colors.grey.shade200),
                 const SizedBox(height: 8),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final key in categories)
-                          _FilterRow(
-                            catKey: key,
-                            counts: counts,
-                            selected: selected,
-                            onToggle: (next) {
-                              context
-                                  .read<PoiSearchBloc>()
-                                  .add(CategoryChanged(next.toList()));
-                            },
-                          ),
-                      ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: _QuickFilterButton(
+                        label: 'All',
+                        onPressed: () {
+                          context.read<PoiSearchBloc>().add(
+                                CategoryChanged(_allCatalogKeys()),
+                              );
+                        },
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _QuickFilterButton(
+                        label: 'None',
+                        onPressed: () {
+                          context.read<PoiSearchBloc>().add(
+                                CategoryChanged(<String>[]),
+                              );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: categories.isEmpty
+                      ? Center(
+                          child: Text(
+                            hideZeroCountCategories
+                                ? 'No POIs in this area for the current categories.'
+                                : 'No categories.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final key in categories)
+                                _FilterRow(
+                                  catKey: key,
+                                  counts: counts,
+                                  selected: selected,
+                                  onToggle: (next) {
+                                    context
+                                        .read<PoiSearchBloc>()
+                                        .add(CategoryChanged(next.toList()));
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _QuickFilterButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+
+  const _QuickFilterButton({
+    required this.label,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -120,7 +208,8 @@ class _FilterRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final def = PoiCategoryCatalog.definitionForUiKey(catKey);
-    final count = counts[catKey] ?? 0;
+    // [counts] tam bbox/alan listesinden (kategori filtresinden bağımsız).
+    final displayCount = counts[catKey] ?? 0;
     final isOn = selected.contains(catKey);
     final color = def?.ringColor ?? const Color(0xFF0096FF);
     final icon = def?.iconData ?? Icons.place_rounded;
@@ -155,12 +244,12 @@ class _FilterRow extends StatelessWidget {
                 height: 22,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: color.withOpacity(isOn ? 0.18 : 0.10),
+                  color: color.withOpacity(isOn ? 0.18 : 0.06),
                 ),
                 child: Icon(
                   icon,
                   size: 14,
-                  color: isOn ? color : Colors.grey.shade500,
+                  color: isOn ? color : Colors.grey.shade400,
                 ),
               ),
               const SizedBox(width: 8),
@@ -169,7 +258,9 @@ class _FilterRow extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 11,
-                    color: isOn ? Colors.black87 : Colors.grey.shade700,
+                    color: isOn
+                        ? Colors.black87
+                        : Colors.grey.shade500,
                     fontWeight: isOn ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
@@ -180,14 +271,14 @@ class _FilterRow extends StatelessWidget {
                   vertical: 3,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: isOn ? Colors.grey.shade100 : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  '$count',
+                  '$displayCount',
                   style: TextStyle(
                     fontSize: 10,
-                    color: Colors.grey.shade800,
+                    color: isOn ? Colors.grey.shade800 : Colors.grey.shade600,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
