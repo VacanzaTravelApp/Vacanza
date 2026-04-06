@@ -11,6 +11,8 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
     required this.textMain,
     required this.textSub,
     required this.vividBlue,
+    required this.vividAmber,
+    required this.vividCoral,
     required this.vividSubtleBg,
     required this.pillSurface,
     required this.pillBorder,
@@ -42,6 +44,12 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
   /// `--vivid-blue` (accent)
   final Color vividBlue;
 
+  /// Web `:root` `--vivid-amber`
+  final Color vividAmber;
+
+  /// Web `:root` `--vivid-coral` (Ask Vacanza AI pill, sabah harita vurgusu)
+  final Color vividCoral;
+
   /// `--vivid-subtle-bg`
   final Color vividSubtleBg;
 
@@ -67,6 +75,8 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
     textMain: Color(0xFF2C3545),
     textSub: Color(0xFF5A6B7A),
     vividBlue: Color(0xFF00B4D8),
+    vividAmber: Color(0xFFFFB347),
+    vividCoral: Color(0xFFFF6B6B),
     vividSubtleBg: Color(0x0A000000),
     pillSurface: Color(0xEBFFFFFF),
     pillBorder: Color(0xF2FFFFFF),
@@ -86,6 +96,8 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
     textMain: Color(0xFFF8FAFC),
     textSub: Color(0xFF94A3B8),
     vividBlue: Color(0xFF38BDF8),
+    vividAmber: Color(0xFFFFB347),
+    vividCoral: Color(0xFFFF6B6B),
     vividSubtleBg: Color(0x14FFFFFF),
     pillSurface: Color(0xD9262732),
     pillBorder: Color(0x3338BDF8),
@@ -105,6 +117,8 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
     Color? textMain,
     Color? textSub,
     Color? vividBlue,
+    Color? vividAmber,
+    Color? vividCoral,
     Color? vividSubtleBg,
     Color? pillSurface,
     Color? pillBorder,
@@ -122,6 +136,8 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
       textMain: textMain ?? this.textMain,
       textSub: textSub ?? this.textSub,
       vividBlue: vividBlue ?? this.vividBlue,
+      vividAmber: vividAmber ?? this.vividAmber,
+      vividCoral: vividCoral ?? this.vividCoral,
       vividSubtleBg: vividSubtleBg ?? this.vividSubtleBg,
       pillSurface: pillSurface ?? this.pillSurface,
       pillBorder: pillBorder ?? this.pillBorder,
@@ -144,6 +160,8 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
       textMain: Color.lerp(textMain, other.textMain, t)!,
       textSub: Color.lerp(textSub, other.textSub, t)!,
       vividBlue: Color.lerp(vividBlue, other.vividBlue, t)!,
+      vividAmber: Color.lerp(vividAmber, other.vividAmber, t)!,
+      vividCoral: Color.lerp(vividCoral, other.vividCoral, t)!,
       vividSubtleBg: Color.lerp(vividSubtleBg, other.vividSubtleBg, t)!,
       pillSurface: Color.lerp(pillSurface, other.pillSurface, t)!,
       pillBorder: Color.lerp(pillBorder, other.pillBorder, t)!,
