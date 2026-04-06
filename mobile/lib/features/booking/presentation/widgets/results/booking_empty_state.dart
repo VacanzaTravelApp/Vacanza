@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+
 /// Empty state shown when search returns zero results.
 class BookingEmptyState extends StatelessWidget {
   final VoidCallback onModifySearch;
@@ -8,6 +10,8 @@ class BookingEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
     return Column(
       children: [
         const SizedBox(height: 32),
@@ -15,22 +19,22 @@ class BookingEmptyState extends StatelessWidget {
           width: 64,
           height: 64,
           decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
+            color: cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(32),
           ),
           child: Icon(
             Icons.search_off_rounded,
             size: 32,
-            color: Colors.grey.shade400,
+            color: cs.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'No results found',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
+            color: cs.onSurface,
           ),
         ),
         const SizedBox(height: 6),
@@ -39,7 +43,7 @@ class BookingEmptyState extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 13,
-            color: Colors.grey.shade500,
+            color: cs.onSurfaceVariant,
             height: 1.4,
           ),
         ),
@@ -49,15 +53,18 @@ class BookingEmptyState extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF2F2F2),
+              color: accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.35),
+              ),
             ),
-            child: const Text(
+            child: Text(
               'Modify Search',
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF555555),
+                fontWeight: FontWeight.w600,
+                color: accent,
               ),
             ),
           ),
