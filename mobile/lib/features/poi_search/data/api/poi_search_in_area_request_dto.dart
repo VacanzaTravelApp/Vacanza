@@ -1,5 +1,3 @@
-import 'package:flutter/cupertino.dart';
-
 import '../models/geo_point.dart';
 import '../models/selected_area.dart';
 
