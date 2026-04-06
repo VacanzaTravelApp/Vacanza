@@ -1,6 +1,8 @@
 // ======================= area_results_bottom_sheet.dart =======================
 // lib/features/poi_search/presentation/widgets/area_results/area_results_bottom_sheet.dart
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/theme/vacanza_tokens.dart';
 
 import '../../../data/models/poi.dart';
 import '../../../data/models/poi_category_catalog.dart';
@@ -61,9 +63,9 @@ class AreaResultsSheet extends StatelessWidget {
         Icons.place_rounded;
   }
 
-  Color _colorFor(String key) {
+  Color _colorFor(BuildContext context, String key) {
     return PoiCategoryCatalog.definitionForUiKey(key)?.ringColor ??
-        const Color(0xFF0096FF);
+        Theme.of(context).colorScheme.primary;
   }
 
   int _countFor(String key) => countsByCategory[key] ?? 0;
@@ -130,6 +132,8 @@ class AreaResultsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!isVisible) return const SizedBox.shrink();
 
+    final t = context.vacanzaTokens;
+
     final chips = hideZeroCountCategories
         ? _normalizedSelectedCategoriesPositiveOnly()
         : _normalizedSelectedCategoriesAll();
@@ -169,11 +173,12 @@ class AreaResultsSheet extends StatelessWidget {
         child: Container(
           constraints: const BoxConstraints(maxHeight: 500),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
+            color: t.glassBg,
             borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: t.cardBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
+                color: t.overlayScrim.withValues(alpha: 0.35),
                 blurRadius: 18,
                 offset: const Offset(0, 10),
               ),
@@ -188,7 +193,7 @@ class AreaResultsSheet extends StatelessWidget {
                 width: 46,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.15),
+                  color: t.textSub.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -207,11 +212,11 @@ class AreaResultsSheet extends StatelessWidget {
                 activeChipKey: allActive ? null : activeKey,
                 labelFor: _labelFor,
                 iconFor: _iconFor,
-                colorFor: _colorFor,
+                colorFor: (key) => _colorFor(context, key),
                 onChipSelected: onChipSelected,
               ),
 
-              const Divider(height: 1),
+              Divider(height: 1, color: t.cardBorder),
 
               Expanded(
                 child: AreaResultsList(
@@ -250,6 +255,8 @@ class _ChipBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allSelected = activeChipKey == null;
+    final t = context.vacanzaTokens;
+    final accent = Theme.of(context).colorScheme.primary;
 
     return SizedBox(
       height: 46,
@@ -258,9 +265,10 @@ class _ChipBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
         children: [
           _buildChip(
+            t: t,
             label: 'All',
             icon: Icons.apps_rounded,
-            color: const Color(0xFF0096FF),
+            color: accent,
             selected: allSelected,
             onTap: () => onChipSelected(null),
           ),
@@ -273,6 +281,7 @@ class _ChipBar extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: _buildChip(
+                t: t,
                 label: labelFor(k),
                 icon: iconFor(k),
                 color: colorFor(k),
@@ -287,6 +296,7 @@ class _ChipBar extends StatelessWidget {
   }
 
   Widget _buildChip({
+    required VacanzaTokens t,
     required String label,
     required IconData icon,
     required Color color,
@@ -299,12 +309,12 @@ class _ChipBar extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.14) : Colors.white,
+          color: selected ? color.withValues(alpha: 0.14) : t.pillSurface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: selected
                 ? color.withValues(alpha: 0.45)
-                : Colors.black.withValues(alpha: 0.10),
+                : t.cardBorder,
             width: 1,
           ),
         ),
@@ -314,7 +324,7 @@ class _ChipBar extends StatelessWidget {
             Icon(
               icon,
               size: 16,
-              color: selected ? color : Colors.black.withValues(alpha: 0.55),
+              color: selected ? color : t.textSub,
             ),
             const SizedBox(width: 8),
             Text(
@@ -322,9 +332,7 @@ class _ChipBar extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: selected
-                    ? Colors.black87
-                    : Colors.black.withValues(alpha: 0.70),
+                color: selected ? t.textMain : t.textSub,
               ),
             ),
           ],

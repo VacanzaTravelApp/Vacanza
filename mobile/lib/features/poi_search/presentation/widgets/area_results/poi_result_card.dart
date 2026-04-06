@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 import '../../../data/models/poi.dart';
 import '../../../data/models/poi_category_catalog.dart';
@@ -13,6 +14,7 @@ class PoiResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
     final title = PoiCategoryCatalog.safePoiTitle(
       name: poi.name,
       rawCategory: poi.category,
@@ -24,17 +26,17 @@ class PoiResultCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.96),
+        color: t.pillSurface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: t.overlayScrim.withValues(alpha: 0.25),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.black.withValues(alpha: 0.06),
+          color: t.cardBorder,
         ),
       ),
       child: Row(
@@ -50,9 +52,10 @@ class PoiResultCard extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
+                    color: t.textMain,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -62,7 +65,7 @@ class PoiResultCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.black.withValues(alpha: 0.55),
+                    color: t.textSub,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -78,7 +81,7 @@ class PoiResultCard extends StatelessWidget {
             '→',
             style: TextStyle(
               fontSize: 18,
-              color: Colors.black.withValues(alpha: 0.35),
+              color: t.textSub.withValues(alpha: 0.8),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -95,7 +98,7 @@ class _CategoryDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final def = PoiCategoryCatalog.poiCategoryForRaw(rawCategory);
-    final color = def?.ringColor ?? const Color(0xFF0096FF);
+    final color = def?.ringColor ?? Theme.of(context).colorScheme.primary;
     final icon = def?.iconData ?? Icons.place_rounded;
 
     return Container(

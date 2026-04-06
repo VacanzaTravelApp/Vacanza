@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 class AreaResultsHeader extends StatelessWidget {
   final String title;
@@ -14,6 +15,7 @@ class AreaResultsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 10, 8),
       child: Row(
@@ -24,9 +26,10 @@ class AreaResultsHeader extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
+                    color: t.textMain,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -34,7 +37,7 @@ class AreaResultsHeader extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.black.withValues(alpha: 0.55),
+                    color: t.textSub,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -44,7 +47,7 @@ class AreaResultsHeader extends StatelessWidget {
           IconButton(
             tooltip: 'Close',
             onPressed: onClose,
-            icon: const Icon(Icons.close_rounded),
+            icon: Icon(Icons.close_rounded, color: t.textSub),
           ),
         ],
       ),

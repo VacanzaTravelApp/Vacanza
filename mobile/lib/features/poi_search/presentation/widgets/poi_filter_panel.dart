@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 import '../../data/models/poi_category_catalog.dart';
 import '../bloc/poi_search_bloc.dart';
@@ -30,6 +31,7 @@ class PoiFilterPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<PoiSearchBloc, PoiSearchState>(
       builder: (context, state) {
+        final t = context.vacanzaTokens;
         final counts = state.countsByCategory;
         final allKeys = _allCatalogKeys();
         // Çizim akışında: bu alanda gerçekten 0 POI olan satırları gösterme (sayılar tam listeden).
@@ -47,11 +49,12 @@ class PoiFilterPanel extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
+              color: t.glassBg,
               borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: t.cardBorder),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.18),
+                  color: t.overlayScrim.withValues(alpha: 0.45),
                   blurRadius: 26,
                   offset: const Offset(0, 10),
                 ),
@@ -62,12 +65,13 @@ class PoiFilterPanel extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Filter POIs',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
+                          color: t.textMain,
                         ),
                       ),
                     ),
@@ -78,16 +82,20 @@ class PoiFilterPanel extends StatelessWidget {
                         width: 24,
                         height: 24,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: t.vividSubtleBg,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.close_rounded, size: 16),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 16,
+                          color: t.textSub,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Divider(height: 1, color: Colors.grey.shade200),
+                Divider(height: 1, color: t.cardBorder),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -125,7 +133,7 @@ class PoiFilterPanel extends StatelessWidget {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade600,
+                              color: t.textSub,
                             ),
                           ),
                         )
@@ -168,8 +176,9 @@ class _QuickFilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
     return Material(
-      color: Colors.grey.shade100,
+      color: t.vividSubtleBg,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -182,7 +191,7 @@ class _QuickFilterButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade800,
+                color: t.textMain,
               ),
             ),
           ),
@@ -207,11 +216,13 @@ class _FilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
     final def = PoiCategoryCatalog.definitionForUiKey(catKey);
     // [counts] tam bbox/alan listesinden (kategori filtresinden bağımsız).
     final displayCount = counts[catKey] ?? 0;
     final isOn = selected.contains(catKey);
-    final color = def?.ringColor ?? const Color(0xFF0096FF);
+    final color =
+        def?.ringColor ?? Theme.of(context).colorScheme.primary;
     final icon = def?.iconData ?? Icons.place_rounded;
     final label = def?.label ?? catKey;
 
@@ -235,7 +246,7 @@ class _FilterRow extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            color: isOn ? color.withOpacity(0.10) : Colors.transparent,
+            color: isOn ? color.withValues(alpha: 0.10) : Colors.transparent,
           ),
           child: Row(
             children: [
@@ -244,12 +255,12 @@ class _FilterRow extends StatelessWidget {
                 height: 22,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: color.withOpacity(isOn ? 0.18 : 0.06),
+                  color: color.withValues(alpha: isOn ? 0.18 : 0.06),
                 ),
                 child: Icon(
                   icon,
                   size: 14,
-                  color: isOn ? color : Colors.grey.shade400,
+                  color: isOn ? color : t.textSub,
                 ),
               ),
               const SizedBox(width: 8),
@@ -258,9 +269,7 @@ class _FilterRow extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 11,
-                    color: isOn
-                        ? Colors.black87
-                        : Colors.grey.shade500,
+                    color: isOn ? t.textMain : t.textSub,
                     fontWeight: isOn ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
@@ -271,14 +280,14 @@ class _FilterRow extends StatelessWidget {
                   vertical: 3,
                 ),
                 decoration: BoxDecoration(
-                  color: isOn ? Colors.grey.shade100 : Colors.grey.shade50,
+                  color: t.vividSubtleBg,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   '$displayCount',
                   style: TextStyle(
                     fontSize: 10,
-                    color: isOn ? Colors.grey.shade800 : Colors.grey.shade600,
+                    color: isOn ? t.textMain : t.textSub,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
