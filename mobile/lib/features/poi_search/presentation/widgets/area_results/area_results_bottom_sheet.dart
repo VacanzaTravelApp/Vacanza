@@ -162,69 +162,62 @@ class AreaResultsSheet extends StatelessWidget {
 
     final visibleCount = visiblePois.length;
 
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-
-    return Positioned(
-      left: 16,
-      right: 16,
-      bottom: bottomPadding + 16,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          constraints: const BoxConstraints(maxHeight: 500),
-          decoration: BoxDecoration(
-            color: t.glassBg,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: t.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: t.overlayScrim.withValues(alpha: 0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxHeight: 500),
+        decoration: BoxDecoration(
+          color: t.glassBg,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: t.cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: t.overlayScrim.withValues(alpha: 0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // handle bar
+            const SizedBox(height: 10),
+            Container(
+              width: 46,
+              height: 4,
+              decoration: BoxDecoration(
+                color: t.textSub.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // handle bar
-              const SizedBox(height: 10),
-              Container(
-                width: 46,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: t.textSub.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              const SizedBox(height: 10),
+            ),
+            const SizedBox(height: 10),
 
-              AreaResultsHeader(
-                title: 'Results in Your Area',
-                subtitle:
-                allActive ? '$count places found' : '$visibleCount places found',
-                onClose: onClose,
-              ),
+            AreaResultsHeader(
+              title: 'Results in Your Area',
+              subtitle:
+                  allActive ? '$count places found' : '$visibleCount places found',
+              onClose: onClose,
+            ),
 
-              // ✅ CHIP BAR (NO COUNTS)
-              _ChipBar(
-                chips: chips,
-                activeChipKey: allActive ? null : activeKey,
-                labelFor: _labelFor,
-                iconFor: _iconFor,
-                colorFor: (key) => _colorFor(context, key),
-                onChipSelected: onChipSelected,
-              ),
+            // ✅ CHIP BAR (NO COUNTS)
+            _ChipBar(
+              chips: chips,
+              activeChipKey: allActive ? null : activeKey,
+              labelFor: _labelFor,
+              iconFor: _iconFor,
+              colorFor: (key) => _colorFor(context, key),
+              onChipSelected: onChipSelected,
+            ),
 
-              Divider(height: 1, color: t.cardBorder),
+            Divider(height: 1, color: t.cardBorder),
 
-              Expanded(
-                child: AreaResultsList(
-                  pois: visiblePois,
-                ),
+            Expanded(
+              child: AreaResultsList(
+                pois: visiblePois,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
