@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 /// Profile chip/badge (map top-left). Avatar from [profilePhotoBytes], then [imageUrl], [imagePath], or placeholder.
 class ProfileBadge extends StatelessWidget {
@@ -103,12 +104,13 @@ class ProfileBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
     final child = Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.90),
+        color: t.pillSurface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+        border: Border.all(color: t.pillBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.10),
@@ -130,12 +132,16 @@ class ProfileBadge extends StatelessWidget {
             children: [
               Text(
                 name,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: t.textMain,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF0096FF)),
+                style: TextStyle(fontSize: 11, color: t.vividBlue),
               ),
             ],
           ),
