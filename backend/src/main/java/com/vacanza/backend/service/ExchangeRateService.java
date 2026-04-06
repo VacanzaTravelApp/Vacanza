@@ -7,9 +7,11 @@ import com.vacanza.backend.dto.request.ForecastRequestDTO;
 import com.vacanza.backend.dto.response.CurrencyConversionResponseDTO;
 import com.vacanza.backend.dto.response.ForecastResponseDTO;
 import com.vacanza.backend.dto.response.ForecastResponseItemDTO;
+import com.vacanza.backend.exceptions.CurrencyException;
 import com.vacanza.backend.integration.currency.FrankfurterClient;
 import com.vacanza.backend.integration.currency.FrankfurterResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -49,13 +51,15 @@ public class ExchangeRateService {
 
         if (response == null || response.getRates() == null) {
             log.warn("Could not fetch exchange rates for {}", baseCurrency);
-            throw new RuntimeException("Exchange rates unavailable for " + baseCurrency);
+            throw new CurrencyException(HttpStatus.SERVICE_UNAVAILABLE, 
+                "Exchange rate service is temporarily unavailable for " + baseCurrency);
         }
 
         String targetCurrency = toCurrency.toUpperCase();
         BigDecimal rate = response.getRates().get(targetCurrency);
         if (rate == null) {
-            throw new RuntimeException("Target currency " + targetCurrency + " not supported from " + baseCurrency);
+            throw new CurrencyException(HttpStatus.BAD_REQUEST, 
+                "Target currency " + targetCurrency + " is not supported from " + baseCurrency);
         }
 
         return amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
