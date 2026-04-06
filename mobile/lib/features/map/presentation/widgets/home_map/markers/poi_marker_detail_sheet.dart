@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import '../../../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../../../checkin/presentation/bloc/location_state.dart';
 import '../../../../../poi_search/data/models/poi.dart';
+import 'package:mobile/core/theme/app_theme.dart';
+
 import '../../../../../poi_search/data/models/poi_category_catalog.dart';
 import '../../../bloc/map_bloc.dart';
 import '../../../bloc/map_event.dart';
@@ -34,11 +36,13 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
     context: context,
     useSafeArea: true,
     showDragHandle: true,
-    backgroundColor: Colors.white,
+    backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (ctx) {
+      final theme = Theme.of(ctx);
+      final cs = theme.colorScheme;
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
         child: Column(
@@ -47,18 +51,24 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
           children: [
             Text(
               poi.name,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-              ),
+              style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                    color: cs.onSurface,
+                  ) ??
+                  TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                    color: cs.onSurface,
+                  ),
             ),
             const SizedBox(height: 6),
             Text(
               categoryLabel,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey.shade700,
+                color: cs.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -75,9 +85,10 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
                   const SizedBox(width: 6),
                   Text(
                     poi.rating!.toStringAsFixed(1),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
                     ),
                   ),
                 ],
@@ -86,7 +97,8 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
-              child: FilledButton.icon(
+              child: _MapAccentCtaButton(
+                enabled: _canFlyTo(poi),
                 onPressed: _canFlyTo(poi)
                     ? () {
                         Navigator.of(ctx).pop();
@@ -98,11 +110,6 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
                         );
                       }
                     : null,
-                icon: const Icon(Icons.map_outlined, size: 20),
-                label: const Text('Show on map'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
               ),
             ),
           ],
@@ -114,6 +121,61 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
 
 bool _canFlyTo(Poi poi) {
   return !(poi.latitude == 0.0 && poi.longitude == 0.0);
+}
+
+class _MapAccentCtaButton extends StatelessWidget {
+  const _MapAccentCtaButton({
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final bool enabled;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final gradient = LinearGradient(
+      colors: context.mapControlActiveGradientColors,
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onPressed : null,
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: enabled ? gradient : null,
+              color: enabled ? null : cs.surfaceContainerHighest,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.map_outlined,
+                    size: 20,
+                    color: enabled ? Colors.white : cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Show on map',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: enabled ? Colors.white : cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _DistanceRow extends StatelessWidget {
@@ -134,6 +196,7 @@ class _DistanceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final hasFix =
         locationState.latitude != null &&
         locationState.longitude != null &&
@@ -143,12 +206,19 @@ class _DistanceRow extends StatelessWidget {
     if (!hasFix || distanceMeters == null) {
       return Row(
         children: [
-          Icon(Icons.my_location_outlined, size: 20, color: Colors.grey.shade600),
+          Icon(
+            Icons.my_location_outlined,
+            size: 20,
+            color: cs.onSurfaceVariant,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               'Distance unavailable (turn on location)',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              style: TextStyle(
+                fontSize: 14,
+                color: cs.onSurfaceVariant,
+              ),
             ),
           ),
         ],
@@ -157,14 +227,15 @@ class _DistanceRow extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(Icons.near_me_outlined, size: 20, color: Colors.blue.shade700),
+        Icon(Icons.near_me_outlined, size: 20, color: cs.primary),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
             '${_formatDistance(distanceMeters!)} from you',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
+              color: cs.onSurface,
             ),
           ),
         ),
