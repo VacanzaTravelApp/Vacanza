@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+
 import 'booking_search_field_styles.dart';
 
 /// Reusable read-only date field that opens a date picker on tap.
@@ -31,13 +33,13 @@ class BookingDateField extends StatefulWidget {
 }
 
 class BookingDateFieldState extends State<BookingDateField> {
-  static const _accent = Color(0xFF0096FF);
-
   /// Programmatically opens the date picker.
   Future<void> openPicker() => _pickDate();
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -45,7 +47,7 @@ class BookingDateFieldState extends State<BookingDateField> {
           padding: const EdgeInsets.only(left: 4, bottom: 4),
           child: Text(
             widget.label,
-            style: BookingSearchFieldStyles.fieldLabel,
+            style: BookingSearchFieldStyles.fieldLabel(context),
           ),
         ),
         GestureDetector(
@@ -61,40 +63,40 @@ class BookingDateFieldState extends State<BookingDateField> {
             child: TextFormField(
               controller: widget.controller,
               readOnly: true,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF1A1A1A),
+                color: cs.onSurface,
               ),
               decoration: InputDecoration(
                 hintText: widget.placeholder,
-                hintStyle: const TextStyle(
-                  color: Color(0xFFBBBBBB),
+                hintStyle: TextStyle(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.85),
                   fontWeight: FontWeight.w400,
                   fontSize: 13,
                 ),
-                prefixIcon: const Icon(
+                prefixIcon: Icon(
                   Icons.calendar_today_rounded,
                   size: 16,
-                  color: Color(0xFFAAAAAA),
+                  color: cs.onSurfaceVariant,
                 ),
                 filled: true,
-                fillColor: const Color(0xFFFAFAFA),
+                fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 14,
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                  borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                  borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: _accent, width: 1.5),
+                  borderSide: BorderSide(color: accent, width: 1.5),
                 ),
               ),
             ),
@@ -105,6 +107,9 @@ class BookingDateFieldState extends State<BookingDateField> {
   }
 
   Future<void> _pickDate() async {
+    final accent = context.mapControlAccent;
+    final surface = Theme.of(context).colorScheme.surface;
+
     final now = DateTime.now();
     final earliest = widget.firstDate ?? now;
     final latest = widget.lastDate ?? DateTime(now.year + 2);
@@ -129,16 +134,16 @@ class BookingDateFieldState extends State<BookingDateField> {
         return Theme(
           data: baseTheme.copyWith(
             colorScheme: baseTheme.colorScheme.copyWith(
-              primary: _accent,
+              primary: accent,
               onPrimary: Colors.white,
             ),
             datePickerTheme: baseTheme.datePickerTheme.copyWith(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
-              headerBackgroundColor: _accent,
+              headerBackgroundColor: accent,
               headerForegroundColor: Colors.white,
-              backgroundColor: Colors.white,
+              backgroundColor: surface,
             ),
           ),
           child: child!,
