@@ -25,3 +25,16 @@ class ToggleViewModePressed extends MapEvent {
 class RecenterPressed extends MapEvent {
   const RecenterPressed();
 }
+
+/// POI detay sheet: haritayı bu noktaya odakla (kuş uçuşu zoom).
+class FlyToPoiRequested extends MapEvent {
+  const FlyToPoiRequested({
+    required this.latitude,
+    required this.longitude,
+    this.zoom = 16.0,
+  });
+
+  final double latitude;
+  final double longitude;
+  final double zoom;
+}

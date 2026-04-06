@@ -10,17 +10,26 @@ import '../../../../../poi_search/data/models/poi_category_catalog.dart';
 import 'poi_marker_bitmap_builder.dart';
 
 class PoiMarkersController {
+  PoiMarkersController(
+    this._map, {
+    this.onPoiTap,
+  });
+
   final mb.MapboxMap _map;
+
+  /// Called when the user taps a POI marker (annotation).
+  final void Function(Poi poi)? onPoiTap;
 
   mb.PointAnnotationManager? _pointManager;
 
   final Map<String, mb.PointAnnotation> _byPoiId = {};
+  final Map<String, Poi> _poiCache = {};
   final Map<String, Uint8List> _iconCache = {};
+
+  mb.Cancelable? _tapCancel;
 
   Completer<void>? _opLock;
   int _opEpoch = 0;
-
-  PoiMarkersController(this._map);
 
   bool get isReady => _pointManager != null;
 
@@ -31,7 +40,26 @@ class PoiMarkersController {
 
     final annotations = _map.annotations;
     _pointManager = await annotations.createPointAnnotationManager();
+
+    _tapCancel?.cancel();
+    _tapCancel = _pointManager!.tapEvents(onTap: _onAnnotationTap);
+
     log('[PoiMarkersController] init completed');
+  }
+
+  void _onAnnotationTap(mb.PointAnnotation annotation) {
+    if (onPoiTap == null) return;
+    String? poiId;
+    for (final e in _byPoiId.entries) {
+      if (e.value.id == annotation.id) {
+        poiId = e.key;
+        break;
+      }
+    }
+    if (poiId == null) return;
+    final poi = _poiCache[poiId];
+    if (poi == null) return;
+    onPoiTap!(poi);
   }
 
   Future<void> clear() async {
@@ -43,6 +71,7 @@ class PoiMarkersController {
 
     try {
       _byPoiId.clear();
+      _poiCache.clear();
       await mgr.deleteAll();
       log('[PoiMarkersController] cleared all markers');
     } catch (e) {
@@ -197,6 +226,12 @@ class PoiMarkersController {
       }
     }
 
+    _poiCache
+      ..clear()
+      ..addEntries(
+        incomingById.entries.where((e) => _byPoiId.containsKey(e.key)),
+      );
+
     log(
       '[PoiMarkersController] diff: +${toAddPois.length} '
       '-${toRemoveIds.length} =${_byPoiId.length} (kept ${toKeep.length})',
@@ -205,6 +240,8 @@ class PoiMarkersController {
 
   Future<void> dispose() async {
     log('[PoiMarkersController] disposing...');
+    _tapCancel?.cancel();
+    _tapCancel = null;
     await clear();
     _pointManager = null;
     _iconCache.clear();

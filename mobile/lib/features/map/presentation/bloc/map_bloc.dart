@@ -18,6 +18,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<MapInitialized>(_onInitialized);
     on<ToggleViewModePressed>(_onToggleMode);
     on<RecenterPressed>(_onRecenter);
+    on<FlyToPoiRequested>(_onFlyToPoi);
     on<ToggleDrawingPressed>(_onToggleDrawingPressed);
     on<SetDrawingEnabled>(_onSetDrawingEnabled);
   }
@@ -46,6 +47,21 @@ class MapBloc extends Bloc<MapEvent, MapState> {
 
     // ignore: avoid_print
     print('[MapBloc] RecenterPressed -> recenterTick=${state.recenterTick + 1}');
+  }
+
+  void _onFlyToPoi(FlyToPoiRequested event, Emitter<MapState> emit) {
+    emit(
+      state.copyWith(
+        flyToPoiTick: state.flyToPoiTick + 1,
+        flyToPoiLat: event.latitude,
+        flyToPoiLng: event.longitude,
+        flyToPoiZoom: event.zoom,
+      ),
+    );
+    log(
+      '[MapBloc] FlyToPoiRequested lat=${event.latitude} lng=${event.longitude} '
+      'zoom=${event.zoom}',
+    );
   }
   void _onToggleDrawingPressed(
       ToggleDrawingPressed event,

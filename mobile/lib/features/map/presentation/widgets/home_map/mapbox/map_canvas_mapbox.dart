@@ -24,6 +24,8 @@ import '../../../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../../../checkin/presentation/bloc/location_state.dart';
 
 import '../drawing/map_drawing_overlay.dart';
+import '../../../../../poi_search/data/models/poi.dart';
+import '../markers/poi_marker_detail_sheet.dart';
 import '../markers/poi_markers_controller.dart';
 import '../markers/poi_markers_listener.dart';
 import 'mapbox_view.dart';
@@ -62,6 +64,11 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _styleBinding = context.read<StylePoiDiscoveryBinding>();
+  }
+
+  void _onPoiMarkerTapped(Poi poi) {
+    if (!mounted) return;
+    showPoiMarkerDetailSheet(context, poi);
   }
 
   void _suspendViewportFor({required int ms}) {
@@ -178,7 +185,10 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                     await oldController.dispose();
                   }
 
-                  final newController = PoiMarkersController(map);
+                  final newController = PoiMarkersController(
+                    map,
+                    onPoiTap: _onPoiMarkerTapped,
+                  );
                   await newController.init();
 
                   if (!newController.isReady) {
@@ -258,6 +268,35 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                       coordinates: mb.Position(loc.longitude!, loc.latitude!),
                     ),
                     zoom: 15.0,
+                    pitch: 0,
+                    bearing: 0,
+                  ),
+                  mb.MapAnimationOptions(duration: 600, startDelay: 0),
+                );
+              },
+            ),
+
+            // ── POI sheet: "Show on map" → fly to POI ─────────────────
+            BlocListener<MapBloc, MapState>(
+              listenWhen:
+                  (prev, next) => prev.flyToPoiTick != next.flyToPoiTick,
+              listener: (context, state) async {
+                final map = _map;
+                final lat = state.flyToPoiLat;
+                final lng = state.flyToPoiLng;
+                if (map == null || lat == null || lng == null) return;
+
+                log(
+                  '[MapCanvas] FlyToPoi lat=$lat lng=$lng zoom=${state.flyToPoiZoom}',
+                );
+                _suspendViewportFor(ms: 800);
+
+                await map.flyTo(
+                  mb.CameraOptions(
+                    center: mb.Point(
+                      coordinates: mb.Position(lng, lat),
+                    ),
+                    zoom: state.flyToPoiZoom,
                     pitch: 0,
                     bearing: 0,
                   ),
@@ -378,7 +417,10 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     await _applyViewMode(MapViewMode.mode2D);
 
     // POI annotation manager first.
-    final controller = PoiMarkersController(mapboxMap);
+    final controller = PoiMarkersController(
+      mapboxMap,
+      onPoiTap: _onPoiMarkerTapped,
+    );
     await controller.init();
 
     if (!controller.isReady) {

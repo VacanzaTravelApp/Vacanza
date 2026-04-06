@@ -44,6 +44,7 @@ class _PoiMarkersListenerState extends State<PoiMarkersListener> {
       listenWhen: (prev, next) {
         return prev.status != next.status ||
             prev.pois != next.pois ||
+            prev.count != next.count ||
             prev.selectedArea != next.selectedArea ||
             prev.areaSource != next.areaSource ||
             prev.selectedCategories != next.selectedCategories;
@@ -96,6 +97,7 @@ class _PoiMarkersListenerState extends State<PoiMarkersListener> {
     if (a == null || b == null) return false;
     return a.status == b.status &&
         a.pois == b.pois &&
+        a.count == b.count &&
         a.selectedArea == b.selectedArea &&
         a.areaSource == b.areaSource &&
         a.selectedCategories == b.selectedCategories;
