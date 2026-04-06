@@ -47,9 +47,12 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
       return;
     }
 
-    // ✅ Aynı bbox geldiyse spam request atma
-    if (state.selectedArea is BboxArea && state.selectedArea == event.bbox) {
-      return;
+    // ✅ Aynı bbox veya görünür alan pratikte aynı (stil/pitch sonrası float farkı)
+    if (state.selectedArea is BboxArea) {
+      final cur = state.selectedArea as BboxArea;
+      if (cur == event.bbox || cur.isNearlyEqual(event.bbox)) {
+        return;
+      }
     }
 
     emit(

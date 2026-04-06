@@ -51,6 +51,15 @@ class BboxArea extends SelectedArea {
   @override
   bool get isUsable => true;
 
+  /// Stil/pitch sonrası [coordinateBoundsForCamera] kaynaklı milimetrik farkları yok sayar;
+  /// aynı görünür alan için tekrar backend araması tetiklenmesin diye kullanılır.
+  bool isNearlyEqual(BboxArea other, {double epsilonDeg = 2e-5}) {
+    return (minLat - other.minLat).abs() < epsilonDeg &&
+        (maxLat - other.maxLat).abs() < epsilonDeg &&
+        (minLng - other.minLng).abs() < epsilonDeg &&
+        (maxLng - other.maxLng).abs() < epsilonDeg;
+  }
+
   @override
   List<Object?> get props => [minLat, minLng, maxLat, maxLng];
 }
