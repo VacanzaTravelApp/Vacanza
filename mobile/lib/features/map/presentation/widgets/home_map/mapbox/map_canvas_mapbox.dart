@@ -15,7 +15,8 @@ import '../../../../../poi_search/presentation/bloc/area_query_state.dart';
 import '../../../../../poi_search/presentation/bloc/poi_search_bloc.dart';
 import '../../../../../poi_search/presentation/bloc/poi_search_state.dart';
 
-import '../../../../data/models/map_view_mode.dart';
+import '../../../../data/models/map_basemap.dart';
+import '../../../../data/models/map_perspective.dart';
 import '../../../bloc/map_bloc.dart';
 import '../../../bloc/map_event.dart';
 import '../../../bloc/map_state.dart';
@@ -52,18 +53,37 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   int _selectionRebuildTick = 0;
   int _markerControllerKey = 0;
 
-  @override
-  void dispose() {
-    _resumeTimer?.cancel();
-    _styleBinding?.detachMap();
-    unawaited(_poiMarkers?.dispose());
-    super.dispose();
+  /// Son senkronlanan uygulama parlaklığı (tema değişince harita basemap güncellenir).
+  Brightness? _lastSyncedAppBrightness;
+
+  static String _styleUriForBasemap(MapBasemap basemap) {
+    return switch (basemap) {
+      MapBasemap.streets => MapboxConfig.styleStandard,
+      MapBasemap.dark => MapboxConfig.styleDark,
+      MapBasemap.satellite => MapboxConfig.styleStandardSatellite,
+    };
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _styleBinding = context.read<StylePoiDiscoveryBinding>();
+
+    final b = Theme.of(context).brightness;
+    if (_lastSyncedAppBrightness != b) {
+      _lastSyncedAppBrightness = b;
+      context.read<MapBloc>().add(
+            SyncBasemapToAppTheme(isDark: b == Brightness.dark),
+          );
+    }
+  }
+
+  @override
+  void dispose() {
+    _resumeTimer?.cancel();
+    _styleBinding?.detachMap();
+    unawaited(_poiMarkers?.dispose());
+    super.dispose();
   }
 
   void _onPoiMarkerTapped(Poi poi) {
@@ -162,18 +182,28 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
         return MultiBlocListener(
           listeners: [
-            // ── ViewMode change ──────────────────────────────────────
+            // ── Basemap / perspective (web: STYLES × is3D) ────────────
             BlocListener<MapBloc, MapState>(
-              listenWhen: (prev, next) => prev.viewMode != next.viewMode,
+              listenWhen: (prev, next) =>
+                  prev.basemap != next.basemap ||
+                  prev.perspective != next.perspective,
               listener: (context, state) async {
                 final map = _map;
                 if (map == null) return;
 
-                log('[MapCanvas] ViewMode changing to ${state.viewMode.label}');
+                final poiBloc = context.read<PoiSearchBloc>();
+
+                log(
+                  '[MapCanvas] Map display → basemap=${state.basemap.label} '
+                  'perspective=${state.perspective.label}',
+                );
 
                 _suspendViewportFor(ms: 900);
 
-                final bool styleChanged = await _applyViewMode(state.viewMode);
+                final bool styleChanged = await _applyMapVisuals(
+                  state.basemap,
+                  state.perspective,
+                );
 
                 if (styleChanged) {
                   log(
@@ -213,7 +243,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                     '[MapCanvas] New controller created key=$_markerControllerKey',
                   );
 
-                  final poiState = context.read<PoiSearchBloc>().state;
+                  final poiState = poiBloc.state;
 
                   if (poiState.status == PoiSearchStatus.success &&
                       poiState.pois.isNotEmpty) {
@@ -413,8 +443,9 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       }
     }
 
-    _lastStyleUri = MapboxConfig.styleStandard;
-    await _applyViewMode(MapViewMode.mode2D);
+    if (!mounted) return;
+    final ms = context.read<MapBloc>().state;
+    await _applyMapVisuals(ms.basemap, ms.perspective);
 
     // POI annotation manager first.
     final controller = PoiMarkersController(
@@ -444,18 +475,18 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     log('[MapCanvas] Initialization complete');
   }
 
-  // ── Style / view-mode ──────────────────────────────────────────────
+  // ── Basemap (streets / dark / sat) + 2D/3D ─────────────────────────
 
-  Future<bool> _applyViewMode(MapViewMode mode) async {
+  Future<bool> _applyMapVisuals(
+    MapBasemap basemap,
+    MapPerspective perspective,
+  ) async {
     final map = _map;
     if (map == null) return false;
 
-    final cs = await map.getCameraState();
+    final targetStyleUri = _styleUriForBasemap(basemap);
 
-    final String targetStyleUri =
-        (mode == MapViewMode.satellite)
-            ? MapboxConfig.styleStandardSatellite
-            : MapboxConfig.styleStandard;
+    final cs = await map.getCameraState();
 
     bool styleChanged = false;
 
@@ -466,15 +497,12 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       styleChanged = true;
     }
 
-    final bool enable3D = (mode == MapViewMode.mode3D);
+    final bool enable3D = perspective == MapPerspective.mode3D;
 
-    // streets-v12: 3D binalar fill-extrusion katmanıyla eklenir.
     await _toggle3DBuildings(map, enable3D);
 
-    final double targetPitch = switch (mode) {
-      MapViewMode.mode3D => MapboxConfig.pitch3D,
-      MapViewMode.mode2D || MapViewMode.satellite => 0,
-    };
+    final double targetPitch =
+        enable3D ? MapboxConfig.pitch3D : 0;
     final double targetZoom = enable3D
         ? math.max(cs.zoom, MapboxConfig.zoomMin3D)
         : cs.zoom;
@@ -511,7 +539,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       final layer = mb.FillExtrusionLayer(id: _buildingLayerId, sourceId: 'composite');
       layer.sourceLayer = 'building';
       layer.minZoom = 13;
-      layer.fillExtrusionColor = const Color(0xFFAAAAAA).value;
+      layer.fillExtrusionColor = const Color(0xFFAAAAAA).toARGB32();
       layer.fillExtrusionOpacity = 0.65;
 
       await map.style.addLayer(layer);
