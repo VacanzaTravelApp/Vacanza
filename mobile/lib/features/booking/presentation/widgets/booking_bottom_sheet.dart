@@ -24,11 +24,19 @@ class BookingBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return BlocProvider(
       create: (ctx) => BookingCubit(
         repository: ctx.read<BookingRepository>(),
       ),
-      child: DraggableScrollableSheet(
+      // Lifts the whole sheet above the keyboard so flight/hotel autocomplete
+      // dropdowns stay visible (inner scroll padding alone is not enough).
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: DraggableScrollableSheet(
         initialChildSize: 0.65,
         minChildSize: 0.35,
         maxChildSize: 0.85,
@@ -85,12 +93,8 @@ class BookingBottomSheet extends StatelessWidget {
                           controller: scrollController,
                           keyboardDismissBehavior:
                               ScrollViewKeyboardDismissBehavior.onDrag,
-                          padding: EdgeInsets.fromLTRB(
-                            24,
-                            24,
-                            24,
-                            24 + MediaQuery.viewInsetsOf(context).bottom,
-                          ),
+                          // Bottom inset handled by [AnimatedPadding] above.
+                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
                           child: _buildBody(context, state),
                         ),
                       );
@@ -101,6 +105,7 @@ class BookingBottomSheet extends StatelessWidget {
             ),
           );
         },
+        ),
       ),
     );
   }
