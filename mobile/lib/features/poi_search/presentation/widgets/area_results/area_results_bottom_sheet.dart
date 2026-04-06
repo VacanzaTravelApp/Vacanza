@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../data/models/poi.dart';
+import '../../../data/models/poi_category_catalog.dart';
 import 'area_results_header.dart';
 import 'area_results_list.dart';
 
@@ -44,55 +45,20 @@ class AreaResultsSheet extends StatelessWidget {
   });
 
   String _labelFor(String key) {
-    switch (key) {
-      case 'restaurant':
-        return 'Restaurant';
-      case 'cafe':
-        return 'Cafes';
-      case 'museum':
-        return 'Museums';
-      case 'monuments':
-        return 'Monuments';
-      case 'parks':
-        return 'Parks';
-      default:
-        if (key.isEmpty) return key;
-        return key[0].toUpperCase() + key.substring(1);
-    }
+    final def = PoiCategoryCatalog.definitionForUiKey(key);
+    if (def != null) return def.label;
+    if (key.isEmpty) return key;
+    return key[0].toUpperCase() + key.substring(1);
   }
 
   IconData _iconFor(String key) {
-    switch (key) {
-      case 'restaurant':
-        return Icons.restaurant_rounded;
-      case 'cafe':
-        return Icons.local_cafe_rounded;
-      case 'museum':
-        return Icons.museum_rounded;
-      case 'monuments':
-        return Icons.account_balance_rounded;
-      case 'parks':
-        return Icons.park_rounded;
-      default:
-        return Icons.place_rounded;
-    }
+    return PoiCategoryCatalog.definitionForUiKey(key)?.iconData ??
+        Icons.place_rounded;
   }
 
   Color _colorFor(String key) {
-    switch (key) {
-      case 'museum':
-        return const Color(0xFF0096FF);
-      case 'restaurant':
-        return const Color(0xFFFFD166);
-      case 'cafe':
-        return const Color(0xFFB37AFF);
-      case 'monuments':
-        return const Color(0xFFFF9F43);
-      case 'parks':
-        return const Color(0xFF2ECC71);
-      default:
-        return const Color(0xFF0096FF);
-    }
+    return PoiCategoryCatalog.definitionForUiKey(key)?.ringColor ??
+        const Color(0xFF0096FF);
   }
 
   List<String> _normalizedSelectedCategories() {
@@ -108,14 +74,8 @@ class AreaResultsSheet extends StatelessWidget {
       set.addAll(countsByCategory.keys.map((e) => e.trim().toLowerCase()));
     }
 
-    // Stabil order (figma uyumlu)
-    const baseOrder = <String>[
-      'restaurant',
-      'cafe',
-      'museum',
-      'monuments',
-      'parks',
-    ];
+    final baseOrder =
+        PoiCategoryCatalog.all.map((e) => e.key).toList(growable: false);
     final ordered = <String>[];
 
     for (final k in baseOrder) {
@@ -138,7 +98,10 @@ class AreaResultsSheet extends StatelessWidget {
     // ✅ UI filtreleme: backend'e gitmeden mevcut pois içinde gez
     final List<Poi> visiblePois = allActive
         ? pois
-        : pois.where((p) => p.category.trim().toLowerCase() == activeKey).toList();
+        : pois.where((p) {
+            final ui = PoiCategoryCatalog.poiCategoryForRaw(p.category)?.key;
+            return ui == activeKey;
+          }).toList();
 
     final visibleCount = visiblePois.length;
 

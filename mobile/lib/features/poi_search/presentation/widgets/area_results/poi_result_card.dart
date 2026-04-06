@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../data/models/poi.dart';
+import '../../../data/models/poi_category_catalog.dart';
 
 class PoiResultCard extends StatelessWidget {
   final Poi poi;
@@ -12,8 +13,13 @@ class PoiResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = (poi.name?.trim().isNotEmpty ?? false) ? poi.name!.trim() : 'Unnamed place';
-    final category = poi.category.trim().isEmpty ? 'place' : poi.category.trim();
+    final title = PoiCategoryCatalog.safePoiTitle(
+      name: poi.name,
+      rawCategory: poi.category,
+    );
+    final categoryLabel =
+        PoiCategoryCatalog.labelForRawCategory(poi.category) ??
+            (poi.category.trim().isEmpty ? 'place' : poi.category.trim());
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -33,7 +39,7 @@ class PoiResultCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _CategoryDot(category: category),
+          _CategoryDot(rawCategory: poi.category),
           const SizedBox(width: 12),
 
           Expanded(
@@ -51,7 +57,7 @@ class PoiResultCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  category,
+                  categoryLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -83,48 +89,14 @@ class PoiResultCard extends StatelessWidget {
 }
 
 class _CategoryDot extends StatelessWidget {
-  final String category;
-  const _CategoryDot({required this.category});
-
-  Color _colorFor(String key) {
-    final k = key.trim().toLowerCase();
-    switch (k) {
-      case 'restaurant':
-        return const Color(0xFFFFD166);
-      case 'cafe':
-        return const Color(0xFFB37AFF);
-      case 'museum':
-        return const Color(0xFF0096FF);
-      case 'monuments':
-        return const Color(0xFFFF9F43);
-      case 'parks':
-        return const Color(0xFF2ECC71);
-      default:
-        return const Color(0xFF0096FF);
-    }
-  }
-
-  IconData _iconFor(String key) {
-    final k = key.trim().toLowerCase();
-    switch (k) {
-      case 'restaurant':
-        return Icons.restaurant_rounded;
-      case 'cafe':
-        return Icons.local_cafe_rounded;
-      case 'museum':
-        return Icons.museum_rounded;
-      case 'monuments':
-        return Icons.account_balance_rounded;
-      case 'parks':
-        return Icons.park_rounded;
-      default:
-        return Icons.place_rounded;
-    }
-  }
+  final String rawCategory;
+  const _CategoryDot({required this.rawCategory});
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorFor(category);
+    final def = PoiCategoryCatalog.poiCategoryForRaw(rawCategory);
+    final color = def?.ringColor ?? const Color(0xFF0096FF);
+    final icon = def?.iconData ?? Icons.place_rounded;
 
     return Container(
       width: 38,
@@ -134,7 +106,7 @@ class _CategoryDot extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: Icon(
-        _iconFor(category),
+        icon,
         size: 20,
         color: color,
       ),

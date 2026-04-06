@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/area_source.dart';
+import '../../data/models/poi_category_catalog.dart';
 import '../../data/models/selected_area.dart';
 import '../../data/repositories/poi_search_repository.dart';
 import '../../data/repositories/poi_search_repository_exception.dart';
@@ -108,21 +109,21 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
   }
 
   void _onCategoryChanged(CategoryChanged event, Emitter<PoiSearchState> emit) {
-    emit(
-      state.copyWith(
-        selectedCategories: List.unmodifiable(event.categories),
-        page: 0,
-      ),
+    final next = state.copyWith(
+      selectedCategories: List.unmodifiable(event.categories),
+      page: 0,
     );
+    emit(next);
 
-    if (state.hasUsableArea) {
+    if (next.hasUsableArea) {
       add(const SearchRequested());
     }
   }
 
   void _onSortChanged(SortChanged event, Emitter<PoiSearchState> emit) {
-    emit(state.copyWith(sort: event.sort, page: 0));
-    if (state.hasUsableArea) add(const SearchRequested());
+    final next = state.copyWith(sort: event.sort, page: 0);
+    emit(next);
+    if (next.hasUsableArea) add(const SearchRequested());
   }
 
   Future<void> _onSearchRequested(
@@ -144,9 +145,11 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
     );
 
     try {
+      final categories = _categoriesForBackendRequest(state.selectedCategories);
+
       final res = await _repo.searchInArea(
         area: state.selectedArea,
-        categories: state.selectedCategories.isEmpty ? null : state.selectedCategories,
+        categories: categories,
         page: page,
         limit: limit,
         sort: state.sort,
@@ -185,5 +188,22 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
 
   Future<void> _onLoadNextPage(LoadNextPage event, Emitter<PoiSearchState> emit) async {
     // ops: şimdilik MVP dışı.
+  }
+
+  /// Boş seçim → backend filtre yok. Tüm katalog anahtarları seçiliyse → `categories` gönderme;
+  /// böylece bbox içindeki tüm kayıtlar gelir (DB’de saklı kategori string’leri UI anahtarından
+  /// sapabildiği için `category IN (...)` çok sonuç kesiyordu).
+  static List<String>? _categoriesForBackendRequest(List<String> selected) {
+    if (selected.isEmpty) return null;
+
+    final selectedSet = selected.map((e) => e.trim().toLowerCase()).toSet();
+    final allKeys =
+        PoiCategoryCatalog.all.map((e) => e.key.toLowerCase()).toSet();
+    if (selectedSet.length == allKeys.length &&
+        selectedSet.containsAll(allKeys)) {
+      return null;
+    }
+
+    return selected;
   }
 }
