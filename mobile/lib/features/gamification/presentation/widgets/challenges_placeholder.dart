@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 /// Placeholder section for live challenges (future feature).
 class ChallengesPlaceholder extends StatelessWidget {
@@ -6,19 +7,21 @@ class ChallengesPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(Icons.track_changes, size: 20, color: Color(0xFF0096FF)),
-            SizedBox(width: 8),
+            Icon(Icons.track_changes, size: 20, color: context.mapControlAccent),
+            const SizedBox(width: 8),
             Text(
               'Live Challenges',
               style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF2C3E50)),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
             ),
           ],
         ),
@@ -27,14 +30,14 @@ class ChallengesPlaceholder extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.8),
+            color: cs.surface.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+            border: Border.all(color: cs.outline.withValues(alpha: 0.14)),
           ),
           child: Text(
             'Coming soon — complete check-ins to unlock challenges!',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
           ),
         ),
       ],
