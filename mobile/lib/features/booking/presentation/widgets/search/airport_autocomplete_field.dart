@@ -232,7 +232,7 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
                       color: cs.onSurfaceVariant,
                     ),
                     filled: true,
-                    fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                    fillColor: BookingSearchFieldStyles.fieldFill(context),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 14,
@@ -240,13 +240,17 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(
-                        color: cs.outline.withValues(alpha: 0.35),
+                        color: BookingSearchFieldStyles.fieldBorderInactive(
+                          context,
+                        ),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(
-                        color: cs.outline.withValues(alpha: 0.35),
+                        color: BookingSearchFieldStyles.fieldBorderInactive(
+                          context,
+                        ),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(

@@ -29,9 +29,9 @@ class AdultsStepper extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+            color: BookingSearchFieldStyles.fieldFill(context),
             border: Border.all(
-              color: cs.outline.withValues(alpha: 0.35),
+              color: BookingSearchFieldStyles.fieldBorderInactive(context),
             ),
             borderRadius: BorderRadius.circular(16),
           ),

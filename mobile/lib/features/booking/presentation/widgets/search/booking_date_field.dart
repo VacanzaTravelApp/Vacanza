@@ -81,18 +81,22 @@ class BookingDateFieldState extends State<BookingDateField> {
                   color: cs.onSurfaceVariant,
                 ),
                 filled: true,
-                fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                fillColor: BookingSearchFieldStyles.fieldFill(context),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 14,
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
+                  borderSide: BorderSide(
+                    color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
+                  borderSide: BorderSide(
+                    color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),

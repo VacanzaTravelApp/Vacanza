@@ -118,7 +118,7 @@ class BudgetField extends StatelessWidget {
                       minHeight: 0,
                     ),
                     filled: true,
-                    fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                    fillColor: BookingSearchFieldStyles.fieldFill(context),
                     isDense: true,
                     contentPadding: const EdgeInsets.only(
                       left: 4,
@@ -129,13 +129,17 @@ class BudgetField extends StatelessWidget {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(
-                        color: cs.outline.withValues(alpha: 0.35),
+                        color: BookingSearchFieldStyles.fieldBorderInactive(
+                          context,
+                        ),
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(
-                        color: cs.outline.withValues(alpha: 0.35),
+                        color: BookingSearchFieldStyles.fieldBorderInactive(
+                          context,
+                        ),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -196,14 +200,16 @@ class _CompactCurrencyPicker extends StatelessWidget {
     return SizedBox(
       height: BudgetField._fieldHeight,
       child: Material(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+        color: BookingSearchFieldStyles.fieldFill(context),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.only(left: 8, right: 4),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outline.withValues(alpha: 0.35)),
+            border: Border.all(
+              color: BookingSearchFieldStyles.fieldBorderInactive(context),
+            ),
           ),
           child: DropdownButton<String>(
             key: ValueKey<String>('budget_ccy_$normalized'),

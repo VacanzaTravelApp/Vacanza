@@ -65,18 +65,22 @@ class SortDropdown extends StatelessWidget {
           ),
           decoration: InputDecoration(
             filled: true,
-            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+            fillColor: BookingSearchFieldStyles.fieldFill(context),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 14,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
+              borderSide: BorderSide(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
+              borderSide: BorderSide(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
