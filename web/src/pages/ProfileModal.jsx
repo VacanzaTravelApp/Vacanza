@@ -45,6 +45,7 @@ import { useGamificationProfile } from "../gamification/useGamificationProfile";
 import { userApi } from "../api/userApi";
 import dayjs from "dayjs";
 import CalendarModal from "./CalendarModal";
+import defaultAvatar from "../assets/default-avatar.png";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -180,7 +181,7 @@ const ProfileCharacterCard = ({ name, role, level, xp, progress, imageUrl }) => 
                         border: "2px solid var(--card-bg, white)", overflow: "hidden", background: "rgba(128,128,128,0.1)",
                         display: "flex", alignItems: "center", justifyContent: "center"
                     }}>
-                        {imageUrl ? <img src={imageUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <UserOutlined style={{ fontSize: 32, color: "var(--card-subtext, #9ca3af)" }} />}
+                        <img src={imageUrl || defaultAvatar} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     </div>
                 </div>
                 <div style={{
@@ -282,7 +283,7 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
                 level={gamification?.levelText ? parseInt(gamification.levelText.replace(/\D/g, ''), 10) : 1}
                 xp={gamification?.totalXp || 0}
                 progress={gamification?.xpProgressPercent || 0}
-                imageUrl={profilePhotoUrl || profile?.profileImageUrl || user?.photoURL}
+                imageUrl={profilePhotoUrl || profile?.profileImageUrl || defaultAvatar}
             />
 
             <SectionCard
@@ -584,7 +585,7 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                     <div style={{ position: "relative" }}>
                         <Avatar
                             size={100}
-                            src={profilePhotoUrl || profile?.profileImageUrl || user?.photoURL}
+                            src={profilePhotoUrl || profile?.profileImageUrl || defaultAvatar}
                             style={{
                                 border: "3px solid rgba(255,255,255,0.1)",
                                 background: "rgba(255,255,255,0.05)",
@@ -835,6 +836,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
     const queryClient = useQueryClient();
     const [view, setView] = useState('MAIN');
 
+    const [optimisticPhotoUrl, setOptimisticPhotoUrl] = useState(null);
     const { data: profile } = useUserProfile();
     const { data: stats } = useUserStats();
     const { data: checkins } = useUserCheckins();
@@ -848,25 +850,41 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
             formData.append('file', file);
             return userApi.uploadPhoto(formData);
         },
+        onMutate: (file) => {
+            // Instantly show the selected image
+            const previewUrl = URL.createObjectURL(file);
+            setOptimisticPhotoUrl(previewUrl);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(["user", "profile"]);
+            queryClient.invalidateQueries(["user", "photo"]);
             message.success("Profile photo updated!");
         },
         onError: (err) => {
+            setOptimisticPhotoUrl(null); // Revert on error
             message.error(err?.friendlyMessage || "Failed to upload photo");
         }
     });
 
     const deletePhotoMutation = useMutation({
         mutationFn: () => userApi.deletePhoto(),
+        onMutate: () => {
+            setOptimisticPhotoUrl(defaultAvatar);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries(["user", "profile"]);
+            queryClient.invalidateQueries(["user", "photo"]);
+            setOptimisticPhotoUrl(null);
             message.success("Photo removed");
         },
         onError: (err) => {
+            setOptimisticPhotoUrl(null);
             message.error(err?.friendlyMessage || "Failed to remove photo");
         }
     });
+
+    // Effective display URL
+    const displayPhotoUrl = optimisticPhotoUrl || profilePhotoUrl;
 
     useEffect(() => {
         if (!open) {
@@ -961,7 +979,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
                         onClose={onClose}
                         onOpenCalendar={onOpenCalendar}
                         onOpenPreferences={onOpenPreferences}
-                        profilePhotoUrl={profilePhotoUrl}
+                        profilePhotoUrl={displayPhotoUrl}
                     />
                 )}
                 {view === 'GAMIFICATION' && (
@@ -982,7 +1000,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
                         updateMutation={updateProfileMutation}
                         uploadMutation={uploadPhotoMutation}
                         deleteMutation={deletePhotoMutation}
-                        profilePhotoUrl={profilePhotoUrl}
+                        profilePhotoUrl={displayPhotoUrl}
                     />
                 )}
             </Modal>

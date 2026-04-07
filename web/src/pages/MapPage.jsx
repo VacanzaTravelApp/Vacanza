@@ -2,16 +2,18 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, Spin } from "antd";
 import {
   LogoutOutlined,
-  UserOutlined,
   GlobalOutlined,
-  CompassOutlined,
   HeatMapOutlined,
-  UnorderedListOutlined,
-  CloseOutlined,
   InfoCircleOutlined,
+  CalendarOutlined,
   SunOutlined,
   MoonOutlined,
+  UserOutlined,
+  CompassOutlined,
+  CloseOutlined,
+  UnorderedListOutlined,
 } from "@ant-design/icons";
+import defaultAvatar from "../assets/default-avatar.png";
 import { useNavigate } from "react-router-dom";
 
 import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
@@ -22,7 +24,6 @@ import { useGamificationProfile } from "../gamification/useGamification";
 import { useUserProfile } from "../hooks/useUserProfileData";
 import { useProfilePhoto } from "../hooks/useProfilePhoto";
 import BookingSheet from "../features/booking/components/BookingSheet";
-import { CalendarOutlined } from "@ant-design/icons";
 import VacanzaChat, {
   getSessionConversationId,
   linkPolygonRouteConversation,
@@ -1651,7 +1652,7 @@ export default function MapPage() {
 
         <div className="sidebar-user-section">
           <div className="sidebar-avatar-wrapper">
-            <Avatar size={90} icon={<UserOutlined />} src={profilePhotoUrl || profile?.profileImageUrl || user?.photoURL} className="sidebar-avatar" />
+            <Avatar size={90} src={profilePhotoUrl || profile?.profileImageUrl || defaultAvatar} className="sidebar-avatar" />
           </div>
           <div className="sidebar-info" style={{ textAlign: "center" }}>
             <div className="sidebar-username">{profile?.preferredName || profile?.firstName || user?.displayName || "Adventurer"}</div>
