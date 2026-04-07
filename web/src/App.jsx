@@ -44,7 +44,14 @@ const App = () => {
                     />
 
                     {/* NEW ROUTES */}
-                    <Route path="/verify-email" element={<EmailVerificationPage />} />
+                    <Route
+                        path="/verify-email"
+                        element={
+                            <AuthLayout>
+                                <EmailVerificationPage />
+                            </AuthLayout>
+                        }
+                    />
                     <Route path="/auth/action" element={<AuthActionPage />} />
 
                     <Route path="/map" element={<MapPage />} />

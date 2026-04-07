@@ -166,6 +166,7 @@ const MapIcon = () => (
 const AuthLayout = ({ children }) => {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
+  const isVerifyPage = location.pathname === '/verify-email';
   const [timeState, setTimeState] = useState(calculateTimeState());
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -210,14 +211,18 @@ const AuthLayout = ({ children }) => {
         <div className="floating-ornaments">
           <div className="poster-text float-top-left">
             <h1 className="vivid-title">
-              {isLoginPage ? (
+              {isVerifyPage ? (
+                <>One More<br /><span className="title-accent">Step</span></>
+              ) : isLoginPage ? (
                 <>Welcome<br /><span className="title-accent">Back</span></>
               ) : (
                 <>Begin Your<br /><span className="title-accent">Journey</span></>
               )}
             </h1>
             <p className="poster-subtitle">
-              {isLoginPage
+              {isVerifyPage
+                ? 'Confirm your email to unlock the full experience.'
+                : isLoginPage
                 ? 'Your plans are waiting.'
                 : 'AI-powered travel planning.'}
             </p>
