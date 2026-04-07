@@ -91,6 +91,7 @@ public class ArPoiController {
                         .latitude(plat)
                         .longitude(plng)
                         .distanceMeters(distance)
+                        .externalId(p.getExternalId())
                         .build();
                 arPois.add(dto);
             }
