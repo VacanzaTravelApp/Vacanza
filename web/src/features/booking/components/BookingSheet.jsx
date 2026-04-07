@@ -404,7 +404,7 @@ export default function BookingSheet({ open, onClose }) {
                   <span className="results-summary-sub">
                     {state.bookingType === 'hotels'
                       ? `${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)} – ${formatFriendlyDate(state.searchParams.checkOutDate)} · ${state.searchParams.adults} adult`
-                      : `${state.searchParams.origin}→${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)} · ${state.searchParams.adults} adult`}
+                      : `${state.searchParams.origin}→${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)}${state.searchParams.isRoundTrip ? ' – ' + formatFriendlyDate(state.searchParams.checkOutDate) : ''} · ${state.searchParams.adults} adult`}
                   </span>
                 </div>
                 <button className="filter-tune-btn" onClick={() => dispatch({ type: "OPEN_FILTERS" })}><MdTune /></button>

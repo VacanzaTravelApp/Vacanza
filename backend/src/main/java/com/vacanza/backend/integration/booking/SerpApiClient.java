@@ -147,7 +147,7 @@ public class SerpApiClient {
                     .block();
 
             List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response,
-                    request.getCurrency());
+                    request.getCurrency(), request.getReturnDate());
 
             log.info("[SERPAPI] Flight search returned {} results", results.size());
             return results;

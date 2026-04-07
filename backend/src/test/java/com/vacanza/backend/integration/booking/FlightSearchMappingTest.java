@@ -35,7 +35,7 @@ class FlightSearchMappingTest {
                     "Paris Charles de Gaulle Airport", "CDG", "2025-07-01 12:45",
                     250);
 
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD", null);
 
             assertFalse(results.isEmpty(), "Should have at least one result");
             TransportOptionDTO dto = results.get(0);
@@ -56,7 +56,7 @@ class FlightSearchMappingTest {
                     "Frankfurt am Main", "FRA", "2025-08-16 06:30",
                     800);
 
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "EUR");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "EUR", null);
             String url = results.get(0).getExternalBookingUrl();
 
             assertTrue(url.startsWith("https://www.google.com/travel/flights?q="),
@@ -73,7 +73,7 @@ class FlightSearchMappingTest {
                     null, "CDG", "2025-07-01 12:45",
                     300);
 
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD", null);
             String url = results.get(0).getExternalBookingUrl();
 
             assertNotNull(url, "URL should still be generated when names are null");
@@ -88,7 +88,7 @@ class FlightSearchMappingTest {
                     "London Heathrow", "LHR", "2025-07-01 18:00",
                     450);
 
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD", null);
             String url = results.get(0).getExternalBookingUrl();
 
             assertNotNull(url, "URL should handle null departure time");
@@ -98,7 +98,7 @@ class FlightSearchMappingTest {
         @Test
         @DisplayName("Null response returns empty list")
         void nullResponseReturnsEmpty() {
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(null, "USD");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(null, "USD", null);
             assertTrue(results.isEmpty());
         }
     }

@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.time.LocalDate;
+
 
 /**
  * Jackson POJOs for deserializing SerpApi Google Flights response.
@@ -112,7 +114,7 @@ public class SerpApiFlightResponse {
     // --- Mapping ---
 
     public static List<TransportOptionDTO> toTransportOptions(
-            SerpApiFlightResponse response, String currency) {
+            SerpApiFlightResponse response, String currency, LocalDate returnDate) {
         if (response == null) {
             return Collections.emptyList();
         }
@@ -185,8 +187,16 @@ public class SerpApiFlightResponse {
                             ? departureTime.substring(0, 10)
                             : "";
 
-                    String rawQuery = String.format("flights from %s to %s on %s",
-                            originName, destinationName, dateStr).trim();
+                    String rawQuery;
+                    if (returnDate != null) {
+                        // Using IATA codes and a simple space-separated format is much more robust for Google Flights deep-links
+                        rawQuery = String.format("flights %s to %s %s %s",
+                                origin, destination, dateStr, returnDate.toString()).trim();
+                    } else {
+                        rawQuery = String.format("flights %s to %s %s",
+                                origin, destination, dateStr).trim();
+                    }
+
                     String bookingUrl = "https://www.google.com/travel/flights?q="
                             + URLEncoder.encode(rawQuery, StandardCharsets.UTF_8);
 
