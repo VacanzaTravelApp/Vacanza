@@ -6,7 +6,8 @@ import '../styles/bookingSheet.css';
 
 const formatFriendlyDate = (dateStr) => {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
+  // Force T00:00:00 to avoid timezone shifts
+  const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}, ${days[d.getDay()]}`;
@@ -404,7 +405,7 @@ export default function BookingSheet({ open, onClose }) {
                   <span className="results-summary-sub">
                     {state.bookingType === 'hotels'
                       ? `${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)} – ${formatFriendlyDate(state.searchParams.checkOutDate)} · ${state.searchParams.adults} adult`
-                      : `${state.searchParams.origin}→${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)}${state.searchParams.isRoundTrip ? ' – ' + formatFriendlyDate(state.searchParams.checkOutDate) : ''} · ${state.searchParams.adults} adult`}
+                      : `${state.searchParams.origin}→${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)}${state.searchParams.isRoundTrip ? ` – ${formatFriendlyDate(state.searchParams.checkOutDate)}` : ''} · ${state.searchParams.adults} adult`}
                   </span>
                 </div>
                 <button className="filter-tune-btn" onClick={() => dispatch({ type: "OPEN_FILTERS" })}><MdTune /></button>

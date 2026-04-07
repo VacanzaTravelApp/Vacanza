@@ -6,6 +6,9 @@ import WaypointFeedback from "./WaypointFeedback";
 import EventRecommendations from "./EventRecommendations";
 import "../styles/routePanel.css";
 
+/** Set to true to show per-stop thumbs on the map route card (POI feedback). */
+const ENABLE_ROUTE_PANEL_WAYPOINT_FEEDBACK = false;
+
 const TIME_SLOT_LABELS = {
   morning: "Sabah",
   lunch: "Öğle Yemeği",
@@ -285,10 +288,12 @@ export default function RoutePanel({
                               </span>
                             )}
                         </div>
-                        <WaypointFeedback
-                          waypoint={wp}
-                          storageKey={`d${activeDay}-i${idx}-o${wp.order ?? idx}-${String(wp.name || "").slice(0, 48)}`}
-                        />
+                        {ENABLE_ROUTE_PANEL_WAYPOINT_FEEDBACK ? (
+                          <WaypointFeedback
+                            waypoint={wp}
+                            storageKey={`d${activeDay}-i${idx}-o${wp.order ?? idx}-${String(wp.name || "").slice(0, 48)}`}
+                          />
+                        ) : null}
                       </div>
                       {wp.description && (
                         <div className="route-panel-waypoint-desc">{wp.description}</div>
