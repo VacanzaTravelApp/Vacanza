@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -46,23 +48,41 @@ class BookingBottomSheet extends StatelessWidget {
         builder: (context, scrollController) {
           final t = context.vacanzaTokens;
           final cs = Theme.of(context).colorScheme;
-          return Container(
-            decoration: BoxDecoration(
-              color: cs.surface.withValues(alpha: 0.98),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(_sheetRadius),
-              ),
-              border: Border.all(color: t.cardBorder.withValues(alpha: 0.6)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 32,
-                  offset: const Offset(0, -8),
-                ),
-              ],
+          final isLight = Theme.of(context).brightness == Brightness.light;
+          final secondary = cs.secondary;
+          return ClipRRect(
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(_sheetRadius),
             ),
-            child: Column(
-              children: [
+            child: BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: isLight ? 14 : 0,
+                sigmaY: isLight ? 14 : 0,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  // Day: bright frosted glass. Night: solid surface.
+                  color: isLight
+                      ? context.lightGlassPanelColor
+                      : cs.surface.withValues(alpha: 0.98),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(_sheetRadius),
+                  ),
+                  border: Border.all(
+                    color: isLight
+                        ? secondary.withValues(alpha: 0.22)
+                        : t.cardBorder.withValues(alpha: 0.6),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 32,
+                      offset: const Offset(0, -8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
                 // ─── Handle bar ──────────────────────────────────
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
@@ -74,7 +94,9 @@ class BookingBottomSheet extends StatelessWidget {
                         width: _handleWidth,
                         height: _handleHeight,
                         decoration: BoxDecoration(
-                          color: cs.outline.withValues(alpha: 0.45),
+                          color: isLight
+                              ? secondary.withValues(alpha: 0.35)
+                              : cs.outline.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(100),
                         ),
                       ),
@@ -85,7 +107,13 @@ class BookingBottomSheet extends StatelessWidget {
                 // ─── Header ──────────────────────────────────────
                 _SheetHeader(onClose: () => Navigator.of(context).pop()),
 
-                Divider(height: 1, thickness: 0.5, color: cs.outline.withValues(alpha: 0.35)),
+                Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  color: isLight
+                      ? secondary.withValues(alpha: 0.22)
+                      : cs.outline.withValues(alpha: 0.35),
+                ),
 
                 // ─── State-driven body ───────────────────────────
                 Expanded(
@@ -106,7 +134,9 @@ class BookingBottomSheet extends StatelessWidget {
                     },
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
           );
         },
@@ -152,6 +182,10 @@ class _SheetHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final chipFill = isLight
+        ? context.lightGlassFieldFill
+        : cs.surfaceContainerHighest;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
@@ -208,7 +242,7 @@ class _SheetHeader extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
+                color: chipFill,
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Icon(
