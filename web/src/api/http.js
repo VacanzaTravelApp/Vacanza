@@ -6,6 +6,7 @@ const http = axios.create({
   // This prevents CORS errors.
   baseURL: "/",
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 http.interceptors.request.use(
