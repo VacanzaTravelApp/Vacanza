@@ -27,8 +27,11 @@ function normalizeCategoryKeys(category) {
 
 function canSendFeedback(wp) {
   const { mapboxId, foursquareId } = pickWaypointIds(wp);
+  const lat = Number(wp.latitude ?? wp.lat);
+  const lon = Number(wp.longitude ?? wp.lon);
+  const hasCoords = Number.isFinite(lat) && Number.isFinite(lon);
   const cats = normalizeCategoryKeys(getWaypointCategory(wp));
-  return !!(mapboxId || foursquareId || cats.length);
+  return !!(mapboxId || foursquareId || hasCoords || cats.length);
 }
 
 /**
@@ -60,10 +63,16 @@ export default function WaypointFeedback({ waypoint, storageKey }) {
 
   const { mapboxId, foursquareId } = pickWaypointIds(waypoint);
   const categoryKeys = normalizeCategoryKeys(getWaypointCategory(waypoint));
+  const rawName = waypoint.name != null ? String(waypoint.name).trim() : "";
+  const lat = Number(waypoint.latitude ?? waypoint.lat);
+  const lon = Number(waypoint.longitude ?? waypoint.lon);
   const payloadBase = {
     mapboxId: mapboxId || null,
     foursquareId: foursquareId || null,
     categoryKeys: categoryKeys.length ? categoryKeys : null,
+    waypointName: rawName || null,
+    latitude: Number.isFinite(lat) ? lat : null,
+    longitude: Number.isFinite(lon) ? lon : null,
   };
 
   const send = async (eventType) => {
