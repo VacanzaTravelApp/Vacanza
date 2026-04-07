@@ -1,4 +1,5 @@
 /* Event recommendations — matches vacanzaChat / routePanel tokens */
+/* Aligned with Vacanza app theme system (.theme-day / .theme-night) */
 
 @keyframes eventRecFadeIn {
   from {
@@ -21,15 +22,8 @@
 }
 
 .event-recommendations-section {
-  margin-top: 16px;
-  padding: 12px 0 4px;
-  border-top: 1px solid var(--vc-border, #e5e7eb);
-  background: linear-gradient(
-    180deg,
-    rgba(61, 168, 200, 0.04) 0%,
-    transparent 100%
-  );
-  border-radius: 0 0 12px 12px;
+  margin-top: 4px;
+  padding: 0 0 4px;
 }
 
 .event-recommendations-section.event-rec-loaded {
@@ -41,10 +35,10 @@
   padding: 8px 10px;
   font-size: 12px;
   line-height: 1.4;
-  color: var(--vc-text-secondary, #6b7280);
-  background: rgba(61, 168, 200, 0.08);
-  border-radius: 8px;
-  border: 1px solid rgba(61, 168, 200, 0.2);
+  color: var(--vc-text-secondary, #5a6b7a);
+  background: var(--vc-primary-soft, rgba(0, 180, 216, 0.08));
+  border-radius: 10px;
+  border: 1px solid var(--vc-primary-soft-strong, rgba(0, 180, 216, 0.2));
 }
 
 .event-rec-broad-actions {
@@ -53,66 +47,49 @@
 }
 
 .event-rec-show-more-btn {
-  padding: 6px 12px;
+  padding: 8px 14px;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--vc-primary, #3da8c8);
-  background: rgba(61, 168, 200, 0.08);
-  border: 1px solid rgba(61, 168, 200, 0.35);
-  border-radius: 8px;
+  font-weight: 700;
+  color: var(--vc-primary, #00B4D8);
+  background: var(--vc-primary-soft, rgba(0, 180, 216, 0.08));
+  border: 1px solid var(--vc-primary-soft-strong, rgba(0, 180, 216, 0.35));
+  border-radius: 10px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .event-rec-show-more-btn:hover {
-  background: rgba(61, 168, 200, 0.14);
+  background: var(--vc-primary-soft-strong, rgba(0, 180, 216, 0.14));
+  transform: translateY(-1px);
 }
 
-.event-recommendations-header {
+.event-recommendations-actions {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 14px;
-  line-height: 1.45;
-  color: var(--vc-text-secondary, #6b7280);
-  margin-bottom: 10px;
+  justify-content: flex-end;
+  margin-bottom: 8px;
   padding: 0 2px;
-  flex-wrap: wrap;
-}
-
-.event-recommendations-header-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.event-recommendations-header svg {
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: var(--vc-primary, #3da8c8);
-  font-size: 16px;
 }
 
 .event-rec-refresh-btn {
   flex-shrink: 0;
   margin-left: auto;
-  padding: 2px 8px;
+  padding: 4px 10px;
   font-size: 11px;
   font-weight: 700;
-  color: var(--vc-primary, #3da8c8);
+  color: var(--vc-primary, #00B4D8);
   background: transparent;
-  border: 1px solid rgba(61, 168, 200, 0.45);
+  border: 1px solid var(--vc-primary-soft-strong, rgba(0, 180, 216, 0.45));
   border-radius: 8px;
   cursor: pointer;
-  transition:
-    background 0.2s,
-    color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .event-rec-refresh-btn:hover {
-  background: rgba(61, 168, 200, 0.1);
+  background: var(--vc-primary-soft, rgba(0, 180, 216, 0.1));
 }
 
 .event-rec-refresh-btn:focus-visible {
-  outline: 2px solid var(--vc-primary, #3da8c8);
+  outline: 2px solid var(--vc-primary, #00B4D8);
   outline-offset: 2px;
 }
 
@@ -123,9 +100,9 @@
   gap: 12px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 4px;
+  padding-bottom: 8px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(61, 168, 200, 0.45) transparent;
+  scrollbar-color: var(--vc-scrollbar-thumb, rgba(0, 180, 216, 0.3)) transparent;
 }
 
 .event-recommendations-list::-webkit-scrollbar {
@@ -133,12 +110,12 @@
 }
 
 .event-recommendations-list::-webkit-scrollbar-thumb {
-  background: rgba(61, 168, 200, 0.35);
+  background: var(--vc-scrollbar-thumb, rgba(0, 180, 216, 0.3));
   border-radius: 4px;
 }
 
 .event-recommendations-list::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.04);
+  background: transparent;
   border-radius: 4px;
 }
 
@@ -152,12 +129,12 @@
 .event-rec-skeleton-card {
   flex: 0 0 200px;
   height: 148px;
-  border-radius: 12px;
+  border-radius: 14px;
   background: linear-gradient(
     90deg,
-    #f3f4f6 0%,
-    #eceff2 40%,
-    #f3f4f6 80%
+    rgba(128, 128, 128, 0.08) 0%,
+    rgba(128, 128, 128, 0.15) 40%,
+    rgba(128, 128, 128, 0.08) 80%
   );
   background-size: 200% 100%;
   animation: eventRecShimmer 1.2s ease-in-out infinite;

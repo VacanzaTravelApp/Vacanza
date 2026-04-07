@@ -243,10 +243,17 @@ const UI_CATEGORIES = [
     key: "monuments",
     label: "Culture",
     aliases: [
-      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre",
-      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture",
-      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema",
-      "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish", "religious_buddhist"
+      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre", 
+      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture", 
+      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema", 
+      "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish", 
+      "religious_buddhist", "mosque", "church", "temple", "synagogue", "buddhist_temple", 
+      "place_of_worship.muslim", "place_of_worship.christian", "place_of_worship.jewish", 
+      "place_of_worship.buddhist", "landmark", "historic", "attraction", 
+      "tourist_attraction", "sightseeing", "cultural_center", "place_of_interest",
+      "religious", "spiritual", "mosques", "churches", "temples", "synagogues", "historic_place",
+      "cathedral", "chapel", "shrine", "monastic", "abbey", "priory", "historical_landmark",
+      "religious_facility", "cultural_heritage", "basilica"
     ],
     icon: <MonumentIcon />,
     pill: "rgba(99, 102, 241, 0.15)",
@@ -352,19 +359,17 @@ const UI_CATEGORIES = [
     key: "others",
     label: "Services",
     aliases: [
-      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy",
-      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist",
-      "veterinarian", "police_station", "fire_station", "government_offices", "library",
-      "school", "university", "college", "community_center", "mosque", "church",
-      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners",
-      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio",
-      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course",
-      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio",
-      "recording_studio", "television_studio", "radio_studio", "design_studio",
-      "coworking_space", "event_space", "conference_center", "offices", "factory",
-      "warehouse", "storage", "services", "it", "consulting", "advertising_agency",
-      "notary", "lawyer", "photographer", "event_planner", "copyshop", "employment_agency",
-      "medical_laboratory", "care_services", "rehabilitation_center", "psychotherapist",
+      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy", 
+      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist", 
+      "veterinarian", "police_station", "fire_station", "government_offices", "library", 
+      "school", "university", "college", "community_center", "mosque", "church", 
+      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners", 
+      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio", 
+      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course", 
+      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio", 
+      "recording_studio", "television_studio", "radio_studio", "design_studio", 
+      "coworking_space", "event_space", "conference_center", "offices", "factory", 
+      "warehouse", "storage", "services", "it", "consulting", "advertising_agency", 
       "chiropractor", "physiotherapist", "alternative_healthcare", "assisted_living_facility"
     ],
     icon: <GlobalOutlined />,
@@ -386,20 +391,51 @@ function hideTrafficLayers(map) {
   });
 }
 
-function poiIconByCategory(category) {
-  const c = normalizeCategory(category);
-  const found = UI_CATEGORIES.find((x) => x.aliases.includes(c));
-  if (!found) return null;
-  return {
-    ring: found.ring,
-    fill: found.fill,
-    uiKey: found.key,
-    icon: found.icon
-  };
+function poiIconByCategory(poi) {
+  if (!poi) return null;
+  // Support both passing the full POI object or just the category string for legacy calls
+  const category = (typeof poi === 'string' || Array.isArray(poi)) ? poi : poi.category;
+  const name = (typeof poi === 'object' && poi !== null) ? String(poi.title || poi.name || "").toLowerCase() : "";
+
+  if (!category) return null;
+
+  // HEURISTIC: Specific overrides for famous landmarks that might have generic categories
+  if (name.includes("ayasofya") || name.includes("hagia sophia") || name.includes("blue mosque") || name.includes("sultanahmet")) {
+    const culture = UI_CATEGORIES.find(c => c.key === "monuments");
+    if (culture) return { ring: culture.ring, fill: culture.fill, uiKey: culture.key, icon: culture.icon };
+  }
+
+  // Handle both single strings, arrays, or comma-separated strings
+  const rawCatsArray = Array.isArray(category) 
+    ? category 
+    : String(category).split(',').map(s => s.trim());
+    
+  // Split by both comma AND dot to handle Mapbox dot-notation subcategories
+  const normCats = rawCatsArray.flatMap(c => c.toLowerCase().trim().split('.')).filter(Boolean);
+  
+  // Also keep the full strings for exact matching
+  rawCatsArray.forEach(c => normCats.push(c.toLowerCase().trim()));
+
+  const specificCategories = UI_CATEGORIES.filter(c => c.key !== 'others');
+  const othersCategory = UI_CATEGORIES.find(c => c.key === 'others');
+
+  for (const catObj of specificCategories) {
+    if (normCats.some(nc => catObj.aliases.includes(nc))) {
+      return { ring: catObj.ring, fill: catObj.fill, uiKey: catObj.key, icon: catObj.icon };
+    }
+  }
+
+  if (othersCategory) {
+    if (normCats.some(nc => othersCategory.aliases.includes(nc))) {
+      return { ring: othersCategory.ring, fill: othersCategory.fill, uiKey: othersCategory.key, icon: othersCategory.icon };
+    }
+  }
+
+  return null;
 }
 
-function labelByCategory(category) {
-  const icon = poiIconByCategory(category);
+function labelByCategory(poi) {
+  const icon = poiIconByCategory(poi);
   if (!icon) return null;
   const found = UI_CATEGORIES.find((x) => x.key === icon.uiKey);
   return found?.label || null;
@@ -1644,6 +1680,13 @@ export default function MapPage() {
     );
   }, [canShowResultsPanel, selection, filterOpen, isMobile]);
 
+  const mapPadding = useMemo(() => ({
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: (isChatOpen || activeRoute) ? (isMobile ? 0 : 440) : 0
+  }), [isChatOpen, activeRoute, isMobile]);
+
   if (loadingAuth || !user) return null;
 
   // ---------- Responsive sizes ----------
@@ -1663,7 +1706,6 @@ export default function MapPage() {
   const resultsBottom = isMobile ? 12 : 18;
   const resultsMaxHeight = isMobile ? 220 : 240;
 
-  const userCardWidth = isMobile ? 220 : 280;
 
   return (
     <div className={`vivid-map-page ${themeClass} ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -1742,6 +1784,7 @@ export default function MapPage() {
         <Map
           ref={mapRef}
           {...viewState}
+          padding={mapPadding}
           onMove={(evt) => setViewState(evt.viewState)}
           onClick={() => setViewportPoiPopoverKey(null)}
           onIdle={handleMapIdle}
@@ -1777,7 +1820,7 @@ export default function MapPage() {
             <Layer {...previewMainLayer} />
           </Source>
           {pois.map((p) => {
-            const icon = poiIconByCategory(p.category);
+            const icon = poiIconByCategory(p);
             const catKey = icon?.uiKey || "others";
             if (!selectedCats[catKey]) return null;
 
@@ -1785,8 +1828,9 @@ export default function MapPage() {
             const catInfo = UI_CATEGORIES.find(c => c.key === catKey);
             const markerBg = catInfo?.fill || "rgba(100, 116, 139, 1)";
             const markerKey = getMapPoiRowKey(p);
-            const catLabel = labelByCategory(p.category);
+            const catLabel = labelByCategory(p);
             const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
+            const zoomScale = Math.min(1.2, Math.max(0.7, viewState.zoom / 15));
 
             const popoverContent = (
               <div className="map-viewport-poi-card glass-panel">
@@ -1848,6 +1892,7 @@ export default function MapPage() {
                     tabIndex={0}
                     aria-label={`${title}. Tap for details and favorites.`}
                     onClick={(e) => e.stopPropagation()}
+                    style={{ transform: `scale(${zoomScale})`, transition: "transform 0.2s ease-out" }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
@@ -1916,8 +1961,8 @@ export default function MapPage() {
           ))}
         </Map>
 
-        {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel is closed */}
-        {!canShowResultsPanel && (
+        {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel and chat are closed */}
+        {!canShowResultsPanel && !isChatOpen && (
           <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
             setFilterOpen(false);
             setFabExpanded(false);
@@ -2072,16 +2117,16 @@ export default function MapPage() {
                       border: "1px solid rgba(255,255,255,0.1)"
                     }}>
                       <div style={{
-                        color: poiIconByCategory(p.category)?.ring,
+                        color: poiIconByCategory(p)?.ring,
                         fontSize: 20,
                         filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
                       }}>
-                        {poiIconByCategory(p.category)?.icon}
+                        {poiIconByCategory(p)?.icon}
                       </div>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p.category)}</div>
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p)}</div>
                     </div>
                     {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
                       <Tooltip title={mapPoiFavored ? "Remove favorite" : "Favorite"}>

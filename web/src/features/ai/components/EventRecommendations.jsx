@@ -73,8 +73,6 @@ export default function EventRecommendations({ routeId, tripDay, refreshKey = 0 
       ? events.slice(0, INITIAL_BROAD_VISIBLE)
       : events;
 
-  const headerText = data.message && String(data.message).trim() ? data.message : "Event recommendations";
-
   return (
     <div className="event-recommendations-section event-rec-loaded">
       {isBroadWindow && (
@@ -82,8 +80,7 @@ export default function EventRecommendations({ routeId, tripDay, refreshKey = 0 
           Showing events for about a month since no specific date was provided. Mention a day or week in chat for more accurate suggestions.
         </p>
       )}
-      <div className="event-recommendations-header">
-        <span className="event-recommendations-header-text">{headerText}</span>
+      <div className="event-recommendations-actions">
         <button
           type="button"
           className="event-rec-refresh-btn"

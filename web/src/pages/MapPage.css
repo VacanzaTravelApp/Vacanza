@@ -34,6 +34,25 @@
     background: var(--bg-main, #f8faff);
     display: flex;
     flex-direction: column;
+    user-select: none;
+    cursor: default;
+}
+
+input, textarea, .msg-text, [contenteditable="true"], .ant-input, .ant-input-number {
+    user-select: text !important;
+    cursor: text !important;
+}
+
+button, a, .vivid-interactive, .route-panel-tab, .route-panel-waypoint-row, .chat-header-icon-btn, .chat-send-icon, .chat-quick-chip {
+    cursor: pointer !important;
+}
+
+.route-panel-header, .chat-header-refined {
+    cursor: grab !important;
+}
+
+.route-panel-header:active, .chat-header-refined:active {
+    cursor: grabbing !important;
 }
 
 /* Themes matching AuthLayout */
@@ -105,6 +124,45 @@
 .vivid-map-dimmer.visible {
     opacity: 1;
     pointer-events: auto;
+}
+
+/* ═══ Mapbox Control Overrides (Theme Aware) ═══ */
+.mapboxgl-ctrl-group {
+    background-color: var(--glass-bg, white) !important;
+    border: 1px solid var(--card-border, rgba(0,0,0,0.1)) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important;
+    overflow: hidden !important;
+}
+
+.mapboxgl-ctrl-group button {
+    width: 36px !important;
+    height: 36px !important;
+    border-bottom: 1px solid var(--card-border, rgba(0,0,0,0.1)) !important;
+}
+
+.mapboxgl-ctrl-group button:last-child {
+    border-bottom: none !important;
+}
+
+.mapboxgl-ctrl-icon {
+    filter: none !important;
+}
+
+/* Dark Theme Specifics */
+.theme-night .mapboxgl-ctrl-group {
+    background-color: rgba(30, 41, 59, 0.85) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+.theme-night .mapboxgl-ctrl-icon {
+    filter: invert(1) brightness(2) !important;
+}
+
+.theme-night .mapboxgl-ctrl-group button:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .map-layout-content {

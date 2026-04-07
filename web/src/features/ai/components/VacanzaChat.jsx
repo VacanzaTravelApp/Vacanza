@@ -5,10 +5,12 @@ import {
   CloseOutlined,
   CompassOutlined,
   EditOutlined,
+  EnvironmentOutlined,
   HistoryOutlined,
   PlusOutlined,
   SendOutlined,
 } from "@ant-design/icons";
+import { Rnd } from "react-rnd";
 import "../styles/vacanzaChat.css";
 import { normalizeRouteForMap } from "../utils/routeMap";
 import RouteCardFeedback from "./RouteCardFeedback";
@@ -50,6 +52,13 @@ function routesForMessage(msg) {
   if (msg.routeDataList?.length) return msg.routeDataList;
   if (msg.routeData) return [msg.routeData];
   return [];
+}
+
+function stripEmojis(text) {
+  if (!text) return text;
+  return String(text)
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}]/gu, '')
+    .trim();
 }
 
 /**
@@ -199,7 +208,7 @@ function RouteWeatherStrip({ rd }) {
     parts.push(`${Math.round(tMax)}° / ${Math.round(tMin)}°`);
   }
   if (precip != null && Number.isFinite(Number(precip))) {
-    parts.push(`yağış ~%${Math.round(precip)}`);
+    parts.push(`rain ~${Math.round(precip)}%`);
   }
   if (parts.length === 0) return null;
   return (
@@ -375,6 +384,7 @@ export default function VacanzaChat({
   const [ticketRowsByKey, setTicketRowsByKey] = useState({});
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const dragNodeRef = useRef(null);
 
   const ticketStateKey = (msgId, rIdx) => `${msgId}-r${rIdx}`;
 
@@ -641,16 +651,29 @@ export default function VacanzaChat({
 
   const showMessageSpinner = initialLoading || messagesLoading;
 
-  return (
+  const isMobile = window.innerWidth <= 768;
+
+  const content = (
     <div
       className={`ai-chat-container vacanza-chat ${isOpen ? "active" : ""}`}
       role="region"
-      aria-label="Vacanza AI sohbet"
+      aria-label="Vacanza AI chat"
     >
       <div className="chat-header-refined">
         <div className="ai-info">
           <div className="ai-brand-avatar" aria-hidden>
-            <CompassOutlined />
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+            </svg>
           </div>
           <div className="ai-text-meta">
             <span className="ai-name" title={activeTitle}>
@@ -679,7 +702,7 @@ export default function VacanzaChat({
           <button type="button" className="chat-header-icon-btn" title="New chat" onClick={handleNewChat}>
             <PlusOutlined />
           </button>
-          <button type="button" className="chat-header-icon-btn" title="Kapat" onClick={onClose}>
+          <button type="button" className="chat-header-icon-btn" title="Close" onClick={onClose}>
             <CloseOutlined />
           </button>
         </div>
@@ -690,15 +713,18 @@ export default function VacanzaChat({
           id="vacanza-chat-history"
           className="chat-history-full"
           role="region"
-          aria-label="Geçmiş sohbetler"
+          aria-label="Chat history"
         >
           <div className="chat-history-full-scroll">
             <div className="chat-history-full-heading">Chat history</div>
             {!conversations.length ? (
               <div className="chat-history-full-empty">
+                <div className="chat-history-full-empty-icon" aria-hidden>
+                  <HistoryOutlined style={{ color: 'var(--vc-primary)' }} />
+                </div>
                 <p className="chat-history-full-empty-title">No saved chats yet</p>
                 <p className="chat-history-full-empty-hint">
-                  Write a route request below to see your history here.
+                  Start a conversation to see your chat history here.
                 </p>
               </div>
             ) : (
@@ -712,8 +738,10 @@ export default function VacanzaChat({
                         className={`chat-conv-row ${selected ? "chat-conv-row-active" : ""}`}
                         onClick={() => handleSelectConversation(c.id)}
                       >
-                        <span className="chat-conv-row-title">{c.title || "Chat"}</span>
-                        <span className="chat-conv-row-meta">{formatConversationDate(c.updatedAt)}</span>
+                        <div className="chat-conv-row-text">
+                          <span className="chat-conv-row-title">{c.title || "Chat"}</span>
+                          <span className="chat-conv-row-meta">{formatConversationDate(c.updatedAt)}</span>
+                        </div>
                       </button>
                     </li>
                   );
@@ -784,7 +812,7 @@ export default function VacanzaChat({
                       {(rd.days || []).map((d) => (
                         <div key={d.day} className="route-card-day-row">
                           <span className="route-card-day-badge">Day {d.day}</span>
-                          <span className="route-card-day-text">{(d.waypoints || []).map((w) => w.name).join(", ")}</span>
+                          <span className="route-card-day-text">{(d.waypoints || []).map((w) => stripEmojis(w.name)).join(", ")}</span>
                         </div>
                       ))}
                     </div>
@@ -808,6 +836,7 @@ export default function VacanzaChat({
                         onClose();
                       }}
                     >
+                      <EnvironmentOutlined style={{ fontSize: 13 }} />
                       Show Route on Map
                     </button>
                     {(() => {
@@ -843,8 +872,8 @@ export default function VacanzaChat({
                           <div className="route-ticket-section">
                           {!hasRouteId ? (
                             <p className="ticket-route-id-hint">
-                              Bu blok Viator fiyatları içindir; yalnızca sunucuda kayıtlı rotada çalışır. AI yanıtında
-                              rota kimliği yoksa düğme kapalıdır — yeni rota isteyin veya sohbeti yenileyin.
+                              This section shows Viator prices and only works for server-saved routes. If no route ID
+                              was received, the button is disabled — request a new route or refresh the chat.
                             </p>
                           ) : null}
                           {hasRouteId ? (
@@ -925,9 +954,9 @@ export default function VacanzaChat({
                     {msg.routeIdList?.[rIdx] ? (
                       <div className="route-card-subsection route-card-subsection--events">
                         <div className="route-card-subsection-head">
-                          <span className="route-card-subsection-title">Etkinlik önerileri</span>
+                          <span className="route-card-subsection-title">Event Recommendations</span>
                           <span className="route-card-subsection-desc">
-                            Ticketmaster — konser, spor, gösteri; tercihlerine göre sıralı
+                            Ticketmaster — concerts, sports, shows; ranked by your preferences
                           </span>
                         </div>
                         <EventRecommendations routeId={msg.routeIdList[rIdx]} />
@@ -947,8 +976,12 @@ export default function VacanzaChat({
             {loading && (
               <div className="chat-row ai-row">
                 <div className="message-bubble ai-bubble chat-typing-bubble">
-                  <Spin size="small" />
-                  <span className="chat-typing-label">Preparing response...</span>
+                  <span className="chat-typing-label">
+                    <span className="chat-typing-dots" aria-hidden>
+                      <span /><span /><span />
+                    </span>
+                    Thinking…
+                  </span>
                 </div>
               </div>
             )}
@@ -989,7 +1022,6 @@ export default function VacanzaChat({
           <div className="chat-input-field-group">
             <input
               type="text"
-              placeholder="For a route plan, e.g.: plan a 3-day trip to Paris..."
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
@@ -1000,15 +1032,47 @@ export default function VacanzaChat({
               className="chat-send-icon"
               onClick={() => handleSendMessage()}
               disabled={loading || messagesLoading || !inputText.trim()}
-              aria-label="Gönder"
+              aria-label="Send"
             >
               <SendOutlined />
             </button>
           </div>
-        </div>
-      )}
-        </>
-      )}
+          </div>
+        )}
+          </>
+        )}
     </div>
+  );
+
+  if (isMobile) {
+    return content;
+  }
+
+  return (
+    <Rnd
+      default={{
+        x: window.innerWidth - 420,
+        y: 100,
+        width: 380,
+        height: 620,
+      }}
+      minWidth={340}
+      minHeight={400}
+      dragHandleClassName="chat-header-refined"
+      bounds="parent"
+      enableResizing={{
+        top: true,
+        right: true,
+        bottom: true,
+        left: true,
+        topRight: true,
+        bottomRight: true,
+        bottomLeft: true,
+        topLeft: true,
+      }}
+      style={{ zIndex: 1001 }}
+    >
+      {content}
+    </Rnd>
   );
 }

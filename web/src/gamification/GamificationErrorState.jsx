@@ -6,11 +6,11 @@ const GamificationErrorState = ({ onRetry }) => {
     <div className="gamification-page">
       <Result
         status="error"
-        title="Veriler Yüklenemedi"
-        subTitle="Profil bilgilerine şu an ulaşılamıyor. Lütfen internet bağlantınızı kontrol edip tekrar deneyin."
+        title="Data Cannot Be Loaded"
+        subTitle="Your profile information is currently unavailable. Please check your connection and try again."
         extra={[
           <Button type="primary" key="retry" onClick={onRetry}>
-            Yeniden Dene
+            Try Again
           </Button>
         ]}
       />

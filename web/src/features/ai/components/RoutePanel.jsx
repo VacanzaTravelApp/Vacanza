@@ -1,21 +1,22 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Button } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
 import { getCategoryColor } from "../../../constants/categoryColors";
 import WaypointFeedback from "./WaypointFeedback";
 import EventRecommendations from "./EventRecommendations";
+import { Rnd } from "react-rnd";
 import "../styles/routePanel.css";
 
 /** Set to true to show per-stop thumbs on the map route card (POI feedback). */
 const ENABLE_ROUTE_PANEL_WAYPOINT_FEEDBACK = false;
 
 const TIME_SLOT_LABELS = {
-  morning: "Sabah",
-  lunch: "Öğle Yemeği",
-  afternoon: "Öğleden Sonra",
-  evening: "Akşam",
-  dinner: "Akşam Yemeği",
-  night: "Gece",
+  morning: "Morning",
+  lunch: "Lunch",
+  afternoon: "Afternoon",
+  evening: "Evening",
+  dinner: "Dinner",
+  night: "Night",
 };
 
 function formatTimeSlot(slot) {
@@ -30,6 +31,13 @@ function formatForecastDate(iso) {
   return Number.isNaN(d.getTime())
     ? String(iso)
     : d.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function stripEmojis(text) {
+  if (!text) return text;
+  return String(text)
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}]/gu, '')
+    .trim();
 }
 
 /** Match day_parts row to active day (by date from daily row, else index). */
@@ -64,11 +72,9 @@ function formatDayPartHintLines(dayRow) {
     if (!s) continue;
     const avoid = s.avoid_outdoor ?? s.avoidOutdoor;
     if (!avoid) continue;
-    const precip =
-      s.precipitation_probability_max_percent ?? s.precipitationProbabilityMaxPercent;
     const pct =
       precip != null && Number.isFinite(Number(precip))
-        ? ` (~%${Math.round(Number(precip))} chance of rain)`
+        ? ` (~${Math.round(Number(precip))}% chance of rain)`
         : "";
     lines.push(`${label}${pct}: not recommended for long outdoor activities.`);
     if (lines.length >= 2) break;
@@ -105,9 +111,12 @@ export default function RoutePanel({
     (Array.isArray(weatherForecast) && weatherForecast.length > 0) ||
     (Array.isArray(weatherDayParts) && weatherDayParts.length > 0);
 
-  return (
+  const isMobile = window.innerWidth <= 768;
+
+  const content = (
     <div className="route-panel">
       <div className="route-panel-header">
+
         <div className="route-panel-title-row">
           <div>
             <div className="route-panel-title">{route.title}</div>
@@ -126,17 +135,18 @@ export default function RoutePanel({
         </div>
       </div>
 
-      {!showWeatherBlock && route.destination && (
-        <div className="route-panel-weather route-panel-weather--empty" role="status">
-          <div className="route-panel-weather-title">Weather Forecast</div>
-          <p className="route-panel-weather-empty-hint">
-            No daily weather forecast available for this route. Forecast is added when the AI creates the plan.
-          </p>
-        </div>
-      )}
+      <div className="route-panel-content">
+        {!showWeatherBlock && route.destination && (
+          <div className="route-panel-weather route-panel-weather--empty" role="status">
+            <div className="route-panel-weather-title">Weather Forecast</div>
+            <p className="route-panel-weather-empty-hint">
+              No daily weather forecast available for this route. Forecast is added when the AI creates the plan.
+            </p>
+          </div>
+        )}
 
-      {showWeatherBlock && (
-        <div className="route-panel-weather" aria-label="Hava tahmini">
+        {showWeatherBlock && (
+          <div className="route-panel-weather" aria-label="Weather forecast">
           <div className="route-panel-weather-title">Weather Forecast (destination)</div>
           {Array.isArray(weatherForecast) && weatherForecast.length > 0 && (
             <ul className="route-panel-weather-days">
@@ -152,11 +162,11 @@ export default function RoutePanel({
                     <span className="route-panel-weather-date">{formatForecastDate(date)}</span>
                     <span className="route-panel-weather-temps">
                       {tMax != null && tMin != null
-                        ? `${Math.round(tMax)}° / ${Math.round(tMin)}°`
+                        ? `${Math.round(tMax)}°C / ${Math.round(tMin)}°C`
                         : "—"}
                     </span>
                     {precip != null && (
-                      <span className="route-panel-weather-rain">Rain %{Math.round(precip)}</span>
+                      <span className="route-panel-weather-rain">Rain {Math.round(precip)}%</span>
                     )}
                   </li>
                 );
@@ -279,7 +289,7 @@ export default function RoutePanel({
                       )}
                       <div className="route-panel-waypoint-main">
                         <div className="route-panel-waypoint-title-block">
-                          <span className="route-panel-waypoint-name">{wp.name}</span>
+                          <span className="route-panel-waypoint-name">{stripEmojis(wp.name)}</span>
                           {(wp.estimated_duration_min ?? wp.estimatedDurationMin) != null &&
                             !arrival &&
                             !departure && (
@@ -291,7 +301,7 @@ export default function RoutePanel({
                         {ENABLE_ROUTE_PANEL_WAYPOINT_FEEDBACK ? (
                           <WaypointFeedback
                             waypoint={wp}
-                            storageKey={`d${activeDay}-i${idx}-o${wp.order ?? idx}-${String(wp.name || "").slice(0, 48)}`}
+                            storageKey={`d${activeDay}-i${idx}-o${wp.order ?? idx}-${stripEmojis(String(wp.name || "")).slice(0, 48)}`}
                           />
                         ) : null}
                       </div>
@@ -329,6 +339,39 @@ export default function RoutePanel({
       {route.notes && (
         <div className="route-panel-notes">{route.notes}</div>
       )}
+      </div>
     </div>
+  );
+
+  if (isMobile) {
+    return content;
+  }
+
+  return (
+    <Rnd
+      default={{
+        x: window.innerWidth - 560,
+        y: 84,
+        width: 400,
+        height: 600,
+      }}
+      minWidth={320}
+      minHeight={400}
+      dragHandleClassName="route-panel-header"
+      cancel=".route-panel-close, .route-panel-tab"
+      bounds="parent"
+      enableResizing={{
+        top: true,
+        right: true,
+        bottom: true,
+        left: true,
+        topRight: true,
+        bottomRight: true,
+        bottomLeft: true,
+        topLeft: true,
+      }}
+    >
+      {content}
+    </Rnd>
   );
 }
