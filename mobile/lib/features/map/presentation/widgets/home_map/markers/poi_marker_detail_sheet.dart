@@ -8,6 +8,8 @@ import '../../../../../poi_search/data/models/poi.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 
 import '../../../../../poi_search/data/models/poi_category_catalog.dart';
+import '../../../../../behavior/domain/feedback_poi_ref.dart';
+import '../../../../../behavior/presentation/widgets/poi_favorite_heart_button.dart';
 import '../../../bloc/map_bloc.dart';
 import '../../../bloc/map_event.dart';
 
@@ -49,19 +51,30 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              poi.name,
-              style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                    color: cs.onSurface,
-                  ) ??
-                  TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                    color: cs.onSurface,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    poi.name,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: cs.onSurface,
+                        ) ??
+                        TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: cs.onSurface,
+                        ),
                   ),
+                ),
+                PoiFavoriteHeartButton(
+                  ref: FeedbackPoiRef.fromPoi(poi),
+                  iconSize: 26,
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(

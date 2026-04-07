@@ -16,6 +16,9 @@ import 'core/network/app_dio.dart';
 import 'features/auth/data/repositories/auth_repository.dart';
 import 'features/auth/data/storage/secure_storage_service.dart';
 
+import 'features/behavior/data/api/feedback_api_client.dart';
+import 'features/behavior/presentation/cubit/favorite_poi_cubit.dart';
+
 import 'features/poi_search/data/api/poi_search_api_client.dart';
 
 import 'features/gamification/data/api/gamification_api_client.dart';
@@ -79,6 +82,10 @@ class VacanzaApp extends StatelessWidget {
           create: (ctx) => PoiSearchApiClient(ctx.read<Dio>()),
         ),
 
+        RepositoryProvider<FeedbackApiClient>(
+          create: (ctx) => FeedbackApiClient(ctx.read<Dio>()),
+        ),
+
         /// Gamification API client (MOB-8)
         RepositoryProvider<GamificationApiClient>(
           create: (ctx) => GamificationApiClient(ctx.read<Dio>()),
@@ -135,6 +142,12 @@ class VacanzaApp extends StatelessWidget {
           BlocProvider<GamificationCubit>(
             create: (context) => GamificationCubit(
               repository: context.read<GamificationRepository>(),
+            ),
+          ),
+
+          BlocProvider<FavoritePoiCubit>(
+            create: (context) => FavoritePoiCubit(
+              context.read<FeedbackApiClient>(),
             ),
           ),
         ],
