@@ -52,7 +52,32 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       return;
     }
 
-    // 2) Permission granted — subscribe to position stream
+    // 2) Permission granted — seed from last known position (fast) so UI can
+    //    open the map on the user instead of a world/fallback view.
+    //    Use a local snapshot: after emit(), `state` in this handler may still
+    //    be the pre-emit snapshot, so do not rely on it for the follow-up emit.
+    var current = state;
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) {
+        final firstFix = current.latitude == null && current.longitude == null;
+        current = current.copyWith(
+          status: LocationStatus.tracking,
+          latitude: last.latitude,
+          longitude: last.longitude,
+          isFirstFix: firstFix,
+        );
+        emit(current);
+        log(
+          '[LocationBloc] Seeded from last known: lat=${last.latitude}, '
+          'lng=${last.longitude}',
+        );
+      }
+    } catch (e) {
+      log('[LocationBloc] getLastKnownPosition failed: $e');
+    }
+
+    // 3) Subscribe to position stream
     log('[LocationBloc] Permission granted, starting position stream');
 
     _positionSubscription = _locationService.positionStream().listen(
@@ -66,8 +91,10 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       },
     );
 
-    // 3) Emit tracking state (coordinates will come via LocationUpdated)
-    emit(state.copyWith(status: LocationStatus.tracking));
+    // 4) Emit tracking if we did not already emit coordinates from last known.
+    if (current.latitude == null || current.longitude == null) {
+      emit(current.copyWith(status: LocationStatus.tracking));
+    }
   }
 
   void _onStopTracking(
