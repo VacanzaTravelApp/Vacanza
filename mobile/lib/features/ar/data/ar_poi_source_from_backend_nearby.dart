@@ -29,7 +29,7 @@ class ArPoiSourceFromBackendNearby implements ArPoiSource {
         lat: lat,
         lng: lng,
         radiusMeters: effectiveRadius,
-        categories: categories,
+        categories: null,
         limit: 40,
       );
 
@@ -58,7 +58,13 @@ class ArPoiSourceFromBackendNearby implements ArPoiSource {
       return out;
     } on DioException catch (e) {
       final sc = e.response?.statusCode;
-      if (sc == 404 || sc == 501 || sc == 405) {
+      final fallback =
+          sc == null ||
+          sc == 404 ||
+          sc == 501 ||
+          sc == 405 ||
+          (sc >= 500 && sc < 600);
+      if (fallback) {
         return _fallback.getNearbyArPois(
           lat: lat,
           lng: lng,
