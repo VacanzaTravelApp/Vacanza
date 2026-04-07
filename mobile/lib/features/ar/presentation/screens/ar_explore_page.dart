@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:ar_flutter_plugin_engine/ar_flutter_plugin.dart';
 import 'package:ar_flutter_plugin_engine/datatypes/config_planedetection.dart';
@@ -11,27 +13,34 @@ import 'package:ar_flutter_plugin_engine/models/ar_node.dart';
 import 'package:camera/camera.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vector_math/vector_math_64.dart' as vmath;
 
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/checkin/data/services/location_service.dart';
 import 'package:mobile/features/checkin/presentation/bloc/checkin_bloc.dart';
 import 'package:mobile/features/checkin/presentation/bloc/checkin_event.dart';
 import 'package:mobile/features/checkin/presentation/bloc/checkin_state.dart';
 import 'package:mobile/features/poi_search/data/api/poi_search_api_client.dart';
-import 'package:mobile/features/poi_search/data/repositories/poi_search_repository_impl.dart';
 import 'package:mobile/features/poi_search/data/models/poi_categories.dart';
+import 'package:mobile/features/poi_search/data/models/poi_category_catalog.dart';
+import 'package:mobile/features/poi_search/data/repositories/poi_search_repository_impl.dart';
+import 'package:mobile/features/poi_search/data/utils/poi_client_category_filter.dart';
 
 import '../../application/ar_poi_layout.dart';
 import '../../application/ar_world_transform.dart';
+import '../../data/ar_hybrid_poi_loader.dart';
 import '../../data/ar_nearby_poi_api_client.dart';
-import '../../data/device_heading_service.dart';
-import '../../data/ar_poi_source_from_backend_nearby.dart';
 import '../../data/ar_poi_source_from_poi_search.dart';
+import '../../data/device_heading_service.dart';
 import '../../domain/models/ar_poi.dart';
 import '../../domain/services/ar_poi_source.dart';
+import '../utils/ar_distance_format.dart';
+import '../widgets/ar_behind_poi_strip.dart';
+import '../widgets/ar_category_filter_sheet.dart';
 import '../widgets/ar_poi_chip.dart';
 
 class ArExplorePage extends StatefulWidget {
@@ -52,7 +61,8 @@ enum _TopHudAction {
   togglePlacementMode,
 }
 
-class _ArExplorePageState extends State<ArExplorePage> {
+class _ArExplorePageState extends State<ArExplorePage>
+    with WidgetsBindingObserver {
   static const String _poiNodeUri =
       'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb';
 
@@ -77,7 +87,7 @@ class _ArExplorePageState extends State<ArExplorePage> {
   final Set<String> _selectedCategories = Set<String>.from(
     PoiCategories.defaults,
   );
-  bool _showDebugPanel = true;
+  bool _showDebugPanel = false;
   double _headingOffsetDeg = 0;
   bool _useWorldAnchors = true;
   bool _isArViewReady = false;
@@ -90,11 +100,27 @@ class _ArExplorePageState extends State<ArExplorePage> {
   final List<ARNode> _arNodes = <ARNode>[];
   final Map<String, ArPoi> _poiByNodeName = <String, ArPoi>{};
 
+  double? _lastLocationAccuracyMeters;
+  final List<String> _recentPoiIds = <String>[];
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkSupportAndPermissions();
     _startHeadingUpdates();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _headingSubscription?.cancel();
+      _headingSubscription = null;
+    } else if (state == AppLifecycleState.resumed) {
+      if (_status == _ArModeStatus.ready && _headingSubscription == null) {
+        _startHeadingUpdates();
+      }
+    }
   }
 
   Future<void> _checkSupportAndPermissions() async {
@@ -132,33 +158,51 @@ class _ArExplorePageState extends State<ArExplorePage> {
         return;
       }
 
-      final pos = await _locationService.getCurrentPosition();
-
+      if (!mounted) return;
       final apiClient = context.read<PoiSearchApiClient>();
+      final dio = context.read<Dio>();
       final poiRepo = PoiSearchRepositoryImpl(apiClient);
       final ArPoiSource fallbackSource = ArPoiSourceFromPoiSearch(poiRepo);
-
-      final dio = context.read<Dio>();
       final nearbyApiClient = ArNearbyPoiApiClient(dio);
-      final ArPoiSource source = ArPoiSourceFromBackendNearby(
-        apiClient: nearbyApiClient,
-        fallback: fallbackSource,
-      );
 
-      final List<String>? effectiveCategories =
-          _selectedCategories.isEmpty
-              ? null
-              : _selectedCategories
-                  .expand(_expandCategoryFiltersForApi)
-                  .toSet()
-                  .toList();
+      final pos = await _locationService.getCurrentPosition();
+      if (!mounted) return;
+      setState(() {
+        _lastLocationAccuracyMeters = pos.accuracy;
+      });
 
-      final pois = await source.getNearbyArPois(
-        lat: pos.latitude,
-        lng: pos.longitude,
-        categories: effectiveCategories,
-        radiusMeters: 600,
-      );
+      const radiusMeters = 600.0;
+      List<ArPoi> pois;
+      try {
+        final dtos = await nearbyApiClient.getNearbyPois(
+          lat: pos.latitude,
+          lng: pos.longitude,
+          radiusMeters: radiusMeters,
+          categories: null,
+          limit: 40,
+        );
+        // Mapbox [MapWidget] bu ekranda kullanılmıyor: Android/iOS platform view
+        // AR kamera / ARCore ile aynı hierarchy'de üstte çizilip siyah ekrana yol açıyor.
+        // Stil katmanı POI’ları yok; backend [PoiSearchService] + ingest yeterli.
+        if (!mounted) return;
+        pois = await ArHybridPoiLoader.mergeNearbyAndStylePois(
+          lat: pos.latitude,
+          lng: pos.longitude,
+          radiusMeters: radiusMeters,
+          nearbyDtos: dtos,
+          mapProbe: null,
+        );
+      } catch (e, st) {
+        debugPrint('[AR_MODE] hybrid POI load failed, fallback: $e\n$st');
+        if (!mounted) return;
+        pois = await fallbackSource.getNearbyArPois(
+          lat: pos.latitude,
+          lng: pos.longitude,
+          categories: null,
+          radiusMeters: radiusMeters,
+        );
+      }
+
       final filteredPois = _applyPoiFilters(pois);
 
       if (!mounted) return;
@@ -174,10 +218,11 @@ class _ArExplorePageState extends State<ArExplorePage> {
         _poisError = 'Could not load nearby places for AR.';
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLoadingPois = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingPois = false;
+        });
+      }
     }
   }
 
@@ -335,6 +380,8 @@ class _ArExplorePageState extends State<ArExplorePage> {
     if (first is! String) return;
     final poi = _poiByNodeName[first];
     if (poi == null || !mounted) return;
+    HapticFeedback.lightImpact();
+    _recordRecentPoi(poi.id);
     setState(() {
       _selectedPoi = poi;
     });
@@ -342,6 +389,7 @@ class _ArExplorePageState extends State<ArExplorePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _headingSubscription?.cancel();
     _clearArNodes();
     _arSessionManager?.dispose();
@@ -411,97 +459,203 @@ class _ArExplorePageState extends State<ArExplorePage> {
           onBackToMap: () => Navigator.of(context).pop(),
         );
       case _ArModeStatus.ready:
-        final effectiveHeadingDeg = _normalizeHeadingDeg(
-          _deviceHeadingDeg + _headingOffsetDeg,
-        );
-        final worldPlacements = buildArWorldPlacements(
-          pois: _pois,
-          deviceHeadingDeg: effectiveHeadingDeg,
-          maxPerCategory: _maxPoisPerCategory,
-        );
-        final positioned = layoutArPois(
-          pois: _pois,
-          deviceHeadingDeg: effectiveHeadingDeg,
-          maxPerCategory: _maxPoisPerCategory,
-        );
-
-        if (_useWorldAnchors) {
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: ARView(
-                  onARViewCreated: _onArViewCreated,
-                  planeDetectionConfig: PlaneDetectionConfig.none,
-                ),
-              ),
-              Positioned.fill(
-                child: Stack(
-                  children: [
-                    _buildTopHud(),
-                    _buildBottomHud(),
-                    if (_showDebugPanel)
-                      _buildWorldDebugPanel(
-                        placements: worldPlacements,
-                        effectiveHeadingDeg: effectiveHeadingDeg,
-                      ),
-                    _buildWorldFloatingLabels(worldPlacements),
-                    if (_arMessage != null) _buildArMessage(),
-                  ],
-                ),
-              ),
-              if (_selectedPoi != null) _buildPoiBottomSheet(),
-            ],
-          );
-        }
-
-        if (_cameraController == null ||
-            !_cameraController!.value.isInitialized) {
-          Future.microtask(_ensureFallbackCameraInitialized);
-        }
-
-        return Stack(
-          children: [
-            Positioned.fill(
-              child:
-                  _cameraController != null &&
-                          _cameraController!.value.isInitialized
-                      ? CameraPreview(_cameraController!)
-                      : const ColoredBox(color: Colors.black),
-            ),
-            Positioned.fill(
-              child: Stack(
-                children: [
-                  _buildTopHud(),
-                  _buildBottomHud(),
-                  if (_showDebugPanel)
-                    _buildDebugPanel(
-                      positioned: positioned,
-                      effectiveHeadingDeg: effectiveHeadingDeg,
-                    ),
-                  for (final p in positioned)
-                    Align(
-                      alignment: Alignment(
-                        p.xFraction * 2 - 1,
-                        -0.6 + p.row * 0.25,
-                      ),
-                      child: GestureDetector(
-                        onTap: () => _onPoiTap(p.poi),
-                        child: ArPoiChip(poi: p.poi),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (_selectedPoi != null) _buildPoiBottomSheet(),
-          ],
-        );
+        return _buildReadyArContent();
     }
   }
 
+  Widget _buildReadyArContent() {
+    final effectiveHeadingDeg = _normalizeHeadingDeg(
+      _deviceHeadingDeg + _headingOffsetDeg,
+    );
+    final behindPois = _behindPoisForHeading(effectiveHeadingDeg);
+    final frontPois = _frontPoisForHeading(effectiveHeadingDeg);
+
+    final worldPlacements = buildArWorldPlacements(
+      pois: _pois,
+      deviceHeadingDeg: effectiveHeadingDeg,
+      maxPerCategory: _maxPoisPerCategory,
+    );
+    final positioned = layoutArPois(
+      pois: frontPois,
+      deviceHeadingDeg: effectiveHeadingDeg,
+      maxPerCategory: _maxPoisPerCategory,
+    );
+
+    if (_useWorldAnchors) {
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: ARView(
+              onARViewCreated: _onArViewCreated,
+              planeDetectionConfig: PlaneDetectionConfig.none,
+            ),
+          ),
+          Positioned.fill(
+            child: Stack(
+              children: [
+                _buildTopHud(),
+                _buildBottomHud(
+                  behindPois: behindPois,
+                  headingDeg: effectiveHeadingDeg,
+                ),
+                if (_showDebugPanel)
+                  _buildWorldDebugPanel(
+                    placements: worldPlacements,
+                    effectiveHeadingDeg: effectiveHeadingDeg,
+                  ),
+                _buildWorldFloatingLabels(worldPlacements, frontPois),
+                if (_arMessage != null) _buildArMessage(),
+              ],
+            ),
+          ),
+          if (_selectedPoi != null) _buildPoiBottomSheet(),
+        ],
+      );
+    }
+
+    if (_cameraController == null ||
+        !_cameraController!.value.isInitialized) {
+      Future.microtask(_ensureFallbackCameraInitialized);
+    }
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child:
+              _cameraController != null &&
+                      _cameraController!.value.isInitialized
+                  ? CameraPreview(_cameraController!)
+                  : const ColoredBox(color: Colors.black),
+        ),
+        Positioned.fill(
+          child: Stack(
+            children: [
+              _buildTopHud(),
+              _buildBottomHud(
+                behindPois: behindPois,
+                headingDeg: effectiveHeadingDeg,
+              ),
+              if (_showDebugPanel)
+                _buildDebugPanel(
+                  positioned: positioned,
+                  effectiveHeadingDeg: effectiveHeadingDeg,
+                ),
+              for (final p in positioned)
+                Align(
+                  alignment: Alignment(
+                    p.xFraction * 2 - 1,
+                    -0.6 + p.row * 0.25,
+                  ),
+                  child: GestureDetector(
+                    onTap: () => _onPoiTap(p.poi),
+                    child: ArPoiChip(
+                      poi: p.poi,
+                      scale: _distanceScaleForPoi(p.poi, frontPois),
+                      isSelected: _selectedPoi?.id == p.poi.id,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (_selectedPoi != null) _buildPoiBottomSheet(),
+      ],
+    );
+  }
+
+  List<ArPoi> _behindPoisForHeading(double headingDeg) {
+    if (_pois.isEmpty) return const [];
+    final out = <ArPoi>[];
+    for (final p in _pois) {
+      final rel = signedRelativeAngleDeg(
+        toBearingDeg: p.bearingDegrees,
+        fromHeadingDeg: headingDeg,
+      );
+      if (rel.abs() > 90) out.add(p);
+    }
+    out.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+    return out;
+  }
+
+  List<ArPoi> _frontPoisForHeading(double headingDeg) {
+    if (_pois.isEmpty) return const [];
+    final out = <ArPoi>[];
+    for (final p in _pois) {
+      final rel = signedRelativeAngleDeg(
+        toBearingDeg: p.bearingDegrees,
+        fromHeadingDeg: headingDeg,
+      );
+      if (rel.abs() <= 90) out.add(p);
+    }
+    return out;
+  }
+
+  double _distanceScaleForPoi(ArPoi poi, List<ArPoi> cohort) {
+    if (cohort.length <= 1) return 1.0;
+    final ds = cohort.map((e) => e.distanceMeters).toList();
+    final minD = ds.reduce(math.min);
+    final maxD = ds.reduce(math.max);
+    if ((maxD - minD).abs() < 1.0) return 0.92;
+    final t = ((poi.distanceMeters - minD) / (maxD - minD)).clamp(0.0, 1.0);
+    return (1.0 - (0.42 * t)).clamp(0.55, 1.0);
+  }
+
   void _onPoiTap(ArPoi poi) {
+    HapticFeedback.lightImpact();
+    _recordRecentPoi(poi.id);
     setState(() {
       _selectedPoi = poi;
     });
+  }
+
+  void _recordRecentPoi(String poiId) {
+    _recentPoiIds.remove(poiId);
+    _recentPoiIds.insert(0, poiId);
+    while (_recentPoiIds.length > 8) {
+      _recentPoiIds.removeLast();
+    }
+  }
+
+  List<ArPoi> _recentPoisOtherThan(String currentId) {
+    final byId = {for (final p in _pois) p.id: p};
+    final out = <ArPoi>[];
+    for (final id in _recentPoiIds) {
+      if (id == currentId) continue;
+      final p = byId[id];
+      if (p != null) {
+        out.add(p);
+      }
+      if (out.length >= 6) break;
+    }
+    return out;
+  }
+
+  Map<String, int> _categoryCountsForFilter() {
+    final keys = PoiCategoryCatalog.all.map((e) => e.key);
+    final m = {for (final k in keys) k: 0};
+    for (final p in _pois) {
+      final d = PoiCategoryCatalog.poiCategoryForRaw(p.categoryKey);
+      if (d != null) {
+        m[d.key] = (m[d.key] ?? 0) + 1;
+      }
+    }
+    return m;
+  }
+
+  Future<void> _openCategoryFilter() async {
+    await showArCategoryFilterSheet(
+      context: context,
+      initialSelection: Set<String>.from(_selectedCategories),
+      countsByCategory: _categoryCountsForFilter(),
+      onSelectionChanged: (next) {
+        setState(() {
+          _selectedCategories
+            ..clear()
+            ..addAll(next);
+        });
+        _loadPoisForCurrentLocation();
+      },
+    );
   }
 
   void _closePoiSheet() {
@@ -514,11 +668,12 @@ class _ArExplorePageState extends State<ArExplorePage> {
 
   Widget _buildPoiBottomSheet() {
     final poi = _selectedPoi!;
-
-    final dist =
-        poi.distanceMeters >= 1000
-            ? '${(poi.distanceMeters / 1000).toStringAsFixed(1)} km'
-            : '${poi.distanceMeters.round()} m';
+    final useImperial = localeUsesImperial(context);
+    final dist = formatArDistanceMeters(
+      poi.distanceMeters,
+      useImperial: useImperial,
+    );
+    final recents = _recentPoisOtherThan(poi.id);
 
     return Positioned(
       left: 0,
@@ -529,7 +684,7 @@ class _ArExplorePageState extends State<ArExplorePage> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Material(
-            color: Colors.black.withOpacity(0.85),
+            color: Colors.black.withValues(alpha: 0.85),
             borderRadius: BorderRadius.circular(16),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -559,18 +714,62 @@ class _ArExplorePageState extends State<ArExplorePage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Approx. $dist away',
+                    'Yaklaşık $dist uzakta',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.82),
                       fontSize: 12,
                     ),
                   ),
+                  if (recents.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Son bakılanlar',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 40,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: recents.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, i) {
+                          final r = recents[i];
+                          return ActionChip(
+                            label: Text(
+                              r.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
+                              _recordRecentPoi(r.id);
+                              setState(() => _selectedPoi = r);
+                            },
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.14,
+                            ),
+                            labelStyle: const TextStyle(color: Colors.white),
+                            side: BorderSide(
+                              color: Colors.white.withValues(alpha: 0.28),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   if (_checkinMessage != null) ...[
                     Text(
                       _checkinMessage!,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.92),
                         fontSize: 12,
                       ),
                     ),
@@ -615,7 +814,7 @@ class _ArExplorePageState extends State<ArExplorePage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text('Check in here'),
+                      child: const Text('Check-in yap'),
                     ),
                   ),
                 ],
@@ -628,63 +827,76 @@ class _ArExplorePageState extends State<ArExplorePage> {
   }
 
   Widget _buildTopHud() {
+    final cs = Theme.of(context).colorScheme;
     return Align(
       alignment: Alignment.topCenter,
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.45),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: cs.surface.withValues(alpha: 0.78),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: cs.outline.withValues(alpha: 0.22),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
                 IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back,
-                    color: Colors.white,
-                    size: 20,
+                  icon: Icon(
+                    Icons.arrow_back_rounded,
+                    color: cs.onSurface,
+                    size: 22,
                   ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
+                    minWidth: 36,
+                    minHeight: 36,
                   ),
                   visualDensity: VisualDensity.compact,
                   onPressed: () => Navigator.of(context).pop(),
                 ),
-                const SizedBox(width: 4),
-                const Expanded(
+                const SizedBox(width: 2),
+                Expanded(
                   child: Text(
                     'Explore in AR',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.35,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (_isLoadingPois)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: SizedBox(
-                      width: 16,
-                      height: 16,
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        color: cs.primary,
                       ),
                     ),
                   ),
                 PopupMenuButton<_TopHudAction>(
                   tooltip: 'AR options',
-                  icon: const Icon(
-                    Icons.more_vert,
-                    color: Colors.white,
-                    size: 20,
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    color: cs.onSurface,
+                    size: 22,
                   ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
@@ -783,111 +995,78 @@ class _ArExplorePageState extends State<ArExplorePage> {
           ),
         ),
       ),
+              if (_lastLocationAccuracyMeters != null &&
+                  _lastLocationAccuracyMeters! > 35.0) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Konum hassasiyeti düşük (±${_lastLocationAccuracyMeters!.round()} m).',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: cs.error.withValues(alpha: 0.92),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildBottomHud() {
-    final chips = PoiCategories.defaults;
+  Widget _buildBottomHud({
+    required List<ArPoi> behindPois,
+    required double headingDeg,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: SafeArea(
-        minimum: const EdgeInsets.only(bottom: 12, left: 16, right: 16),
+        minimum: const EdgeInsets.only(bottom: 8, left: 12, right: 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_poisError != null)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                margin: const EdgeInsets.only(bottom: 6),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withOpacity(0.85),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _poisError!,
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else if (!_isLoadingPois && _pois.isEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                margin: const EdgeInsets.only(bottom: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'No places found around you for the selected categories.',
-                  style: TextStyle(color: Colors.white, fontSize: 11),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                margin: const EdgeInsets.only(bottom: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'Showing ${_pois.length} places',
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
+            if (behindPois.isNotEmpty)
+              ArBehindPoiStrip(
+                pois: behindPois,
+                deviceHeadingDeg: headingDeg,
+                onPoiTap: _onPoiTap,
+                selectedPoiId: _selectedPoi?.id,
+              ),
+            if (_poisError != null) ...[
+              if (behindPois.isNotEmpty) const SizedBox(height: 6),
+              Text(
+                _poisError!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: cs.error,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.45),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final key in chips)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: FilterChip(
-                          label: Text(
-                            key[0].toUpperCase() + key.substring(1),
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          selected: _selectedCategories.contains(key),
-                          onSelected: (selected) {
-                            setState(() {
-                              if (selected) {
-                                _selectedCategories.add(key);
-                              } else {
-                                _selectedCategories.remove(key);
-                              }
-                            });
-                            _loadPoisForCurrentLocation();
-                          },
-                          backgroundColor: Colors.black.withOpacity(0.3),
-                          selectedColor: Colors.white.withOpacity(0.9),
-                          checkmarkColor: Colors.black87,
-                          labelStyle: TextStyle(
-                            color:
-                                _selectedCategories.contains(key)
-                                    ? Colors.black87
-                                    : Colors.white,
-                          ),
-                        ),
-                      ),
-                  ],
+            ],
+            if (behindPois.isNotEmpty || _poisError != null)
+              const SizedBox(height: 6),
+            OutlinedButton.icon(
+              onPressed: _isLoadingPois ? null : _openCategoryFilter,
+              icon: Icon(Icons.filter_list_rounded, size: 18, color: cs.primary),
+              label: Text(
+                'Kategoriler · ${_selectedCategories.length}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: cs.onSurface,
                 ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                side: BorderSide(
+                  color: context.mapControlAccent.withValues(alpha: 0.45),
+                ),
+                backgroundColor: cs.surface.withValues(alpha: 0.82),
               ),
             ),
           ],
@@ -896,7 +1075,10 @@ class _ArExplorePageState extends State<ArExplorePage> {
     );
   }
 
-  Widget _buildWorldFloatingLabels(List<ArWorldPlacement> placements) {
+  Widget _buildWorldFloatingLabels(
+    List<ArWorldPlacement> placements,
+    List<ArPoi> frontCohort,
+  ) {
     if (placements.isEmpty) return const SizedBox.shrink();
     final labels = _buildWorldLabelPositions(placements);
     return Align(
@@ -910,12 +1092,16 @@ class _ArExplorePageState extends State<ArExplorePage> {
                 alignment: Alignment(label.x * 2 - 1, label.yAlign),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 190),
-                  child: Transform.scale(
-                    scale: label.scale,
-                    alignment: Alignment.center,
-                    child: GestureDetector(
-                      onTap: () => _onPoiTap(label.placement.poi),
-                      child: ArPoiChip(poi: label.placement.poi),
+                  child: GestureDetector(
+                    onTap: () => _onPoiTap(label.placement.poi),
+                    child: ArPoiChip(
+                      poi: label.placement.poi,
+                      scale: label.scale *
+                          _distanceScaleForPoi(
+                            label.placement.poi,
+                            frontCohort,
+                          ),
+                      isSelected: _selectedPoi?.id == label.placement.poi.id,
                     ),
                   ),
                 ),
@@ -976,13 +1162,12 @@ class _ArExplorePageState extends State<ArExplorePage> {
     double maxDistanceMeters,
   ) {
     if ((maxDistanceMeters - minDistanceMeters).abs() < 0.1) {
-      return 0.88;
+      return 0.9;
     }
     final t = ((distanceMeters - minDistanceMeters) /
             (maxDistanceMeters - minDistanceMeters))
         .clamp(0.0, 1.0);
-    // Closest -> 1.0, farthest -> 0.70
-    return (1.0 - (0.30 * t)).clamp(0.70, 1.0);
+    return (1.0 - (0.38 * t)).clamp(0.58, 1.0);
   }
 
   bool _isDisplayablePoiName(String rawName) {
@@ -995,16 +1180,29 @@ class _ArExplorePageState extends State<ArExplorePage> {
   }
 
   List<ArPoi> _applyPoiFilters(List<ArPoi> pois) {
+    if (_selectedCategories.isEmpty) {
+      return const [];
+    }
+
+    final clientCats = PoiClientCategoryFilter.categoriesForSearch(
+      _selectedCategories.toList(),
+    );
+    final selectedSet = <String>{
+      if (clientCats != null)
+        for (final c in clientCats) c.trim().toLowerCase(),
+    };
+
     final out = <ArPoi>[];
     final seenKeys = <String>{};
-    final selected = _selectedCategories.map(_canonicalCategory).toSet();
-    final enforceCategory = selected.isNotEmpty;
 
     for (final poi in pois) {
       if (!_isDisplayablePoiName(poi.name)) continue;
 
-      final canonicalPoiCategory = _canonicalCategory(poi.categoryKey);
-      if (enforceCategory && !selected.contains(canonicalPoiCategory)) {
+      if (!PoiCategoryCatalog.passesCategoryFilter(
+        rawCategory: poi.categoryKey,
+        selectedUiKeys: selectedSet,
+        treatEmptySelectionAsShowAll: true,
+      )) {
         continue;
       }
 
@@ -1042,24 +1240,6 @@ class _ArExplorePageState extends State<ArExplorePage> {
         return 'parks';
       default:
         return c;
-    }
-  }
-
-  Iterable<String> _expandCategoryFiltersForApi(String category) {
-    final canonical = _canonicalCategory(category);
-    switch (canonical) {
-      case 'restaurant':
-        return const ['restaurant', 'restaurants'];
-      case 'cafe':
-        return const ['cafe', 'cafes'];
-      case 'museum':
-        return const ['museum', 'museums'];
-      case 'monuments':
-        return const ['monuments', 'monument'];
-      case 'parks':
-        return const ['parks', 'park'];
-      default:
-        return [canonical];
     }
   }
 
