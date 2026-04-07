@@ -2,57 +2,117 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models/ar_poi.dart';
 import '../styles/ar_poi_style.dart';
+import '../utils/ar_distance_format.dart';
 
+/// Harita pinleri ile uyumlu: dolgu + halka rengi, mesafeye göre [scale] ile küçülür.
 class ArPoiChip extends StatelessWidget {
   final ArPoi poi;
+  final double scale;
+  final bool isSelected;
 
-  const ArPoiChip({super.key, required this.poi});
+  const ArPoiChip({
+    super.key,
+    required this.poi,
+    this.scale = 1.0,
+    this.isSelected = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = arPoiColorForCategory(poi.categoryKey);
+    final cs = Theme.of(context).colorScheme;
+    final fill = arPoiFillColorForCategory(poi.categoryKey);
+    final ring = arPoiRingColorForCategory(poi.categoryKey);
     final icon = arPoiIconForCategory(poi.categoryKey);
 
-    final dist = poi.distanceMeters >= 1000
-        ? '${(poi.distanceMeters / 1000).toStringAsFixed(1)} km'
-        : '${poi.distanceMeters.round()} m';
+    final dist = formatArDistanceMeters(
+      poi.distanceMeters,
+      useImperial: localeUsesImperial(context),
+    );
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.55),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.9), width: 1.4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              poi.name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+    final s = (isSelected ? scale * 1.06 : scale).clamp(0.5, 1.12);
+
+    return Transform.scale(
+      scale: s,
+      alignment: Alignment.center,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 200),
+        child: Material(
+          color: cs.surface.withValues(alpha: 0.92),
+          elevation: isSelected ? 6 : 3,
+          shadowColor: Colors.black26,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isSelected ? cs.primary : ring.withValues(alpha: 0.95),
+                width: isSelected ? 2.5 : 2,
               ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              softWrap: false,
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: cs.primary.withValues(alpha: 0.35),
+                        blurRadius: 12,
+                        spreadRadius: 0,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: fill.withValues(alpha: 0.95),
+                    boxShadow: [
+                      BoxShadow(
+                        color: fill.withValues(alpha: 0.35),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(icon, size: 18, color: Colors.white),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        poi.name,
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
+                          letterSpacing: -0.2,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        dist,
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            dist,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 11,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
-
