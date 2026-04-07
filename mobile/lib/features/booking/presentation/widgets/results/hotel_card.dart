@@ -5,6 +5,7 @@ import 'package:mobile/core/theme/app_theme.dart';
 import '../../../data/models/accommodation_option.dart';
 import '../../../data/models/booking_utils.dart';
 import '../booking_url_launcher.dart';
+import '../search/booking_search_field_styles.dart';
 
 /// Card displaying a single hotel result.
 class HotelCard extends StatefulWidget {
@@ -32,7 +33,9 @@ class _HotelCardState extends State<HotelCard> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: cs.surface,
-        border: Border.all(color: cs.outline.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: BookingSearchFieldStyles.fieldBorderInactive(context),
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(

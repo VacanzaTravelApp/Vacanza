@@ -5,6 +5,7 @@ import '../../../data/models/accommodation_option.dart';
 import '../../../data/models/transport_option.dart';
 import '../../cubit/booking_cubit.dart';
 import '../../cubit/booking_state.dart';
+import '../search/booking_search_field_styles.dart';
 import 'flight_card.dart';
 import 'hotel_card.dart';
 
@@ -61,7 +62,7 @@ class BookingResultsView extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: cs.outline.withValues(alpha: 0.35),
+                    color: BookingSearchFieldStyles.fieldBorderInactive(context),
                   ),
                 ),
                 child: Icon(

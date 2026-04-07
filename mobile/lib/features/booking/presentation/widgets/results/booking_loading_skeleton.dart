@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../search/booking_search_field_styles.dart';
+
 /// Animated shimmer-like loading skeleton for result cards.
 class BookingLoadingSkeleton extends StatefulWidget {
   const BookingLoadingSkeleton({super.key});
@@ -49,7 +51,9 @@ class _BookingLoadingSkeletonState extends State<BookingLoadingSkeleton>
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: cs.surface,
-          border: Border.all(color: cs.outline.withValues(alpha: 0.2)),
+          border: Border.all(
+            color: BookingSearchFieldStyles.fieldBorderInactive(context),
+          ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(

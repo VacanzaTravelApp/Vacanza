@@ -5,6 +5,7 @@ import 'package:mobile/core/theme/app_theme.dart';
 import '../../../data/models/booking_utils.dart';
 import '../../../data/models/transport_option.dart';
 import '../booking_url_launcher.dart';
+import '../search/booking_search_field_styles.dart';
 
 /// Card displaying a single flight result.
 class FlightCard extends StatefulWidget {
@@ -35,7 +36,9 @@ class _FlightCardState extends State<FlightCard> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.surface,
-        border: Border.all(color: cs.outline.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: BookingSearchFieldStyles.fieldBorderInactive(context),
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -56,7 +59,7 @@ class _FlightCardState extends State<FlightCard> {
                   color: cs.surfaceContainerHighest,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: cs.outline.withValues(alpha: 0.2),
+                    color: BookingSearchFieldStyles.fieldBorderInactive(context),
                   ),
                   image: flight.airlineLogo != null &&
                           flight.airlineLogo!.isNotEmpty
@@ -166,7 +169,9 @@ class _FlightCardState extends State<FlightCard> {
                   Container(
                     height: 2,
                     decoration: BoxDecoration(
-                      color: cs.outline.withValues(alpha: 0.4),
+                      color: Theme.of(context).brightness == Brightness.light
+                          ? cs.secondary.withValues(alpha: 0.22)
+                          : cs.outline.withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(1),
                     ),
                   ),
@@ -227,7 +232,7 @@ class _FlightCardState extends State<FlightCard> {
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
                   border: Border.all(
-                    color: cs.outline.withValues(alpha: 0.35),
+                    color: BookingSearchFieldStyles.fieldBorderInactive(context),
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
