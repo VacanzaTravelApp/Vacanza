@@ -37,14 +37,6 @@ import 'features/auth/presentation/screens/auth_gate.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Mapbox public token (build-time only; never commit — see MapboxConfig)
-  if (MapboxConfig.accessToken.isEmpty) {
-    throw StateError(
-      'MAPBOX_ACCESS_TOKEN is not set. Run with:\n'
-      '  flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_public_token\n'
-      'Or add the same flag to your IDE run configuration.',
-    );
-  }
   MapboxOptions.setAccessToken(MapboxConfig.accessToken);
 
   // Firebase init

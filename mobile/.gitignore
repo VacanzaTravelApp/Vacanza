@@ -23,10 +23,6 @@ migrate_working_dir/
 # is commented out by default.
 #.vscode/
 
-# Local Mapbox token file (if you script --dart-define from a file)
-.env.mapbox
-mapbox.local.env
-
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id

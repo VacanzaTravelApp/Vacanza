@@ -1,20 +1,11 @@
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
-/// Mapbox harita yapılandırması.
-///
-/// **Public access token (pk.…)** repoya yazılmamalı; GitHub secret scanning push’u engeller.
-/// Yerelde ve CI’da derleme sırasında verin:
-///
-/// ```sh
-/// flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_public_token
-/// ```
-///
-/// Xcode/Android Studio: Run configuration’a aynı `--dart-define` satırını ekleyin.
+import 'mapbox_access_token.dart';
+
+/// Harita stilleri, kamera ve Mapbox token referansı.
+/// Token değeri [mapbox_access_token.dart] içinde tutulur.
 class MapboxConfig {
-  static const String accessToken = String.fromEnvironment(
-    'MAPBOX_ACCESS_TOKEN',
-    defaultValue: '',
-  );
+  static String get accessToken => kMapboxAccessToken;
 
   /// Streets v12 — web MapPage ile aynı stil; POI label katmanları mevcut.
   static const String styleStandard =
