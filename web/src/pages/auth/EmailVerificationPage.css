@@ -1,34 +1,9 @@
-/* Same layout rhythm as LoginCard / RegisterCard: stack + secondary control */
+/* Same layout rhythm as LoginCard / RegisterCard */
 
 .verify-email-actions {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.register-card .verify-email-secondary-btn.ant-btn {
-  height: auto !important;
-  min-height: 44px;
-  padding: 10px 20px !important;
-  border-radius: 12px !important;
-  font-family: var(--font-sans) !important;
-  font-weight: 600 !important;
-  font-size: 14px !important;
-  background: var(--input-bg) !important;
-  border: 1.5px solid var(--input-border) !important;
-  color: var(--card-text) !important;
-  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease !important;
-}
-
-.register-card .verify-email-secondary-btn.ant-btn:hover:not(:disabled) {
-  border-color: var(--vivid-teal) !important;
-  color: var(--vivid-teal) !important;
-  filter: brightness(1.05);
-}
-
-.register-card .verify-email-secondary-btn.ant-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .verify-email-inline-success {

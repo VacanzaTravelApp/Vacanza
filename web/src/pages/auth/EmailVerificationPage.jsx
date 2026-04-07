@@ -16,7 +16,6 @@ const EmailVerificationPage = () => {
     const verifiedFromLink = searchParams.get(VERIFIED_QUERY) === "1";
 
     const [resending, setResending] = useState(false);
-    const [checking, setChecking] = useState(false);
     const [cooldown, setCooldown] = useState(0);
     const [showSuccess, setShowSuccess] = useState(false);
     const [guestVerified, setGuestVerified] = useState(false);
@@ -72,23 +71,38 @@ const EmailVerificationPage = () => {
         if (cooldown === 0) setShowSuccess(false);
     }, [cooldown]);
 
-    const handleCheckVerification = useCallback(async () => {
-        setChecking(true);
+    /** After user taps the link in email and returns to this tab, refresh profile and redirect if verified. */
+    const syncVerificationFromServer = useCallback(async () => {
+        const user = auth.currentUser;
+        if (!user || user.emailVerified) return;
         try {
-            await auth.currentUser?.reload();
-            const refreshed = auth.currentUser;
-            if (refreshed?.emailVerified) {
+            await user.reload();
+            if (auth.currentUser?.emailVerified) {
                 message.success("Email verified! Redirecting...");
-                setTimeout(() => navigate("/map"), 800);
-            } else {
-                message.info("Email not yet verified. Please check your inbox.");
+                setTimeout(() => navigate("/map"), 600);
             }
         } catch {
-            message.error("Could not check status.");
-        } finally {
-            setChecking(false);
+            /* ignore */
         }
     }, [navigate]);
+
+    useEffect(() => {
+        const onBackToTab = () => {
+            if (document.visibilityState === "visible") syncVerificationFromServer();
+        };
+        document.addEventListener("visibilitychange", onBackToTab);
+        window.addEventListener("focus", onBackToTab);
+        return () => {
+            document.removeEventListener("visibilitychange", onBackToTab);
+            window.removeEventListener("focus", onBackToTab);
+        };
+    }, [syncVerificationFromServer]);
+
+    useEffect(() => {
+        if (!authReady || guestVerified) return;
+        const u = auth.currentUser;
+        if (u && !u.emailVerified) syncVerificationFromServer();
+    }, [authReady, guestVerified, syncVerificationFromServer]);
 
     const goToLogin = useCallback(async () => {
         try {
@@ -132,7 +146,8 @@ const EmailVerificationPage = () => {
                     Verify your <span>email</span>
                 </h3>
                 <p className="header-subtext">
-                    We sent a confirmation link to your inbox. Open it to verify your address, then tap below.
+                    We sent a confirmation link to your inbox. Open it to verify — when you return to this tab,
+                    we&apos;ll continue automatically.
                 </p>
             </div>
             <div className="verify-email-actions" style={{ marginTop: 20 }}>
@@ -140,19 +155,10 @@ const EmailVerificationPage = () => {
                     type="primary"
                     size="large"
                     block
-                    loading={checking}
-                    onClick={handleCheckVerification}
-                    className="cta-button"
-                >
-                    I&apos;ve verified
-                </Button>
-                <Button
-                    block
-                    size="large"
                     loading={resending}
                     disabled={cooldown > 0}
                     onClick={handleResend}
-                    className="verify-email-secondary-btn"
+                    className="cta-button"
                 >
                     {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend email"}
                 </Button>
