@@ -40,6 +40,7 @@ import '../../../poi_search/presentation/widgets/poi_filter_panel.dart';
 import '../../../../features/booking/presentation/widgets/booking_bottom_sheet.dart';
 
 import '../../../chat/presentation/screens/chat_screen.dart';
+import '../../../trip_agenda/trip_agenda_calendar_sheet.dart';
 import '../../../profile/data/repositories/profile_repository.dart';
 import '../../../profile/presentation/bloc/profile_bloc.dart';
 import '../../../profile/presentation/bloc/profile_event.dart';
@@ -477,6 +478,11 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
                 backgroundColor: Colors.transparent,
                 builder: (_) => const BookingBottomSheet(),
               );
+            },
+
+            onOpenTripAgenda: () {
+              _closeControlsMenu();
+              showTripAgendaCalendar(context);
             },
 
             // ✅ Chatbot

@@ -18,11 +18,13 @@ class MapboxConfig {
   static const String styleStandardSatellite =
       'mapbox://styles/mapbox/satellite-streets-v12';
 
-  /// Başlangıç kamera
-  /// İlk açılış (GPS gelene kadar); stil / 2D-3D geçişinde konum korunur.
+  /// Harita ilk açılışında [MapWidget] için kamera.
+  /// Sabit şehir/mock koordinat yok; düşük zoom ile genel dünya görünümü.
+  /// GPS zaten hazırsa [MapCanvasMapbox._onMapCreated] anında konuma gider;
+  /// ilk fix gelince [BlocListener] (first GPS) ile kullanıcıya uçulur.
   static final CameraOptions initialCamera = CameraOptions(
-    center: Point(coordinates: Position(32.8597, 39.9334)),
-    zoom: 13.5,
+    center: Point(coordinates: Position(0, 15)),
+    zoom: 1.2,
     pitch: 0,
     bearing: 0,
   );

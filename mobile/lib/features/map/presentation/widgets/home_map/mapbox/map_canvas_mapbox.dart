@@ -64,6 +64,35 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     };
   }
 
+  /// Map is shown only when we have coordinates or a definitive non-tracking
+  /// outcome (denied / error); otherwise a spinner until GPS or last-known seed.
+  static bool _locationAllowsMap(LocationState loc) {
+    if (loc.latitude != null && loc.longitude != null) return true;
+    switch (loc.status) {
+      case LocationStatus.permissionDenied:
+      case LocationStatus.permissionDeniedForever:
+      case LocationStatus.error:
+        return true;
+      case LocationStatus.initial:
+      case LocationStatus.tracking:
+        return false;
+    }
+  }
+
+  static mb.CameraOptions _cameraForLocation(LocationState loc) {
+    if (loc.latitude != null && loc.longitude != null) {
+      return mb.CameraOptions(
+        center: mb.Point(
+          coordinates: mb.Position(loc.longitude!, loc.latitude!),
+        ),
+        zoom: 15.0,
+        pitch: 0,
+        bearing: 0,
+      );
+    }
+    return MapboxConfig.initialCamera;
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -162,6 +191,9 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   @override
   Widget build(BuildContext context) {
     final bool isDrawing = context.select((MapBloc b) => b.state.isDrawing);
+
+    final LocationState locState = context.watch<LocationBloc>().state;
+    final bool showMap = _locationAllowsMap(locState);
 
     final AreaQueryState areaState = context.watch<AreaQueryBloc>().state;
     final areaCtx = areaState.context;
@@ -335,42 +367,17 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
               },
             ),
 
-            // ── First GPS fix → center camera once (MOB-6) ──────────
-            BlocListener<LocationBloc, LocationState>(
-              listenWhen: (prev, next) => !prev.isFirstFix && next.isFirstFix,
-              listener: (context, state) async {
-                final map = _map;
-                if (map == null) return;
-                if (state.latitude == null || state.longitude == null) return;
-
-                log(
-                  '[MapCanvas] ★ first GPS fix — flying camera to '
-                  'lat=${state.latitude}, lng=${state.longitude}',
-                );
-
-                _suspendViewportFor(ms: 800);
-
-                await map.flyTo(
-                  mb.CameraOptions(
-                    center: mb.Point(
-                      coordinates: mb.Position(
-                        state.longitude!,
-                        state.latitude!,
-                      ),
-                    ),
-                    zoom: 15.0,
-                    pitch: 0,
-                    bearing: 0,
-                  ),
-                  mb.MapAnimationOptions(duration: 600, startDelay: 0),
-                );
-              },
-            ),
           ],
-          child: Stack(
+          child: !showMap
+              ? const Center(child: CircularProgressIndicator())
+              : Stack(
             children: [
               MapboxView(
                 ignoreGestures: isDrawing,
+                cameraOptions: _cameraForLocation(locState),
+                mapWidgetKey: ValueKey(
+                  'map-${locState.latitude != null && locState.longitude != null ? 'gps' : 'nogps'}-${locState.status}',
+                ),
                 onMapCreated: _onMapCreated,
                 onMapIdle: () {
                   if (_map == null) return;

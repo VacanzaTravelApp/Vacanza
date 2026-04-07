@@ -20,6 +20,7 @@ class MapControlsMenu extends StatefulWidget {
     required this.onOpenFilters,
     required this.onOpenArMode,
     required this.onOpenBooking,
+    required this.onOpenTripAgenda,
     required this.onCycleBasemap,
     required this.onTogglePerspective,
   });
@@ -35,6 +36,7 @@ class MapControlsMenu extends StatefulWidget {
   final VoidCallback onOpenFilters;
   final VoidCallback onOpenArMode;
   final VoidCallback onOpenBooking;
+  final VoidCallback onOpenTripAgenda;
   final VoidCallback onCycleBasemap;
   final VoidCallback onTogglePerspective;
 
@@ -141,6 +143,12 @@ class _MapControlsMenuState extends State<MapControlsMenu>
                         tooltip: 'Booking',
                         icon: Icons.luggage_rounded,
                         onPressed: widget.onOpenBooking,
+                      ),
+                      const SizedBox(height: 16),
+                      ActionIconButton(
+                        tooltip: 'Trip Agenda',
+                        icon: Icons.calendar_month_rounded,
+                        onPressed: widget.onOpenTripAgenda,
                       ),
                       const SizedBox(height: 16),
                       _actionWithBadge(

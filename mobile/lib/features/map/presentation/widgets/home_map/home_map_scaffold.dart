@@ -31,6 +31,9 @@ class HomeMapScaffold extends StatelessWidget {
   /// UC1.8-MOB1: booking entry point
   final VoidCallback onOpenBooking;
 
+  /// Trip Agenda (web CalendarModal equivalent)
+  final VoidCallback onOpenTripAgenda;
+
   /// Chatbot entry point
   final VoidCallback onOpenChat;
 
@@ -68,6 +71,7 @@ class HomeMapScaffold extends StatelessWidget {
     required this.onRecenter,
     required this.onToggleDrawing,
     required this.onOpenBooking,
+    required this.onOpenTripAgenda,
     required this.onOpenChat,
     required this.onOpenArMode,
     required this.onOpenFilters,
@@ -159,6 +163,7 @@ class HomeMapScaffold extends StatelessWidget {
               onOpenFilters: onOpenFilters,
               onOpenArMode: onOpenArMode,
               onOpenBooking: onOpenBooking,
+              onOpenTripAgenda: onOpenTripAgenda,
               onCycleBasemap: onCycleBasemap,
               onTogglePerspective: onTogglePerspective,
             ),
