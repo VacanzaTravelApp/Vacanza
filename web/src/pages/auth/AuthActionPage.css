@@ -48,10 +48,6 @@
     font-size: 80px;
 }
 
-.action-icon.success {
-    color: #43a047;
-}
-
 .action-icon.error {
     color: #e53935;
 }
@@ -72,11 +68,6 @@
     margin-bottom: 32px;
 }
 
-.action-brand {
-    font-weight: 700;
-    color: #00acc1;
-}
-
 /* Buttons */
 .action-btn {
     height: 52px !important;
@@ -84,17 +75,6 @@
     font-weight: 700 !important;
     font-size: 16px !important;
     transition: all 0.3s ease !important;
-}
-
-.action-btn.success {
-    background: linear-gradient(135deg, #00acc1 0%, #00897b 100%) !important;
-    border: none !important;
-    box-shadow: 0 4px 14px rgba(0, 172, 193, 0.3) !important;
-}
-
-.action-btn.success:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(0, 172, 193, 0.45) !important;
 }
 
 .action-btn.error {

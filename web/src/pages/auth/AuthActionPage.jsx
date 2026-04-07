@@ -2,15 +2,15 @@ import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { applyActionCode, onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
-import { Button, Spin, Result } from "antd";
-import { CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from "@ant-design/icons";
+import { Button, Spin } from "antd";
+import { CloseCircleFilled, LoadingOutlined } from "@ant-design/icons";
 import "./AuthActionPage.css";
 
 const AuthActionPage = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
 
-    const [status, setStatus] = useState("loading"); // loading, success, error
+    const [status, setStatus] = useState("loading"); // loading, error (success → redirect)
     const [errorMessage, setErrorMessage] = useState("");
 
     const mode = searchParams.get("mode");
@@ -38,16 +38,11 @@ const AuthActionPage = () => {
     const handleVerifyEmail = async (code) => {
         try {
             await applyActionCode(auth, code);
-            setStatus("success");
-
-            // If user is already logged in, try to reload their profile
             const unsubscribe = onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    await user.reload();
-                }
+                if (user) await user.reload();
                 unsubscribe();
             });
-
+            navigate("/verify-email?verified=1", { replace: true });
         } catch (error) {
             console.error("Verification error:", error);
             setStatus("error");
@@ -66,29 +61,6 @@ const AuthActionPage = () => {
                     <div className="action-loading">
                         <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: "#00acc1" }} spin />} />
                         <p className="action-text">Verifying your email...</p>
-                    </div>
-                )}
-
-                {status === "success" && (
-                    <div className="action-success">
-                        <div className="action-icon-wrap success">
-                            <CheckCircleFilled className="action-icon success" />
-                        </div>
-                        <h1 className="action-title">Email Verified</h1>
-                        <p className="action-description">
-                            Your email has been successfully verified.
-                            <br />
-                            You're all set to explore <span className="action-brand">Vacanza</span>!
-                        </p>
-                        <Button
-                            type="primary"
-                            size="large"
-                            block
-                            onClick={() => navigate("/verify-email?verified=1")}
-                            className="action-btn success"
-                        >
-                            Continue
-                        </Button>
                     </div>
                 )}
 
