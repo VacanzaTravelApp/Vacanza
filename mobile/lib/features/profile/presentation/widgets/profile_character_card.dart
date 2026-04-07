@@ -1,6 +1,8 @@
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 /// Pure character card widget for the Profile hub.
 ///
@@ -40,16 +42,21 @@ class ProfileCharacterCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final clampedPercent = (xpProgressPercent ?? 0).clamp(0, 100);
     final showXp = totalXp != null && xpProgressPercent != null;
+    final cs = Theme.of(context).colorScheme;
+    final gradientColors = context.mapControlActiveGradientColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
+    final inner = Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
+        color: isDark
+            ? cs.surface.withValues(alpha: 0.92)
+            : context.lightGlassPanelColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+        border: Border.all(color: cs.secondary.withValues(alpha: 0.18)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 32,
+            color: cs.shadow.withValues(alpha: 0.08),
+            blurRadius: 26,
             offset: const Offset(0, 8),
           ),
         ],
@@ -65,8 +72,8 @@ class ProfileCharacterCard extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFF0096FF).withValues(alpha: 0.08),
-                    const Color(0xFF2ECC71).withValues(alpha: 0.08),
+                    gradientColors.first.withValues(alpha: 0.10),
+                    gradientColors.last.withValues(alpha: 0.08),
                   ],
                 ),
               ),
@@ -78,12 +85,13 @@ class ProfileCharacterCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Avatar with gradient border
-                _buildAvatar(),
+                _buildAvatar(context),
                 const SizedBox(width: 16),
                 // Info
                 Expanded(
                   child: onInfoTap == null
                       ? _buildInfoColumn(
+                          context: context,
                           showXp: showXp,
                           clampedPercent: clampedPercent,
                         )
@@ -100,6 +108,7 @@ class ProfileCharacterCard extends StatelessWidget {
                                 bottom: 8,
                               ),
                               child: _buildInfoColumn(
+                                context: context,
                                 showXp: showXp,
                                 clampedPercent: clampedPercent,
                               ),
@@ -113,50 +122,67 @@ class ProfileCharacterCard extends StatelessWidget {
         ],
       ),
     );
+
+    if (isDark) return inner;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: inner,
+      ),
+    );
   }
 
   Widget _buildInfoColumn({
+    required BuildContext context,
     required bool showXp,
     required int clampedPercent,
   }) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           name,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF2C3E50),
+            color: cs.onSurface,
           ),
         ),
         const SizedBox(height: 4),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.6),
+            color: accent.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(color: accent.withValues(alpha: 0.30)),
           ),
           child: Text(
             roleText,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF5F7A8F)),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
           ),
         ),
         const SizedBox(height: 6),
         Text(
           levelText,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF0096FF),
+            color: accent,
           ),
         ),
         if (showXp) ...[
           const SizedBox(height: 4),
           Text(
             '$totalXp XP • $clampedPercent% to next level',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 6),
           ClipRRect(
@@ -164,8 +190,8 @@ class ProfileCharacterCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: clampedPercent / 100,
               minHeight: 4,
-              backgroundColor: const Color(0xFFE5E7EB),
-              valueColor: const AlwaysStoppedAnimation(Color(0xFF0096FF)),
+              backgroundColor: cs.outline.withValues(alpha: 0.25),
+              valueColor: AlwaysStoppedAnimation(accent),
             ),
           ),
         ],
@@ -177,7 +203,9 @@ class ProfileCharacterCard extends StatelessWidget {
   static const double _ring = 3;
   static double get _avatarInner => _avatarOuter - 2 * _ring;
 
-  Widget _buildAvatar() {
+  Widget _buildAvatar(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final gradientColors = context.mapControlActiveGradientColors;
     final hasBytes =
         profilePhotoBytes != null && profilePhotoBytes!.isNotEmpty;
     final hasUrl = profileImageUrl != null && profileImageUrl!.trim().isNotEmpty;
@@ -219,10 +247,10 @@ class ProfileCharacterCard extends StatelessWidget {
       width: _avatarOuter,
       height: _avatarOuter,
       padding: const EdgeInsets.all(_ring),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
-          colors: [Color(0xFF0096FF), Color(0xFF2ECC71)],
+          colors: gradientColors,
         ),
       ),
       child: ClipOval(
@@ -230,7 +258,7 @@ class ProfileCharacterCard extends StatelessWidget {
           width: _avatarInner,
           height: _avatarInner,
           child: ColoredBox(
-            color: Colors.grey.shade200,
+            color: cs.surfaceContainerHighest,
             child: inner,
           ),
         ),
