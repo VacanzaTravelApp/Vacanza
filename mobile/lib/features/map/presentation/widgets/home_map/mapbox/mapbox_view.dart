@@ -16,6 +16,14 @@ import '../../../../../poi_search/data/models/selected_area.dart';
 class MapboxView extends StatefulWidget {
   final bool ignoreGestures;
 
+  /// Initial camera; use user coordinates when available so the map does not
+  /// flash a world view before GPS.
+  final mb.CameraOptions cameraOptions;
+
+  /// Optional key for the underlying [mb.MapWidget] (e.g. remount when
+  /// switching between fallback and user-centered camera).
+  final Key? mapWidgetKey;
+
   final Future<void> Function(mb.MapboxMap mapboxMap) onMapCreated;
 
   final void Function(BboxArea bbox) onViewportBbox;
@@ -25,6 +33,8 @@ class MapboxView extends StatefulWidget {
   const MapboxView({
     super.key,
     required this.ignoreGestures,
+    required this.cameraOptions,
+    this.mapWidgetKey,
     required this.onMapCreated,
     required this.onViewportBbox,
     this.onMapIdle,
@@ -51,8 +61,8 @@ class _MapboxViewState extends State<MapboxView> {
     return IgnorePointer(
       ignoring: widget.ignoreGestures,
       child: mb.MapWidget(
-        key: const ValueKey('mapbox-map'),
-        cameraOptions: MapboxConfig.initialCamera,
+        key: widget.mapWidgetKey ?? const ValueKey('mapbox-map'),
+        cameraOptions: widget.cameraOptions,
         styleUri: MapboxConfig.styleStandard,
         onMapCreated: (mapboxMap) async {
           _map = mapboxMap;
