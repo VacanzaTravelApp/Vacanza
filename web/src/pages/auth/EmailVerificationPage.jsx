@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Button, message, Spin } from "antd";
-import { CheckCircleFilled } from "@ant-design/icons";
+import { MailOutlined } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth } from "../../firebase";
 import { sendEmailVerification, onAuthStateChanged, signOut } from "firebase/auth";
@@ -158,15 +158,15 @@ const EmailVerificationPage = () => {
                     loading={resending}
                     disabled={cooldown > 0}
                     onClick={handleResend}
-                    className="cta-button"
+                    className="cta-button verify-email-resend-btn"
                 >
                     {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend email"}
                 </Button>
             </div>
             {showSuccess && (
                 <div className="verify-email-inline-success">
-                    <CheckCircleFilled className="verify-email-inline-success-icon" />
-                    <span>Check your inbox for the link</span>
+                    <MailOutlined className="verify-email-inline-success-icon" aria-hidden />
+                    <span>We sent another message — check your inbox (and spam).</span>
                 </div>
             )}
             <div className="login-redirect">

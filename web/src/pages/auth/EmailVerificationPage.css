@@ -6,20 +6,54 @@
   gap: 12px;
 }
 
+/* Matches header-subtext / login-redirect tone — not bright “success green” */
 .verify-email-inline-success {
-  margin-top: 14px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  gap: 6px;
-  color: var(--vivid-green);
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: 11px;
+  gap: 10px;
+  text-align: left;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--card-subtext);
+  transition:
+    color 1.5s ease,
+    background 1.5s ease,
+    border-color 1.5s ease;
 }
 
 .verify-email-inline-success-icon {
-  font-size: 13px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 15px;
+  color: var(--vivid-teal);
+  opacity: 0.9;
+  font-style: normal;
+}
+
+/* Resend on cooldown: faded primary (matches card, not loud disabled gray) */
+.register-card .verify-email-resend-btn.ant-btn-primary.ant-btn-disabled,
+.register-card .verify-email-resend-btn.ant-btn-primary:disabled {
+  opacity: 0.42 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+}
+
+.register-card .verify-email-resend-btn.ant-btn-primary.ant-btn-disabled:hover,
+.register-card .verify-email-resend-btn.ant-btn-primary:disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 0.42 !important;
 }
 
 .verify-email-loading {

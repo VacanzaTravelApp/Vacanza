@@ -59,7 +59,14 @@ const App = () => {
                         }
                     />
                     {/* Not under /auth/* — in production that prefix is often proxied to the Java API, which made /auth/action return JSON and download as a file named "action". */}
-                    <Route path="/confirm-email" element={<AuthActionPage />} />
+                    <Route
+                        path="/confirm-email"
+                        element={
+                            <AuthLayout>
+                                <AuthActionPage />
+                            </AuthLayout>
+                        }
+                    />
                     <Route path="/auth/action" element={<LegacyFirebaseAuthLinkRedirect />} />
 
                     <Route path="/map" element={<MapPage />} />

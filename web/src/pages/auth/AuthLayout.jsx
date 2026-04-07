@@ -167,6 +167,7 @@ const AuthLayout = ({ children }) => {
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
   const isVerifyPage = location.pathname === '/verify-email';
+  const isConfirmEmailPage = location.pathname === '/confirm-email';
   const [timeState, setTimeState] = useState(calculateTimeState());
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -211,7 +212,9 @@ const AuthLayout = ({ children }) => {
         <div className="floating-ornaments">
           <div className="poster-text float-top-left">
             <h1 className="vivid-title">
-              {isVerifyPage ? (
+              {isConfirmEmailPage ? (
+                <>Inbox<br /><span className="title-accent">Link</span></>
+              ) : isVerifyPage ? (
                 <>One More<br /><span className="title-accent">Step</span></>
               ) : isLoginPage ? (
                 <>Welcome<br /><span className="title-accent">Back</span></>
@@ -220,7 +223,9 @@ const AuthLayout = ({ children }) => {
               )}
             </h1>
             <p className="poster-subtitle">
-              {isVerifyPage
+              {isConfirmEmailPage
+                ? 'Secure steps from your email, right here.'
+                : isVerifyPage
                 ? 'Confirm your email to unlock the full experience.'
                 : isLoginPage
                 ? 'Your plans are waiting.'
