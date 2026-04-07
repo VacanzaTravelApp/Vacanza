@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import '../../data/models/user_profile.dart';
 import '../../data/profile_profile_options.dart';
 import '../../data/utils/profile_photo_pick_crop.dart';
@@ -169,7 +170,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         options: profileCountryOptions,
         initialSelected: current != null && current.isNotEmpty ? [current] : [],
         searchable: true,
-        accentColor: ProfileSheetStyles.primaryBlue,
+        accentColor: context.mapControlAccent,
         onDone: (selected) {
           setState(() {
             _draft = _draft.copyWith(
@@ -184,6 +185,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     return ProfileSheetStyles.sheetPanel(
+      context: context,
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.88,
       ),
@@ -214,6 +216,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Column(
@@ -223,7 +226,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               width: 32,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: cs.outline.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -231,12 +234,12 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
           const SizedBox(height: 16),
           Row(
             children: [
-              const Text(
+              Text(
                 'Edit Profile',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827),
+                  color: cs.onSurface,
                 ),
               ),
               const Spacer(),
@@ -244,7 +247,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close, size: 20),
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.grey.shade100,
+                  backgroundColor: cs.surfaceContainerHighest,
                 ),
               ),
             ],
@@ -255,6 +258,9 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   }
 
   Widget _buildPhotoSection() {
+    final cs = Theme.of(context).colorScheme;
+    final gradientColors = context.mapControlActiveGradientColors;
+    final accent = context.mapControlAccent;
     const avatarSize = 108.0;
     const ring = 3.0;
     final innerSize = avatarSize - 2 * ring;
@@ -315,14 +321,14 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                 width: avatarSize,
                 height: avatarSize,
                 padding: const EdgeInsets.all(ring),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [Color(0xFF0096FF), Color(0xFF2ECC71)],
+                    colors: gradientColors,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0x26000000),
+                      color: cs.shadow.withValues(alpha: 0.16),
                       blurRadius: 12,
                       offset: Offset(0, 4),
                     ),
@@ -346,7 +352,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                   width: cameraButtonSize,
                   height: cameraButtonSize,
                   decoration: BoxDecoration(
-                    color: ProfileSheetStyles.primaryBlue,
+                    color: accent,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -356,7 +362,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                  child: Icon(Icons.camera_alt, color: cs.onPrimary, size: 20),
                 ),
               ),
             ],
@@ -367,6 +373,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   }
 
   Widget _buildReadOnlyBlock() {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
     final joinFormatted = _draft.joinDate != null
         ? _formatJoinDate(_draft.joinDate!)
         : '—';
@@ -384,78 +392,133 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF3F4F6)),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.mail_outline, size: 14, color: Colors.grey.shade500),
+              Icon(Icons.mail_outline, size: 14, color: cs.onSurfaceVariant),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Email', style: TextStyle(fontSize: 10, color: Colors.grey.shade500, letterSpacing: 0.5)),
+                    Text(
+                      'Email',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: cs.onSurfaceVariant,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(_draft.email, style: const TextStyle(fontSize: 14, color: Color(0xFF374151)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      _draft.email,
+                      style: TextStyle(fontSize: 14, color: cs.onSurface),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
+                  color: cs.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text('Read-only', style: TextStyle(fontSize: 9, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                child: Text(
+                  'Read-only',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ],
           ),
           const Divider(height: 24),
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade500),
+              Icon(Icons.calendar_today, size: 14, color: cs.onSurfaceVariant),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Account', style: TextStyle(fontSize: 10, color: Colors.grey.shade500, letterSpacing: 0.5)),
+                    Text(
+                      'Account',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: cs.onSurfaceVariant,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(joinFormatted, style: const TextStyle(fontSize: 14, color: Color(0xFF374151))),
+                    Text(
+                      joinFormatted,
+                      style: TextStyle(fontSize: 14, color: cs.onSurface),
+                    ),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
+                  color: cs.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text('Read-only', style: TextStyle(fontSize: 9, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                child: Text(
+                  'Read-only',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ],
           ),
           const Divider(height: 24),
           Row(
             children: [
-              Icon(Icons.person_outline, size: 14, color: ProfileSheetStyles.primaryBlue),
+              Icon(Icons.person_outline, size: 14, color: accent),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Display name', style: TextStyle(fontSize: 10, color: Colors.grey.shade500, letterSpacing: 0.5)),
+                    Text(
+                      'Display name',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: cs.onSurfaceVariant,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(displayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: ProfileSheetStyles.primaryBlue), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(
+                      displayName,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: accent,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
-              Text('Auto-computed', style: TextStyle(fontSize: 9, color: Colors.grey.shade500)),
+              Text(
+                'Auto-computed',
+                style: TextStyle(fontSize: 9, color: cs.onSurfaceVariant),
+              ),
             ],
           ),
         ],
@@ -464,10 +527,19 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   }
 
   Widget _buildPersonalInfoSection() {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('PERSONAL INFO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 1.2)),
+        Text(
+          'PERSONAL INFO',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurfaceVariant,
+            letterSpacing: 1.2,
+          ),
+        ),
         const SizedBox(height: 12),
         _sectionLabel('First name *'),
         TextField(
@@ -499,6 +571,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   }
 
   Widget _buildAdditionalInfoSection() {
+    final cs = Theme.of(context).colorScheme;
     DateTime? birthDateTime;
     if (_draft.birthDate != null && _draft.birthDate!.length >= 10) {
       birthDateTime = DateTime.tryParse(_draft.birthDate!);
@@ -509,7 +582,15 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
       children: [
         const Divider(height: 1),
         const SizedBox(height: 16),
-        Text('ADDITIONAL INFO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade500, letterSpacing: 1.2)),
+        Text(
+          'ADDITIONAL INFO',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurfaceVariant,
+            letterSpacing: 1.2,
+          ),
+        ),
         const SizedBox(height: 12),
         _sectionLabel('Country'),
         InkWell(
@@ -519,23 +600,25 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                Icon(Icons.public, size: 20, color: Colors.grey.shade500),
+                Icon(Icons.public, size: 20, color: cs.onSurfaceVariant),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     (_draft.country != null && _draft.country!.isNotEmpty) ? _draft.country! : 'Select country',
                     style: TextStyle(
                       fontSize: 14,
-                      color: (_draft.country != null && _draft.country!.isNotEmpty) ? const Color(0xFF111827) : Colors.grey.shade500,
+                      color: (_draft.country != null && _draft.country!.isNotEmpty)
+                          ? cs.onSurface
+                          : cs.onSurfaceVariant,
                     ),
                   ),
                 ),
-                Icon(Icons.chevron_right, size: 20, color: Colors.grey.shade500),
+                Icon(Icons.chevron_right, size: 20, color: cs.onSurfaceVariant),
               ],
             ),
           ),
@@ -548,23 +631,29 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today, size: 20, color: Colors.grey.shade500),
+                Icon(Icons.calendar_today, size: 20, color: cs.onSurfaceVariant),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     birthDateLabel ?? 'Select date of birth',
                     style: TextStyle(
                       fontSize: 14,
-                      color: birthDateLabel != null ? const Color(0xFF111827) : Colors.grey.shade500,
+                      color: birthDateLabel != null
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
-                Icon(Icons.chevron_right, size: 20, color: Colors.grey.shade500),
+                Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ],
             ),
           ),
@@ -580,14 +669,18 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                     decoration: BoxDecoration(
-                      color: _draft.gender == g ? ProfileSheetStyles.primaryBlue : Colors.grey.shade100,
+                      color: _draft.gender == g
+                          ? context.mapControlAccent
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       formatGenderLabel(g),
                       style: TextStyle(
                         fontSize: 12,
-                        color: _draft.gender == g ? Colors.white : Colors.grey.shade700,
+                        color: _draft.gender == g
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -602,6 +695,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   }
 
   Widget _sectionLabel(String text) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 12, bottom: 6),
       child: Text(
@@ -609,7 +703,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: Colors.grey.shade500,
+          color: cs.onSurfaceVariant,
           letterSpacing: 1.2,
         ),
       ),
@@ -617,7 +711,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   }
 
   InputDecoration _inputDecoration(String hint) {
-    return ProfileSheetStyles.inputDecoration(hint);
+    return ProfileSheetStyles.inputDecoration(context, hint);
   }
 
   Widget _buildFooter(BuildContext context) {
@@ -631,6 +725,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
             children: [
               Expanded(
                 child: ProfileSheetStyles.secondaryButton(
+                  context: context,
                   text: 'Cancel',
                   onPressed: busy ? null : () => Navigator.of(context).pop(),
                 ),
@@ -638,6 +733,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               const SizedBox(width: 12),
               Expanded(
                 child: ProfileSheetStyles.primaryButton(
+                  context: context,
                   text: busy ? 'Saving…' : 'Save',
                   onPressed: busy ? null : _save,
                 ),

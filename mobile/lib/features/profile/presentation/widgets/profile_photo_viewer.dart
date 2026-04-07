@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 import 'profile_photo_source_sheet.dart';
 
@@ -250,12 +251,12 @@ class _ProfilePhotoViewerDialogState extends State<_ProfilePhotoViewerDialog> {
             width: diameter,
             height: diameter,
             padding: const EdgeInsets.all(ring),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF0096FF), Color(0xFF2ECC71)],
+                colors: widget.hostContext.mapControlActiveGradientColors,
               ),
             ),
             child: ClipOval(
@@ -280,7 +281,7 @@ class _ProfilePhotoViewerDialogState extends State<_ProfilePhotoViewerDialog> {
             bottom: 2,
             child: Material(
               key: _editButtonKey,
-              color: const Color(0xFF0096FF),
+              color: widget.hostContext.mapControlAccent,
               elevation: 4,
               shadowColor: Colors.black45,
               shape: const CircleBorder(),

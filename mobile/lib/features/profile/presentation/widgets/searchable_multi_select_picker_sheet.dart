@@ -92,8 +92,10 @@ class _SearchableMultiSelectPickerSheetState
   Widget build(BuildContext context) {
     final accent = widget.config.accentColor;
     final options = _filteredOptions;
+    final cs = Theme.of(context).colorScheme;
 
     return ProfileSheetStyles.sheetPanel(
+      context: context,
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.88,
       ),
@@ -111,17 +113,17 @@ class _SearchableMultiSelectPickerSheetState
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(Icons.arrow_back),
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.grey.shade100,
+                        backgroundColor: cs.surfaceContainerHighest,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         widget.config.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827),
+                          color: cs.onSurface,
                         ),
                       ),
                     ),
@@ -129,7 +131,7 @@ class _SearchableMultiSelectPickerSheetState
                       '${_selected.length} selected',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade600,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -139,9 +141,10 @@ class _SearchableMultiSelectPickerSheetState
                   TextField(
                     controller: _searchController,
                     onChanged: (_) => setState(() {}),
+                    style: TextStyle(color: cs.onSurface),
                     decoration: InputDecoration(
                       hintText: 'Search…',
-                      prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey.shade400),
+                      prefixIcon: Icon(Icons.search, size: 20, color: cs.onSurfaceVariant),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.close, size: 20),
@@ -152,10 +155,10 @@ class _SearchableMultiSelectPickerSheetState
                             )
                           : null,
                       filled: true,
-                      fillColor: Colors.grey.shade100,
+                      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.25)),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -167,18 +170,18 @@ class _SearchableMultiSelectPickerSheetState
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: cs.outline.withValues(alpha: 0.25)),
           // List
           Flexible(
             child: options.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.all(24),
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
                     child: Center(
                       child: Text(
                         'No results',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF9CA3AF),
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ),
