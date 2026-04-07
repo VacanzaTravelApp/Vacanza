@@ -35,17 +35,16 @@ class FlightSearchMappingTest {
                     "Paris Charles de Gaulle Airport", "CDG", "2025-07-01 12:45",
                     250);
 
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD", null);
 
             assertFalse(results.isEmpty(), "Should have at least one result");
             TransportOptionDTO dto = results.get(0);
             String url = dto.getExternalBookingUrl();
 
             assertNotNull(url, "Booking URL should not be null");
-            assertTrue(url.contains("Istanbul"), "URL should contain origin airport name, got: " + url);
-            assertTrue(url.contains("Charles+de+Gaulle") || url.contains("Charles%20de%20Gaulle"),
-                    "URL should contain destination airport name (URL encoded), got: " + url);
-            assertFalse(url.matches(".*[?&]q=IST.*"), "URL should NOT contain raw IATA code as query start");
+            // Since we now use IATA codes for robustness, checking for those
+            assertTrue(url.contains("IST"), "URL should contain origin IATA code, got: " + url);
+            assertTrue(url.contains("CDG"), "URL should contain destination IATA code, got: " + url);
         }
 
         @Test
@@ -56,7 +55,7 @@ class FlightSearchMappingTest {
                     "Frankfurt am Main", "FRA", "2025-08-16 06:30",
                     800);
 
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "EUR");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "EUR", null);
             String url = results.get(0).getExternalBookingUrl();
 
             assertTrue(url.startsWith("https://www.google.com/travel/flights?q="),
@@ -73,7 +72,7 @@ class FlightSearchMappingTest {
                     null, "CDG", "2025-07-01 12:45",
                     300);
 
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD", null);
             String url = results.get(0).getExternalBookingUrl();
 
             assertNotNull(url, "URL should still be generated when names are null");
@@ -88,7 +87,7 @@ class FlightSearchMappingTest {
                     "London Heathrow", "LHR", "2025-07-01 18:00",
                     450);
 
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD", null);
             String url = results.get(0).getExternalBookingUrl();
 
             assertNotNull(url, "URL should handle null departure time");
@@ -98,8 +97,24 @@ class FlightSearchMappingTest {
         @Test
         @DisplayName("Null response returns empty list")
         void nullResponseReturnsEmpty() {
-            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(null, "USD");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(null, "USD", null);
             assertTrue(results.isEmpty());
+        }
+
+        @Test
+        @DisplayName("URL should include return date for round trips")
+        void urlIncludesReturnDate() {
+            SerpApiFlightResponse response = buildFlightResponse(
+                    "Istanbul", "IST", "2026-04-10 10:00",
+                    "London", "LHR", "2026-04-10 13:00",
+                    500);
+
+            java.time.LocalDate returnDate = java.time.LocalDate.parse("2026-04-15");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD", returnDate);
+            String url = results.get(0).getExternalBookingUrl();
+
+            assertTrue(url.contains("2026-04-15"), "URL should contain return date, got: " + url);
+            assertTrue(url.contains("IST") && url.contains("LHR"), "URL should contain airport codes, got: " + url);
         }
     }
 
