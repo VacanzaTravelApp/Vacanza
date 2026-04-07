@@ -84,10 +84,10 @@ const AuthActionPage = () => {
                             type="primary"
                             size="large"
                             block
-                            onClick={() => navigate("/map")}
+                            onClick={() => navigate("/verify-email?verified=1")}
                             className="action-btn success"
                         >
-                            Go to App
+                            Continue
                         </Button>
                     </div>
                 )}

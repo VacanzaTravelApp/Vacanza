@@ -1,170 +1,59 @@
-/* Email Verification Page */
+/* Same layout rhythm as LoginCard / RegisterCard: stack + secondary control */
 
-.verify-page {
-    min-height: 100vh;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(160deg, #e0f7fa 0%, #e8f5e9 30%, #e0f2f1 60%, #f1f8e9 100%);
-    padding: 20px;
+.verify-email-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.verify-card {
-    width: 100%;
-    max-width: 380px;
-    text-align: center;
-    padding: 48px 32px 40px;
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-radius: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow:
-        0 8px 32px rgba(0, 172, 193, 0.08),
-        0 2px 8px rgba(0, 0, 0, 0.04);
+.register-card .verify-email-secondary-btn.ant-btn {
+  height: auto !important;
+  min-height: 44px;
+  padding: 10px 20px !important;
+  border-radius: 12px !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  background: var(--input-bg) !important;
+  border: 1.5px solid var(--input-border) !important;
+  color: var(--card-text) !important;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease !important;
 }
 
-/* Icon */
-.verify-icon-wrap {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 28px;
+.register-card .verify-email-secondary-btn.ant-btn:hover:not(:disabled) {
+  border-color: var(--vivid-teal) !important;
+  color: var(--vivid-teal) !important;
+  filter: brightness(1.05);
 }
 
-.verify-icon {
-    width: 88px;
-    height: 88px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(0, 172, 193, 0.12) 0%, rgba(76, 175, 80, 0.1) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: verifyIconPulse 2s ease-in-out infinite;
+.register-card .verify-email-secondary-btn.ant-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
-@keyframes verifyIconPulse {
-
-    0%,
-    100% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(0, 172, 193, 0.15);
-    }
-
-    50% {
-        transform: scale(1.04);
-        box-shadow: 0 0 0 12px rgba(0, 172, 193, 0);
-    }
+.verify-email-inline-success {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--vivid-green);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 11px;
 }
 
-/* Title */
-.verify-title {
-    font-size: 24px;
-    font-weight: 800;
-    color: #1c1c1e;
-    margin: 0 0 12px 0;
-    letter-spacing: -0.3px;
+.verify-email-inline-success-icon {
+  font-size: 13px;
 }
 
-/* Description */
-.verify-description {
-    font-size: 14px;
-    color: #6b7280;
-    font-weight: 500;
-    line-height: 1.6;
-    margin: 0 0 32px 0;
+.verify-email-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
 }
 
-.verify-brand {
-    font-weight: 700;
-    color: #00acc1;
-}
-
-/* I Verified Button (Primary) */
-.verify-check-btn {
-    height: 50px !important;
-    border-radius: 14px !important;
-    font-weight: 700 !important;
-    font-size: 15px !important;
-    background: linear-gradient(135deg, #00acc1 0%, #00897b 100%) !important;
-    border: none !important;
-    box-shadow: 0 4px 14px rgba(0, 172, 193, 0.3) !important;
-    transition: all 0.3s ease !important;
-    margin-bottom: 12px !important;
-}
-
-.verify-check-btn:hover:not(:disabled) {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 20px rgba(0, 172, 193, 0.4) !important;
-}
-
-/* Resend Button (Secondary) */
-.verify-second-btn {
-    height: 50px !important;
-    border-radius: 14px !important;
-    font-weight: 700 !important;
-    font-size: 15px !important;
-    background: transparent !important;
-    border: 2px solid #e0e0e0 !important;
-    color: #4a4a4a !important;
-    box-shadow: none !important;
-    transition: all 0.3s ease !important;
-}
-
-.verify-second-btn:hover:not(:disabled) {
-    border-color: #00acc1 !important;
-    color: #00acc1 !important;
-    background: rgba(0, 172, 193, 0.04) !important;
-}
-
-.verify-second-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    border-color: #f0f0f0 !important;
-    color: #999 !important;
-}
-
-/* Inline Success */
-.verify-inline-success {
-    margin-top: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    color: #00897b;
-    font-weight: 600;
-    font-size: 13px;
-    animation: fadeInSlideUp 0.3s ease-out;
-}
-
-.success-inline-icon {
-    font-size: 14px;
-}
-
-@keyframes fadeInSlideUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Mobile */
-@media (max-width: 480px) {
-    .verify-card {
-        padding: 36px 24px 32px;
-        border-radius: 24px;
-    }
-
-    .verify-title {
-        font-size: 22px;
-    }
-
-    .verify-description {
-        font-size: 13px;
-    }
+.verify-email-loading .ant-spin-dot-item {
+  background-color: var(--btn-primary-bg);
 }

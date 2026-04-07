@@ -1,37 +1,51 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Button, message } from "antd";
+import { Button, message, Spin } from "antd";
 import { CheckCircleFilled } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth } from "../../firebase";
-import { sendEmailVerification, onAuthStateChanged } from "firebase/auth";
+import { sendEmailVerification, onAuthStateChanged, signOut } from "firebase/auth";
+import "./RegisterCard.css";
 import "./EmailVerificationPage.css";
+
+/** After Firebase email link verification, redirect here with ?verified=1 so guests see success + Log in. */
+const VERIFIED_QUERY = "verified";
 
 const EmailVerificationPage = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const verifiedFromLink = searchParams.get(VERIFIED_QUERY) === "1";
+
     const [resending, setResending] = useState(false);
     const [checking, setChecking] = useState(false);
     const [cooldown, setCooldown] = useState(0);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [guestVerified, setGuestVerified] = useState(false);
+    const [authReady, setAuthReady] = useState(false);
 
-    // Redirect if not logged in or already verified
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, (user) => {
+            setAuthReady(true);
             if (!user) {
-                navigate("/login");
-            } else if (user.emailVerified) {
-                navigate("/map");
+                if (verifiedFromLink) {
+                    setGuestVerified(true);
+                } else {
+                    navigate("/login", { replace: true });
+                }
+                return;
+            }
+            setGuestVerified(false);
+            if (user.emailVerified) {
+                navigate("/map", { replace: true });
             }
         });
         return () => unsub();
-    }, [navigate]);
+    }, [navigate, verifiedFromLink]);
 
-    // Cooldown timer
     useEffect(() => {
         if (cooldown <= 0) return;
         const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
         return () => clearTimeout(t);
     }, [cooldown]);
-
-    const [showSuccess, setShowSuccess] = useState(false);
 
     const handleResend = useCallback(async () => {
         const user = auth.currentUser;
@@ -41,7 +55,7 @@ const EmailVerificationPage = () => {
         try {
             await sendEmailVerification(user);
             setShowSuccess(true);
-            setCooldown(60); // 60 second cooldown
+            setCooldown(60);
         } catch (e) {
             if (e.code === "auth/too-many-requests") {
                 message.warning("Too many attempts. Please wait a moment.");
@@ -54,7 +68,6 @@ const EmailVerificationPage = () => {
         }
     }, []);
 
-    // Clear success message when cooldown is almost over or on manual check
     useEffect(() => {
         if (cooldown === 0) setShowSuccess(false);
     }, [cooldown]);
@@ -77,62 +90,84 @@ const EmailVerificationPage = () => {
         }
     }, [navigate]);
 
-    return (
-        <div className="verify-page">
-            <div className="verify-card">
-                {/* Email Icon */}
-                <div className="verify-icon-wrap">
-                    <div className="verify-icon">
-                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                            <rect x="4" y="10" width="40" height="28" rx="4" stroke="#00acc1" strokeWidth="2.5" fill="none" />
-                            <path d="M4 14l20 13 20-13" stroke="#00acc1" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                            <circle cx="38" cy="14" r="7" fill="#4caf50" />
-                            <path d="M34.5 14l2.5 2.5 4-4" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </div>
+    const goToLogin = useCallback(async () => {
+        try {
+            if (auth.currentUser) await signOut(auth);
+        } catch {
+            /* ignore */
+        }
+        navigate("/login");
+    }, [navigate]);
+
+    if (!authReady) {
+        return (
+            <div className="register-card verify-email-loading">
+                <Spin size="large" />
+            </div>
+        );
+    }
+
+    if (guestVerified) {
+        return (
+            <div className="register-card">
+                <div className="card-header">
+                    <h3>
+                        Email <span>verified</span>
+                    </h3>
+                    <p className="header-subtext">Sign in with your email and password to continue your journey</p>
                 </div>
+                <div style={{ marginTop: 20 }}>
+                    <Button type="primary" size="large" block className="cta-button" onClick={goToLogin}>
+                        Log in
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
-                {/* Title */}
-                <h1 className="verify-title">Verify your email</h1>
-
-                {/* Description */}
-                <p className="verify-description">
-                    We sent a verification link to your email address.
-                    <br />
-                    Please verify your email to continue to <span className="verify-brand">Vacanza</span>.
+    return (
+        <div className="register-card">
+            <div className="card-header">
+                <h3>
+                    Verify your <span>email</span>
+                </h3>
+                <p className="header-subtext">
+                    We sent a confirmation link to your inbox. Open it to verify your address, then tap below.
                 </p>
-
-                {/* I Verified Button */}
+            </div>
+            <div className="verify-email-actions" style={{ marginTop: 20 }}>
                 <Button
                     type="primary"
-                    block
                     size="large"
+                    block
                     loading={checking}
                     onClick={handleCheckVerification}
-                    className="verify-check-btn"
+                    className="cta-button"
                 >
-                    I verified
+                    I&apos;ve verified
                 </Button>
-
-                {/* Resend Button */}
                 <Button
                     block
                     size="large"
                     loading={resending}
                     disabled={cooldown > 0}
                     onClick={handleResend}
-                    className="verify-second-btn"
+                    className="verify-email-secondary-btn"
                 >
-                    {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend verification email"}
+                    {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend email"}
                 </Button>
-
-                {/* Inline Success Informative State */}
-                {showSuccess && (
-                    <div className="verify-inline-success">
-                        <CheckCircleFilled className="success-inline-icon" />
-                        <span>Check your inbox for the link</span>
-                    </div>
-                )}
+            </div>
+            {showSuccess && (
+                <div className="verify-email-inline-success">
+                    <CheckCircleFilled className="verify-email-inline-success-icon" />
+                    <span>Check your inbox for the link</span>
+                </div>
+            )}
+            <div className="login-redirect">
+                Different account?{" "}
+                <span onClick={goToLogin} className="login-link">
+                    Log in
+                </span>
             </div>
         </div>
     );
