@@ -110,7 +110,7 @@ const RegisterCard = () => {
         displayName: dispName
       });
 
-      // 2. Sync with Backend Database
+      // 2. Sync with Backend Database & Create Session
       await authApi.register({
         email,
         firstName,
@@ -118,6 +118,13 @@ const RegisterCard = () => {
         middleName: middleName || null,
         preferredName: (preferredName && preferredName.length > 0) ? preferredName[0] : null
       });
+
+      // Synchronize backend session (Spring Session sync with Firebase token)
+      try {
+        await authApi.login();
+      } catch (loginErr) {
+        console.warn("[Register] Session sync skipped or handled by register:", loginErr.message);
+      }
 
       // 3. Send Verification Email
       await sendEmailVerification(userCredential.user);
