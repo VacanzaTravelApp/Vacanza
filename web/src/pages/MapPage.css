@@ -964,7 +964,7 @@
 .vivid-map-page.theme-night .mapboxgl-map {
     background-color: #06080b !important;
 }
-}
+
 
 /* Viewport POI tap — glass popover (matches Discover sheet / filter panels) */
 .map-viewport-poi-popover.ant-popover {
