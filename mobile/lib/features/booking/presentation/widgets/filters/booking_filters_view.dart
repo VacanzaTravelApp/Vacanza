@@ -8,6 +8,7 @@ import '../../../data/models/sort_criteria.dart';
 import '../../cubit/booking_cubit.dart';
 import '../../cubit/booking_state.dart';
 import '../search/booking_field_scroll_padding.dart';
+import '../search/booking_search_field_styles.dart';
 
 /// UC1.8-MOB8 — Filters view for budget + sort adjustment.
 class BookingFiltersView extends StatefulWidget {
@@ -66,6 +67,10 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
     final cs = Theme.of(context).colorScheme;
     final accent = context.mapControlAccent;
     final gradientColors = context.mapControlActiveGradientColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final neutralFieldFill = isLight
+        ? context.lightGlassFieldFill
+        : cs.surfaceContainerHighest.withValues(alpha: 0.65);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -88,9 +93,11 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
                 height: 32,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: cs.surfaceContainerHighest,
+                  color: neutralFieldFill,
                   border: Border.all(
-                    color: cs.outline.withValues(alpha: 0.35),
+                    color: isLight
+                        ? accent.withValues(alpha: 0.22)
+                        : cs.outline.withValues(alpha: 0.35),
                   ),
                 ),
                 child: Icon(
@@ -164,18 +171,22 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
             suffixIconConstraints:
                 const BoxConstraints(minWidth: 0, minHeight: 0),
             filled: true,
-            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+            fillColor: neutralFieldFill,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 14,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
+              borderSide: BorderSide(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
+              borderSide: BorderSide(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
@@ -239,7 +250,7 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
+              color: neutralFieldFill,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -281,6 +292,7 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
 
   Widget _sortChip(BuildContext context, SortCriteria criteria) {
     final cs = Theme.of(context).colorScheme;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final accent = context.mapControlAccent;
     final selected = _sort == criteria;
     final label = switch (criteria) {
@@ -295,10 +307,16 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? accent : cs.surfaceContainerHighest,
+          color: selected
+              ? accent
+              : (isLight
+                  ? context.lightGlassFieldFill
+                  : cs.surfaceContainerHighest),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? accent : cs.outline.withValues(alpha: 0.35),
+            color: selected
+                ? accent
+                : BookingSearchFieldStyles.fieldBorderInactive(context),
           ),
         ),
         child: Text(
