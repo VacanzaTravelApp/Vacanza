@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/core/theme/app_theme.dart';
@@ -31,7 +33,10 @@ class PoiFilterPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<PoiSearchBloc, PoiSearchState>(
       builder: (context, state) {
-        final t = context.vacanzaTokens;
+        final cs = Theme.of(context).colorScheme;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final accent = context.mapControlAccent;
+        final secondary = cs.secondary;
         final counts = state.countsByCategory;
         final allKeys = _allCatalogKeys();
         // Çizim akışında: bu alanda gerçekten 0 POI olan satırları gösterme (sayılar tam listeden).
@@ -43,120 +48,151 @@ class PoiFilterPanel extends StatelessWidget {
 
         final selected = state.selectedCategories.toSet();
 
+        const radius = 18.0;
+        final panelTint = cs.surface.withValues(alpha: 0.76);
+
         return SizedBox(
           width: 200,
           height: 400,
-          child: Container(
-            padding: const EdgeInsets.all(10),
+          // Shadow outside clip so rounded corners stay clean (no square corner bleed).
+          child: DecoratedBox(
             decoration: BoxDecoration(
-              color: t.glassBg,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: t.cardBorder),
+              borderRadius: BorderRadius.circular(radius),
               boxShadow: [
                 BoxShadow(
-                  color: t.overlayScrim.withValues(alpha: 0.45),
-                  blurRadius: 26,
-                  offset: const Offset(0, 10),
+                  color: cs.shadow.withValues(alpha: isDark ? 0.28 : 0.12),
+                  blurRadius: 22,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Filter POIs',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: t.textMain,
-                        ),
-                      ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              clipBehavior: Clip.antiAlias,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                // No [BoxDecoration.borderRadius] here — clip defines the curve (avoids corner seams).
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: panelTint,
+                    border: Border.all(
+                      color: (isDark ? accent : secondary)
+                          .withValues(alpha: isDark ? 0.26 : 0.22),
                     ),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(999),
-                      onTap: onClose,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: t.vividSubtleBg,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 16,
-                          color: t.textSub,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Divider(height: 1, color: t.cardBorder),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _QuickFilterButton(
-                        label: 'All',
-                        onPressed: () {
-                          context.read<PoiSearchBloc>().add(
-                                CategoryChanged(_allCatalogKeys()),
-                              );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _QuickFilterButton(
-                        label: 'None',
-                        onPressed: () {
-                          context.read<PoiSearchBloc>().add(
-                                CategoryChanged(<String>[]),
-                              );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: categories.isEmpty
-                      ? Center(
-                          child: Text(
-                            hideZeroCountCategories
-                                ? 'No POIs in this area for the current categories.'
-                                : 'No categories.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: t.textSub,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Filter POIs',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? cs.onSurface
+                                    : cs.onSurfaceVariant.withValues(alpha: 0.95),
+                              ),
                             ),
                           ),
-                        )
-                      : SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              for (final key in categories)
-                                _FilterRow(
-                                  catKey: key,
-                                  counts: counts,
-                                  selected: selected,
-                                  onToggle: (next) {
-                                    context
-                                        .read<PoiSearchBloc>()
-                                        .add(CategoryChanged(next.toList()));
-                                  },
+                          InkWell(
+                            borderRadius: BorderRadius.circular(999),
+                            onTap: onClose,
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? cs.surfaceContainerHighest
+                                        .withValues(alpha: 0.55)
+                                    : context.lightGlassFieldFill,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: accent.withValues(alpha: 0.22),
                                 ),
-                            ],
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 16,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Divider(
+                        height: 1,
+                        color: (isDark ? cs.outline : secondary)
+                            .withValues(alpha: isDark ? 0.35 : 0.22),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _QuickFilterButton(
+                              label: 'All',
+                              onPressed: () {
+                                context.read<PoiSearchBloc>().add(
+                                      CategoryChanged(_allCatalogKeys()),
+                                    );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _QuickFilterButton(
+                              label: 'None',
+                              onPressed: () {
+                                context.read<PoiSearchBloc>().add(
+                                      CategoryChanged(<String>[]),
+                                    );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: categories.isEmpty
+                            ? Center(
+                                child: Text(
+                                  hideZeroCountCategories
+                                      ? 'No POIs in this area for the current categories.'
+                                      : 'No categories.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              )
+                            : SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    for (final key in categories)
+                                      _FilterRow(
+                                        catKey: key,
+                                        counts: counts,
+                                        selected: selected,
+                                        onToggle: (next) {
+                                          context
+                                              .read<PoiSearchBloc>()
+                                              .add(CategoryChanged(next.toList()));
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -176,9 +212,11 @@ class _QuickFilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.vacanzaTokens;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: t.vividSubtleBg,
+      color: cs.surfaceContainerHighest
+          .withValues(alpha: isDark ? 0.55 : 0.75),
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -191,7 +229,7 @@ class _QuickFilterButton extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: t.textMain,
+                color: cs.onSurface,
               ),
             ),
           ),
@@ -216,7 +254,8 @@ class _FilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.vacanzaTokens;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final def = PoiCategoryCatalog.definitionForUiKey(catKey);
     // [counts] tam bbox/alan listesinden (kategori filtresinden bağımsız).
     final displayCount = counts[catKey] ?? 0;
@@ -260,7 +299,7 @@ class _FilterRow extends StatelessWidget {
                 child: Icon(
                   icon,
                   size: 14,
-                  color: isOn ? color : t.textSub,
+                  color: isOn ? color : cs.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 8),
@@ -269,7 +308,7 @@ class _FilterRow extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 11,
-                    color: isOn ? t.textMain : t.textSub,
+                    color: isOn ? cs.onSurface : cs.onSurfaceVariant,
                     fontWeight: isOn ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
@@ -280,14 +319,15 @@ class _FilterRow extends StatelessWidget {
                   vertical: 3,
                 ),
                 decoration: BoxDecoration(
-                  color: t.vividSubtleBg,
+                  color: cs.surfaceContainerHighest
+                      .withValues(alpha: isDark ? 0.55 : 0.75),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   '$displayCount',
                   style: TextStyle(
                     fontSize: 10,
-                    color: isOn ? t.textMain : t.textSub,
+                    color: isOn ? cs.onSurface : cs.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
