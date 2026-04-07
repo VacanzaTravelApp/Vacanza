@@ -15,7 +15,7 @@ import 'booking_date_field.dart';
 import 'booking_type_toggle.dart';
 import 'budget_field.dart';
 import 'airport_autocomplete_field.dart';
-import 'destination_autocomplete_field.dart';
+import 'iata_text_field.dart';
 import 'sort_dropdown.dart';
 import 'booking_search_field_styles.dart';
 
@@ -78,7 +78,14 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         _budgetCtrl,
       ];
 
-  void _onFieldChanged() => setState(() {});
+  void _onFieldChanged() {
+    if (_type == BookingType.hotels) {
+      context.read<BookingCubit>().onHotelDestinationFieldTextChanged(
+            _hotelQueryCtrl.text,
+          );
+    }
+    setState(() {});
+  }
 
   @override
   void dispose() {
@@ -374,12 +381,12 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   List<Widget> _hotelFields(BuildContext context) {
     final now = DateTime.now();
     return [
-      DestinationAutocompleteField(
+      IataTextField(
         controller: _hotelQueryCtrl,
         label: 'Destination',
         placeholder: 'e.g. Paris or Istanbul',
         icon: Icons.location_city_rounded,
-        onSearchSubmitted: _onSearch,
+        onSubmitted: _onSearch,
       ),
       const SizedBox(height: 12),
       Row(
@@ -469,7 +476,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
 
   Widget _roundTripToggle(BuildContext context) {
     final accent = context.mapControlAccent;
-    final outline = Theme.of(context).colorScheme.outline;
+    final inactiveBorder = BookingSearchFieldStyles.fieldBorderInactive(context);
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -487,7 +494,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
               color: _isRoundTrip ? accent : Colors.transparent,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: _isRoundTrip ? accent : outline.withValues(alpha: 0.5),
+                color: _isRoundTrip ? accent : inactiveBorder,
                 width: 1.5,
               ),
             ),
