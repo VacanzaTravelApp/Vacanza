@@ -5,11 +5,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:mobile/core/navigation/navigation_service.dart';
 import 'package:mobile/core/theme/vacanza_tokens.dart';
-import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/mapbox/map_canvas_mapbox.dart';
-import 'package:mobile/features/map/presentation/widgets/home_map/action_bar.dart';
+import 'package:mobile/features/map/presentation/widgets/home_map/action_icon_button.dart';
+import 'package:mobile/features/map/presentation/widgets/home_map/map_controls_menu.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/vacanza_chat_floating_pill.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/profile_badge.dart';
 import 'package:mobile/features/profile/presentation/bloc/profile_bloc.dart';
@@ -38,11 +37,13 @@ class HomeMapScaffold extends StatelessWidget {
   /// UC1.11 — Explore in AR entry point
   final VoidCallback onOpenArMode;
 
-  /// Gün / gece tema
-  final VoidCallback onToggleTheme;
-
   /// VACANZA-188: filter panel open
   final VoidCallback onOpenFilters;
+
+  /// Map controls menu (top-right)
+  final bool isControlsMenuOpen;
+  final VoidCallback onToggleControlsMenu;
+  final VoidCallback onCloseControlsMenu;
 
   /// Panel overlay kontrolü (HomeMapScreen yönetir)
   final bool isFiltersOpen;
@@ -69,8 +70,10 @@ class HomeMapScaffold extends StatelessWidget {
     required this.onOpenBooking,
     required this.onOpenChat,
     required this.onOpenArMode,
-    required this.onToggleTheme,
     required this.onOpenFilters,
+    required this.isControlsMenuOpen,
+    required this.onToggleControlsMenu,
+    required this.onCloseControlsMenu,
     this.isFiltersOpen = false,
     this.filtersPanel,
     this.onCloseFilters,
@@ -79,19 +82,11 @@ class HomeMapScaffold extends StatelessWidget {
     this.showResultsBlurUnderFilters = false,
   });
 
-  /// VACANZA-163 Logout
-  Future<void> _handleLogout(BuildContext context) async {
-    try {
-      await context.read<AuthRepository>().logout();
-    } finally {
-      NavigationService.resetToLogin();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final padding = MediaQuery.of(context).padding;
     final showFilters = isFiltersOpen && filtersPanel != null;
+    final showMenu = isControlsMenuOpen;
 
     // normal sheet: filter kapalıyken
     final showResults = isResultsOpen && resultsSheet != null && !showFilters;
@@ -100,7 +95,7 @@ class HomeMapScaffold extends StatelessWidget {
     final showBlurPreview =
         showFilters && showResultsBlurUnderFilters && resultsSheet != null;
 
-    // Alt yüzen sohbet pill’i: sonuç / filtre / çizim modunda gizle.
+    // Alt yüzen sohbet pill’i: sonuç / filtre / çizim modunda gizle (sağ üst menü açıkken kalır).
     final showChatPill = !showResults && !showFilters && !isDrawing;
 
     return Scaffold(
@@ -150,34 +145,33 @@ class HomeMapScaffold extends StatelessWidget {
             ),
           ),
 
-          // ================= LOGOUT (SAĞ ÜST) =================
+          // ================= CONTROLS MENU (SAĞ ÜST) =================
           Positioned(
             top: padding.top + 12,
             right: 16,
-            child: IconButton(
-              tooltip: 'Logout',
-              icon: const Icon(Icons.logout_rounded),
-              color: Theme.of(context).colorScheme.onSurface,
-              onPressed: () => _handleLogout(context),
-            ),
-          ),
-
-          // ================= ACTION BAR (SAĞ) =================
-          Positioned(
-            top: padding.top + 72,
-            right: 12,
-            child: ActionBar(
+            child: MapControlsMenu(
+              open: showMenu,
+              onToggle: onToggleControlsMenu,
               basemap: basemap,
               perspective: perspective,
               isDrawing: isDrawing,
-              onCycleBasemap: onCycleBasemap,
-              onTogglePerspective: onTogglePerspective,
-              onRecenter: onRecenter,
               onToggleDrawing: onToggleDrawing,
-              onOpenBooking: onOpenBooking,
               onOpenFilters: onOpenFilters,
               onOpenArMode: onOpenArMode,
-              onToggleTheme: onToggleTheme,
+              onOpenBooking: onOpenBooking,
+              onCycleBasemap: onCycleBasemap,
+              onTogglePerspective: onTogglePerspective,
+            ),
+          ),
+
+          // ================= RECENTER (SAĞ ALT - SABİT) =================
+          Positioned(
+            right: 16,
+            bottom: padding.bottom + 18,
+            child: ActionIconButton(
+              tooltip: 'Recenter',
+              icon: Icons.my_location_rounded,
+              onPressed: onRecenter,
             ),
           ),
 
