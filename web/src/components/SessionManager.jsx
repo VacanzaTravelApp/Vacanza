@@ -31,7 +31,7 @@ const SessionManager = ({ children }) => {
         if (timerRef.current) clearTimeout(timerRef.current);
 
         // Only set inactivity timer if we are NOT on auth pages
-        const isAuthPage = ["/login", "/register", "/verify-email"].includes(location.pathname);
+        const isAuthPage = ["/login", "/register", "/verify-email", "/confirm-email"].includes(location.pathname);
         if (!isAuthPage && auth.currentUser) {
             timerRef.current = setTimeout(() => handleLogout("inactivity"), INACTIVITY_TIMEOUT);
         }

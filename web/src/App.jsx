@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import AuthLayout from "./pages/auth/AuthLayout";
 import RegisterCard from "./pages/auth/RegisterCardtempclass";
@@ -17,6 +17,12 @@ message.config({
     duration: 3,
     maxCount: 2,
 });
+
+/** Old Firebase default path; keep redirect so past emails still work. */
+function LegacyFirebaseAuthLinkRedirect() {
+    const { search } = useLocation();
+    return <Navigate to={{ pathname: "/confirm-email", search }} replace />;
+}
 
 const App = () => {
     return (
@@ -52,7 +58,9 @@ const App = () => {
                             </AuthLayout>
                         }
                     />
-                    <Route path="/auth/action" element={<AuthActionPage />} />
+                    {/* Not under /auth/* — in production that prefix is often proxied to the Java API, which made /auth/action return JSON and download as a file named "action". */}
+                    <Route path="/confirm-email" element={<AuthActionPage />} />
+                    <Route path="/auth/action" element={<LegacyFirebaseAuthLinkRedirect />} />
 
                     <Route path="/map" element={<MapPage />} />
                     <Route path="/gamification" element={<GamificationSummary />} />
