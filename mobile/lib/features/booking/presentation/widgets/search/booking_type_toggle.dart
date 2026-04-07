@@ -19,7 +19,10 @@ class BookingTypeToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final accent = context.mapControlAccent;
-    final track = cs.surfaceContainerHighest.withValues(alpha: 0.9);
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final track = isLight
+        ? context.lightGlassFieldFill
+        : cs.surfaceContainerHighest.withValues(alpha: 0.9);
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(

@@ -11,12 +11,16 @@ class IataTextField extends StatelessWidget {
   final String placeholder;
   final IconData icon;
 
+  /// e.g. trigger search when user taps keyboard "search".
+  final VoidCallback? onSubmitted;
+
   const IataTextField({
     super.key,
     required this.controller,
     required this.label,
     required this.placeholder,
     this.icon = Icons.search_rounded,
+    this.onSubmitted,
   });
 
   @override
@@ -39,6 +43,8 @@ class IataTextField extends StatelessWidget {
         ),
         TextFormField(
           controller: controller,
+          textInputAction: TextInputAction.search,
+          onFieldSubmitted: onSubmitted != null ? (_) => onSubmitted!() : null,
           textCapitalization: TextCapitalization.sentences,
           style: TextStyle(
             fontSize: 15,
@@ -53,18 +59,22 @@ class IataTextField extends StatelessWidget {
             ),
             prefixIcon: Icon(icon, size: 20, color: cs.onSurfaceVariant),
             filled: true,
-            fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+            fillColor: BookingSearchFieldStyles.fieldFill(context),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 14,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
+              borderSide: BorderSide(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
+              borderSide: BorderSide(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
