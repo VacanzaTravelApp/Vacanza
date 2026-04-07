@@ -1,5 +1,7 @@
 // ======================= area_results_bottom_sheet.dart =======================
 // lib/features/poi_search/presentation/widgets/area_results/area_results_bottom_sheet.dart
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/theme/vacanza_tokens.dart';
@@ -34,6 +36,9 @@ class AreaResultsSheet extends StatelessWidget {
   /// X’e basınca: selection temizlenip viewport’a dönülecek (A senaryosu)
   final VoidCallback onClose;
 
+  /// POI tap: open same detail UI as marker tap.
+  final ValueChanged<Poi>? onPoiTap;
+
   /// Alan çizimi (user selection) sonrası: 0 POI’lı chip’leri gösterme.
   /// Viewport / genel harita akışında `false` — tüm seçili kategoriler chip’te kalır.
   final bool hideZeroCountCategories;
@@ -48,6 +53,7 @@ class AreaResultsSheet extends StatelessWidget {
     required this.activeChipKey,
     required this.onChipSelected,
     required this.onClose,
+    this.onPoiTap,
     this.hideZeroCountCategories = false,
   });
 
@@ -133,6 +139,9 @@ class AreaResultsSheet extends StatelessWidget {
     if (!isVisible) return const SizedBox.shrink();
 
     final t = context.vacanzaTokens;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isLight = theme.brightness == Brightness.light;
 
     final chips = hideZeroCountCategories
         ? _normalizedSelectedCategoriesPositiveOnly()
@@ -162,25 +171,37 @@ class AreaResultsSheet extends StatelessWidget {
 
     final visibleCount = visiblePois.length;
 
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 500),
-        decoration: BoxDecoration(
-          color: t.glassBg,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: t.cardBorder),
-          boxShadow: [
-            BoxShadow(
-              color: t.overlayScrim.withValues(alpha: 0.35),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-            ),
-          ],
+    final sheet = ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: isLight ? 14 : 14,
+          sigmaY: isLight ? 14 : 14,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 500),
+          decoration: BoxDecoration(
+            // Night theme: keep the glass surface that you liked.
+            // Day theme: also glass, but neutral (avoid bluish tint).
+            color: isLight ? context.lightGlassPanelColor : t.glassBg,
+            borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isLight
+              ? context.mapControlAccent.withValues(alpha: 0.22)
+              : t.cardBorder,
+        ),
+            boxShadow: [
+              BoxShadow(
+                color: (isLight ? cs.shadow : t.overlayScrim)
+                    .withValues(alpha: isLight ? 0.12 : 0.35),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             // handle bar
             const SizedBox(height: 10),
             Container(
@@ -215,12 +236,16 @@ class AreaResultsSheet extends StatelessWidget {
             Expanded(
               child: AreaResultsList(
                 pois: visiblePois,
+                onPoiTap: onPoiTap,
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+
+    return Material(color: Colors.transparent, child: sheet);
   }
 }
 

@@ -6,10 +6,12 @@ import 'poi_result_card.dart';
 
 class AreaResultsList extends StatelessWidget {
   final List<Poi> pois;
+  final ValueChanged<Poi>? onPoiTap;
 
   const AreaResultsList({
     super.key,
     required this.pois,
+    this.onPoiTap,
   });
 
   @override
@@ -32,7 +34,11 @@ class AreaResultsList extends StatelessWidget {
       itemCount: pois.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        return PoiResultCard(poi: pois[index]);
+        final poi = pois[index];
+        return PoiResultCard(
+          poi: poi,
+          onTap: onPoiTap == null ? null : () => onPoiTap!(poi),
+        );
       },
     );
   }
