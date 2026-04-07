@@ -68,11 +68,13 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
 
   /// Web `.theme-day` (MapPage.css ~632–643)
   static const VacanzaTokens light = VacanzaTokens(
-    bgMain: Color(0xFFF8FAFF),
+    // Neutral soft white page (less blue-gray than F8FAFF).
+    bgMain: Color(0xFFF7F7F8),
     cardBg: Color(0xFFFFFFFF),
     glassBg: Color(0xF2E0F7FA),
     cardBorder: Color(0x14000000),
-    textMain: Color(0xFF2C3545),
+    // Slightly softer than near-black for light mode typography.
+    textMain: Color(0xFF3A4658),
     textSub: Color(0xFF5A6B7A),
     vividBlue: Color(0xFF00B4D8),
     vividAmber: Color(0xFFFFB347),
