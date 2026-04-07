@@ -5,7 +5,7 @@ import '../api/poi_search_in_area_response_dto.dart';
 import '../models/poi.dart';
 import '../models/poi_category_catalog.dart';
 import '../models/selected_area.dart';
-import '../utils/polygon_contains.dart';
+import '../utils/hybrid_poi_merge.dart';
 import '../services/mapbox_style_poi_discovery.dart';
 import '../services/style_poi_discovery_binding.dart';
 import 'poi_search_repository.dart';
@@ -70,7 +70,7 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
       log('[CompositePoiSearchRepository] style discovery failed: $e\n$st');
     }
 
-    final mergedUnfiltered = _mergeWithoutCategoryFilter(
+    final mergedUnfiltered = HybridPoiMerge.mergeBackendAndStyle(
       area: area,
       backendPois: backendRes.pois,
       stylePois: stylePois,
@@ -102,50 +102,6 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
     );
   }
 
-  /// Backend + Mapbox, dedupe, polygon — kategori yok.
-  List<Poi> _mergeWithoutCategoryFilter({
-    required SelectedArea area,
-    required List<Poi> backendPois,
-    required List<Poi> stylePois,
-  }) {
-    final all = <Poi>[...backendPois];
-    final poiCoords = <String>{
-      for (final p in backendPois)
-        '${p.latitude.toStringAsFixed(4)},${p.longitude.toStringAsFixed(4)}',
-    };
-
-    for (final mbp in stylePois) {
-      if (area is BboxArea && !_poiInBbox(mbp, area)) {
-        continue;
-      }
-      final key =
-          '${mbp.latitude.toStringAsFixed(4)},${mbp.longitude.toStringAsFixed(4)}';
-      if (!poiCoords.contains(key)) {
-        all.add(mbp);
-        poiCoords.add(key);
-      }
-    }
-
-    log(
-      '[CompositePoiSearchRepository] merged=${all.length} '
-      '(backend=${backendPois.length} style=${stylePois.length})',
-    );
-
-    if (area is PolygonArea) {
-      return all
-          .where(
-            (p) => pointInsidePolygonLatLng(
-              lat: p.latitude,
-              lng: p.longitude,
-              polygonLatLng: area.points,
-            ),
-          )
-          .toList();
-    }
-
-    return all;
-  }
-
   /// [categories] null => tümü (Bloc "hepsi seçili" ile uyumlu).
   List<Poi> _applyCategoryFilter(
     List<Poi> pois, {
@@ -165,12 +121,5 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
           ),
         )
         .toList();
-  }
-
-  static bool _poiInBbox(Poi p, BboxArea b) {
-    return p.latitude >= b.minLat &&
-        p.latitude <= b.maxLat &&
-        p.longitude >= b.minLng &&
-        p.longitude <= b.maxLng;
   }
 }

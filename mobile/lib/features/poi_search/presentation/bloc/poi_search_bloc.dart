@@ -3,8 +3,8 @@ import 'dart:developer';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/area_source.dart';
-import '../../data/models/poi_category_catalog.dart';
 import '../../data/models/selected_area.dart';
+import '../../data/utils/poi_client_category_filter.dart';
 import '../../data/repositories/poi_search_repository.dart';
 import '../../data/repositories/poi_search_repository_exception.dart';
 import 'poi_search_event.dart';
@@ -165,7 +165,8 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
 
     try {
       // Composite repo: backend’e kategori gönderilmez; bu sadece istemci tarafı filtre.
-      final categories = _categoriesForClientFilter(state.selectedCategories);
+      final categories =
+          PoiClientCategoryFilter.categoriesForSearch(state.selectedCategories);
 
       final res = await _repo.searchInArea(
         area: state.selectedArea,
@@ -210,19 +211,4 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
     // ops: şimdilik MVP dışı.
   }
 
-  /// [CompositePoiSearchRepository] istemci filtresi: boş seçim yok (None ayrı ele alınır).
-  /// Tüm katalog seçiliyse `null` → filtre yok (tüm POI’lar); aksi halde alt küme.
-  static List<String>? _categoriesForClientFilter(List<String> selected) {
-    if (selected.isEmpty) return null;
-
-    final selectedSet = selected.map((e) => e.trim().toLowerCase()).toSet();
-    final allKeys =
-        PoiCategoryCatalog.all.map((e) => e.key.toLowerCase()).toSet();
-    if (selectedSet.length == allKeys.length &&
-        selectedSet.containsAll(allKeys)) {
-      return null;
-    }
-
-    return selected;
-  }
 }

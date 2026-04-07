@@ -53,6 +53,11 @@ List<ArWorldPlacement> buildArWorldPlacements({
       fromHeadingDeg: deviceHeadingDeg,
     );
 
+    // Arkada kalanlar 3D etiket / düğüm olarak gösterilmez; UI’da alt bantta ok ile gösterilir.
+    if (candidateRel.abs() > 90.0) {
+      continue;
+    }
+
     final hasCollision = accepted.any((other) {
       final otherRel = signedRelativeAngleDeg(
         toBearingDeg: other.bearingDegrees,
