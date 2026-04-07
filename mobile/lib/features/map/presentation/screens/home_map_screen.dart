@@ -37,8 +37,6 @@ import '../../../poi_search/presentation/bloc/poi_search_state.dart';
 import '../../../poi_search/presentation/widgets/area_results/area_results_bottom_sheet.dart';
 import '../../../poi_search/presentation/widgets/poi_filter_panel.dart';
 
-import 'package:mobile/core/theme/theme_cubit.dart';
-
 import '../../../../features/booking/presentation/widgets/booking_bottom_sheet.dart';
 
 import '../../../chat/presentation/screens/chat_screen.dart';
@@ -50,6 +48,7 @@ import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
 import '../widgets/home_map/home_map_scaffold.dart';
+import '../widgets/home_map/markers/poi_marker_detail_sheet.dart';
 
 class HomeMapScreen extends StatelessWidget {
   const HomeMapScreen({super.key});
@@ -107,6 +106,7 @@ class _HomeMapView extends StatefulWidget {
 class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver {
   bool _filtersOpen = false;
   bool _resultsOpen = false;
+  bool _controlsMenuOpen = false;
 
   /// Cached reference to avoid context.read in dispose/lifecycle callbacks.
   late final LocationBloc _locationBloc;
@@ -172,6 +172,17 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
 
     // ✅ drawing de kapansın (temiz)
     context.read<MapBloc>().add(SetDrawingEnabled(false));
+  }
+
+  void _toggleControlsMenu() {
+    if (!mounted) return;
+    setState(() => _controlsMenuOpen = !_controlsMenuOpen);
+  }
+
+  void _closeControlsMenu() {
+    if (!_controlsMenuOpen) return;
+    if (!mounted) return;
+    setState(() => _controlsMenuOpen = false);
   }
 
   @override
@@ -410,6 +421,7 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
               setState(() => _activeChipKey = key); // null => All
             },
             onClose: _closeResultsAndResetToViewport,
+            onPoiTap: (poi) => showPoiMarkerDetailSheet(context, poi),
             hideZeroCountCategories:
                 poiState.areaSource == AreaSource.userSelection,
           );
@@ -438,7 +450,9 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             },
 
             // ✅ manual filter tuşu -> blur preview OFF
-            onOpenFilters: () => _openFilters(fromUserSelection: false),
+            onOpenFilters: () {
+              _openFilters(fromUserSelection: false);
+            },
 
             // UC1.11 — Explore in AR entry point
             onOpenArMode: () {
@@ -469,8 +483,6 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
               Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
             },
 
-            onToggleTheme: () => context.read<ThemeCubit>().toggle(),
-
             // ===== Filters overlay =====
             isFiltersOpen: _filtersOpen,
             onCloseFilters: _closeFilters,
@@ -479,6 +491,11 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
               hideZeroCountCategories:
                   poiState.areaSource == AreaSource.userSelection,
             ),
+
+            // ===== Controls menu =====
+            isControlsMenuOpen: _controlsMenuOpen,
+            onToggleControlsMenu: _toggleControlsMenu,
+            onCloseControlsMenu: _closeControlsMenu,
 
             // ===== Results sheet (normal) =====
             isResultsOpen: _resultsOpen,
