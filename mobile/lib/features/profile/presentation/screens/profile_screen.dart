@@ -7,6 +7,7 @@ import 'package:mobile/core/navigation/navigation_service.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/theme/theme_cubit.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
+import 'package:mobile/features/booking/presentation/widgets/search/booking_search_field_styles.dart';
 
 import '../../../gamification/presentation/cubit/gamification_cubit.dart';
 import '../../../gamification/presentation/cubit/gamification_state.dart';
@@ -117,10 +118,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 16),
 
               _ProfileMenuCard(
-                title: 'Account Details',
-                subtitle: 'Email, joined, and basics',
-                icon: Icons.person_outline,
+                title: 'Edit Profile',
+                subtitle: 'Name, photo, country, date of birth',
+                icon: Icons.edit_rounded,
                 iconGradient: ProfileIconGradient.editProfile(context),
+                trailing: Icon(
+                  Icons.edit_outlined,
+                  size: 22,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 onTap: () {
                   final s = context.read<ProfileBloc>().state;
                   final initial = s.profile ??
@@ -130,7 +136,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                   _openEditProfileSheet(context, initial);
                 },
-                child: const _AccountDetailsPreview(),
               ),
               const SizedBox(height: 16),
 
@@ -202,6 +207,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                 },
               ),
+              const SizedBox(height: 16),
+
+              const _ActionsCard(),
             ],
           ),
         ),
@@ -218,18 +226,9 @@ class _ProfileHeaderSection extends StatelessWidget {
 
   const _ProfileHeaderSection({required this.onOpenEditProfile});
 
-  Future<void> _handleLogout(BuildContext context) async {
-    try {
-      await context.read<AuthRepository>().logout();
-    } finally {
-      NavigationService.resetToLogin();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -250,26 +249,6 @@ class _ProfileHeaderSection extends StatelessWidget {
                 fontSize: 22,
                 fontWeight: FontWeight.w600,
                 color: cs.onSurface,
-              ),
-            ),
-            const Spacer(),
-            IconButton(
-              tooltip: isDark ? 'Light mode' : 'Dark mode',
-              onPressed: () => context.read<ThemeCubit>().toggle(),
-              icon: Icon(isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
-              style: IconButton.styleFrom(
-                backgroundColor: cs.surfaceContainerHighest.withValues(alpha: 0.8),
-                foregroundColor: cs.onSurface,
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: 'Logout',
-              onPressed: () => _handleLogout(context),
-              icon: const Icon(Icons.logout_rounded),
-              style: IconButton.styleFrom(
-                backgroundColor: cs.surfaceContainerHighest.withValues(alpha: 0.8),
-                foregroundColor: cs.onSurface,
               ),
             ),
           ],
@@ -350,6 +329,8 @@ class _ProfileMenuCard extends StatelessWidget {
   final LinearGradient iconGradient;
   final VoidCallback onTap;
   final Widget? child;
+  /// When null, shows a chevron (push navigation). Pass a custom widget for sheets / other affordances.
+  final Widget? trailing;
 
   const _ProfileMenuCard({
     required this.title,
@@ -358,6 +339,7 @@ class _ProfileMenuCard extends StatelessWidget {
     required this.iconGradient,
     required this.onTap,
     this.child,
+    this.trailing,
   });
 
   @override
@@ -412,7 +394,8 @@ class _ProfileMenuCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right, size: 22, color: cs.onSurfaceVariant),
+                      trailing ??
+                          Icon(Icons.chevron_right, size: 22, color: cs.onSurfaceVariant),
                     ],
                   ),
                   if (child != null) ...[
@@ -429,84 +412,91 @@ class _ProfileMenuCard extends StatelessWidget {
   }
 }
 
-class _AccountDetailsPreview extends StatelessWidget {
-  const _AccountDetailsPreview();
+/// Theme toggle + logout (moved from app bar for clearer hierarchy).
+class _ActionsCard extends StatelessWidget {
+  const _ActionsCard();
+
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await context.read<AuthRepository>().logout();
+    } finally {
+      NavigationService.resetToLogin();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return BlocBuilder<ProfileBloc, ProfileState>(
-      buildWhen: (p, n) => p.profile != n.profile || p.profileStatus != n.profileStatus,
-      builder: (context, state) {
-        final p = state.profile;
-        if (state.profileStatus == LoadStatus.loading && p == null) {
-          return Row(
-            children: [
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text('Loading…', style: TextStyle(color: cs.onSurfaceVariant)),
-            ],
-          );
-        }
-        if (state.profileStatus == LoadStatus.failure) {
-          return Text(
-            state.errorFor(ProfileSection.profile) ?? 'Error',
-            style: TextStyle(color: cs.error, fontSize: 12),
-          );
-        }
-        if (p == null) return const SizedBox.shrink();
-
-        final joined = p.joinDate != null
-            ? '${p.joinDate!.year}-${p.joinDate!.month.toString().padLeft(2, '0')}-${p.joinDate!.day.toString().padLeft(2, '0')}'
-            : '—';
-
-        return Column(
+    final tokens = context.vacanzaTokens;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Moon: cool blue-slate (not primary cyan). Sun: warm amber when on dark UI.
+    final themeToggleIconColor = isDark
+        ? tokens.vividAmber
+        : Color.lerp(
+            const Color(0xFF546E7A),
+            const Color(0xFF5C6BC0),
+            0.35,
+          )!;
+    return profileGlassMenuCard(
+      context: context,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _kv(context, 'Email', p.email),
-            const SizedBox(height: 6),
-            _kv(context, 'Joined', joined),
+            Text(
+              'Actions',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.palette_outlined, color: cs.onSurfaceVariant),
+              title: Text(
+                isDark ? 'Light mode' : 'Dark mode',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+              ),
+              subtitle: Text(
+                'App appearance',
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+              trailing: IconButton(
+                tooltip: isDark ? 'Switch to light mode' : 'Switch to dark mode',
+                icon: Icon(
+                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  color: themeToggleIconColor,
+                  size: 26,
+                ),
+                onPressed: () => context.read<ThemeCubit>().toggle(),
+              ),
+              onTap: () => context.read<ThemeCubit>().toggle(),
+            ),
+            Divider(
+              height: 1,
+              color: BookingSearchFieldStyles.fieldBorderInactive(context),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.logout_rounded, color: cs.error),
+              title: Text(
+                'Logout',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: cs.error,
+                ),
+              ),
+              onTap: () => _logout(context),
+            ),
           ],
-        );
-      },
-    );
-  }
-
-  Widget _kv(BuildContext context, String k, String v) {
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        SizedBox(
-          width: 56,
-          child: Text(
-            k,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: cs.onSurfaceVariant,
-            ),
-          ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            v,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: cs.onSurface,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

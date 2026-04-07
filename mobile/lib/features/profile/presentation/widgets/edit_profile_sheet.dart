@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/features/booking/presentation/widgets/search/booking_search_field_styles.dart';
 import '../../data/models/user_profile.dart';
 import '../../data/profile_profile_options.dart';
 import '../../data/utils/profile_photo_pick_crop.dart';
@@ -392,9 +393,11 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+        color: BookingSearchFieldStyles.fieldFill(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outline.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: BookingSearchFieldStyles.fieldBorderInactive(context),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,7 +445,12 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               ),
             ],
           ),
-          const Divider(height: 24),
+          Divider(
+            height: 24,
+            thickness: 0.5,
+            color: BookingSearchFieldStyles.fieldBorderInactive(context)
+                .withValues(alpha: 0.42),
+          ),
           Row(
             children: [
               Icon(Icons.calendar_today, size: 14, color: cs.onSurfaceVariant),
@@ -484,7 +492,12 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               ),
             ],
           ),
-          const Divider(height: 24),
+          Divider(
+            height: 24,
+            thickness: 0.5,
+            color: BookingSearchFieldStyles.fieldBorderInactive(context)
+                .withValues(alpha: 0.42),
+          ),
           Row(
             children: [
               Icon(Icons.person_outline, size: 14, color: accent),
@@ -544,24 +557,28 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         _sectionLabel('First name *'),
         TextField(
           controller: _firstNameController,
+          style: TextStyle(fontSize: 14, color: cs.onSurface),
           decoration: _inputDecoration('First name'),
           onChanged: (_) => _syncDraftFromControllers(),
         ),
         _sectionLabel('Middle name (optional)'),
         TextField(
           controller: _middleNameController,
+          style: TextStyle(fontSize: 14, color: cs.onSurface),
           decoration: _inputDecoration('Middle name'),
           onChanged: (_) => _syncDraftFromControllers(),
         ),
         _sectionLabel('Last name *'),
         TextField(
           controller: _lastNameController,
+          style: TextStyle(fontSize: 14, color: cs.onSurface),
           decoration: _inputDecoration('Last name'),
           onChanged: (_) => _syncDraftFromControllers(),
         ),
         _sectionLabel('Preferred name'),
         TextField(
           controller: _preferredNameController,
+          style: TextStyle(fontSize: 14, color: cs.onSurface),
           decoration: _inputDecoration('e.g. Alex'),
           onChanged: (_) => _syncDraftFromControllers(),
         ),
@@ -595,13 +612,16 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         _sectionLabel('Country'),
         InkWell(
           onTap: _openCountryPicker,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(12),
+              color: BookingSearchFieldStyles.fieldFill(context),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             child: Row(
               children: [
@@ -609,10 +629,13 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    (_draft.country != null && _draft.country!.isNotEmpty) ? _draft.country! : 'Select country',
+                    (_draft.country != null && _draft.country!.isNotEmpty)
+                        ? _draft.country!
+                        : 'Select country',
                     style: TextStyle(
                       fontSize: 14,
-                      color: (_draft.country != null && _draft.country!.isNotEmpty)
+                      color: (_draft.country != null &&
+                              _draft.country!.isNotEmpty)
                           ? cs.onSurface
                           : cs.onSurfaceVariant,
                     ),
@@ -626,13 +649,16 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         _sectionLabel('Date of birth'),
         InkWell(
           onTap: _pickBirthDate,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(12),
+              color: BookingSearchFieldStyles.fieldFill(context),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             child: Row(
               children: [

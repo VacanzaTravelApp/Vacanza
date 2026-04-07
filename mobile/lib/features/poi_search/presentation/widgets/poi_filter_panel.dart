@@ -49,7 +49,10 @@ class PoiFilterPanel extends StatelessWidget {
         final selected = state.selectedCategories.toSet();
 
         const radius = 18.0;
-        final panelTint = cs.surface.withValues(alpha: 0.76);
+        // Slightly more opaque than bare surface@0.76 so the map does not read muddy gray.
+        final panelTint = isDark
+            ? cs.surface.withValues(alpha: 0.88)
+            : context.lightGlassPanelColor;
 
         return SizedBox(
           width: 200,
@@ -215,8 +218,9 @@ class _QuickFilterButton extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: cs.surfaceContainerHighest
-          .withValues(alpha: isDark ? 0.55 : 0.75),
+      color: isDark
+          ? cs.surfaceContainerHighest.withValues(alpha: 0.55)
+          : context.lightGlassFieldFill,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -319,8 +323,9 @@ class _FilterRow extends StatelessWidget {
                   vertical: 3,
                 ),
                 decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest
-                      .withValues(alpha: isDark ? 0.55 : 0.75),
+                  color: isDark
+                      ? cs.surfaceContainerHighest.withValues(alpha: 0.55)
+                      : context.lightGlassFieldFill,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(

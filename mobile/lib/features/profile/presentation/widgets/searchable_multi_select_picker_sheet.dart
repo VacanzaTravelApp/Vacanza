@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:mobile/features/booking/presentation/widgets/search/booking_search_field_styles.dart';
+
 import '../../data/profile_preference_options.dart';
 import '../styles/profile_sheet_styles.dart';
 
@@ -144,10 +146,13 @@ class _SearchableMultiSelectPickerSheetState
                     style: TextStyle(color: cs.onSurface),
                     decoration: InputDecoration(
                       hintText: 'Search…',
+                      hintStyle: TextStyle(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.85),
+                      ),
                       prefixIcon: Icon(Icons.search, size: 20, color: cs.onSurfaceVariant),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.close, size: 20),
+                              icon: Icon(Icons.close, size: 20, color: cs.onSurfaceVariant),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {});
@@ -155,10 +160,25 @@ class _SearchableMultiSelectPickerSheetState
                             )
                           : null,
                       filled: true,
-                      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                      fillColor: BookingSearchFieldStyles.fieldFill(context),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.25)),
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: accent,
+                          width: 1.5,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -170,7 +190,10 @@ class _SearchableMultiSelectPickerSheetState
               ],
             ),
           ),
-          Divider(height: 1, color: cs.outline.withValues(alpha: 0.25)),
+          Divider(
+            height: 1,
+            color: BookingSearchFieldStyles.fieldBorderInactive(context),
+          ),
           // List
           Flexible(
             child: options.isEmpty
@@ -210,7 +233,9 @@ class _SearchableMultiSelectPickerSheetState
                                   border: Border.all(
                                     color: active
                                         ? Colors.transparent
-                                        : Colors.grey.shade300,
+                                        : BookingSearchFieldStyles.fieldBorderInactive(
+                                            context,
+                                          ),
                                     width: 2,
                                   ),
                                 ),
@@ -226,9 +251,9 @@ class _SearchableMultiSelectPickerSheetState
                               Expanded(
                                 child: Text(
                                   formatOptionLabel(option),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: Color(0xFF1F2937),
+                                    color: cs.onSurface,
                                   ),
                                 ),
                               ),

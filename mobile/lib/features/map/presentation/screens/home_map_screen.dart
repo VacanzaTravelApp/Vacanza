@@ -439,9 +439,10 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
               final isDrawingNow = context.read<MapBloc>().state.isDrawing;
 
               if (isDrawingNow) {
-                // ✅ Butondan kapatma: komple reset
+                // Sadece çizim modunu kapat. Alan/POI reseti yalnızca sonuç sheet kapatma
+                // veya geçerli bir poligon tamamlandığında (MapDrawingOverlay) yapılır;
+                // aksi halde hiç çizmeden kapatınca gereksiz viewport yenilemesi olur.
                 context.read<MapBloc>().add(SetDrawingEnabled(false));
-                _closeResultsAndResetToViewport();
                 if (_filtersOpen) _closeFilters();
                 return;
               }

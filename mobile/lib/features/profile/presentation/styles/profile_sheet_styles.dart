@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/features/booking/presentation/widgets/search/booking_search_field_styles.dart';
 
 /// Shared style kit for Profile bottom sheets (Edit Profile, Edit Preferences).
 /// Keeps sheets consistent; Auth screens use their own theme.
@@ -106,22 +107,29 @@ abstract final class ProfileSheetStyles {
   }
 
   // ─── Inputs ───────────────────────────────────────────────────────────────
-  /// Filled gray input; focus = soft blue border, no heavy glow.
+  /// Filled input — secondary-style border in light, outline in dark.
   static InputDecoration inputDecoration(BuildContext context, String hint) {
-    final cs = Theme.of(context).colorScheme;
     final accent = context.mapControlAccent;
+    final borderColor = BookingSearchFieldStyles.fieldBorderInactive(context);
+    final fill = BookingSearchFieldStyles.fieldFill(context);
+    final cs = Theme.of(context).colorScheme;
     return InputDecoration(
       hintText: hint,
+      hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.85)),
       filled: true,
-      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.65),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      fillColor: fill,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: borderColor),
+      ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.25)),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: borderColor),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: accent, width: 1.2),
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: accent, width: 1.5),
       ),
     );
   }
