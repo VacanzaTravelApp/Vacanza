@@ -11,6 +11,7 @@ abstract final class AppTheme {
       brightness: Brightness.light,
       colorScheme: ColorScheme.light(
         primary: tokens.vividBlue,
+        secondary: tokens.vividCoral,
         onPrimary: Colors.white,
         surface: tokens.cardBg,
         onSurface: tokens.textMain,
@@ -30,6 +31,7 @@ abstract final class AppTheme {
       brightness: Brightness.dark,
       colorScheme: ColorScheme.dark(
         primary: tokens.vividBlue,
+        secondary: tokens.vividBlue,
         onPrimary: const Color(0xFF0A0A0A),
         surface: tokens.cardBg,
         onSurface: tokens.textMain,
@@ -62,5 +64,27 @@ extension VacanzaTokensX on BuildContext {
         ? const Color(0xFFEE5253)
         : Color.lerp(vivid, Colors.white, 0.15)!;
     return <Color>[vivid, vividHi];
+  }
+
+  /// Light-mode glass panel tint (use with [BackdropFilter]). Airy white, not muddy gray.
+  Color get lightGlassPanelColor {
+    final cs = Theme.of(this).colorScheme;
+    if (Theme.of(this).brightness != Brightness.light) return cs.surface;
+    return Color.alphaBlend(
+      Colors.white.withValues(alpha: 0.90),
+      cs.surface.withValues(alpha: 0.94),
+    );
+  }
+
+  /// Inputs / chips on light glass — warm white inset, not [surfaceContainerHighest] gray.
+  Color get lightGlassFieldFill {
+    final cs = Theme.of(this).colorScheme;
+    if (Theme.of(this).brightness != Brightness.light) {
+      return cs.surfaceContainerHighest.withValues(alpha: 0.65);
+    }
+    return Color.alphaBlend(
+      Colors.white.withValues(alpha: 0.76),
+      cs.surface.withValues(alpha: 0.98),
+    );
   }
 }
