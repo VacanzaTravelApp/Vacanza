@@ -34,7 +34,7 @@ class JwtInterceptor extends Interceptor {
           accessToken.trim().toLowerCase() != 'null';
 
       if (tokenOk) {
-        options.headers['Authorization'] = 'Bearer ${accessToken!.trim()}';
+        options.headers['Authorization'] = 'Bearer ${accessToken.trim()}';
       }
     } catch (_) {}
 

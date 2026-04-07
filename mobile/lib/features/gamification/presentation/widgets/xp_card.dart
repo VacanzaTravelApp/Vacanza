@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 import '../../data/models/gamification_profile_dto.dart';
 import '../../data/models/stat_dto.dart';
@@ -12,16 +13,21 @@ class XpCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ringGradient = <Color>[
+      ...context.mapControlActiveGradientColors,
+      context.vacanzaTokens.vividAmber,
+    ];
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
+        color: cs.surface.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.14)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 32,
-            offset: const Offset(0, 8),
+            color: cs.shadow.withValues(alpha: 0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -33,29 +39,33 @@ class XpCard extends StatelessWidget {
             width: 192,
             height: 192,
             child: CustomPaint(
-              painter: XpRingPainter(profile.xpProgressPercent / 100.0),
+              painter: XpRingPainter(
+                profile.xpProgressPercent / 100.0,
+                trackColor: cs.outline.withValues(alpha: 0.22),
+                gradientColors: ringGradient,
+              ),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       '${profile.xpProgressPercent}%',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 36,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF2C3E50)),
+                          color: cs.onSurface),
                     ),
                     Text(
                       'to next level',
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                      style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       '${profile.totalXp} XP',
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF2C3E50)),
+                          color: cs.onSurface),
                     ),
                   ],
                 ),
@@ -67,7 +77,7 @@ class XpCard extends StatelessWidget {
 
           // ─── Stats row ───
           if (profile.stats.isNotEmpty) ...[
-            const Divider(height: 1),
+            Divider(height: 1, color: cs.outline.withValues(alpha: 0.18)),
             const SizedBox(height: 16),
             _StatsRow(stats: profile.stats),
           ],
@@ -86,6 +96,7 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: stats.asMap().entries.expand((entry) {
@@ -97,15 +108,15 @@ class _StatsRow extends StatelessWidget {
               children: [
                 Text(
                   '${stat.value}',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF2C3E50)),
+                      color: cs.onSurface),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   stat.label,
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -114,7 +125,7 @@ class _StatsRow extends StatelessWidget {
             Container(
               width: 1,
               height: 40,
-              color: const Color(0xFFE5E7EB),
+              color: cs.outline.withValues(alpha: 0.18),
             ),
         ];
       }).toList(),

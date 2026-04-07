@@ -5,7 +5,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import 'core/config/mapbox_config.dart';
-import 'core/theme/app_colors.dart';
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_cubit.dart';
+import 'core/theme/theme_lifecycle.dart';
 import 'firebase_options.dart';
 
 import 'core/navigation/navigation_service.dart';
@@ -35,7 +37,6 @@ import 'features/auth/presentation/screens/auth_gate.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Mapbox token
   MapboxOptions.setAccessToken(MapboxConfig.accessToken);
 
   // Firebase init
@@ -137,19 +138,24 @@ class VacanzaApp extends StatelessWidget {
             ),
           ),
         ],
-        child: MaterialApp(
-          navigatorKey: NavigationService.navigatorKey,
-          debugShowCheckedModeBanner: false,
-          title: 'Vacanza',
-          theme: ThemeData(
-            useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: AppColors.primary,
-              brightness: Brightness.light,
-            ),
-            fontFamily: 'SF Pro',
+        child: BlocProvider<ThemeCubit>(
+          create: (_) => ThemeCubit(),
+          child: BlocBuilder<ThemeCubit, ThemeCubitState>(
+            buildWhen: (a, b) => a.resolvedThemeMode != b.resolvedThemeMode,
+            builder: (context, themeState) {
+              return ThemeLifecycle(
+                child: MaterialApp(
+                  navigatorKey: NavigationService.navigatorKey,
+                  debugShowCheckedModeBanner: false,
+                  title: 'Vacanza',
+                  theme: AppTheme.light(),
+                  darkTheme: AppTheme.dark(),
+                  themeMode: themeState.resolvedThemeMode,
+                  home: const AuthGate(),
+                ),
+              );
+            },
           ),
-          home: const AuthGate(),
         ),
       ),
     );

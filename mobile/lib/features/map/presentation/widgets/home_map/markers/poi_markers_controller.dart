@@ -1,20 +1,35 @@
+import 'dart:async';
 import 'dart:developer';
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
 
 import '../../../../../poi_search/data/models/poi.dart';
+import '../../../../../poi_search/data/models/poi_category_catalog.dart';
+
+import 'poi_marker_bitmap_builder.dart';
 
 class PoiMarkersController {
+  PoiMarkersController(
+    this._map, {
+    this.onPoiTap,
+  });
+
   final mb.MapboxMap _map;
+
+  /// Called when the user taps a POI marker (annotation).
+  final void Function(Poi poi)? onPoiTap;
 
   mb.PointAnnotationManager? _pointManager;
 
-  final Map<String, dynamic> _byPoiId = <String, dynamic>{};
-  final Map<String, Uint8List> _iconCache = <String, Uint8List>{};
+  final Map<String, mb.PointAnnotation> _byPoiId = {};
+  final Map<String, Poi> _poiCache = {};
+  final Map<String, Uint8List> _iconCache = {};
 
-  PoiMarkersController(this._map);
+  mb.Cancelable? _tapCancel;
+
+  Completer<void>? _opLock;
+  int _opEpoch = 0;
 
   bool get isReady => _pointManager != null;
 
@@ -23,26 +38,30 @@ class PoiMarkersController {
       await dispose();
     }
 
-    // ✅ Tip verme: bazı sürümlerde AnnotationPlugin diye bir type yok
-    var annotations = _map.annotations;
-
-    // küçük retry loop (style load anında null gelebiliyor)
-    int attempt = 0;
-    while (annotations == null && attempt < 5) {
-      attempt++;
-      log('[PoiMarkersController] init: map.annotations is null, retry #$attempt');
-      await Future.delayed(const Duration(milliseconds: 200));
-      annotations = _map.annotations;
-    }
-
-    if (annotations == null) {
-      log('[PoiMarkersController] init: map.annotations still null -> abort');
-      return;
-    }
-
+    final annotations = _map.annotations;
     _pointManager = await annotations.createPointAnnotationManager();
+
+    _tapCancel?.cancel();
+    _tapCancel = _pointManager!.tapEvents(onTap: _onAnnotationTap);
+
     log('[PoiMarkersController] init completed');
   }
+
+  void _onAnnotationTap(mb.PointAnnotation annotation) {
+    if (onPoiTap == null) return;
+    String? poiId;
+    for (final e in _byPoiId.entries) {
+      if (e.value.id == annotation.id) {
+        poiId = e.key;
+        break;
+      }
+    }
+    if (poiId == null) return;
+    final poi = _poiCache[poiId];
+    if (poi == null) return;
+    onPoiTap!(poi);
+  }
+
   Future<void> clear() async {
     final mgr = _pointManager;
     if (mgr == null) {
@@ -52,6 +71,7 @@ class PoiMarkersController {
 
     try {
       _byPoiId.clear();
+      _poiCache.clear();
       await mgr.deleteAll();
       log('[PoiMarkersController] cleared all markers');
     } catch (e) {
@@ -61,107 +81,169 @@ class PoiMarkersController {
 
   String _normCategory(String raw) => raw.trim().toLowerCase();
 
-  String _assetPathFor(String key) {
-    switch (key) {
-      case 'restaurant':
-        return 'assets/core/theme/poi/poi_restaurant.png';
-      case 'cafe':
-        return 'assets/core/theme/poi/poi_cafe.png';
-      case 'museum':
-        return 'assets/core/theme/poi/poi_museum.png';
-      case 'monuments':
-        return 'assets/core/theme/poi/poi_monument.png';
-      case 'parks':
-        return 'assets/core/theme/poi/poi_park.png';
-      default:
-        return 'assets/core/theme/poi/poi_monument.png';
-    }
+  String _cacheKeyForCategory(String category) {
+    final def = PoiCategoryCatalog.poiCategoryForRaw(category);
+    return def?.key ?? 'others';
   }
 
-  Future<Uint8List> _loadMarkerPngForCategory(String category) async {
-    final key = _normCategory(category);
+  Future<Uint8List> _bitmapForCategory(String category) async {
+    final key = _cacheKeyForCategory(category);
 
     final cached = _iconCache[key];
     if (cached != null) return cached;
 
-    final path = _assetPathFor(key);
-
     try {
-      final ByteData data = await rootBundle.load(path);
-      final Uint8List bytes = data.buffer.asUint8List();
-
+      final bytes =
+          await PoiMarkerBitmapBuilder.bitmapForRawCategory(category);
       _iconCache[key] = bytes;
-      log('[PoiMarkersController] loaded icon "$key" from "$path" (${bytes.length} bytes)');
+      log('[PoiMarkersController] built icon for catalog key "$key" (${bytes.length} bytes)');
       return bytes;
-    } catch (e) {
-      log('[PoiMarkersController] FAILED to load "$key" from "$path": $e');
-
-      // 1x1 transparent PNG fallback
-      final fallback = Uint8List.fromList(<int>[
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
-        0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
-        0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
-        0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
-        0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
-        0x42, 0x60, 0x82
-      ]);
-
+    } catch (e, st) {
+      log('[PoiMarkersController] bitmap build failed for "$key": $e\n$st');
+      final fallback = _transparentPng1x1();
       _iconCache[key] = fallback;
       return fallback;
     }
+  }
+
+  Uint8List _transparentPng1x1() {
+    return Uint8List.fromList(<int>[
+      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+      0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+      0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+      0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
+      0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+      0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
+      0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+      0x42, 0x60, 0x82
+    ]);
   }
 
   Future<void> setPois(List<Poi> pois) async {
     final mgr = _pointManager;
     if (mgr == null) return;
 
-    await clear();
-    if (pois.isEmpty) return;
+    while (_opLock != null) {
+      await _opLock!.future;
+    }
+    final epoch = ++_opEpoch;
+    final completer = Completer<void>();
+    _opLock = completer;
 
-    // ✅ önce unique kategorileri yükle
+    try {
+      await _doSetPois(mgr, pois, epoch);
+    } finally {
+      _opLock = null;
+      completer.complete();
+    }
+  }
+
+  Future<void> _doSetPois(
+    mb.PointAnnotationManager mgr,
+    List<Poi> pois,
+    int epoch,
+  ) async {
+    if (pois.isEmpty) {
+      await clear();
+      return;
+    }
+
+    // ── Phase 1: prepare bitmaps while old markers stay visible ──
     final categories = <String>{};
     for (final p in pois) {
       categories.add(_normCategory(p.category));
     }
     for (final c in categories) {
-      await _loadMarkerPngForCategory(c);
+      await _bitmapForCategory(c);
     }
+    if (epoch != _opEpoch) return;
 
-    final options = <mb.PointAnnotationOptions>[];
-    final createdPoiIds = <String>[];
-
+    // ── Phase 2: diff — keep common, add new, remove stale ──
+    final incomingById = <String, Poi>{};
     for (final poi in pois) {
       if (poi.latitude == 0.0 && poi.longitude == 0.0) continue;
+      incomingById[poi.poiId] = poi;
+    }
+    if (incomingById.isEmpty || epoch != _opEpoch) return;
 
-      final key = _normCategory(poi.category);
-      final png = _iconCache[key]!; // ✅ artık kesin var
+    final oldIds = _byPoiId.keys.toSet();
+    final newIds = incomingById.keys.toSet();
 
-      options.add(
-        mb.PointAnnotationOptions(
-          geometry: mb.Point(coordinates: mb.Position(poi.longitude, poi.latitude)),
-          image: png,
-          iconSize: 1.4,
-        ),
+    final toKeep = oldIds.intersection(newIds);
+    final toRemoveIds = oldIds.difference(newIds).toList();
+    final toAddPois = <Poi>[
+      for (final id in newIds)
+        if (!toKeep.contains(id)) incomingById[id]!,
+    ];
+
+    // ── Phase 3: add NEW markers first (always visible) ──
+    if (toAddPois.isNotEmpty) {
+      final options = <mb.PointAnnotationOptions>[];
+      final addedIds = <String>[];
+
+      for (final poi in toAddPois) {
+        final cacheKey = _cacheKeyForCategory(poi.category);
+        final png = _iconCache[cacheKey]!;
+        options.add(
+          mb.PointAnnotationOptions(
+            geometry: mb.Point(
+              coordinates: mb.Position(poi.longitude, poi.latitude),
+            ),
+            image: png,
+            iconAnchor: mb.IconAnchor.BOTTOM,
+            iconSize: 1.0,
+          ),
+        );
+        addedIds.add(poi.poiId);
+      }
+
+      try {
+        final created = await mgr.createMulti(options);
+        if (epoch != _opEpoch) return;
+        for (int i = 0; i < created.length && i < addedIds.length; i++) {
+          final ann = created[i];
+          if (ann != null) {
+            _byPoiId[addedIds[i]] = ann;
+          }
+        }
+      } catch (e, st) {
+        log('[PoiMarkersController] createMulti FAILED: $e\n$st');
+      }
+    }
+
+    if (epoch != _opEpoch) return;
+
+    // ── Phase 4: remove STALE markers ──
+    if (toRemoveIds.isNotEmpty) {
+      for (final id in toRemoveIds) {
+        final ann = _byPoiId.remove(id);
+        if (ann != null) {
+          try {
+            await mgr.delete(ann);
+          } catch (_) {}
+        }
+      }
+    }
+
+    _poiCache
+      ..clear()
+      ..addEntries(
+        incomingById.entries.where((e) => _byPoiId.containsKey(e.key)),
       );
 
-      createdPoiIds.add(poi.poiId);
-    }
-
-    if (options.isEmpty) return;
-
-    final created = await mgr.createMulti(options);
-    for (int i = 0; i < created.length && i < createdPoiIds.length; i++) {
-      _byPoiId[createdPoiIds[i]] = created[i];
-    }
+    log(
+      '[PoiMarkersController] diff: +${toAddPois.length} '
+      '-${toRemoveIds.length} =${_byPoiId.length} (kept ${toKeep.length})',
+    );
   }
 
   Future<void> dispose() async {
     log('[PoiMarkersController] disposing...');
+    _tapCancel?.cancel();
+    _tapCancel = null;
     await clear();
     _pointManager = null;
-    // _iconCache.clear(); // istersen tut (performans)
+    _iconCache.clear();
   }
 }

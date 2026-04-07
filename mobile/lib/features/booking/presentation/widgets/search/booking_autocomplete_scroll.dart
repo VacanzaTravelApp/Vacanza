@@ -12,13 +12,16 @@ void scheduleBookingAutocompleteScrollIntoView(GlobalKey columnKey) {
       if (ctx == null || !ctx.mounted) return;
       Scrollable.ensureVisible(
         ctx,
-        duration: const Duration(milliseconds: 260),
+        duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
-        alignment: 0.02,
+        // Keep field + dropdown block near top of scroll viewport (above keyboard).
+        alignment: 0.0,
       );
     });
   }
 
   scroll();
   Future<void>.delayed(const Duration(milliseconds: 320), scroll);
+  // Keyboard / sheet animation can finish later on some devices.
+  Future<void>.delayed(const Duration(milliseconds: 520), scroll);
 }

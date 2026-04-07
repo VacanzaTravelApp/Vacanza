@@ -1,130 +1,128 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 import '../../../data/models/poi.dart';
+import '../../../data/models/poi_category_catalog.dart';
 
 class PoiResultCard extends StatelessWidget {
   final Poi poi;
+  final VoidCallback? onTap;
 
   const PoiResultCard({
     super.key,
     required this.poi,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final title = (poi.name?.trim().isNotEmpty ?? false) ? poi.name!.trim() : 'Unnamed place';
-    final category = poi.category.trim().isEmpty ? 'place' : poi.category.trim();
+    final t = context.vacanzaTokens;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final accent = context.mapControlAccent;
+    final title = PoiCategoryCatalog.safePoiTitle(
+      name: poi.name,
+      rawCategory: poi.category,
+    );
+    final categoryLabel =
+        PoiCategoryCatalog.labelForRawCategory(poi.category) ??
+            (poi.category.trim().isEmpty ? 'place' : poi.category.trim());
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    final radius = BorderRadius.circular(16);
+    return Material(
+      // IMPORTANT: clip the ripple + hitbox to the rounded shape,
+      // otherwise the rectangular tap area can show as a "grey gap".
+      color: Colors.transparent,
+      borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        splashColor: isLight
+            ? accent.withValues(alpha: 0.10)
+            : Colors.white.withValues(alpha: 0.08),
+        highlightColor: Colors.transparent,
+        child: Ink(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isLight
+                ? context.lightGlassFieldFill
+                : t.pillSurface.withValues(alpha: 0.88),
+            borderRadius: radius,
+            boxShadow: [
+              BoxShadow(
+                color: t.overlayScrim.withValues(alpha: isLight ? 0.18 : 0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(
+              // Thin secondary/accent frame, subtle in both modes.
+              color: isLight
+                  ? accent.withValues(alpha: 0.22)
+                  : accent.withValues(alpha: 0.18),
+              width: 1,
+            ),
           ),
-        ],
-        border: Border.all(
-          color: Colors.black.withValues(alpha: 0.06),
+          child: Row(
+            children: [
+              _CategoryDot(rawCategory: poi.category),
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: t.textMain,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      categoryLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: t.textSub,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              Text(
+                '→',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: t.textSub.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          _CategoryDot(category: category),
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  category,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.black.withValues(alpha: 0.55),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
-          // Şimdilik placeholder.
-          // İleride: "Add to route" / distance / navigate vs.
-          Text(
-            '→',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.black.withValues(alpha: 0.35),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }
 }
 
 class _CategoryDot extends StatelessWidget {
-  final String category;
-  const _CategoryDot({required this.category});
-
-  Color _colorFor(String key) {
-    final k = key.trim().toLowerCase();
-    switch (k) {
-      case 'restaurant':
-        return const Color(0xFFFFD166);
-      case 'cafe':
-        return const Color(0xFFB37AFF);
-      case 'museum':
-        return const Color(0xFF0096FF);
-      case 'monuments':
-        return const Color(0xFFFF9F43);
-      case 'parks':
-        return const Color(0xFF2ECC71);
-      default:
-        return const Color(0xFF0096FF);
-    }
-  }
-
-  IconData _iconFor(String key) {
-    final k = key.trim().toLowerCase();
-    switch (k) {
-      case 'restaurant':
-        return Icons.restaurant_rounded;
-      case 'cafe':
-        return Icons.local_cafe_rounded;
-      case 'museum':
-        return Icons.museum_rounded;
-      case 'monuments':
-        return Icons.account_balance_rounded;
-      case 'parks':
-        return Icons.park_rounded;
-      default:
-        return Icons.place_rounded;
-    }
-  }
+  final String rawCategory;
+  const _CategoryDot({required this.rawCategory});
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorFor(category);
+    final def = PoiCategoryCatalog.poiCategoryForRaw(rawCategory);
+    final color = def?.ringColor ?? Theme.of(context).colorScheme.primary;
+    final icon = def?.iconData ?? Icons.place_rounded;
 
     return Container(
       width: 38,
@@ -134,7 +132,7 @@ class _CategoryDot extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: Icon(
-        _iconFor(category),
+        icon,
         size: 20,
         color: color,
       ),

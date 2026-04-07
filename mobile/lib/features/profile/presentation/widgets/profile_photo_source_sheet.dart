@@ -94,6 +94,7 @@ Future<void> showProfilePhotoSourceBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     builder: (ctx) => ProfileSheetStyles.sheetPanel(
+      context: ctx,
       topRadius: 20,
       child: SafeArea(
         child: Column(

@@ -9,6 +9,8 @@ import '../../cubit/booking_cubit.dart';
 import '../../cubit/booking_state.dart';
 import 'booking_autocomplete_scroll.dart';
 import 'booking_field_scroll_padding.dart';
+import 'package:mobile/core/theme/app_theme.dart';
+
 import 'booking_search_field_styles.dart';
 
 /// Flight origin/destination with debounced `GET /bookings/airports/search`.
@@ -35,7 +37,6 @@ class AirportAutocompleteField extends StatefulWidget {
 
 class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
     with WidgetsBindingObserver {
-  static const _accent = Color(0xFF0096FF);
   static const _debounceMs = 300;
 
   final FocusNode _focus = FocusNode();
@@ -186,6 +187,8 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
       },
       child: BlocBuilder<BookingCubit, BookingState>(
         builder: (context, state) {
+          final cs = Theme.of(context).colorScheme;
+          final accent = context.mapControlAccent;
           final slot = _slot(state);
 
           Widget? panel;
@@ -204,7 +207,7 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
                   padding: const EdgeInsets.only(left: 4, bottom: 4),
                   child: Text(
                     widget.label,
-                    style: BookingSearchFieldStyles.fieldLabel,
+                    style: BookingSearchFieldStyles.fieldLabel(context),
                   ),
                 ),
                 TextField(
@@ -212,40 +215,48 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
                   focusNode: _focus,
                   scrollPadding: bookingFieldScrollPadding(context),
                   textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF1A1A1A),
+                    color: cs.onSurface,
                   ),
                   decoration: InputDecoration(
                     hintText: widget.placeholder,
-                    hintStyle: const TextStyle(
-                      color: Color(0xFFBBBBBB),
+                    hintStyle: TextStyle(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.85),
                       fontWeight: FontWeight.w400,
                     ),
                     prefixIcon: Icon(
                       widget.icon,
                       size: 20,
-                      color: const Color(0xFFAAAAAA),
+                      color: cs.onSurfaceVariant,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFFAFAFA),
+                    fillColor: BookingSearchFieldStyles.fieldFill(context),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 14,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                      borderSide: BorderSide(
+                        color: BookingSearchFieldStyles.fieldBorderInactive(
+                          context,
+                        ),
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                      borderSide: BorderSide(
+                        color: BookingSearchFieldStyles.fieldBorderInactive(
+                          context,
+                        ),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _accent,
+                      borderSide: BorderSide(
+                        color: accent,
                         width: 1.5,
                       ),
                     ),
@@ -258,9 +269,9 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
                     padding: const EdgeInsets.only(top: 6, left: 4),
                     child: Text(
                       slot.suggestionError!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFFB00020),
+                        color: cs.error,
                       ),
                     ),
                   ),

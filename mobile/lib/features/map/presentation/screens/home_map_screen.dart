@@ -23,8 +23,10 @@ import '../../../gamification/presentation/cubit/gamification_cubit.dart';
 import '../../../poi_search/data/api/poi_search_api_client.dart';
 import '../../../poi_search/data/models/area_source.dart';
 import '../../../poi_search/data/models/selected_area.dart';
+import '../../../poi_search/data/repositories/composite_poi_search_repository.dart';
 import '../../../poi_search/data/repositories/poi_search_repository.dart';
 import '../../../poi_search/data/repositories/poi_search_repository_impl.dart';
+import '../../../poi_search/data/services/style_poi_discovery_binding.dart';
 import '../../../poi_search/presentation/bloc/area_query_bloc.dart';
 import '../../../poi_search/presentation/bloc/area_query_event.dart' as aq;
 import '../../../poi_search/presentation/bloc/area_query_state.dart';
@@ -46,6 +48,7 @@ import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
 import '../widgets/home_map/home_map_scaffold.dart';
+import '../widgets/home_map/markers/poi_marker_detail_sheet.dart';
 
 class HomeMapScreen extends StatelessWidget {
   const HomeMapScreen({super.key});
@@ -54,8 +57,14 @@ class HomeMapScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
+        RepositoryProvider<StylePoiDiscoveryBinding>(
+          create: (_) => StylePoiDiscoveryBinding(),
+        ),
         RepositoryProvider<PoiSearchRepository>(
-          create: (ctx) => PoiSearchRepositoryImpl(ctx.read<PoiSearchApiClient>()),
+          create: (ctx) => CompositePoiSearchRepository(
+            backend: PoiSearchRepositoryImpl(ctx.read<PoiSearchApiClient>()),
+            styleBinding: ctx.read<StylePoiDiscoveryBinding>(),
+          ),
         ),
         RepositoryProvider<LocationService>(create: (_) => LocationService()),
         RepositoryProvider<CheckinApiClient>(create: (ctx) => CheckinApiClient(ctx.read<Dio>())),
@@ -97,6 +106,7 @@ class _HomeMapView extends StatefulWidget {
 class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver {
   bool _filtersOpen = false;
   bool _resultsOpen = false;
+  bool _controlsMenuOpen = false;
 
   /// Cached reference to avoid context.read in dispose/lifecycle callbacks.
   late final LocationBloc _locationBloc;
@@ -162,6 +172,17 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
 
     // ✅ drawing de kapansın (temiz)
     context.read<MapBloc>().add(SetDrawingEnabled(false));
+  }
+
+  void _toggleControlsMenu() {
+    if (!mounted) return;
+    setState(() => _controlsMenuOpen = !_controlsMenuOpen);
+  }
+
+  void _closeControlsMenu() {
+    if (!_controlsMenuOpen) return;
+    if (!mounted) return;
+    setState(() => _controlsMenuOpen = false);
   }
 
   @override
@@ -400,20 +421,28 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
               setState(() => _activeChipKey = key); // null => All
             },
             onClose: _closeResultsAndResetToViewport,
+            onPoiTap: (poi) => showPoiMarkerDetailSheet(context, poi),
+            hideZeroCountCategories:
+                poiState.areaSource == AreaSource.userSelection,
           );
 
           return HomeMapScaffold(
-            mode: state.viewMode,
+            basemap: state.basemap,
+            perspective: state.perspective,
             isDrawing: state.isDrawing,
-            onToggleMode: () => context.read<MapBloc>().add(const ToggleViewModePressed()),
+            onCycleBasemap: () =>
+                context.read<MapBloc>().add(const CycleBasemapPressed()),
+            onTogglePerspective: () =>
+                context.read<MapBloc>().add(const TogglePerspectivePressed()),
             onRecenter: () => context.read<MapBloc>().add(const RecenterPressed()),
             onToggleDrawing: () {
               final isDrawingNow = context.read<MapBloc>().state.isDrawing;
 
               if (isDrawingNow) {
-                // ✅ Butondan kapatma: komple reset
+                // Sadece çizim modunu kapat. Alan/POI reseti yalnızca sonuç sheet kapatma
+                // veya geçerli bir poligon tamamlandığında (MapDrawingOverlay) yapılır;
+                // aksi halde hiç çizmeden kapatınca gereksiz viewport yenilemesi olur.
                 context.read<MapBloc>().add(SetDrawingEnabled(false));
-                _closeResultsAndResetToViewport();
                 if (_filtersOpen) _closeFilters();
                 return;
               }
@@ -422,7 +451,9 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             },
 
             // ✅ manual filter tuşu -> blur preview OFF
-            onOpenFilters: () => _openFilters(fromUserSelection: false),
+            onOpenFilters: () {
+              _openFilters(fromUserSelection: false);
+            },
 
             // UC1.11 — Explore in AR entry point
             onOpenArMode: () {
@@ -456,7 +487,16 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             // ===== Filters overlay =====
             isFiltersOpen: _filtersOpen,
             onCloseFilters: _closeFilters,
-            filtersPanel: PoiFilterPanel(onClose: _closeFilters),
+            filtersPanel: PoiFilterPanel(
+              onClose: _closeFilters,
+              hideZeroCountCategories:
+                  poiState.areaSource == AreaSource.userSelection,
+            ),
+
+            // ===== Controls menu =====
+            isControlsMenuOpen: _controlsMenuOpen,
+            onToggleControlsMenu: _toggleControlsMenu,
+            onCloseControlsMenu: _closeControlsMenu,
 
             // ===== Results sheet (normal) =====
             isResultsOpen: _resultsOpen,

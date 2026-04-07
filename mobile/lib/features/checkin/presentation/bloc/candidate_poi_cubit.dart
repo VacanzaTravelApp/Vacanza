@@ -59,6 +59,7 @@ class CandidatePoiCubit extends Cubit<CandidatePoiState> {
 
     final candidates = <String>[];
     for (final poi in _allPois) {
+      if (!poi.isEligibleForBackendCheckin) continue;
       if (poi.latitude >= minLat &&
           poi.latitude <= maxLat &&
           poi.longitude >= minLng &&

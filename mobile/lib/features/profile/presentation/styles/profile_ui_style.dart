@@ -1,28 +1,25 @@
 // Profile UI — shared styles matching Figma/React reference.
 // Use across profile cards; no BLoC or API logic.
 
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 // ─── Colors ─────────────────────────────────────────────────────────────────
 
 abstract final class ProfileUIColors {
   ProfileUIColors._();
 
-  static const profileBlue = Color(0xFF0096FF);
-  static const profileBlueLight = Color(0xFF00C6FF);
   static const profileGreen = Color(0xFF2ECC71);
   static const profileGreenDark = Color(0xFF27AE60);
   static const profileAmber = Color(0xFFFFD166);
   static const profileOrange = Color(0xFFF4A261);
   static const profileRed = Color(0xFFEF4444);
 
-  static const profileGray100 = Color(0xFFF3F4F6);
   static const profileGray400 = Color(0xFF9CA3AF);
   static const profileGray500 = Color(0xFF6B7280);
   static const profileGray800 = Color(0xFF1F2937);
-
-  static const profileBg = Color(0xFFFAFAFA);
-  static const profileRed50 = Color(0xFFFEF2F2);
 }
 
 // ─── Card decoration ─────────────────────────────────────────────────────────
@@ -30,20 +27,50 @@ abstract final class ProfileUIColors {
 abstract final class ProfileCardDecoration {
   ProfileCardDecoration._();
 
-  static BoxDecoration card() {
+  static BoxDecoration card(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = context.mapControlAccent;
     return BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.8),
+      color: isDark
+          ? cs.surface.withValues(alpha: 0.92)
+          : context.lightGlassPanelColor,
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+      border: Border.all(
+        // Frame should match "Ask Vacanza" accent family.
+        color: accent.withValues(alpha: isDark ? 0.28 : 0.22),
+      ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.04),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
+          color: cs.shadow.withValues(alpha: isDark ? 0.20 : 0.06),
+          blurRadius: isDark ? 18 : 14,
+          offset: const Offset(0, 4),
         ),
       ],
     );
   }
+}
+
+/// Menu row cards: frosted glass in light mode, solid in dark.
+Widget profileGlassMenuCard({
+  required BuildContext context,
+  required Widget child,
+}) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final decoration = ProfileCardDecoration.card(context);
+  if (isDark) {
+    return Container(decoration: decoration, child: child);
+  }
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(20),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+      child: Container(
+        decoration: decoration,
+        child: child,
+      ),
+    ),
+  );
 }
 
 // ─── Icon container gradients ────────────────────────────────────────────────
@@ -51,61 +78,63 @@ abstract final class ProfileCardDecoration {
 abstract final class ProfileIconGradient {
   ProfileIconGradient._();
 
-  static const gamification = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [ProfileUIColors.profileAmber, ProfileUIColors.profileOrange],
-  );
-
-  static const travelPrefs = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [ProfileUIColors.profileBlue, ProfileUIColors.profileBlueLight],
-  );
-
-  static const stats = LinearGradient(
+  static LinearGradient stats = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [ProfileUIColors.profileGreen, ProfileUIColors.profileGreenDark],
   );
 
-  static const checkIn = LinearGradient(
+  static LinearGradient checkIn(BuildContext context) => LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [ProfileUIColors.profileAmber, ProfileUIColors.profileOrange],
+    colors: [context.vacanzaTokens.vividCoral, context.mapControlAccent],
+  );
+
+  static LinearGradient editProfile(BuildContext context) => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: context.mapControlActiveGradientColors,
+  );
+
+  static LinearGradient achievements(BuildContext context) => LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [context.vacanzaTokens.vividAmber, context.vacanzaTokens.vividCoral],
   );
 }
 
-/// Icon container 48x48, rounded 16, with gradient and optional icon.
+/// Icon container 48x48, rounded 16.
+///
+/// No colored background (requested): uses neutral surface + accent border/ring.
 Widget profileIconContainer({
-  required LinearGradient gradient,
-  required Widget icon,
-  List<BoxShadow>? boxShadow,
+  required BuildContext context,
+  required Color accentColor,
+  required IconData icon,
 }) {
+  final cs = Theme.of(context).colorScheme;
+  final isLight = Theme.of(context).brightness == Brightness.light;
   return Container(
     width: 48,
     height: 48,
     decoration: BoxDecoration(
       borderRadius: BorderRadius.circular(16),
-      gradient: gradient,
-      boxShadow: boxShadow ??
-          [
-            BoxShadow(
-              color: gradient.colors.first.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
+      color: isLight ? context.lightGlassFieldFill : cs.surface.withValues(alpha: 0.6),
+      border: Border.all(color: accentColor.withValues(alpha: 0.55), width: 1.2),
+      boxShadow: [
+        BoxShadow(
+          color: accentColor.withValues(alpha: 0.10),
+          blurRadius: 14,
+          offset: const Offset(0, 6),
+        ),
+      ],
     ),
-    child: IconTheme(
-      data: const IconThemeData(color: Colors.white, size: 24),
-      child: icon,
-    ),
+    child: Icon(icon, size: 22, color: accentColor),
   );
 }
 
 /// Small icon container 36x36, rounded 12, tint background (no gradient).
 Widget profileAccountIconContainer({
+  required BuildContext context,
   required Color backgroundColor,
   required Color iconColor,
   required IconData icon,
@@ -126,55 +155,61 @@ Widget profileAccountIconContainer({
 abstract final class ProfileChipStyle {
   ProfileChipStyle._();
 
-  static Widget categoryPill(String label) {
+  static Widget categoryPill(BuildContext context, String label) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: ProfileUIColors.profileBlue.withValues(alpha: 0.1),
+        color: accent.withValues(alpha: 0.12),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w500,
-          color: ProfileUIColors.profileBlue,
+          color: cs.onSurface,
         ),
       ),
     );
   }
 
-  static Widget extraPill(String text) {
+  static Widget extraPill(BuildContext context, String text) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: ProfileUIColors.profileGray100,
+        color: cs.surfaceContainerHighest,
+        border: Border.all(color: cs.outline.withValues(alpha: 0.25)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w500,
-          color: ProfileUIColors.profileGray500,
+          color: cs.onSurfaceVariant,
         ),
       ),
     );
   }
 
-  static Widget dietaryPill(String label) {
+  static Widget dietaryPill(BuildContext context, String label) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: ProfileUIColors.profileRed50,
+        color: cs.errorContainer,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w500,
-          color: ProfileUIColors.profileRed,
+          color: cs.onErrorContainer,
         ),
       ),
     );
@@ -183,37 +218,49 @@ abstract final class ProfileChipStyle {
 
 // ─── Section label ──────────────────────────────────────────────────────────
 
-const TextStyle profileSectionLabelStyle = TextStyle(
-  fontSize: 10,
-  fontWeight: FontWeight.w600,
-  color: ProfileUIColors.profileGray400,
-  letterSpacing: 1.0,
-);
+TextStyle profileSectionLabelStyle(BuildContext context) {
+  final cs = Theme.of(context).colorScheme;
+  return TextStyle(
+    fontSize: 10,
+    fontWeight: FontWeight.w600,
+    color: cs.onSurfaceVariant,
+    letterSpacing: 1.0,
+  );
+}
 
 // ─── Stat tile ───────────────────────────────────────────────────────────────
 
 const EdgeInsets _statTilePadding = EdgeInsets.symmetric(horizontal: 16, vertical: 12);
 
 Widget profileStatTile({
+  required BuildContext context,
   required Widget title,
   required String subtitle,
 }) {
+  final cs = Theme.of(context).colorScheme;
+  final isLight = Theme.of(context).brightness == Brightness.light;
   return Container(
     padding: _statTilePadding,
     decoration: BoxDecoration(
-      color: ProfileUIColors.profileBg,
+      color: isLight
+          ? context.lightGlassFieldFill
+          : cs.surfaceContainerHighest.withValues(alpha: 0.55),
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: ProfileUIColors.profileGray100),
+      border: Border.all(
+        color: isLight
+            ? context.mapControlAccent.withValues(alpha: 0.14)
+            : cs.outline.withValues(alpha: 0.2),
+      ),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         DefaultTextStyle(
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: ProfileUIColors.profileGray800,
+            color: cs.onSurface,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -222,9 +269,9 @@ Widget profileStatTile({
         const SizedBox(height: 2),
         Text(
           subtitle,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: ProfileUIColors.profileGray500,
+            color: cs.onSurfaceVariant,
           ),
         ),
       ],

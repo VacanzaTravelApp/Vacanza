@@ -1,9 +1,6 @@
+import 'poi_category_catalog.dart';
+
+/// Varsayılan seçili kategoriler (web MapPage: tüm UI anahtarları açık).
 class PoiCategories {
-  static const List<String> defaults = <String>[
-    'restaurant',
-    'cafe',
-    'museum',
-    'monuments',
-    'parks',
-  ];
+  static List<String> get defaults => PoiCategoryCatalog.defaultSelectedCategoryKeys;
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../search/booking_search_field_styles.dart';
+
 /// Animated shimmer-like loading skeleton for result cards.
 class BookingLoadingSkeleton extends StatefulWidget {
   const BookingLoadingSkeleton({super.key});
@@ -35,24 +37,27 @@ class _BookingLoadingSkeletonState extends State<BookingLoadingSkeleton>
         final opacity =
             0.3 + 0.4 * (0.5 + 0.5 * (_controller.value * 2 - 1).abs());
         return Column(
-          children: List.generate(3, (i) => _skeletonCard(opacity)),
+          children: List.generate(3, (i) => _skeletonCard(context, opacity)),
         );
       },
     );
   }
 
-  Widget _skeletonCard(double opacity) {
+  Widget _skeletonCard(BuildContext context, double opacity) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: const Color(0xFFF0F0F0)),
+          color: cs.surface,
+          border: Border.all(
+            color: BookingSearchFieldStyles.fieldBorderInactive(context),
+          ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: cs.shadow.withValues(alpha: 0.04),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -61,17 +66,17 @@ class _BookingLoadingSkeletonState extends State<BookingLoadingSkeleton>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _bar(opacity, width: double.infinity, height: 14),
+            _bar(cs, opacity, width: double.infinity, height: 14),
             const SizedBox(height: 8),
-            _bar(opacity, width: 160, height: 10),
+            _bar(cs, opacity, width: 160, height: 10),
             const SizedBox(height: 8),
-            _bar(opacity, width: 80, height: 10),
+            _bar(cs, opacity, width: 80, height: 10),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _bar(opacity, width: 60, height: 16),
-                _bar(opacity, width: 90, height: 28),
+                _bar(cs, opacity, width: 60, height: 16),
+                _bar(cs, opacity, width: 90, height: 28),
               ],
             ),
           ],
@@ -80,12 +85,18 @@ class _BookingLoadingSkeletonState extends State<BookingLoadingSkeleton>
     );
   }
 
-  Widget _bar(double opacity, {required double width, required double height}) {
+  Widget _bar(
+    ColorScheme cs,
+    double pulseOpacity, {
+    required double width,
+    required double height,
+  }) {
+    final a = (0.25 + 0.35 * pulseOpacity).clamp(0.0, 1.0);
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Color.fromRGBO(229, 229, 229, opacity),
+        color: cs.outline.withValues(alpha: a),
         borderRadius: BorderRadius.circular(height / 2),
       ),
     );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/features/booking/presentation/widgets/search/booking_search_field_styles.dart';
 
 import '../../data/models/user_preferences.dart';
 import '../../data/profile_preference_options.dart';
@@ -49,6 +51,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
   late TextEditingController _budgetController;
   late ScrollController _scrollController;
   late FocusNode _budgetFocusNode;
+  late Color _accentBlue;
 
   static const _stepCount = 17;
   late final List<GlobalKey> _stepKeys;
@@ -67,7 +70,6 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
   /// For non-input steps: alignment ~0.15 so section heading stays visible (not 0.0 top snap).
   static const _nonInputAlignment = 0.15;
 
-  static const _accentBlue = Color(0xFF0096FF);
   static const _accentCuisine = Color(0xFFF4A261);
   static const _accentDietary = Color(0xFFFF6B6B);
   static const _accentAccessibility = Color(0xFF9C27B0);
@@ -244,7 +246,9 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
 
   @override
   Widget build(BuildContext context) {
+    _accentBlue = context.mapControlAccent;
     return ProfileSheetStyles.sheetPanel(
+      context: context,
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.88,
       ),
@@ -260,7 +264,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildBasicsSection(),
+                  _buildBasicsSection(_accentBlue),
                   _buildAdvancedSection(),
                 ],
               ),
@@ -274,6 +278,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       child: Column(
@@ -283,7 +288,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: cs.outline.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -291,12 +296,12 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
           const SizedBox(height: 16),
           Row(
             children: [
-              const Text(
+              Text(
                 'Edit Preferences',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF111827),
+                  color: cs.onSurface,
                 ),
               ),
               const Spacer(),
@@ -304,7 +309,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close, size: 20),
                 style: IconButton.styleFrom(
-                  backgroundColor: Colors.grey.shade100,
+                  backgroundColor: cs.surfaceContainerHighest,
                 ),
               ),
             ],
@@ -315,6 +320,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
   }
 
   Widget _sectionLabel(String text) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(top: 16, bottom: 8),
       child: Text(
@@ -322,14 +328,14 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: Colors.grey.shade500,
+          color: cs.onSurfaceVariant,
           letterSpacing: 1.2,
         ),
       ),
     );
   }
 
-  Widget _buildBasicsSection() {
+  Widget _buildBasicsSection(Color accentBlue) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -340,7 +346,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: _accentBlue,
+              color: accentBlue,
               letterSpacing: 1.2,
             ),
           ),
@@ -355,16 +361,16 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
           },
         )),
         _sectionLabel('Favorite Categories'),
-        _chipPreview(_draft.favoriteCategories, _accentBlue),
+        _chipPreview(_draft.favoriteCategories, accentBlue),
         _wrapWithKey(_Step.favoriteCategories, _selectRow(
           label: 'Select categories',
           value: _draft.favoriteCategories,
-          accentColor: _accentBlue,
+          accentColor: accentBlue,
           onTap: () => _openPickerAndSet(
             'Favorite Categories',
             optionFavoriteCategories,
             _draft.favoriteCategories,
-            _accentBlue,
+            accentBlue,
             true,
             (d, sel) => d.copyWith(favoriteCategories: sel),
             onAfterCloseAdvanceStep: _Step.favoriteCategories,
@@ -436,7 +442,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
                 controller: _budgetController,
                 focusNode: _budgetFocusNode,
                 keyboardType: TextInputType.number,
-                decoration: ProfileSheetStyles.inputDecoration('150'),
+                decoration: ProfileSheetStyles.inputDecoration(context, '150'),
                 onChanged: (s) {
                   final v = num.tryParse(s);
                   _updateDraft((d) => d.copyWith(dailyBudget: v));
@@ -448,7 +454,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
               child: DropdownButtonFormField<String>(
                 key: ValueKey<String?>(_draft.budgetCurrency),
                 initialValue: _draft.budgetCurrency ?? 'EUR',
-                decoration: ProfileSheetStyles.inputDecoration(''),
+                decoration: ProfileSheetStyles.inputDecoration(context, ''),
                 items: optionBudgetCurrency
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
@@ -465,6 +471,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
   }
 
   Widget _buildAdvancedSection() {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -482,7 +489,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
+                    color: cs.onSurfaceVariant,
                     letterSpacing: 1.2,
                   ),
                 ),
@@ -492,13 +499,13 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
                       _advancedOpen ? 'Hide' : 'Show',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.grey.shade500,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                     Icon(
                       _advancedOpen ? Icons.expand_less : Icons.expand_more,
                       size: 20,
-                      color: Colors.grey.shade500,
+                      color: cs.onSurfaceVariant,
                     ),
                   ],
                 ),
@@ -622,6 +629,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
   }
 
   Widget _chipPreview(List<String> value, Color accentColor) {
+    final cs = Theme.of(context).colorScheme;
     if (value.isEmpty) return const SizedBox.shrink();
     final show = value.take(3).toList();
     final extra = value.length - 3;
@@ -651,14 +659,14 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 '+$extra',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),
@@ -673,55 +681,65 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
     required Color accentColor,
     required VoidCallback onTap,
   }) {
+    final cs = Theme.of(context).colorScheme;
     final summary = value.isEmpty
         ? 'None selected'
         : value.length <= 2
             ? value.map(formatOptionLabel).join(', ')
             : '${value.take(2).map(formatOptionLabel).join(', ')} +${value.length - 2}';
+    final borderColor = BookingSearchFieldStyles.fieldBorderInactive(context);
+    final fill = BookingSearchFieldStyles.fieldFill(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
+      child: Container(
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        summary,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: value.isEmpty
-                              ? Colors.grey.shade500
-                              : accentColor,
+                        const SizedBox(height: 2),
+                        Text(
+                          summary,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: value.isEmpty
+                                ? cs.onSurfaceVariant
+                                : accentColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: Colors.grey.shade400,
-                ),
-              ],
+                  Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -734,18 +752,24 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
     required String? value,
     required void Function(String) onChanged,
   }) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: options.map((o) {
         final selected = value == o;
+        final borderColor = selected
+            ? Colors.white.withValues(alpha: 0.35)
+            : cs.outline.withValues(alpha: isDark ? 0.28 : 0.35);
         return GestureDetector(
           onTap: () => onChanged(o),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: selected ? _accentBlue : Colors.grey.shade100,
+              color: selected ? _accentBlue : cs.surfaceContainerHighest,
+              border: Border.all(color: borderColor),
               borderRadius: BorderRadius.circular(10),
               boxShadow: selected
                   ? [
@@ -761,7 +785,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
               formatOptionLabel(o),
               style: TextStyle(
                 fontSize: 12,
-                color: selected ? Colors.white : Colors.grey.shade700,
+                color: selected ? Colors.white : cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -775,26 +799,35 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
     required String? value,
     required void Function(String) onChanged,
   }) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: options.map((o) {
         final selected = value == o;
+        final borderColor = selected
+            ? Colors.white.withValues(alpha: 0.35)
+            : cs.outline.withValues(alpha: isDark ? 0.28 : 0.35);
         return Expanded(
           child: Padding(
             padding: const EdgeInsets.only(right: 8),
             child: Material(
-              color: selected ? _accentBlue : Colors.grey.shade100,
+              color: selected ? _accentBlue : cs.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(10),
               child: InkWell(
                 onTap: () => onChanged(o),
                 borderRadius: BorderRadius.circular(10),
-                child: Padding(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: borderColor),
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Center(
                     child: Text(
                       formatOptionLabel(o),
                       style: TextStyle(
                         fontSize: 12,
-                        color: selected ? Colors.white : Colors.grey.shade700,
+                        color: selected ? Colors.white : cs.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -814,6 +847,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
         children: [
           Expanded(
             child: ProfileSheetStyles.secondaryButton(
+              context: context,
               text: 'Cancel',
               onPressed: () => Navigator.of(context).pop(),
             ),
@@ -821,6 +855,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
           const SizedBox(width: 12),
           Expanded(
             child: ProfileSheetStyles.primaryButton(
+              context: context,
               text: 'Save',
               onPressed: _save,
             ),

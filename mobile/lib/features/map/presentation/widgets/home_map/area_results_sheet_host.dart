@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../poi_search/data/models/area_source.dart';
-import '../../../../poi_search/data/models/selected_area.dart';
 import '../../../../poi_search/presentation/bloc/area_query_bloc.dart';
 import '../../../../poi_search/presentation/bloc/area_query_event.dart' as aq;
 import '../../../../poi_search/presentation/bloc/poi_search_bloc.dart';
@@ -60,6 +59,8 @@ class _AreaResultsSheetHostState extends State<AreaResultsSheetHost> {
       activeChipKey: _activeChipKey,
       onChipSelected: _onChipSelected,
       onClose: () => _handleClose(context),
+      hideZeroCountCategories:
+          poiState.areaSource == AreaSource.userSelection,
     );
   }
 }

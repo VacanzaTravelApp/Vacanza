@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 import '../../data/models/badge_dto.dart';
 import 'badge_icon_mapper.dart';
@@ -15,21 +16,23 @@ class BadgeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final colors = BadgeIconMapper.gradient(badge.key);
     final icon = BadgeIconMapper.icon(badge.key);
+    final accent = colors.first;
 
     return Opacity(
       opacity: badge.earned ? 1.0 : 0.40,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.8),
+          color: cs.surface.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+          border: Border.all(color: cs.outline.withValues(alpha: 0.14)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: cs.shadow.withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -43,16 +46,18 @@ class BadgeCard extends StatelessWidget {
               height: 52,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(colors: colors),
+                // Requested: empty background, accent border/ring.
+                color: cs.surface.withValues(alpha: 0.75),
+                border: Border.all(color: accent.withValues(alpha: 0.70), width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: colors.first.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    color: accent.withValues(alpha: 0.12),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
-              child: Icon(icon, color: Colors.white, size: 26),
+              child: Icon(icon, color: accent, size: 26),
             ),
             const SizedBox(height: 8),
             // Title
@@ -61,16 +66,22 @@ class BadgeCard extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF2C3E50)),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
             ),
             // Earned checkmark
             if (badge.earned) ...[
               const SizedBox(height: 2),
-              const Text('✓',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF2ECC71))),
+              Text(
+                '✓',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.mapControlAccent,
+                ),
+              ),
             ],
           ],
         ),

@@ -1,27 +1,25 @@
 // mapbox_view.dart
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
 import 'package:mobile/core/config/mapbox_config.dart';
 
 import '../../../../../poi_search/data/models/selected_area.dart';
 
-/// Map widget + viewport bbox emitter (debounced).
-/// - Gesture ignore: drawing modunda map interaction kapatmak için.
-/// - İlk idle’da da bbox gönderir.
-/// - ✅ Parent isterse her idle eventini dinleyebilir (selection redraw için).
+/// Map widget + viewport bbox emitter.
+///
+/// Uses [onCameraChangeListener] with debounce to track viewport changes.
+/// This is more reliable than relying solely on [onMapIdleListener] because
+/// continuous animations (e.g. location puck pulsing) can prevent the map
+/// from ever reaching idle state.
 class MapboxView extends StatefulWidget {
   final bool ignoreGestures;
 
-  /// Parent map referansını saklayabilsin diye.
   final Future<void> Function(mb.MapboxMap mapboxMap) onMapCreated;
 
-  /// Viewport bbox üretildiğinde parent’a gönderir.
   final void Function(BboxArea bbox) onViewportBbox;
 
-  /// ✅ Map idle olduğunda parent bilgilensin (bbox dışında işler için)
   final VoidCallback? onMapIdle;
 
   const MapboxView({
@@ -39,10 +37,8 @@ class MapboxView extends StatefulWidget {
 class _MapboxViewState extends State<MapboxView> {
   mb.MapboxMap? _map;
 
-  bool _initialViewportSent = false;
-
   Timer? _debounce;
-  static const Duration _debounceDuration = Duration(milliseconds: 500);
+  static const Duration _debounceDuration = Duration(milliseconds: 600);
 
   @override
   void dispose() {
@@ -64,16 +60,11 @@ class _MapboxViewState extends State<MapboxView> {
         },
         onMapIdleListener: (_) {
           if (_map == null) return;
-
-          // ✅ Parent'a idle sinyali (selection polygon redraw vb.)
           widget.onMapIdle?.call();
-
-          if (!_initialViewportSent) {
-            _initialViewportSent = true;
-            unawaited(_emitViewportBboxNow());
-            return;
-          }
-
+          _scheduleViewportBbox();
+        },
+        onCameraChangeListener: (_) {
+          if (_map == null) return;
           _scheduleViewportBbox();
         },
       ),

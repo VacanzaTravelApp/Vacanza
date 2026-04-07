@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+
 import '../../../data/models/booking_currency.dart';
 import 'booking_field_scroll_padding.dart';
 import 'booking_search_field_styles.dart';
@@ -45,11 +47,12 @@ class BudgetField extends StatelessWidget {
     }
   }
 
-  static const _accent = Color(0xFF0096FF);
   static const _fieldHeight = 52.0;
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
     final code = BookingCurrencies.normalize(currencyCode);
     final symbol = _symbolFor(code);
 
@@ -58,7 +61,7 @@ class BudgetField extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 4),
-          child: Text(label, style: BookingSearchFieldStyles.fieldLabel),
+          child: Text(label, style: BookingSearchFieldStyles.fieldLabel(context)),
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -74,15 +77,15 @@ class BudgetField extends StatelessWidget {
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
                   ],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF1A1A1A),
+                    color: cs.onSurface,
                   ),
                   decoration: InputDecoration(
                     hintText: '120',
                     hintStyle: TextStyle(
-                      color: Colors.grey.shade400,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.75),
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
                     ),
@@ -97,7 +100,7 @@ class BudgetField extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade600,
+                                  color: cs.onSurfaceVariant,
                                 ),
                               ),
                             ),
@@ -107,7 +110,7 @@ class BudgetField extends StatelessWidget {
                             child: Icon(
                               Icons.payments_outlined,
                               size: 18,
-                              color: Colors.grey.shade500,
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                     prefixIconConstraints: const BoxConstraints(
@@ -115,7 +118,7 @@ class BudgetField extends StatelessWidget {
                       minHeight: 0,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFFFAFAFA),
+                    fillColor: BookingSearchFieldStyles.fieldFill(context),
                     isDense: true,
                     contentPadding: const EdgeInsets.only(
                       left: 4,
@@ -125,16 +128,24 @@ class BudgetField extends StatelessWidget {
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                      borderSide: BorderSide(
+                        color: BookingSearchFieldStyles.fieldBorderInactive(
+                          context,
+                        ),
+                      ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+                      borderSide: BorderSide(
+                        color: BookingSearchFieldStyles.fieldBorderInactive(
+                          context,
+                        ),
+                      ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(
-                        color: _accent,
+                      borderSide: BorderSide(
+                        color: accent,
                         width: 1.5,
                       ),
                     ),
@@ -154,9 +165,9 @@ class BudgetField extends StatelessWidget {
             padding: const EdgeInsets.only(left: 4, top: 4),
             child: Text(
               helperText!,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
-                color: Color(0xFFAAAAAA),
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -184,18 +195,21 @@ class _CompactCurrencyPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final normalized = BookingCurrencies.normalize(value);
     return SizedBox(
       height: BudgetField._fieldHeight,
       child: Material(
-        color: const Color(0xFFFAFAFA),
+        color: BookingSearchFieldStyles.fieldFill(context),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.only(left: 8, right: 4),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE5E5E5)),
+            border: Border.all(
+              color: BookingSearchFieldStyles.fieldBorderInactive(context),
+            ),
           ),
           child: DropdownButton<String>(
             key: ValueKey<String>('budget_ccy_$normalized'),
@@ -206,16 +220,16 @@ class _CompactCurrencyPicker extends StatelessWidget {
             icon: Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 20,
-              color: Colors.grey.shade600,
+              color: cs.onSurfaceVariant,
             ),
-            style: BookingSearchFieldStyles.dropdownValue,
+            style: BookingSearchFieldStyles.dropdownValue(context),
             selectedItemBuilder: (context) => BookingCurrencies.codes
                 .map(
                   (c) => Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
                       c,
-                      style: BookingSearchFieldStyles.dropdownValue,
+                      style: BookingSearchFieldStyles.dropdownValue(context),
                     ),
                   ),
                 )
@@ -226,7 +240,7 @@ class _CompactCurrencyPicker extends StatelessWidget {
                     value: c,
                     child: Text(
                       c,
-                      style: BookingSearchFieldStyles.dropdownMenuItem,
+                      style: BookingSearchFieldStyles.dropdownMenuItem(context),
                     ),
                   ),
                 )
