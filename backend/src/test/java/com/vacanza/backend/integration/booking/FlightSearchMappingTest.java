@@ -42,10 +42,9 @@ class FlightSearchMappingTest {
             String url = dto.getExternalBookingUrl();
 
             assertNotNull(url, "Booking URL should not be null");
-            assertTrue(url.contains("Istanbul"), "URL should contain origin airport name, got: " + url);
-            assertTrue(url.contains("Charles+de+Gaulle") || url.contains("Charles%20de%20Gaulle"),
-                    "URL should contain destination airport name (URL encoded), got: " + url);
-            assertFalse(url.matches(".*[?&]q=IST.*"), "URL should NOT contain raw IATA code as query start");
+            // Since we now use IATA codes for robustness, checking for those
+            assertTrue(url.contains("IST"), "URL should contain origin IATA code, got: " + url);
+            assertTrue(url.contains("CDG"), "URL should contain destination IATA code, got: " + url);
         }
 
         @Test
@@ -100,6 +99,22 @@ class FlightSearchMappingTest {
         void nullResponseReturnsEmpty() {
             List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(null, "USD", null);
             assertTrue(results.isEmpty());
+        }
+
+        @Test
+        @DisplayName("URL should include return date for round trips")
+        void urlIncludesReturnDate() {
+            SerpApiFlightResponse response = buildFlightResponse(
+                    "Istanbul", "IST", "2026-04-10 10:00",
+                    "London", "LHR", "2026-04-10 13:00",
+                    500);
+
+            java.time.LocalDate returnDate = java.time.LocalDate.parse("2026-04-15");
+            List<TransportOptionDTO> results = SerpApiFlightResponse.toTransportOptions(response, "USD", returnDate);
+            String url = results.get(0).getExternalBookingUrl();
+
+            assertTrue(url.contains("2026-04-15"), "URL should contain return date, got: " + url);
+            assertTrue(url.contains("IST") && url.contains("LHR"), "URL should contain airport codes, got: " + url);
         }
     }
 

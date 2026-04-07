@@ -123,8 +123,23 @@ public class BookingServiceImpl implements BookingService {
 
         private String resolveToIata(String input) {
                 if (input == null || input.isBlank()) return input;
+                
+                // Optimized resolution: if the input is already a 3-letter code, use it.
                 if (SerpApiAirportSuggestion.isIataCode(input.toUpperCase())) {
                         return input.toUpperCase();
+                }
+
+                // Rapid extraction from label: e.g., "Istanbul (SAW)" or "London, United Kingdom (LHR)"
+                if (input.contains("(") && input.contains(")")) {
+                        int start = input.lastIndexOf("(") + 1;
+                        int end = input.lastIndexOf(")");
+                        if (start < end) {
+                                String extracted = input.substring(start, end).trim().toUpperCase();
+                                if (SerpApiAirportSuggestion.isIataCode(extracted)) {
+                                        log.info("[RESOLVE-FAST] Extracted '{}' from label '{}'", extracted, input);
+                                        return extracted;
+                                }
+                        }
                 }
 
                 log.info("[RESOLVE] '{}' is not an IATA code, searching...", input);
