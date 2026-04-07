@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, Spin } from "antd";
+import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, Spin, Popover } from "antd";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LogoutOutlined,
   GlobalOutlined,
@@ -12,6 +13,8 @@ import {
   CompassOutlined,
   CloseOutlined,
   UnorderedListOutlined,
+  HeartOutlined,
+  HeartFilled,
 } from "@ant-design/icons";
 import defaultAvatar from "../assets/default-avatar.png";
 import { useNavigate } from "react-router-dom";
@@ -34,7 +37,10 @@ import PreferencesModal from "./PreferencesModal";
 import CalendarModal from "./CalendarModal";
 import http from "../api/http";
 import { aiApi } from "../api/aiApi";
+import { postPoiFeedbackEvent } from "../api/feedbackApi";
+import { useFeedbackAffinity } from "../hooks/useFeedbackAffinity";
 import { normalizeRouteForMap } from "../features/ai/utils/routeMap";
+import { buildMapPoiFeedbackPayload, deriveMapPoiFavorited } from "../features/ai/utils/feedbackVoteUtils";
 import "./MapPage.css";
 
 
@@ -417,6 +423,18 @@ function getSafePoiTitle(p) {
   return "Place";
 }
 
+/** Stable React key + favorite row id for a map / Discover POI row. */
+function getMapPoiRowKey(p) {
+  if (!p) return "";
+  if (p.poiId != null) return String(p.poiId);
+  const lat = Number(p.latitude ?? p.lat);
+  const lon = Number(p.longitude ?? p.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return `unknown:${String(p?.name || "").slice(0, 48)}`;
+  }
+  return `${lat.toFixed(5)}:${lon.toFixed(5)}:${String(p?.name || "").slice(0, 48)}`;
+}
+
 function isPointInsidePolygon(lat, lng, polygonLatLng) {
   if (!polygonLatLng || polygonLatLng.length < 3) return false;
   let inside = false;
@@ -568,6 +586,12 @@ export default function MapPage() {
 
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+
+  const queryClient = useQueryClient();
+  const { data: feedbackAffinity } = useFeedbackAffinity();
+  const [favSendingKey, setFavSendingKey] = useState(null);
+  /** Which viewport POI marker has the detail popover open (pin tap). */
+  const [viewportPoiPopoverKey, setViewportPoiPopoverKey] = useState(null);
 
   const [viewState, setViewState] = useState({
     longitude: 32.8597,
@@ -865,6 +889,30 @@ export default function MapPage() {
       console.error(e);
     }
   }, [navigate]);
+
+  const toggleMapPoiFavorite = useCallback(
+    async (p) => {
+      if (!user) return;
+      const lat = Number(p?.latitude ?? p?.lat);
+      const lon = Number(p?.longitude ?? p?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      const key = getMapPoiRowKey(p);
+      const base = buildMapPoiFeedbackPayload(p);
+      const favored = deriveMapPoiFavorited(feedbackAffinity, p);
+      const eventType = favored ? "THUMBS_DOWN" : "THUMBS_UP";
+      setFavSendingKey(key);
+      try {
+        await postPoiFeedbackEvent({ eventType, ...base });
+        await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
+        message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
+      } catch (e) {
+        message.error(e?.friendlyMessage || "Could not update favorites.");
+      } finally {
+        setFavSendingKey(null);
+      }
+    },
+    [user, feedbackAffinity, queryClient]
+  );
 
   const handleMapIdle = useCallback(() => {
     if (!mapRef.current) return;
@@ -1695,6 +1743,7 @@ export default function MapPage() {
           ref={mapRef}
           {...viewState}
           onMove={(evt) => setViewState(evt.viewState)}
+          onClick={() => setViewportPoiPopoverKey(null)}
           onIdle={handleMapIdle}
           onMoveEnd={() => { if (mode === "VIEWPORT" && !freehandEnabled) scheduleViewportFetch(); }}
           mapStyle={mapStyle}
@@ -1735,30 +1784,114 @@ export default function MapPage() {
             const title = getSafePoiTitle(p);
             const catInfo = UI_CATEGORIES.find(c => c.key === catKey);
             const markerBg = catInfo?.fill || "rgba(100, 116, 139, 1)";
+            const markerKey = getMapPoiRowKey(p);
+            const catLabel = labelByCategory(p.category);
+            const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
+
+            const popoverContent = (
+              <div className="map-viewport-poi-card glass-panel">
+                <div className="map-viewport-poi-card__row">
+                  <div className="map-viewport-poi-card__text">
+                    <div className="map-viewport-poi-card__title">{title}</div>
+                    {catLabel ? <div className="map-viewport-poi-card__meta">{catLabel}</div> : null}
+                  </div>
+                  {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
+                    <Tooltip title={mapPoiFavored ? "Remove favorite" : "Save to favorites"}>
+                      <button
+                        type="button"
+                        className={`map-poi-fav-hit${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
+                        aria-label={mapPoiFavored ? "Remove favorite" : "Save to favorites"}
+                        aria-pressed={mapPoiFavored}
+                        disabled={favSendingKey === markerKey}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleMapPoiFavorite(p);
+                        }}
+                      >
+                        {favSendingKey === markerKey ? (
+                          <Spin size="small" className="map-poi-fav-hit__spin" />
+                        ) : (
+                          <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
+                            {mapPoiFavored ? (
+                              <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
+                            ) : (
+                              <HeartOutlined className="map-poi-fav-hit__heart" />
+                            )}
+                          </span>
+                        )}
+                      </button>
+                    </Tooltip>
+                  ) : (
+                    <span className="map-viewport-poi-card__hint">Sign in to save favorites</span>
+                  )}
+                </div>
+              </div>
+            );
 
             return (
               <Marker key={p.poiId || `${p.latitude}-${p.longitude}-${title}`} longitude={p.longitude} latitude={p.latitude} anchor="bottom">
-                <Tooltip title={title}>
-                  <div style={{ cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.25))" }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: "50% 50% 50% 0", transform: "rotate(-45deg)",
-                      background: markerBg, border: "2.5px solid white",
-                      display: "grid", placeItems: "center",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                      position: "relative"
-                    }}>
-                      <div style={{
-                        transform: "rotate(45deg)", color: "white",
-                        display: "grid", placeItems: "center",
-                        width: 22, height: 22,
-                        fontSize: 16,
-                        lineHeight: 0,
-                      }}>
-                        {icon?.icon || <GlobalOutlined />}
+                <Popover
+                  open={viewportPoiPopoverKey === markerKey}
+                  onOpenChange={(open) => {
+                    if (open) setViewportPoiPopoverKey(markerKey);
+                    else setViewportPoiPopoverKey((k) => (k === markerKey ? null : k));
+                  }}
+                  trigger="click"
+                  placement="top"
+                  rootClassName="map-viewport-poi-popover"
+                  styles={{ body: { padding: 0 } }}
+                  content={popoverContent}
+                >
+                  <div
+                    className={`map-viewport-marker-hit vivid-interactive${viewportPoiPopoverKey === markerKey ? " map-viewport-marker-hit--open" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${title}. Tap for details and favorites.`}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setViewportPoiPopoverKey((prev) => (prev === markerKey ? null : markerKey));
+                      }
+                    }}
+                  >
+                    <div style={{ cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.25))" }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50% 50% 50% 0",
+                          transform: "rotate(-45deg)",
+                          background: markerBg,
+                          border:
+                            viewportPoiPopoverKey === markerKey
+                              ? "2.5px solid var(--vivid-blue, #3da8c8)"
+                              : "2.5px solid white",
+                          display: "grid",
+                          placeItems: "center",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                          position: "relative",
+                        }}
+                      >
+                        <div
+                          style={{
+                            transform: "rotate(45deg)",
+                            color: "white",
+                            display: "grid",
+                            placeItems: "center",
+                            width: 22,
+                            height: 22,
+                            fontSize: 16,
+                            lineHeight: 0,
+                          }}
+                        >
+                          {icon?.icon || <GlobalOutlined />}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </Tooltip>
+                </Popover>
               </Marker>
             );
           })}
@@ -1920,8 +2053,11 @@ export default function MapPage() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sub)" }}>Finding nearby gems...</div>
                 </div>
               ) : resultsPois.length > 0 ? (
-                resultsPois.map(p => (
-                  <div key={p.poiId} style={{
+                resultsPois.map((p) => {
+                  const favRowKey = getMapPoiRowKey(p);
+                  const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
+                  return (
+                  <div key={favRowKey} style={{
                     display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
                     borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
                     marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
@@ -1943,12 +2079,37 @@ export default function MapPage() {
                         {poiIconByCategory(p.category)?.icon}
                       </div>
                     </div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
                       <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p.category)}</div>
                     </div>
+                    {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
+                      <Tooltip title={mapPoiFavored ? "Remove favorite" : "Favorite"}>
+                        <button
+                          type="button"
+                          className={`map-poi-fav-hit map-poi-fav-hit--in-sheet${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
+                          aria-label={mapPoiFavored ? "Remove favorite" : "Add favorite"}
+                          aria-pressed={mapPoiFavored}
+                          disabled={favSendingKey === favRowKey}
+                          onClick={() => toggleMapPoiFavorite(p)}
+                        >
+                          {favSendingKey === favRowKey ? (
+                            <Spin size="small" className="map-poi-fav-hit__spin" />
+                          ) : (
+                            <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
+                              {mapPoiFavored ? (
+                                <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
+                              ) : (
+                                <HeartOutlined className="map-poi-fav-hit__heart" />
+                              )}
+                            </span>
+                          )}
+                        </button>
+                      </Tooltip>
+                    ) : null}
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
                   <GlobalOutlined style={{ fontSize: 32, marginBottom: 12 }} />

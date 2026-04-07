@@ -12,6 +12,10 @@ public record PoiFeedbackEventRequestDTO(
         String eventType,
         String mapboxId,
         String foursquareId,
-        List<String> categoryKeys
+        List<String> categoryKeys,
+        /** When {@code foursquareId}/{@code mapboxId} are absent, anchors POI feedback to name + coordinates (AI waypoints / map). */
+        String waypointName,
+        Double latitude,
+        Double longitude
 ) {
 }

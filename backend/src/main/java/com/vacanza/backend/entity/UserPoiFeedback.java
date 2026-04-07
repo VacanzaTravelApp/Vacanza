@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Aggregated user × POI affinity (e.g. thumbs up/down), keyed by stable id prefix (fs:, mb:).
+ * Aggregated user × POI affinity (e.g. thumbs up/down), keyed by stable id prefix (fs:, mb:, wp: for name+coords).
  */
 @Entity
 @Table(name = "user_poi_feedback", uniqueConstraints = {
