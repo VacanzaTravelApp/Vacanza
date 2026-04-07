@@ -33,12 +33,14 @@ import {
     ControlOutlined,
     RocketOutlined,
     CoffeeOutlined,
-    ShopOutlined
+    ShopOutlined,
+    DeleteOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useUserPreferences } from "../hooks/useUserPreferences";
 import { useUserProfile, useUserStats, useUserCheckins } from "../hooks/useUserProfileData";
+import { useProfilePhoto } from "../hooks/useProfilePhoto";
 import { useGamificationProfile } from "../gamification/useGamificationProfile";
 import { userApi } from "../api/userApi";
 import dayjs from "dayjs";
@@ -246,7 +248,7 @@ const CheckinItem = ({ name, category, date }) => (
 
 // --- Sub-Views (Stable Components) ---
 
-const MainView = ({ profile, gamification, stats, checkins, user, setView, onClose, onOpenCalendar, onOpenPreferences, isDarkMode = true }) => (
+const MainView = ({ profile, gamification, stats, checkins, user, setView, onClose, onOpenCalendar, onOpenPreferences, profilePhotoUrl, isDarkMode = true }) => (
     <div style={{ background: "var(--bg-main, #0D1526)", flex: 1, overflowY: "auto", paddingBottom: 40, borderRadius: 40 }}>
         <div style={{
             padding: "0 24px",
@@ -280,7 +282,7 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
                 level={gamification?.levelText ? parseInt(gamification.levelText.replace(/\D/g, ''), 10) : 1}
                 xp={gamification?.totalXp || 0}
                 progress={gamification?.xpProgressPercent || 0}
-                imageUrl={profile?.profileImageUrl || user?.photoURL}
+                imageUrl={profilePhotoUrl || profile?.profileImageUrl || user?.photoURL}
             />
 
             <SectionCard
@@ -289,14 +291,6 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
                 icon={<ControlOutlined />}
                 iconBg="var(--vivid-blue, #38BDF8)"
                 onClick={() => setView('EDIT_PROFILE')}
-            />
-
-            <SectionCard
-                title="Trip Agenda"
-                subtitle="Plans and schedule"
-                icon={<CalendarOutlined />}
-                iconBg="var(--vivid-indigo, #6366F1)"
-                onClick={onOpenCalendar}
             />
 
             <SectionCard
@@ -526,9 +520,10 @@ const GenderSelector = ({ value, onChange, isDarkMode = true }) => {
     );
 };
 
-const EditProfileView = ({ profile, user, setView, onClose, updateMutation, isDarkMode = true }) => {
+const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uploadMutation, deleteMutation, profilePhotoUrl, isDarkMode = true }) => {
     const [form] = Form.useForm();
     const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
+    const fileInputRef = React.useRef(null);
 
     useEffect(() => {
         if (profile || user) {
@@ -589,22 +584,51 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, isDa
                     <div style={{ position: "relative" }}>
                         <Avatar
                             size={100}
-                            src={profile?.profileImageUrl || user?.photoURL}
+                            src={profilePhotoUrl || profile?.profileImageUrl || user?.photoURL}
                             style={{
                                 border: "3px solid rgba(255,255,255,0.1)",
                                 background: "rgba(255,255,255,0.05)",
                                 boxShadow: "0 12px 30px rgba(0,0,0,0.3)"
                             }}
                         />
-                        <div style={{
-                            position: "absolute", bottom: 2, right: 2, width: 32, height: 32,
-                            background: "#38BDF8", borderRadius: "50%", border: "3px solid #0D1526",
-                            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"
-                        }}>
+                        <div
+                            style={{
+                                position: "absolute", bottom: 2, right: 2, width: 32, height: 32,
+                                background: "#38BDF8", borderRadius: "50%", border: "3px solid #0D1526",
+                                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                            }}
+                            onClick={() => fileInputRef.current?.click()}
+                        >
                             <CameraFilled style={{ color: "#fff", fontSize: 14 }} />
                         </div>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: "none" }}
+                            accept="image/*"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) uploadMutation.mutate(file);
+                            }}
+                        />
                     </div>
                 </div>
+
+                {profile?.hasProfilePhoto && (
+                    <div style={{ textAlign: "center", marginBottom: 32, marginTop: -20 }}>
+                        <Button
+                            type="text"
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => deleteMutation.mutate()}
+                            loading={deleteMutation.isLoading}
+                            style={{ fontSize: 12, fontWeight: 700 }}
+                        >
+                            Remove Photo
+                        </Button>
+                    </div>
+                )}
 
                 <div style={{
                     background: "var(--vivid-subtle-bg, rgba(255,255,255,0.03))",
@@ -816,6 +840,34 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
     const { data: checkins } = useUserCheckins();
     const { data: gamification } = useGamificationProfile();
 
+    const { profilePhotoUrl } = useProfilePhoto(profile);
+
+    const uploadPhotoMutation = useMutation({
+        mutationFn: (file) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            return userApi.uploadPhoto(formData);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(["user", "profile"]);
+            message.success("Profile photo updated!");
+        },
+        onError: (err) => {
+            message.error(err?.friendlyMessage || "Failed to upload photo");
+        }
+    });
+
+    const deletePhotoMutation = useMutation({
+        mutationFn: () => userApi.deletePhoto(),
+        onSuccess: () => {
+            queryClient.invalidateQueries(["user", "profile"]);
+            message.success("Photo removed");
+        },
+        onError: (err) => {
+            message.error(err?.friendlyMessage || "Failed to remove photo");
+        }
+    });
+
     useEffect(() => {
         if (!open) {
             setTimeout(() => setView('MAIN'), 300);
@@ -909,6 +961,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
                         onClose={onClose}
                         onOpenCalendar={onOpenCalendar}
                         onOpenPreferences={onOpenPreferences}
+                        profilePhotoUrl={profilePhotoUrl}
                     />
                 )}
                 {view === 'GAMIFICATION' && (
@@ -927,6 +980,9 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
                         setView={setView}
                         onClose={onClose}
                         updateMutation={updateProfileMutation}
+                        uploadMutation={uploadPhotoMutation}
+                        deleteMutation={deletePhotoMutation}
+                        profilePhotoUrl={profilePhotoUrl}
                     />
                 )}
             </Modal>

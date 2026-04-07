@@ -20,6 +20,7 @@ import { auth } from "../firebase";
 import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
 import { useUserProfile } from "../hooks/useUserProfileData";
+import { useProfilePhoto } from "../hooks/useProfilePhoto";
 import BookingSheet from "../features/booking/components/BookingSheet";
 import { CalendarOutlined } from "@ant-design/icons";
 import VacanzaChat, {
@@ -560,6 +561,7 @@ export default function MapPage() {
   const mapRef = useRef(null);
   const isMobile = useIsMobile(768);
   const { data: profile } = useUserProfile();
+  const { profilePhotoUrl } = useProfilePhoto(profile);
   const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
     useGamificationProfile();
 
@@ -1645,7 +1647,7 @@ export default function MapPage() {
 
         <div className="sidebar-user-section">
           <div className="sidebar-avatar-wrapper">
-            <Avatar size={90} icon={<UserOutlined />} src={user?.photoURL} className="sidebar-avatar" />
+            <Avatar size={90} icon={<UserOutlined />} src={profilePhotoUrl || profile?.profileImageUrl || user?.photoURL} className="sidebar-avatar" />
           </div>
           <div className="sidebar-info" style={{ textAlign: "center" }}>
             <div className="sidebar-username">{profile?.preferredName || profile?.firstName || user?.displayName || "Adventurer"}</div>
