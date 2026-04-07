@@ -836,12 +836,16 @@ export default function MapPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
+        // Only redirect if NOT loading, but wait, we need to know if it's the first check.
+        // Actually, just set loading to false and let the user decide.
+        setLoadingAuth(false);
         navigate("/login");
         return;
       }
 
       // If email is not verified, send to verification page
       if (!currentUser.emailVerified) {
+        setLoadingAuth(false);
         navigate("/verify-email");
         return;
       }
