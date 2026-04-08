@@ -194,26 +194,44 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
   return msgs;
 }
 
-/** İlk gün hava özeti — rota JSON’unda weather_forecast varsa sohbet kartında gösterilir. */
+function formatForecastDateShort(iso) {
+  if (!iso) return "—";
+  const d = new Date(String(iso).slice(0, 10));
+  return Number.isNaN(d.getTime())
+    ? String(iso)
+    : d.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" }).replace(',', '');
+}
+
+/** Weather cards — route JSON’unda weather_forecast varsa sohbet kartında gösterilir. */
 function RouteWeatherStrip({ rd }) {
   const wf = rd?.weather_forecast ?? rd?.weatherForecast;
   if (!Array.isArray(wf) || wf.length === 0) return null;
-  const row = wf[0];
-  const tMax = row.temp_max_celsius ?? row.tempMaxCelsius;
-  const tMin = row.temp_min_celsius ?? row.tempMinCelsius;
-  const precip =
-    row.precipitation_probability_max_percent ?? row.precipitationProbabilityMaxPercent;
-  const parts = [];
-  if (tMax != null && tMin != null) {
-    parts.push(`${Math.round(tMax)}° / ${Math.round(tMin)}°`);
-  }
-  if (precip != null && Number.isFinite(Number(precip))) {
-    parts.push(`rain ~${Math.round(precip)}%`);
-  }
-  if (parts.length === 0) return null;
+
   return (
-    <div className="route-card-weather-strip" role="status">
-      <span className="route-card-weather-strip-text">Weather (Day 1): {parts.join(" · ")}</span>
+    <div className="route-card-weather-strip-multi" role="status">
+      {wf.slice(0, 5).map((row, i) => {
+        const tMax = row.temp_max_celsius ?? row.tempMaxCelsius;
+        const tMin = row.temp_min_celsius ?? row.tempMinCelsius;
+        const precip =
+          row.precipitation_probability_max_percent ?? row.precipitationProbabilityMaxPercent;
+
+        const hasTemp = tMax != null && tMin != null;
+        if (!hasTemp && precip == null) return null;
+
+        return (
+          <div key={i} className="weather-mini-card">
+            <div className="weather-mini-date">{formatForecastDateShort(row.date)}</div>
+            <div className="weather-mini-temp">
+              {tMax != null ? `${Math.round(tMax)}°C` : ""}
+              {tMax != null && tMin != null && <span className="weather-mini-temp-sep"> / </span>}
+              {tMin != null ? `${Math.round(tMin)}°C` : ""}
+            </div>
+            {precip != null && Number.isFinite(Number(precip)) && precip > 0 && (
+              <div className="weather-mini-precip">Rain {Math.round(precip)}%</div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

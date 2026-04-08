@@ -30,7 +30,7 @@ function formatForecastDate(iso) {
   const d = new Date(String(iso).slice(0, 10));
   return Number.isNaN(d.getTime())
     ? String(iso)
-    : d.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
+    : d.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" }).replace(',', '');
 }
 
 function stripEmojis(text) {
@@ -72,6 +72,7 @@ function formatDayPartHintLines(dayRow) {
     if (!s) continue;
     const avoid = s.avoid_outdoor ?? s.avoidOutdoor;
     if (!avoid) continue;
+    const precip = s.precipitation_probability_max_percent ?? s.precipitationProbabilityMaxPercent;
     const pct =
       precip != null && Number.isFinite(Number(precip))
         ? ` (~${Math.round(Number(precip))}% chance of rain)`
@@ -350,9 +351,9 @@ export default function RoutePanel({
   return (
     <Rnd
       default={{
-        x: window.innerWidth - 560,
+        x: window.innerWidth - 640,
         y: 84,
-        width: 400,
+        width: 480,
         height: 600,
       }}
       minWidth={320}

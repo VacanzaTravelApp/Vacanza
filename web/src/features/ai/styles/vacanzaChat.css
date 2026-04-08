@@ -944,28 +944,56 @@
   color: var(--vc-text-secondary);
 }
 
-/* ═══ Weather Strip ═══ */
-.route-card-weather-strip {
+/* ═══ Weather Multi-Card Strip ═══ */
+.route-card-weather-strip-multi {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 0 16px 10px;
-  padding: 8px 10px;
-  border-radius: 12px;
+  gap: 8px;
+  margin: 0 16px 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.route-card-weather-strip-multi::-webkit-scrollbar {
+  display: none;
+}
+
+.weather-mini-card {
+  flex: 0 0 auto;
   background: var(--vc-weather-bg);
   border: 1px solid var(--vc-weather-border);
-  font-size: 11px;
-  font-weight: 600;
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 80px;
+}
+
+.weather-mini-date {
+  font-size: 10px;
+  font-weight: 700;
   color: var(--vc-text-secondary);
-  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
-.route-card-weather-strip-icon {
-  flex-shrink: 0;
+.weather-mini-temp {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--vc-text);
+  white-space: nowrap;
 }
 
-.route-card-weather-strip-text {
-  min-width: 0;
+.weather-mini-temp-sep {
+  opacity: 0.3;
+  margin: 0 1px;
+}
+
+.weather-mini-precip {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--vc-primary);
+  opacity: 0.9;
 }
 
 .route-tickets-btn:disabled {

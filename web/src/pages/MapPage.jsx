@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, Spin, Popover } from "antd";
+import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, Spin, Popover, ConfigProvider, theme } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LogoutOutlined,
@@ -347,7 +347,8 @@ const UI_CATEGORIES = [
       "ferry_terminal", "transit_stop", "stop_area", "railway_station", "bus_station",
       "subway_station", "light_rail_station", "public_transportation_station", "taxi",
       "car_rental", "parking_lot", "parking", "gas_station", "charging_station",
-      "train", "bus", "rail", "subway"
+      "train", "bus", "rail", "subway", "metro", "metro_station", "underground",
+      "tube", "tram", "tram_stop", "public_transport"
     ],
     icon: <TransportIcon />,
     pill: "rgba(71, 85, 105, 0.15)",
@@ -845,9 +846,14 @@ export default function MapPage() {
       id: "preview-glow",
       type: "line",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-width": 10, "line-opacity": 0.22, "line-color": "#7DD3FC", "line-blur": 2.2 },
+      paint: {
+        "line-width": 12,
+        "line-opacity": 0.22,
+        "line-color": isDarkMode ? "#38BDF8" : "#FF6B6B",
+        "line-blur": 2.5,
+      },
     }),
-    []
+    [isDarkMode]
   );
 
   const previewMainLayer = useMemo(
@@ -856,17 +862,24 @@ export default function MapPage() {
       type: "line",
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
-        "line-width": 4,
+        "line-width": 3,
         "line-opacity": 0.95,
-        "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0.0, "#22C55E", 0.5, "#60A5FA", 1.0, "#A78BFA"],
+        "line-color": isDarkMode ? "#0EA5E9" : "#FF6B6B",
       },
     }),
-    []
+    [isDarkMode]
   );
 
   const selectionFillLayer = useMemo(
-    () => ({ id: "sel-fill", type: "fill", paint: { "fill-color": "#60A5FA", "fill-opacity": 0.1 } }),
-    []
+    () => ({
+      id: "sel-fill",
+      type: "fill",
+      paint: {
+        "fill-color": isDarkMode ? "#38BDF8" : "#FF6B6B",
+        "fill-opacity": 0.08,
+      },
+    }),
+    [isDarkMode]
   );
 
   const selectionOutlineGlowLayer = useMemo(
@@ -874,9 +887,14 @@ export default function MapPage() {
       id: "sel-outline-glow",
       type: "line",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-width": 10, "line-opacity": 0.18, "line-color": "#93C5FD", "line-blur": 2.0 },
+      paint: {
+        "line-width": 12,
+        "line-opacity": 0.2,
+        "line-color": isDarkMode ? "#38BDF8" : "#FF6B6B",
+        "line-blur": 3.0,
+      },
     }),
-    []
+    [isDarkMode]
   );
 
   const selectionOutlineMainLayer = useMemo(
@@ -886,11 +904,21 @@ export default function MapPage() {
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
         "line-width": 4,
-        "line-opacity": 0.95,
-        "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0.0, "#22C55E", 0.55, "#60A5FA", 1.0, "#A78BFA"],
+        "line-opacity": 1,
+        "line-gradient": [
+          "interpolate",
+          ["linear"],
+          ["line-progress"],
+          0.0,
+          isDarkMode ? "#2DD4BF" : "#22C55E",
+          0.5,
+          isDarkMode ? "#38BDF8" : "#FF6B6B",
+          1.0,
+          isDarkMode ? "#818CF8" : "#4338CA",
+        ],
       },
     }),
-    []
+    [isDarkMode]
   );
 
   // AUTH
@@ -1128,7 +1156,7 @@ export default function MapPage() {
       await fetchPois({ selectionType: "BBOX", bbox, categoriesOverride: [] });
     }
 
-    setFilterOpen(true);
+    setFilterOpen(false);
   }, [fetchPois, getViewportBbox]);
 
   const handleSelectAllFilters = useCallback(() => {
@@ -1183,6 +1211,8 @@ export default function MapPage() {
 
     setPreviewLine(null);
     setFreehandEnabled(false);
+
+
 
     if (pts.length < 3) {
       setSelection({ mode: null, polygon: [] });
@@ -1240,6 +1270,8 @@ export default function MapPage() {
           setResultsOpen(false);
           setFilterOpen(false);
           setIsChatOpen(false);
+          setSelection({ mode: null, polygon: [] });
+          setMode("VIEWPORT");
           const convId = res.conversation_id || res.conversationId;
           if (convId) {
             linkPolygonRouteConversation(convId);
@@ -1469,6 +1501,10 @@ export default function MapPage() {
     return out.slice(0, 1000);
   }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom]);
 
+  const canShowResultsPanel = useMemo(() => {
+    return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
+  }, [resultsOpen, selection]);
+
   const resultsPois = useMemo(() => {
     if (!resultsOpen) return [];
     if (!(selection?.mode === "polygon" && selection.polygon.length >= 3)) return [];
@@ -1480,9 +1516,23 @@ export default function MapPage() {
     });
   }, [pois, resultsOpen, resultsTab, selection]);
 
-  const canShowResultsPanel = useMemo(() => {
-    return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
-  }, [resultsOpen, selection]);
+  const resultsCategories = useMemo(() => {
+    if (!canShowResultsPanel) return [];
+    const keys = new Set();
+    pois.forEach((p) => {
+      const icon = poiIconByCategory(p);
+      if (icon?.uiKey) keys.add(icon.uiKey);
+    });
+    return UI_CATEGORIES.filter((c) => keys.has(c.key));
+  }, [pois, canShowResultsPanel]);
+
+  useEffect(() => {
+    if (resultsTab !== "all" && resultsCategories.length > 0) {
+      if (!resultsCategories.find((c) => c.key === resultsTab)) {
+        setResultsTab("all");
+      }
+    }
+  }, [resultsCategories, resultsTab]);
 
   // Normalize waypoint coords: backend may send latitude/longitude (camelCase); ensure numeric and consistent order
   const activeWaypoints = useMemo(() => {
@@ -1660,8 +1710,9 @@ export default function MapPage() {
     const bbox = polygonToBbox(selection.polygon);
     if (!bbox) return;
 
-    const bottomPad = isMobile ? 340 : 380; // Optimized for lowered list sheet
-    const rightPad = isMobile ? 16 : filterOpen ? (FILTER_PANEL_APPROX_WIDTH_DESKTOP + 60) : 90;
+    const bottomPad = isMobile ? 320 : 360; 
+    // If filter is open, push the polygon to the left slightly to avoid overlap
+    const rightPad = isMobile ? 16 : filterOpen ? (FILTER_PANEL_APPROX_WIDTH_DESKTOP + 80) : 100;
 
     map.fitBounds(
       [
@@ -1772,11 +1823,11 @@ export default function MapPage() {
           <button className="sidebar-item vivid-interactive" onClick={() => { setPreferencesModalOpen(true); setSidebarOpen(false); }}>
             <SettingsIcon /> Preferences
           </button>
-
-          <button className="sidebar-item logout vivid-interactive" onClick={handleLogout}>
-            <LogoutIcon /> Sign Out
-          </button>
         </nav>
+
+        <button className="sidebar-item logout vivid-interactive" onClick={handleLogout}>
+          <LogoutIcon /> Sign Out
+        </button>
       </aside>
 
       {/* 3. Main Content (MAP) */}
@@ -2065,7 +2116,12 @@ export default function MapPage() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {user && !activeRoute && (
-                  <Button type="primary" shape="round" onClick={openPolygonRouteParams} style={{ background: "var(--vivid-blue)", borderColor: "var(--vivid-blue)" }}>
+                  <Button 
+                    type="primary" 
+                    shape="round" 
+                    onClick={openPolygonRouteParams} 
+                    className="vivid-create-route-btn"
+                  >
                     Create AI Route
                   </Button>
                 )}
@@ -2074,7 +2130,7 @@ export default function MapPage() {
             </div>
 
             <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
-              {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...UI_CATEGORIES].map(t => {
+              {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...resultsCategories].map(t => {
                 const active = resultsTab === t.key;
                 return (
                   <button key={t.key} onClick={() => setResultsTab(t.key)}
@@ -2165,15 +2221,59 @@ export default function MapPage() {
           </div>
         )}
 
-        <Modal title="AI Route Parameters" open={polygonRouteParamsOpen} onCancel={() => setPolygonRouteParamsOpen(false)} footer={null} zIndex={1100}>
-          <Spin spinning={polygonRouteSubmitting}>
-            <Form form={polygonRouteForm} layout="vertical" onFinish={submitPolygonRoute}>
-              <Form.Item name="totalDays" label="Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
-              <Form.Item name="travelStyle" label="Travel Style"><Select options={[{ value: "general", label: "Balanced" }, { value: "history", label: "Historical" }, { value: "food", label: "Gourmet" }, { value: "nature", label: "Outdoors" }]} /></Form.Item>
-              <Button type="primary" block size="large" htmlType="submit" loading={polygonRouteSubmitting} style={{ borderRadius: 12 }}>Generate Smart Route</Button>
-            </Form>
-          </Spin>
-        </Modal>
+        <ConfigProvider
+          theme={{
+            algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
+            token: {
+              borderRadius: 14,
+              colorPrimary: "#FF6B6B",
+            }
+          }}
+        >
+          <Modal 
+            title={<div className="vivid-modal-title">Plan a Route</div>} 
+            open={polygonRouteParamsOpen} 
+            onCancel={() => setPolygonRouteParamsOpen(false)} 
+            footer={null} 
+            zIndex={1150}
+            className={`vivid-premium-modal route-plan-modal ${themeClass}`}
+            rootClassName={themeClass}
+            centered
+            width={400}
+            styles={{
+              mask: { backdropFilter: 'blur(10px)', background: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.2)' },
+              content: {
+                background: isDarkMode ? "#06080b" : "#fff",
+                padding: '32px',
+                overflow: 'hidden'
+              }
+            }}
+          >
+            <Spin spinning={polygonRouteSubmitting}>
+              <Form form={polygonRouteForm} layout="vertical" onFinish={submitPolygonRoute}>
+                <Form.Item name="totalDays" label="Trip Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
+                <Form.Item name="travelStyle" label="Preferred Travel Style">
+                  <Select 
+                    popupClassName="route-plan-select-dropdown"
+                    getPopupContainer={(trigger) => trigger.parentNode}
+                    options={[{ value: "general", label: "Balanced" }, { value: "history", label: "Historical" }, { value: "food", label: "Gourmet" }, { value: "nature", label: "Outdoors" }]} 
+                  />
+                </Form.Item>
+                <Button 
+                  type="primary" 
+                  block 
+                  size="large" 
+                  htmlType="submit" 
+                  loading={polygonRouteSubmitting} 
+                  className="vivid-create-route-btn"
+                  style={{ marginTop: 12 }}
+                >
+                  Done
+                </Button>
+              </Form>
+            </Spin>
+          </Modal>
+        </ConfigProvider>
 
         <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
 
@@ -2223,6 +2323,8 @@ export default function MapPage() {
         <CalendarModal
           open={calendarOpen}
           onClose={() => setCalendarOpen(false)}
+          themeClass={themeClass}
+          isDarkMode={isDarkMode}
         />
       </main>
     </div>

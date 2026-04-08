@@ -511,6 +511,7 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
                         contentBg: 'transparent',
                         paddingMD: 0,
                         borderRadiusLG: 40,
+                        boxShadow: 'none',
                     },
                 },
                 token: {

@@ -5,7 +5,10 @@ const http = axios.create({
   // Using / instead of full URL to use Vite Proxy.
   // This prevents CORS errors.
   baseURL: "/",
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Content-Type": "application/json",
+    "Accept-Language": "en"
+  },
   withCredentials: true,
 });
 
