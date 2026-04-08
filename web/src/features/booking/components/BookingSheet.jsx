@@ -92,6 +92,19 @@ export default function BookingSheet({ open, onClose }) {
     return () => clearTimeout(delayDebounce);
   }, [searchQuery, activeSearchField, state.bookingType]);
 
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (activeSearchField === 'origin' && originRef.current && !originRef.current.contains(event.target)) {
+        setActiveSearchField(null);
+      }
+      if (activeSearchField === 'destination' && destRef.current && !destRef.current.contains(event.target)) {
+        setActiveSearchField(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [activeSearchField]);
+
   const handleSearch = async () => {
     const newErrors = {};
     if (!state.searchParams.destination) newErrors.destination = "Required";
@@ -194,7 +207,7 @@ export default function BookingSheet({ open, onClose }) {
                     <div className="input-with-icon-mobile">
                       <MdFlightTakeoff className="input-icon-prefix" />
                       <input
-                        type="text" placeholder="e.g. IST or Istanbul"
+                        type="text" placeholder=""
                         value={activeSearchField === 'origin' ? searchQuery : (originLabel || state.searchParams.origin)}
                         onFocus={() => {
                           setActiveSearchField('origin');
@@ -249,7 +262,7 @@ export default function BookingSheet({ open, onClose }) {
                   <div className="input-with-icon-mobile">
                     {state.bookingType === 'hotels' ? <MdHotel className="input-icon-prefix" /> : <MdLocationOn className="input-icon-prefix" />}
                     <input
-                      type="text" placeholder={state.bookingType === 'hotels' ? "Where are you going? (City or hotel)" : "e.g. CDG or Paris"}
+                      type="text" placeholder={state.bookingType === 'hotels' ? "City or hotel" : ""}
                       autoComplete="off"
                       value={activeSearchField === 'destination' ? searchQuery : (destLabel || state.searchParams.destination)}
                       onFocus={() => {
@@ -324,6 +337,7 @@ export default function BookingSheet({ open, onClose }) {
                     <label className="input-label-mobile">{state.bookingType === 'hotels' ? 'CHECK-IN' : 'DATE'}</label>
                     <input
                       type="date"
+                      className={state.searchParams.dates ? 'date-filled' : 'date-empty'}
                       onFocus={() => setActiveSearchField(null)}
                       min={new Date().toISOString().split('T')[0]}
                       value={state.searchParams.dates}
@@ -336,6 +350,7 @@ export default function BookingSheet({ open, onClose }) {
                       <label className="input-label-mobile">{state.bookingType === 'hotels' ? 'CHECK-OUT' : 'RETURN'}</label>
                       <input
                         type="date"
+                        className={state.searchParams.checkOutDate ? 'date-filled' : 'date-empty'}
                         onFocus={() => setActiveSearchField(null)}
                         min={state.searchParams.dates || new Date().toISOString().split('T')[0]}
                         value={state.searchParams.checkOutDate}
@@ -355,9 +370,9 @@ export default function BookingSheet({ open, onClose }) {
                     </div>
                   </div>
                   <div className="input-group-modern half">
-                    <label className="input-label-mobile">BUDGET (OPTIONAL)</label>
+                    <label className="input-label-mobile">BUDGET (MAX)</label>
                     <input
-                      type="number" min="0" placeholder="Max $"
+                      type="number" min="0" placeholder="$"
                       onFocus={() => setActiveSearchField(null)}
                       value={state.searchParams.budget}
                       onChange={(e) => {

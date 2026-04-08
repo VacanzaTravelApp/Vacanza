@@ -294,13 +294,7 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
                 onClick={() => setView('EDIT_PROFILE')}
             />
 
-            <SectionCard
-                title="Preferences"
-                subtitle="Customized your travel experience"
-                icon={<SlidersOutlined />}
-                iconBg="var(--vivid-teal, #2DD4A8)"
-                onClick={onOpenPreferences}
-            />
+
 
             <SectionCard
                 title="Account Details"

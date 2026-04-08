@@ -13,8 +13,8 @@ function formatEventStart(startTime) {
     return String(startTime);
   }
   const day = d.getDate();
-  const month = d.toLocaleString("tr-TR", { month: "long" });
-  const hm = d.toLocaleTimeString("tr-TR", {
+  const month = d.toLocaleString("en-US", { month: "short" });
+  const hm = d.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -56,9 +56,9 @@ export default function EventCard({ event }) {
     matchReason,
   } = event;
 
-  const displayName = name?.trim() || "Etkinlik";
+  const displayName = name?.trim() || "Event";
   const dateLine = formatEventStart(startTime);
-  const ticketLabel = `Bilet al: ${displayName}`;
+  const ticketLabel = `Get tickets: ${displayName}`;
   const titleId =
     event.id != null ? `event-card-title-${String(event.id)}` : "event-card-title";
 
@@ -128,7 +128,7 @@ export default function EventCard({ event }) {
             rel="noopener noreferrer"
             aria-label={ticketLabel}
           >
-            Bilet Al
+            Get Tickets
           </Button>
         ) : null}
       </div>

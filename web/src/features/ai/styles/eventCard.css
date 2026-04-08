@@ -1,13 +1,14 @@
 /* Single recommended event — horizontal scroll tile (~220px) */
+/* Aligned with Vacanza app theme system (.theme-day / .theme-night) */
 
 .event-card {
-  --event-card-accent: #3da8c8;
-  --event-card-accent-soft: rgba(61, 168, 200, 0.18);
-  --event-card-text: #1c1c1e;
-  --event-card-text-secondary: #6b7280;
-  --event-card-muted: #9ca3af;
-  --event-card-surface: #ffffff;
-  --event-card-border: #e5e7eb;
+  --event-card-accent: var(--vc-primary, #00B4D8);
+  --event-card-accent-soft: var(--vc-primary-soft, rgba(0, 180, 216, 0.14));
+  --event-card-text: var(--vc-text, #2c3545);
+  --event-card-text-secondary: var(--vc-text-secondary, #5a6b7a);
+  --event-card-muted: var(--vc-muted, #94a3b8);
+  --event-card-surface: var(--vc-card-bg, #ffffff);
+  --event-card-border: var(--vc-border, rgba(0, 0, 0, 0.08));
   --event-card-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
 
   position: relative;
@@ -18,7 +19,7 @@
   flex-shrink: 0;
   background: var(--event-card-surface);
   border: 1px solid var(--event-card-border);
-  border-radius: 12px;
+  border-radius: 14px;
   box-shadow: var(--event-card-shadow);
   overflow: hidden;
   outline: none;
@@ -30,7 +31,7 @@
 
 .event-card:hover {
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .event-card:focus-visible {
@@ -39,19 +40,13 @@
     0 0 0 4px var(--event-card-accent);
 }
 
-@media (prefers-color-scheme: dark) {
-  .event-card {
-    --event-card-text: #f1f5f9;
-    --event-card-text-secondary: #94a3b8;
-    --event-card-muted: #64748b;
-    --event-card-surface: #1e293b;
-    --event-card-border: rgba(255, 255, 255, 0.1);
-    --event-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-  }
+/* Dark mode via app theme class */
+.theme-night .event-card {
+  --event-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
 
-  .event-card:hover {
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-  }
+.theme-night .event-card:hover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
 }
 
 /* Thumbnail region — 120px, rounded top */
@@ -59,13 +54,13 @@
   position: relative;
   height: 120px;
   flex-shrink: 0;
-  border-radius: 12px 12px 0 0;
+  border-radius: 14px 14px 0 0;
   overflow: hidden;
   background: linear-gradient(
     135deg,
-    rgba(61, 168, 200, 0.35) 0%,
-    rgba(14, 165, 233, 0.2) 45%,
-    rgba(45, 212, 191, 0.25) 100%
+    rgba(0, 180, 216, 0.30) 0%,
+    rgba(14, 165, 233, 0.18) 45%,
+    rgba(45, 212, 191, 0.22) 100%
   );
 }
 
@@ -109,12 +104,10 @@
   border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-@media (prefers-color-scheme: dark) {
-  .event-card-badge--cat {
-    background: rgba(30, 41, 59, 0.92);
-    color: #e2e8f0;
-    border-color: rgba(255, 255, 255, 0.1);
-  }
+.theme-night .event-card-badge--cat {
+  background: rgba(26, 27, 38, 0.88);
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .event-card-body {
@@ -180,12 +173,15 @@
   color: var(--event-card-accent) !important;
   background: transparent !important;
   font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.2s ease;
 }
 
 .event-card-ticket-btn.ant-btn:hover {
   border-color: var(--event-card-accent) !important;
   color: #fff !important;
   background: var(--event-card-accent) !important;
+  transform: translateY(-1px);
 }
 
 .event-card-ticket-btn.ant-btn:focus-visible {
