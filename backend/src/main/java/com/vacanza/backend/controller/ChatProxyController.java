@@ -52,6 +52,15 @@ public class ChatProxyController {
                         "museum", "monument", "historic_site", "church", "park", "neighborhood",
                         "landmark", "art_gallery", "tourist_attraction", "restaurant", "cafe", "bar");
 
+        /**
+         * Dining categories that should be fetched using a tight bbox around sightseeing POIs,
+         * not the full destination bbox. This keeps recommended restaurants/cafes near the
+         * day's actual sightseeing spots.
+         */
+        private static final java.util.Set<String> DINING_CATS = java.util.Set.of(
+                        "restaurant", "cafe", "bar", "fast_food",
+                        "nightclub", "nightlife", "pub", "food", "market", "bakery");
+
         /** Resolve search categories from request or fall back to defaults. */
         private List<String> resolveSearchCategories(List<String> fromRequest) {
                 if (fromRequest != null && !fromRequest.isEmpty()) {
@@ -660,11 +669,33 @@ public class ChatProxyController {
                         cats.add("tourist_attraction");
                 }
 
+                // Phase 1: fetch sightseeing categories with full destination bbox
+                List<String> sightCats = cats.stream()
+                                .filter(c -> c != null && !DINING_CATS.contains(c.toLowerCase(java.util.Locale.ROOT)))
+                                .toList();
+                List<String> diningCats = cats.stream()
+                                .filter(c -> c != null && DINING_CATS.contains(c.toLowerCase(java.util.Locale.ROOT)))
+                                .toList();
+
                 List<PoiResult> all = new java.util.ArrayList<>();
-                for (String c : cats) {
-                        if (c == null || c.isBlank()) continue;
+                for (String c : sightCats) {
+                        if (c.isBlank()) continue;
                         var pois = mapboxPoiSearchClient
                                         .searchByCategory(c, dest.getMinLon(), dest.getMinLat(), dest.getMaxLon(), dest.getMaxLat())
+                                        .blockOptional()
+                                        .orElse(List.of());
+                        all.addAll(pois);
+                }
+
+                // Phase 2: compute a tight bbox around sightseeing POIs (+1500 m padding)
+                // so dining results stay near where the traveller will actually be.
+                double[] dBbox = tightBboxWithPaddingMeters(all, dest, 1500.0);
+
+                // Phase 3: fetch dining categories with tight bbox
+                for (String c : diningCats) {
+                        if (c.isBlank()) continue;
+                        var pois = mapboxPoiSearchClient
+                                        .searchByCategory(c, dBbox[0], dBbox[1], dBbox[2], dBbox[3])
                                         .blockOptional()
                                         .orElse(List.of());
                         all.addAll(pois);
@@ -695,7 +726,107 @@ public class ChatProxyController {
                                 new java.util.ArrayList<>(dedup.values()),
                                 profile,
                                 PersonalizedPoiParams.forUser(userId));
+
+                // ── POI POOL DIAGNOSTIC LOG ──────────────────────────────────────────
+                // Shows exactly what is sent to the AI. Check this first when debugging
+                // bad routes: wrong POIs here = backend problem; correct POIs but bad
+                // route = AI or post-processing problem.
+                long sightCount = merged.stream().filter(p -> !DINING_CATS.contains(
+                                (p.getCategory() == null ? "" : p.getCategory()).toLowerCase(java.util.Locale.ROOT))).count();
+                long diningCount = merged.size() - sightCount;
+                log.info("[POI_POOL] destination='{}' total={} (sight={} dining={})",
+                                destination, merged.size(), sightCount, diningCount);
+                for (PoiResult p : merged) {
+                        log.info("[POI_POOL]   [{}] {} → lat:{} lon:{}",
+                                        p.getCategory(), p.getName(), p.getLat(), p.getLon());
+                }
+                // ─────────────────────────────────────────────────────────────────────
+
                 return new PoiToolExecutionResult(merged, planning);
+        }
+
+        /**
+         * Compute a bounding box that tightly wraps the given POIs and adds {@code paddingMeters}
+         * on every side. Used to restrict dining POI searches to the area where sightseeing happens.
+         *
+         * <p>Fallback: if {@code pois} has no valid coordinates, returns a small box centred on
+         * {@code dest} with radius {@code paddingMeters}.
+         *
+         * @return [minLon, minLat, maxLon, maxLat]
+         */
+        /**
+         * Maximum distance from the sightseeing centroid that a POI may be and still
+         * influence the dining bbox. Outliers beyond this radius (e.g. Yoros Castle 19 km
+         * away, Senlikkoy 23 km away) would otherwise stretch the bbox across the whole
+         * city and pull in restaurants from totally different districts.
+         */
+        private static final double CLUSTER_FILTER_RADIUS_M = 7_000.0;
+
+        private static double[] tightBboxWithPaddingMeters(
+                        List<PoiResult> pois,
+                        DestinationGeocodeResult dest,
+                        double paddingMeters) {
+
+                if (pois.isEmpty()) {
+                        // No sightseeing POIs — small box around city centre
+                        double padLat0 = paddingMeters / 111_000.0;
+                        double padLon0 = paddingMeters / (111_000.0 * Math.cos(Math.toRadians(dest.getCenterLat())));
+                        return new double[]{
+                                dest.getCenterLon() - padLon0, dest.getCenterLat() - padLat0,
+                                dest.getCenterLon() + padLon0, dest.getCenterLat() + padLat0
+                        };
+                }
+
+                // Step 1: compute raw centroid of ALL sightseeing POIs
+                double sumLat = 0, sumLon = 0;
+                for (PoiResult p : pois) { sumLat += p.getLat(); sumLon += p.getLon(); }
+                double centLat = sumLat / pois.size();
+                double centLon = sumLon / pois.size();
+
+                // Step 2: keep only POIs within CLUSTER_FILTER_RADIUS_M of the centroid
+                // This removes outliers (castles, suburbs, far museums) that would
+                // otherwise stretch the bbox across the entire city.
+                List<PoiResult> core = pois.stream()
+                        .filter(p -> haversineMeters(centLat, centLon, p.getLat(), p.getLon()) <= CLUSTER_FILTER_RADIUS_M)
+                        .collect(java.util.stream.Collectors.toList());
+
+                if (core.isEmpty()) {
+                        core = pois; // safety: if every POI is an outlier, use all
+                }
+
+                log.info("[POI_DINING_BBOX] centroid=({},{}) cluster={}/{} POIs within {}m",
+                        centLat, centLon, core.size(), pois.size(), (int) CLUSTER_FILTER_RADIUS_M);
+
+                // Step 3: min/max of the core cluster
+                double minLat = Double.MAX_VALUE, maxLat = -Double.MAX_VALUE;
+                double minLon = Double.MAX_VALUE, maxLon = -Double.MAX_VALUE;
+                for (PoiResult p : core) {
+                        minLat = Math.min(minLat, p.getLat());
+                        maxLat = Math.max(maxLat, p.getLat());
+                        minLon = Math.min(minLon, p.getLon());
+                        maxLon = Math.max(maxLon, p.getLon());
+                }
+                double centerLat = (minLat + maxLat) / 2.0;
+                double padLat = paddingMeters / 111_000.0;
+                double padLon = paddingMeters / (111_000.0 * Math.cos(Math.toRadians(centerLat)));
+                double[] bbox = new double[]{
+                        minLon - padLon, minLat - padLat,
+                        maxLon + padLon, maxLat + padLat
+                };
+                log.info("[POI_DINING_BBOX] result: minLon={} minLat={} maxLon={} maxLat={}",
+                        bbox[0], bbox[1], bbox[2], bbox[3]);
+                return bbox;
+        }
+
+        /** Haversine distance in metres between two lat/lon points. */
+        private static double haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+                final double R = 6_371_000.0;
+                double phi1 = Math.toRadians(lat1), phi2 = Math.toRadians(lat2);
+                double dPhi = Math.toRadians(lat2 - lat1);
+                double dLam = Math.toRadians(lon2 - lon1);
+                double a = Math.sin(dPhi / 2) * Math.sin(dPhi / 2)
+                        + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLam / 2) * Math.sin(dLam / 2);
+                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
         /**
