@@ -8,6 +8,9 @@ ArPoi poiToArPoi(Poi p, double userLat, double userLng) {
     id: p.poiId,
     name: p.name,
     categoryKey: p.category,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    externalId: p.externalId,
     distanceMeters: distanceMeters(
       lat1: userLat,
       lng1: userLng,

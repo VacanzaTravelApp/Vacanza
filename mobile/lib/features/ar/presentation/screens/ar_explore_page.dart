@@ -20,6 +20,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:vector_math/vector_math_64.dart' as vmath;
 
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/features/behavior/domain/feedback_poi_ref.dart';
+import 'package:mobile/features/behavior/presentation/cubit/favorite_poi_cubit.dart';
+import 'package:mobile/features/behavior/presentation/widgets/poi_favorite_heart_button.dart';
 import 'package:mobile/features/checkin/data/services/location_service.dart';
 import 'package:mobile/features/checkin/presentation/bloc/checkin_bloc.dart';
 import 'package:mobile/features/checkin/presentation/bloc/checkin_event.dart';
@@ -109,6 +112,10 @@ class _ArExplorePageState extends State<ArExplorePage>
     WidgetsBinding.instance.addObserver(this);
     _checkSupportAndPermissions();
     _startHeadingUpdates();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<FavoritePoiCubit>().refreshAffinity();
+    });
   }
 
   @override
@@ -705,6 +712,13 @@ class _ArExplorePageState extends State<ArExplorePage>
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                      PoiFavoriteHeartButton(
+                        ref: FeedbackPoiRef.fromArPoi(poi),
+                        iconSize: 24,
+                        padding: EdgeInsets.zero,
+                        filledColor: const Color(0xFFFF8A95),
+                        outlineColor: Colors.white.withValues(alpha: 0.88),
                       ),
                       IconButton(
                         icon: const Icon(Icons.close, color: Colors.white),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 
+import 'package:mobile/features/behavior/domain/feedback_poi_ref.dart';
+import 'package:mobile/features/behavior/presentation/widgets/poi_favorite_heart_button.dart';
+
 import '../../../data/models/poi.dart';
 import '../../../data/models/poi_category_catalog.dart';
 
@@ -96,7 +99,15 @@ class PoiResultCard extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(width: 10),
+              const SizedBox(width: 6),
+
+              PoiFavoriteHeartButton(
+                ref: FeedbackPoiRef.fromPoi(poi),
+                iconSize: 22,
+                padding: EdgeInsets.zero,
+              ),
+
+              const SizedBox(width: 4),
 
               Text(
                 '→',

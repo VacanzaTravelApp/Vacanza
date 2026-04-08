@@ -47,8 +47,11 @@ class ArPoiSourceFromBackendNearby implements ArPoiSource {
             id: dto.poiId,
             name: dto.name,
             categoryKey: dto.category,
+            latitude: dto.latitude,
+            longitude: dto.longitude,
             distanceMeters: dto.distanceMeters,
             bearingDegrees: b,
+            externalId: dto.externalId,
           ),
         );
       }
