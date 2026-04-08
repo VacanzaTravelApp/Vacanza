@@ -34,6 +34,7 @@ public class SecurityConfigDev {
                         .requestMatchers("/chat/**").authenticated()
                         .requestMatchers("/api/behavior/**").authenticated()
                         .requestMatchers("/api/feedback/**").authenticated()
+                        .requestMatchers("/users/me/trip-calendar/**").authenticated()
                         .anyRequest().permitAll())
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(form -> form.disable())
