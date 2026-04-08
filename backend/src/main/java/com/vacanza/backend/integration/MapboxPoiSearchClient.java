@@ -170,6 +170,151 @@ public class MapboxPoiSearchClient {
                 });
     }
 
+
+    /**
+     * High-level resolver: tries forward search → expanded bbox → suggest+retrieve.
+     * Returns coordinates for a place name, guaranteed to try every strategy.
+     */
+    public Mono<PoiResult> resolvePlace(String placeName, String destination,
+            double minLon, double minLat, double maxLon, double maxLat) {
+        String query = placeName.contains(",") ? placeName : placeName + ", " + destination;
+
+        // Step 1: forward search in bbox (EN)
+        return forwardSearchPoi(query, minLon, minLat, maxLon, maxLat)
+                .flatMap(results -> results.isEmpty() ? Mono.<PoiResult>empty() : Mono.just(results.get(0)))
+                .doOnNext(r -> log.info("[RESOLVE] Step 1 (forward/bbox) hit for '{}'", placeName))
+
+                // Step 2: forward search with expanded bbox (+50%)
+                .switchIfEmpty(Mono.defer(() -> {
+                    double latRange = (maxLat - minLat) * 0.5;
+                    double lonRange = (maxLon - minLon) * 0.5;
+                    log.info("[RESOLVE] Step 2 (forward/expanded-bbox) for '{}'", placeName);
+                    return forwardSearchPoi(query,
+                            minLon - lonRange, minLat - latRange,
+                            maxLon + lonRange, maxLat + latRange)
+                            .flatMap(r -> r.isEmpty() ? Mono.<PoiResult>empty() : Mono.just(r.get(0)));
+                }))
+
+                // Step 3: suggest+retrieve (fuzzy matching, no bbox constraint)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.info("[RESOLVE] Step 3 (suggest+retrieve) for '{}'", placeName);
+                    double proxLon = (minLon + maxLon) / 2;
+                    double proxLat = (minLat + maxLat) / 2;
+                    return suggestAndRetrieve(query, proxLon, proxLat);
+                }))
+
+                // Step 4: forward search without bbox (global, proximity-biased)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.info("[RESOLVE] Step 4 (forward/no-bbox) for '{}'", placeName);
+                    return forwardSearchPoiWithProximity(query,
+                            (minLon + maxLon) / 2, (minLat + maxLat) / 2);
+                }))
+
+                .doOnNext(r -> log.info("[RESOLVE] '{}' -> ({}, {})", placeName, r.getLat(), r.getLon()));
+    }
+
+    /**
+     * Forward search without bbox, using proximity bias only (global scope).
+     * Last-resort fallback — wider net but proximity keeps results relevant.
+     */
+    public Mono<PoiResult> forwardSearchPoiWithProximity(String query, double proxLon, double proxLat) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/search/searchbox/v1/forward")
+                        .queryParam("q", query)
+                        .queryParam("limit", 3)
+                        .queryParam("types", "poi,address")
+                        .queryParam("proximity", proxLon + "," + proxLat)
+                        .queryParam("language", "en")
+                        .build())
+                .retrieve()
+                .bodyToMono(FeatureCollection.class)
+                .flatMap(resp -> {
+                    if (resp == null || resp.getFeatures() == null || resp.getFeatures().isEmpty()) {
+                        return Mono.empty();
+                    }
+                    PoiResult r = toPoiResult(resp.getFeatures().get(0), "attraction");
+                    return r != null ? Mono.just(r) : Mono.empty();
+                })
+                .onErrorResume(e -> {
+                    log.warn("[POI FORWARD/PROXIMITY] failed for '{}': {}", query, e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    /**
+     * Suggest + Retrieve 2-step flow for fuzzy POI matching.
+     * /suggest finds candidates with fuzzy matching (handles multilingual names),
+     * /retrieve fetches exact coordinates for the best match.
+     */
+    public Mono<PoiResult> suggestAndRetrieve(String query, double proxLon, double proxLat) {
+        String sessionToken = java.util.UUID.randomUUID().toString();
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/search/searchbox/v1/suggest")
+                        .queryParam("q", query)
+                        .queryParam("limit", 3)
+                        .queryParam("types", "poi")
+                        .queryParam("proximity", proxLon + "," + proxLat)
+                        .queryParam("language", "en")
+                        .queryParam("session_token", sessionToken)
+                        .build())
+                .retrieve()
+                .bodyToMono(SuggestResponse.class)
+                .flatMap(resp -> {
+                    if (resp == null || resp.getSuggestions() == null || resp.getSuggestions().isEmpty()) {
+                        return Mono.empty();
+                    }
+                    // Pick the first POI suggestion
+                    Suggestion best = null;
+                    for (Suggestion s : resp.getSuggestions()) {
+                        if (s != null && s.getMapboxId() != null && !s.getMapboxId().isBlank()) {
+                            if ("poi".equals(s.getFeatureType())) {
+                                best = s;
+                                break;
+                            }
+                            if (best == null) {
+                                best = s; // fallback to any type
+                            }
+                        }
+                    }
+                    if (best == null) return Mono.empty();
+                    String mapboxId = best.getMapboxId();
+                    log.info("[SUGGEST] best match for '{}': name='{}', id={}", query,
+                            best.getName(), mapboxId);
+                    return retrieveByMapboxId(mapboxId, sessionToken);
+                })
+                .onErrorResume(e -> {
+                    log.warn("[SUGGEST+RETRIEVE] failed for '{}': {}", query, e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    /**
+     * Retrieve feature details (coordinates) by mapbox_id.
+     * Used after /suggest to get exact coordinates.
+     */
+    private Mono<PoiResult> retrieveByMapboxId(String mapboxId, String sessionToken) {
+        return webClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/search/searchbox/v1/retrieve/{id}")
+                        .queryParam("session_token", sessionToken)
+                        .build(mapboxId))
+                .retrieve()
+                .bodyToMono(FeatureCollection.class)
+                .flatMap(resp -> {
+                    if (resp == null || resp.getFeatures() == null || resp.getFeatures().isEmpty()) {
+                        return Mono.empty();
+                    }
+                    PoiResult r = toPoiResult(resp.getFeatures().get(0), "attraction");
+                    return r != null ? Mono.just(r) : Mono.empty();
+                })
+                .onErrorResume(e -> {
+                    log.warn("[RETRIEVE] failed for mapboxId='{}': {}", mapboxId, e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
     private static PoiResult toPoiResult(Feature f, String normalizedSearchCategory) {
         Properties p = f.getProperties();
         if (p == null || p.getName() == null || p.getName().isBlank()) {
@@ -258,6 +403,28 @@ public class MapboxPoiSearchClient {
         private Double longitude;
     }
 
+    /** Suggest endpoint response. */
+    @Data
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class SuggestResponse {
+        private List<Suggestion> suggestions;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class Suggestion {
+        private String name;
+        @JsonProperty("mapbox_id")
+        private String mapboxId;
+        @JsonProperty("feature_type")
+        private String featureType;
+        private String address;
+        @JsonProperty("full_address")
+        private String fullAddress;
+    }
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -270,3 +437,4 @@ public class MapboxPoiSearchClient {
         private double maxLat;
     }
 }
+
