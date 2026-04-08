@@ -2325,6 +2325,26 @@ export default function MapPage() {
           onClose={() => setCalendarOpen(false)}
           themeClass={themeClass}
           isDarkMode={isDarkMode}
+          onOpenRouteFromCalendar={async (routeId) => {
+            setCalendarOpen(false);
+            try {
+              const d = await aiApi.getRoute(routeId);
+              const raw = d?.routeData && typeof d.routeData === "object" ? d.routeData : {};
+              setActiveRoute(
+                normalizeRouteForMap({
+                  ...raw,
+                  title: d.title ?? raw.title,
+                  destination: d.destination ?? raw.destination,
+                  total_days: d.totalDays ?? raw.total_days,
+                  totalDays: d.totalDays ?? raw.totalDays,
+                })
+              );
+              setActiveDay(1);
+              setIsChatOpen(false);
+            } catch (e) {
+              message.error(e?.friendlyMessage || "Could not load route.");
+            }
+          }}
         />
       </main>
     </div>

@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
-import { Modal, Typography, Button, Input, Select, ConfigProvider } from 'antd';
-import { CloseOutlined, LeftOutlined, RightOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Modal, Button, Input, Select, ConfigProvider, Spin, message } from 'antd';
+import { CloseOutlined, LeftOutlined, RightOutlined, PlusOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
+import { useAuth } from '../context/useAuth';
+import { deleteTripCalendarEvent, deleteTripCalendarEventsByRoute, listTripCalendarEvents } from '../api/tripCalendarApi';
 import './CalendarModal.css';
 
-const { Title, Text } = Typography;
 const { Option } = Select;
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -17,15 +19,27 @@ const CATEGORIES = [
     { key: 'Transport', color: '#EF4444' },
 ];
 
+/** Saved liked routes on the calendar (server). */
+const ROUTE_EVENT_COLOR = '#8B5CF6';
+
+function formatRouteDayLabel(re) {
+    const td = Number(re.totalDays) || 1;
+    const id = Number(re.itineraryDay) || 1;
+    if (td > 1) return `Day ${id}/${td} · ${re.title}`;
+    return re.title;
+}
+
 function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDay(y, m) { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; }
 
-export default function CalendarModal({ open, onClose, isDarkMode = true, themeClass = "theme-night" }) {
+export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, isDarkMode = true, themeClass = "theme-night" }) {
+    const { isAuthenticated } = useAuth();
     const today = new Date();
     const [month, setMonth] = useState(today.getMonth());
     const [year, setYear] = useState(today.getFullYear());
     const [events, setEvents] = useState([]);
-
+    const [remoteEvents, setRemoteEvents] = useState([]);
+    const [remoteLoading, setRemoteLoading] = useState(false);
     // Selection state: click first day, then click second day for range
     const [selectStart, setSelectStart] = useState(null);
     const [selectEnd, setSelectEnd] = useState(null);
@@ -36,7 +50,15 @@ export default function CalendarModal({ open, onClose, isDarkMode = true, themeC
     const [formPos, setFormPos] = useState({ top: 0, left: 0 });
     const [newTitle, setNewTitle] = useState('');
     const [newCat, setNewCat] = useState('Activity');
+    /** Right-hand detail panel (Apple-style inspector) */
+    const [eventDetail, setEventDetail] = useState(null);
     const gridRef = useRef(null);
+
+    const closeEventDetail = useCallback(() => setEventDetail(null), []);
+
+    useEffect(() => {
+        if (!open) setEventDetail(null);
+    }, [open]);
 
     const prev = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); };
     const next = () => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); };
@@ -44,10 +66,99 @@ export default function CalendarModal({ open, onClose, isDarkMode = true, themeC
     const isToday = (d) => d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
     const catInfo = (key) => CATEGORIES.find(c => c.key === key) || CATEGORIES[2];
 
-    const getEvts = (d) => events.filter(e => {
-        const end = e.endDay || e.day;
-        return d >= e.day && d <= end && e.month === month && e.year === year;
-    });
+    const loadRemoteEvents = useCallback(async () => {
+        if (!open || !isAuthenticated) {
+            setRemoteEvents([]);
+            return;
+        }
+        setRemoteLoading(true);
+        try {
+            const rows = await listTripCalendarEvents(year, month + 1);
+            setRemoteEvents(Array.isArray(rows) ? rows : []);
+        } catch {
+            setRemoteEvents([]);
+        } finally {
+            setRemoteLoading(false);
+        }
+    }, [open, isAuthenticated, year, month]);
+
+    useEffect(() => {
+        loadRemoteEvents();
+    }, [loadRemoteEvents]);
+
+    useEffect(() => {
+        const onChanged = () => {
+            if (open) loadRemoteEvents();
+        };
+        window.addEventListener('vacanza-trip-calendar-changed', onChanged);
+        return () => window.removeEventListener('vacanza-trip-calendar-changed', onChanged);
+    }, [open, loadRemoteEvents]);
+
+    /** Unified chips for one calendar day: saved routes + local notes */
+    const getEvts = (d) => {
+        const fromRemote = remoteEvents
+            .filter((re) => {
+                const dt = dayjs(re.eventDate);
+                return dt.date() === d && dt.month() === month && dt.year() === year;
+            })
+            .map((re) => ({
+                key: `remote-${re.eventId}`,
+                title: formatRouteDayLabel(re),
+                shortTitle: re.title,
+                color: ROUTE_EVENT_COLOR,
+                routeId: re.routeId,
+                eventId: re.eventId,
+                itineraryDay: Number(re.itineraryDay) || 1,
+                totalDays: Number(re.totalDays) || 1,
+            }));
+
+        const fromLocal = events
+            .filter((e) => {
+                const end = e.endDay || e.day;
+                return d >= e.day && d <= end && e.month === month && e.year === year;
+            })
+            .map((e) => ({
+                key: `local-${events.indexOf(e)}-${e.title}`,
+                title: e.title,
+                color: e.color,
+                localIndex: events.indexOf(e),
+                day: e.day,
+                endDay: e.endDay || null,
+            }));
+
+        return [...fromRemote, ...fromLocal];
+    };
+
+    const removeRemoteEvent = async (eventId) => {
+        try {
+            await deleteTripCalendarEvent(eventId);
+            await loadRemoteEvents();
+            closeEventDetail();
+            try {
+                window.dispatchEvent(new CustomEvent('vacanza-trip-calendar-changed'));
+            } catch {
+                /* ignore */
+            }
+        } catch (e) {
+            message.error(e?.friendlyMessage || 'Could not remove calendar item.');
+        }
+    };
+
+    const removeRemoteRouteAll = async (routeId) => {
+        try {
+            await deleteTripCalendarEventsByRoute(routeId);
+            await loadRemoteEvents();
+            closeEventDetail();
+            try {
+                window.dispatchEvent(new CustomEvent('vacanza-trip-calendar-changed'));
+            } catch {
+                /* ignore */
+            }
+            message.success('Trip removed from calendar.');
+        } catch (e) {
+            message.error(e?.friendlyMessage || 'Could not remove trip from calendar.');
+        }
+    };
 
     const rangeMin = () => selectStart && selectEnd ? Math.min(selectStart, selectEnd) : selectStart;
     const rangeMax = () => selectStart && selectEnd ? Math.max(selectStart, selectEnd) : selectStart;
@@ -110,6 +221,7 @@ export default function CalendarModal({ open, onClose, isDarkMode = true, themeC
 
     const removeEvent = (idx) => {
         setEvents(prev => prev.filter((_, i) => i !== idx));
+        closeEventDetail();
     };
 
     const dim = getDaysInMonth(year, month);
@@ -142,7 +254,7 @@ export default function CalendarModal({ open, onClose, isDarkMode = true, themeC
                 open={open}
                 onCancel={() => { onClose(); resetSelection(); }}
                 footer={null}
-                width={820}
+                width={eventDetail ? 1080 : 820}
                 centered
                 closable={false}
                 styles={{
@@ -158,13 +270,23 @@ export default function CalendarModal({ open, onClose, isDarkMode = true, themeC
                     </div>
                 )}
             >
-                <div className="cal-container">
+                <div className={`cal-modal-row ${eventDetail ? 'cal-modal-row--split' : ''}`}>
+                <div className={`cal-container ${eventDetail ? 'cal-container--split-left' : ''}`}>
                     <div className="cal-nav">
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                            <span className="cal-month-name">{MONTH_NAMES[month]}</span>
-                            <span className="cal-year">{year}</span>
+                        <div>
+                            <div className="cal-nav-heading">
+                                <span className="cal-month-name">{MONTH_NAMES[month]}</span>
+                                <span className="cal-year">{year}</span>
+                            </div>
+                            <p className="cal-help-line">
+                                Click an event to open details on the right — map, remove one day, or remove the whole trip.
+                                Double-click a date to add a note.
+                            </p>
                         </div>
                         <div className="cal-nav-right">
+                            {remoteLoading ? (
+                                <Spin size="small" style={{ marginRight: 8 }} aria-label="Loading calendar" />
+                            ) : null}
                             {selectStart && (
                                 <Button size="small" className="cal-cancel-sel" onClick={resetSelection}>Cancel</Button>
                             )}
@@ -214,11 +336,45 @@ export default function CalendarModal({ open, onClose, isDarkMode = true, themeC
                                         {c.cur && !selectStart && <PlusOutlined className="cal-add-icon" />}
                                     </div>
                                     <div className="cal-events">
-                                        {evts.map((ev, i) => (
-                                            <div key={i} className="cal-event-chip" style={{ background: ev.color }}>
-                                                {ev.title}
-                                            </div>
-                                        ))}
+                                        {evts.map((ev) => {
+                                            const routeMulti = !!(ev.routeId && ev.totalDays > 1);
+                                            const primaryText = (ev.shortTitle || ev.title || "").trim();
+                                            return (
+                                                <div
+                                                    key={ev.key}
+                                                    className={`cal-event-pill ${ev.routeId ? "cal-event-pill--route" : "cal-event-pill--local"}`}
+                                                    style={
+                                                        ev.routeId
+                                                            ? undefined
+                                                            : { "--local-pill-bg": ev.color }
+                                                    }
+                                                >
+                                                    <button
+                                                        type="button"
+                                                        className="cal-event-pill-main cal-event-pill-main--full"
+                                                        title="Open details"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEventDetail({ ev, dayOfMonth: c.day });
+                                                        }}
+                                                    >
+                                                        <span className="cal-event-pill-line">
+                                                            {routeMulti ? (
+                                                                <>
+                                                                    <span className="cal-event-pill-meta">
+                                                                        Day {ev.itineraryDay} of {ev.totalDays}
+                                                                    </span>
+                                                                    <span className="cal-event-pill-sep" aria-hidden>
+                                                                        ·
+                                                                    </span>
+                                                                </>
+                                                            ) : null}
+                                                            <span className="cal-event-pill-ellip">{primaryText}</span>
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             );
@@ -237,18 +393,38 @@ export default function CalendarModal({ open, onClose, isDarkMode = true, themeC
 
                                 {getEvts(rangeMin()).length > 0 && (
                                     <div className="cal-popup-events">
-                                        {events.map((ev, i) => (
-                                            ev.day === rangeMin() && ev.month === month && ev.year === year ? (
-                                                <div key={i} className="cal-popup-event-row">
+                                        {getEvts(rangeMin()).map((ev) => {
+                                            const localEv = ev.localIndex != null ? events[ev.localIndex] : null;
+                                            return (
+                                                <div
+                                                    key={ev.key}
+                                                    className="cal-popup-event-row cal-popup-event-row--clickable"
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEventDetail({ ev, dayOfMonth: rangeMin() });
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' || e.key === ' ') {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setEventDetail({ ev, dayOfMonth: rangeMin() });
+                                                        }
+                                                    }}
+                                                >
                                                     <span className="cal-popup-dot" style={{ background: ev.color }} />
-                                                    <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>
+                                                    <span className="cal-popup-event-text">
                                                         {ev.title}
-                                                        {ev.endDay && <span style={{ color: 'var(--cal-text-muted)', fontSize: 11, fontWeight: 600 }}> ({ev.day}–{ev.endDay})</span>}
+                                                        {localEv?.endDay ? (
+                                                            <span className="cal-popup-event-range">
+                                                                {' '}({localEv.day}–{localEv.endDay})
+                                                            </span>
+                                                        ) : null}
                                                     </span>
-                                                    <DeleteOutlined className="cal-delete-icon" onClick={() => removeEvent(i)} />
                                                 </div>
-                                            ) : null
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
 
@@ -281,6 +457,86 @@ export default function CalendarModal({ open, onClose, isDarkMode = true, themeC
                             </div>
                         )}
                     </div>
+                </div>
+
+                {eventDetail ? (
+                    (() => {
+                        const { ev, dayOfMonth } = eventDetail;
+                        const primaryText = (ev.shortTitle || ev.title || '').trim();
+                        const routeMulti = !!(ev.routeId && ev.totalDays > 1);
+                        const localEv = ev.localIndex != null ? events[ev.localIndex] : null;
+                        const dateStr = `${MONTH_NAMES[month]} ${dayOfMonth}, ${year}`;
+                        return (
+                            <aside
+                                className={`cal-event-detail-aside ${ev.routeId ? 'cal-event-detail-aside--route' : 'cal-event-detail-aside--local'}`}
+                                style={ev.routeId ? undefined : { '--detail-accent': ev.color }}
+                                aria-label="Event details"
+                            >
+                                <div className="cal-event-detail-inner">
+                                    <div className="cal-event-detail-top">
+                                        <button
+                                            type="button"
+                                            className="cal-event-detail-close"
+                                            aria-label="Close"
+                                            onClick={closeEventDetail}
+                                        >
+                                            <CloseOutlined />
+                                        </button>
+                                    </div>
+                                    <p className="cal-event-detail-kicker">{dateStr}</p>
+                                    {routeMulti ? (
+                                        <p className="cal-event-detail-daytag">
+                                            Day {ev.itineraryDay} of {ev.totalDays}
+                                        </p>
+                                    ) : null}
+                                    <h2 className="cal-event-detail-title">{primaryText}</h2>
+
+                                    <div className="cal-event-detail-actions">
+                                        {ev.routeId && onOpenRouteFromCalendar ? (
+                                            <button
+                                                type="button"
+                                                className="cal-event-detail-btn cal-event-detail-btn--primary"
+                                                onClick={() => onOpenRouteFromCalendar(ev.routeId)}
+                                            >
+                                                Open on map
+                                            </button>
+                                        ) : null}
+
+                                        {ev.eventId ? (
+                                            <button
+                                                type="button"
+                                                className="cal-event-detail-btn cal-event-detail-btn--danger"
+                                                onClick={() => removeRemoteEvent(ev.eventId)}
+                                            >
+                                                Remove this day
+                                            </button>
+                                        ) : null}
+
+                                        {ev.routeId && routeMulti ? (
+                                            <button
+                                                type="button"
+                                                className="cal-event-detail-btn cal-event-detail-btn--muted"
+                                                onClick={() => removeRemoteRouteAll(ev.routeId)}
+                                            >
+                                                Remove all {ev.totalDays} days
+                                            </button>
+                                        ) : null}
+
+                                        {ev.localIndex != null ? (
+                                            <button
+                                                type="button"
+                                                className="cal-event-detail-btn cal-event-detail-btn--danger"
+                                                onClick={() => removeEvent(ev.localIndex)}
+                                            >
+                                                {localEv?.endDay ? 'Remove note from calendar' : 'Remove note'}
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            </aside>
+                        );
+                    })()
+                ) : null}
                 </div>
             </Modal>
         </ConfigProvider>
