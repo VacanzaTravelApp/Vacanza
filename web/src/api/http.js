@@ -71,7 +71,7 @@ http.interceptors.response.use(
     } else if (status === 400) {
       error.friendlyMessage = message || "Invalid request. Please check your input.";
     } else if (status === 409) {
-      error.friendlyMessage = message || "This email is already registered.";
+      error.friendlyMessage = message || "This action conflicts with existing data.";
     }
 
     return Promise.reject(error);

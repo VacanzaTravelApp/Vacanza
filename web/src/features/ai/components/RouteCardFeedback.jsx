@@ -1,8 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, message } from "antd";
-import { LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled } from "@ant-design/icons";
+import { Button, DatePicker, Modal, message } from "antd";
+import {
+  LikeOutlined,
+  LikeFilled,
+  DislikeOutlined,
+  DislikeFilled,
+  CalendarOutlined,
+} from "@ant-design/icons";
+import dayjs from "dayjs";
 import { useAuth } from "../../../context/useAuth";
 import { postPoiFeedbackEvent, postRouteFeedback } from "../../../api/feedbackApi";
+import { createTripCalendarEvent } from "../../../api/tripCalendarApi";
 import { getWaypointCategory } from "../utils/routeMap";
 
 const STORAGE_PREFIX = "vacanzaRouteVote:v2:";
@@ -44,6 +52,9 @@ export function collectRouteCategoryKeys(route) {
 export default function RouteCardFeedback({ route, storageKey, routeId, initialDbVote }) {
   const { isAuthenticated } = useAuth();
   const [sending, setSending] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(() => dayjs());
+  const [calendarSaving, setCalendarSaving] = useState(false);
   const [vote, setVote] = useState(() => {
     const fromDb = dbVoteToUi(initialDbVote);
     return fromDb ?? readStoredVote(storageKey);
@@ -94,6 +105,46 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
     }
   };
 
+  /** Calendar add is independent of thumbs vote; requires a server-saved route id. */
+  const showAddToCalendar = hasSavedRoute && isAuthenticated;
+
+  const tripDays = Math.max(
+    1,
+    Number(route?.total_days ?? route?.totalDays ?? 1) || 1
+  );
+
+  const addRouteToCalendar = async () => {
+    if (!routeId || !calendarDate) return;
+    setCalendarSaving(true);
+    try {
+      const created = await createTripCalendarEvent({
+        routeId,
+        eventDate: calendarDate.format("YYYY-MM-DD"),
+      });
+      const n = Array.isArray(created) ? created.length : 1;
+      message.success(
+        n > 1
+          ? `${n} days added to your calendar (Day 1–${n}).`
+          : "Route added to your calendar."
+      );
+      try {
+        window.dispatchEvent(new CustomEvent("vacanza-trip-calendar-changed"));
+      } catch {
+        /* ignore */
+      }
+      setCalendarOpen(false);
+    } catch (e) {
+      const status = e?.response?.status;
+      if (status === 409) {
+        message.warning("This route is already on that day.");
+      } else {
+        message.error(e?.friendlyMessage || "Could not add to calendar.");
+      }
+    } finally {
+      setCalendarSaving(false);
+    }
+  };
+
   return (
     <div className="route-card-feedback" role="group" aria-label="General route feedback">
       <span className="route-card-feedback-label">Feedback:</span>
@@ -117,6 +168,49 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
         aria-label="I don't like this route recommendation"
         aria-pressed={vote === "down"}
       />
+      {showAddToCalendar ? (
+        <>
+          <Button
+            type="text"
+            size="small"
+            className="route-card-feedback-calendar"
+            icon={<CalendarOutlined />}
+            onClick={() => {
+              setCalendarDate(dayjs());
+              setCalendarOpen(true);
+            }}
+            aria-label="Add this route to your calendar"
+          >
+            Add to calendar
+          </Button>
+          <Modal
+            title="Add route to calendar"
+            open={calendarOpen}
+            onCancel={() => setCalendarOpen(false)}
+            onOk={addRouteToCalendar}
+            okText="Add"
+            confirmLoading={calendarSaving}
+            destroyOnClose
+          >
+            <p style={{ marginBottom: 12, opacity: 0.85 }}>
+              {tripDays > 1 ? (
+                <>
+                  Choose the <strong>first trip day</strong>. A {tripDays}-day route is added as Day&nbsp;1…Day&nbsp;
+                  {tripDays} on consecutive dates. Open any day from the map calendar.
+                </>
+              ) : (
+                <>Pick the day for this route. Open it anytime from the map calendar.</>
+              )}
+            </p>
+            <DatePicker
+              value={calendarDate}
+              onChange={(d) => d && setCalendarDate(d)}
+              style={{ width: "100%" }}
+              format="MMM D, YYYY"
+            />
+          </Modal>
+        </>
+      ) : null}
     </div>
   );
 }

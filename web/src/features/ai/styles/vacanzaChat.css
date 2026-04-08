@@ -829,6 +829,20 @@
   background: var(--vc-feedback-bg) !important;
 }
 
+.route-card-feedback-calendar {
+  margin-left: auto;
+  color: var(--vc-primary) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 0 8px !important;
+  height: 30px !important;
+  border-radius: 10px !important;
+}
+
+.route-card-feedback-calendar:hover {
+  background: var(--vc-primary-soft) !important;
+}
+
 /* ═══ Show Route Button ═══ */
 .route-show-btn {
   width: calc(100% - 32px);
