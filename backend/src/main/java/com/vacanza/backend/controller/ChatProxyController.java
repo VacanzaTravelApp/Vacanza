@@ -11,6 +11,7 @@ import com.vacanza.backend.integration.ai.AiChatDto;
 import com.vacanza.backend.integration.ai.AiServiceClient;
 import com.vacanza.backend.integration.ai.UserProfileForAi;
 import com.vacanza.backend.integration.MapboxPoiSearchClient;
+import com.vacanza.backend.integration.MapboxPoiSearchClient.DestinationGeocodeResult;
 import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.security.CurrentUserProvider;
 import com.vacanza.backend.util.PolygonRouteGeometry;
@@ -484,30 +485,51 @@ public class ChatProxyController {
         /**
          * Resolve waypoints that have null lat/lon via Mapbox forward search.
          * LLM may add iconic landmarks not in the POI list with null coordinates.
+         * <p>
+         * Uses the trip destination's bounding box so generic names (e.g. "Blue Mosque") resolve
+         * in the correct city instead of a same-named POI elsewhere (e.g. Jakarta).
          */
         private void resolveNullCoordinates(AiChatDto.RouteData routeData) {
                 if (routeData == null || routeData.getDays() == null) return;
                 String destination = routeData.getDestination();
+                double minLon = -180;
+                double minLat = -90;
+                double maxLon = 180;
+                double maxLat = 90;
+                if (destination != null && !destination.isBlank()) {
+                        var bboxOpt = mapboxPoiSearchClient.geocodeDestination(destination.trim()).blockOptional();
+                        if (bboxOpt.isPresent()) {
+                                DestinationGeocodeResult g = bboxOpt.get();
+                                minLon = g.getMinLon();
+                                minLat = g.getMinLat();
+                                maxLon = g.getMaxLon();
+                                maxLat = g.getMaxLat();
+                                log.info("[RESOLVE NULL] bbox from destination '{}' -> {},{},{},{}",
+                                                destination, minLon, minLat, maxLon, maxLat);
+                        } else {
+                                log.warn("[RESOLVE NULL] Could not geocode destination '{}'; forward search may be ambiguous",
+                                                destination);
+                        }
+                }
                 for (AiChatDto.DayPlan dayPlan : routeData.getDays()) {
                         if (dayPlan.getWaypoints() == null) continue;
                         for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
                                 if (wp.getLatitude() != null && wp.getLongitude() != null) continue;
                                 if (wp.getName() == null || wp.getName().isBlank()) continue;
                                 try {
-                                        String query = wp.getName().contains(",")
-                                                        ? wp.getName()
-                                                        : wp.getName() + (destination != null ? ", " + destination : "");
-                                        var results = mapboxPoiSearchClient.forwardSearchPoi(query,
-                                                        -180, -90, 180, 90)
-                                                .blockOptional().orElse(List.of());
-                                        if (!results.isEmpty()) {
-                                                var best = results.get(0);
-                                                wp.setLatitude(best.getLat());
-                                                wp.setLongitude(best.getLon());
-                                                log.info("[RESOLVE NULL] '{}' -> ({}, {})", wp.getName(),
-                                                                best.getLat(), best.getLon());
+                                        var result = mapboxPoiSearchClient.resolvePlace(
+                                                        wp.getName(),
+                                                        destination != null ? destination : "",
+                                                        minLon, minLat, maxLon, maxLat)
+                                                .blockOptional();
+                                        if (result.isPresent()) {
+                                                wp.setLatitude(result.get().getLat());
+                                                wp.setLongitude(result.get().getLon());
+                                                log.info("[RESOLVE NULL] '{}' -> ({}, {}) ✓", wp.getName(),
+                                                                result.get().getLat(), result.get().getLon());
                                         } else {
-                                                log.warn("[RESOLVE NULL] No result for '{}'", wp.getName());
+                                                log.warn("[RESOLVE NULL] All strategies exhausted for '{}' — waypoint has no coordinates",
+                                                                wp.getName());
                                         }
                                 } catch (Exception e) {
                                         log.warn("[RESOLVE NULL] Failed for '{}': {}", wp.getName(), e.getMessage());
