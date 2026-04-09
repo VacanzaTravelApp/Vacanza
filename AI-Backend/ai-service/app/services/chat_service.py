@@ -108,6 +108,7 @@ TURN1_TOOL_CONTEXT_RULES = """Tool-call context (use the User context block belo
 - Museums/culture/history → art or history; outdoors → nature; otherwise general.
 - If user has cuisine preferences, dietary restrictions, or food interests, always include restaurant and/or cafe in categories.
 - If user has favoriteCategories or splurgeCategories, include matching POI categories even if they are not in the trip-type baseline.
+- If user has "Saved / favorited places", add them to the must_visit list (they are places the user already likes and wants to revisit).
 - Choose categories to match pace, activity level, dietary and accessibility needs; respect avoid_categories (omit types the user dislikes).
 - If the user's current message explicitly conflicts with older notes, prioritize the current message.
 - Destination (priority): (1) city/region named in the **latest** user turn if they name one; (2) else the **most recent** explicit trip city in the thread; (3) profile/RAG only when the conversation does not name a place. Never let an older turn (e.g. a country) or a generic profile hint replace a **newer** city (e.g. user said Istanbul after discussing elsewhere).
@@ -119,6 +120,7 @@ TURN1_TOOL_CONTEXT_RULES = """Tool-call context (use the User context block belo
 TURN2_TOOL_CONTEXT_RULES = """User context (apply the profile and preferences below when choosing POIs and building each day):
 - Pick POIs that fit the user's profile: pace, budget, accessibility, languages, cuisine preferences, and dietary restrictions.
 - Deprioritize or skip POI types/categories the user wants to avoid; favor categories matching travel style and interests.
+- If the user has "Saved / favorited places": these are places the user has explicitly bookmarked. If any of these places exist in the POI list or are relevant to the destination, PRIORITIZE them over generic alternatives — include them in the itinerary whenever geographically feasible.
 - Set day_start_local per day from trip_pace and activity (SLOW ~10:00, MODERATE ~09:00, FAST ~08:30) — NEVER earlier than 08:30. Museums/galleries/palaces open at 09:00 at the earliest — do not schedule them before that.
 - estimated_duration_min must vary by venue type (large museums 90–120, small sites 30–50, parks 40–75, quick landmarks 20–40, restaurants 50–80, cafes 20–35). Do not use 60 for every stop.
 - Keep geographic efficiency; preferences override only when choosing among nearby alternatives.
@@ -680,9 +682,12 @@ def _optimize_route_order(route_data: RouteData) -> RouteData:
         current_chunk = []
         
         # Split into blocks: sights, dining, sights, dining...
+        # ALL dining types (cafes, bars, nightlife, not just restaurants) must be
+        # treated as fixed anchors so geographic reordering never moves them to
+        # wrong time slots (e.g. afternoon café bumped to 11 AM).
         for wp in day.waypoints:
             cat = (wp.category or "").lower()
-            if cat in _RESTAURANT_CATS:
+            if cat in _DINING_CATS:
                 if current_chunk:
                     chunks.append(("sights", current_chunk))
                     current_chunk = []
@@ -884,10 +889,25 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
                     best_dist = d
                     best = p
 
+            # Fallback: if no same-type replacement found, accept any in-range dining type
+            used_fallback = False
+            if best is None:
+                for p in dining_pool:
+                    p_name = (p.get("name") or "").lower()
+                    if p_name in used_names:
+                        continue
+                    d = _haversine_meters(center_lat, center_lon, p.get("lat") or 0, p.get("lon") or 0)
+                    if d < best_dist and d <= _MAX_DINING_DISTANCE_M:
+                        best_dist = d
+                        best = p
+                if best is not None:
+                    used_fallback = True
+
             if best is not None:
+                log_suffix = " [type fallback]" if used_fallback else ""
                 logger.info(
-                    "[DINING_PROXIMITY] Day %s: '%s' is %.0fm away → replaced by '%s' (%.0fm)",
-                    day_plan.day, wp.name, dist, best.get("name"), best_dist,
+                    "[DINING_PROXIMITY] Day %s: '%s' is %.0fm away → replaced by '%s' (%.0fm)%s",
+                    day_plan.day, wp.name, dist, best.get("name"), best_dist, log_suffix,
                 )
                 used_names.discard((wp.name or "").lower())
                 wps[i] = RouteWaypoint(
@@ -1011,6 +1031,151 @@ def _fix_opening_hours(route_data: RouteData) -> RouteData:
                         day_plan.day, wp.name, cursor.strftime("%H:%M"),
                     )
             cursor += datetime.timedelta(minutes=wp.estimated_duration_min or 45)
+
+    return route_data
+
+
+_MAX_SPREAD_FROM_CENTROID_M = 5000.0  # Sightseeing stops > 5 km from day centroid are outliers
+_MIN_SIGHTSEEING_PER_DAY = 2  # Never drop below this many sightseeing stops in a day
+
+
+def _fix_geographic_spread(route_data: RouteData) -> RouteData:
+    """Post-process: remove sightseeing outliers that are geographically far from the day's cluster.
+
+    For each day, computes the centroid of all sightseeing stops with known coordinates.
+    Any sightseeing stop more than 5 km from that centroid is considered an outlier and removed,
+    provided at least _MIN_SIGHTSEEING_PER_DAY sightseeing stops remain after removal.
+
+    Dining stops are NEVER touched by this function (use _fix_dining_proximity for those).
+    """
+    if not route_data.days:
+        return route_data
+
+    for day_plan in route_data.days:
+        wps = day_plan.waypoints
+        if not wps:
+            continue
+
+        sight_wps = [
+            wp for wp in wps
+            if (wp.category or "").lower() not in _DINING_CATS
+            and wp.latitude is not None
+            and wp.longitude is not None
+        ]
+
+        if len(sight_wps) <= _MIN_SIGHTSEEING_PER_DAY:
+            continue
+
+        center_lat = sum(w.latitude for w in sight_wps) / len(sight_wps)  # type: ignore[arg-type]
+        center_lon = sum(w.longitude for w in sight_wps) / len(sight_wps)  # type: ignore[arg-type]
+
+        outlier_names: set[str] = set()
+        for wp in sight_wps:
+            d = _haversine_meters(center_lat, center_lon, wp.latitude, wp.longitude)  # type: ignore[arg-type]
+            if d > _MAX_SPREAD_FROM_CENTROID_M:
+                outlier_names.add(wp.name or "")
+                logger.warning(
+                    "[GEO_SPREAD] Day %s: '%s' is %.1f km from day centroid → removing as outlier",
+                    day_plan.day, wp.name, d / 1000,
+                )
+
+        if not outlier_names:
+            continue
+
+        # Safety: ensure enough sightseeing remains after removal
+        remaining_sight_count = sum(
+            1 for wp in sight_wps if (wp.name or "") not in outlier_names
+        )
+        if remaining_sight_count < _MIN_SIGHTSEEING_PER_DAY:
+            logger.warning(
+                "[GEO_SPREAD] Day %s: skipping outlier removal — would leave fewer than %d sightseeing stops",
+                day_plan.day, _MIN_SIGHTSEEING_PER_DAY,
+            )
+            continue
+
+        new_wps = [
+            wp for wp in wps
+            if (wp.category or "").lower() in _DINING_CATS or (wp.name or "") not in outlier_names
+        ]
+        for i, wp in enumerate(new_wps):
+            wp.order = i + 1
+        day_plan.waypoints = new_wps
+
+    return route_data
+
+
+def _poi_names_are_related(waypoint_name: str | None, poi_name: str | None) -> bool:
+    """Return True if a waypoint name and a POI list name refer to the same place.
+
+    Used to decide whether matching coordinates are a legitimate reference or a theft.
+    Logic: at least one significant word (>3 chars) must be shared, OR one name contains
+    the other as a substring.
+    """
+    if not waypoint_name or not poi_name:
+        return False
+    wn = waypoint_name.lower()
+    pn = poi_name.lower()
+    if wn in pn or pn in wn:
+        return True
+    w_words = {w for w in wn.split() if len(w) > 3}
+    p_words = {w for w in pn.split() if len(w) > 3}
+    return bool(w_words & p_words)
+
+
+def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dict]) -> RouteData:
+    """Post-process: detect sightseeing waypoints that carry ANOTHER POI's coordinates.
+
+    The AI reads a long POI list and occasionally copies a different POI's lat/lon to a
+    sightseeing stop.  The original check covered only dining POIs (e.g. "Golden Gate Bridge"
+    getting "Amber India"'s coordinates).  This expanded version covers ALL POI types,
+    including sightseeing-to-sightseeing theft (e.g. "Golden Gate Bridge" getting
+    "Lombard Street"'s coordinates).
+
+    Detection: for each sightseeing waypoint with non-null coordinates, look up those
+    coordinates (≤ 4 decimal places ≈ 11 m) in the full POI index.  If a match is found
+    and the matched POI's name is UNRELATED to the waypoint name, the coordinates are
+    cleared so the Java backend can geocode the correct location via Mapbox.
+
+    Correct usage (e.g. "Hagia Sophia" using "Hagia Sophia"'s coordinates from the list)
+    is not affected — name relatedness check passes and coordinates are kept.
+    """
+    if not route_data.days or not tool_pois:
+        return route_data
+
+    # Index ALL POI coordinates: (lat4, lon4) -> poi name
+    coord_to_poi: dict[tuple[float, float], str] = {}
+    for p in tool_pois:
+        lat = p.get("lat")
+        lon = p.get("lon")
+        name = p.get("name") or ""
+        if lat is not None and lon is not None and name:
+            key = (round(float(lat), 4), round(float(lon), 4))
+            coord_to_poi[key] = name
+
+    if not coord_to_poi:
+        return route_data
+
+    for day_plan in route_data.days:
+        for wp in (day_plan.waypoints or []):
+            if wp.latitude is None or wp.longitude is None:
+                continue  # Already null — will be geocoded by Java backend
+
+            key = (round(wp.latitude, 4), round(wp.longitude, 4))
+            poi_name = coord_to_poi.get(key)
+            if poi_name is None:
+                continue  # Coordinates not from list — AI world knowledge, leave alone
+
+            if _poi_names_are_related(wp.name, poi_name):
+                continue  # Correct: waypoint correctly references this POI's coordinates
+
+            # Coordinate theft detected — waypoint name and list POI name are unrelated
+            logger.warning(
+                "[COORD_MISMATCH] Day %s: '%s' (%s) has coordinates of unrelated POI '%s'"
+                " → clearing for proper geocode",
+                day_plan.day, wp.name, wp.category, poi_name,
+            )
+            wp.latitude = None
+            wp.longitude = None
 
     return route_data
 
@@ -1285,6 +1450,9 @@ def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
     sl = _join_list(profile.spokenLanguages)
     if sl:
         travel.append(f"Spoken languages: {sl}")
+    saved = _join_list(profile.savedPoiNames)
+    if saved:
+        travel.append(f"Saved / favorited places (PRIORITIZE in itinerary if in destination): {saved}")
 
     if not identity and not travel:
         return ""
@@ -1433,8 +1601,11 @@ async def get_ai_response(
     embedding_service = create_embedding_service(settings)
     if embedding_service and user_id:
         try:
+            # Truncate before embedding — Turn2 user_content contains the full POI
+            # result payload (50k+ chars) which exceeds the 8192-token API limit.
+            rag_query_text = _prepare_content_for_embedding(user_content) or user_content[:500]
             query_embedding = await asyncio.to_thread(
-                embedding_service.embed, user_content.strip()
+                embedding_service.embed, rag_query_text
             )
             similar = message_embedding_repo.search_similar(
                 query_embedding=query_embedding,
@@ -1619,11 +1790,22 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             )
         raw_ai_content = str(turn2.content)
         ai_content, route_data = _parse_route_from_response(raw_ai_content)
+        if route_data is None:
+            # Replan or Turn2 returned no parseable JSON — log enough context to debug later.
+            is_replan = replan_ctx is not None
+            logger.error(
+                "[ROUTE_PARSE_FAIL] %s failed to return valid route JSON. "
+                "Response (first 600 chars): %s",
+                "Replan" if is_replan else "Turn2",
+                raw_ai_content[:600],
+            )
         if route_data:
             _log_route("AI_RAW", route_data)           # what AI produced before any fix
             route_data = _fix_route_dining(route_data)
+            route_data = _validate_sightseeing_coordinates(route_data, tool_pois)
             route_data = _fix_dining_proximity(route_data, tool_pois)
             route_data = _fix_opening_hours(route_data)
+            route_data = _fix_geographic_spread(route_data)
             route_data = _optimize_route_order(route_data)
             _log_route("FINAL", route_data)            # what is actually sent to the user
 
@@ -1648,6 +1830,7 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
         if route_data:
             route_data = _fix_route_dining(route_data)
             route_data = _fix_opening_hours(route_data)
+            route_data = _fix_geographic_spread(route_data)
             route_data = _optimize_route_order(route_data)
 
     # Output moderation: block harmful AI response before returning to user
