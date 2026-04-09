@@ -95,6 +95,7 @@ public class ChatProxyController {
         private final RouteTimelineService routeTimelineService;
         private final WeatherService weatherService;
         private final PersonalizedPoiSelector personalizedPoiSelector;
+        private final com.vacanza.backend.repo.UserInteractionRepository userInteractionRepository;
 
         @PostMapping("/conversations")
         public ResponseEntity<AiChatDto.ConversationCreateResponse> createConversation() {
@@ -123,6 +124,17 @@ public class ChatProxyController {
                 var infoDto = userInfoService.getUserInfoByUser(user).orElse(null);
                 var prefsDto = userPreferencesService.getPreferencesByUser(user).orElse(null);
                 UserProfileForAi profile = UserProfileForAi.from(infoDto, prefsDto);
+
+                // Inject favorited POI names so the AI can prioritize them in routes
+                try {
+                        List<String> savedPoiNames = userInteractionRepository
+                                        .findFavoritePoiNamesByUserId(user.getUserId());
+                        if (!savedPoiNames.isEmpty() && profile != null) {
+                                profile = profile.toBuilder().savedPoiNames(savedPoiNames).build();
+                        }
+                } catch (Exception e) {
+                        log.warn("Could not fetch saved POI names for user {}: {}", user.getUserId(), e.getMessage());
+                }
 
                 var existingAiPrefs = userPreferenceAiService.getExistingPreferences(user);
 
@@ -532,10 +544,17 @@ public class ChatProxyController {
                                                         minLon, minLat, maxLon, maxLat)
                                                 .blockOptional();
                                         if (result.isPresent()) {
-                                                wp.setLatitude(result.get().getLat());
-                                                wp.setLongitude(result.get().getLon());
-                                                log.info("[RESOLVE NULL] '{}' -> ({}, {}) ✓", wp.getName(),
-                                                                result.get().getLat(), result.get().getLon());
+                                                String resultName = result.get().getName();
+                                                if (isGeocodingNameCompatible(wp.getName(), resultName)) {
+                                                        wp.setLatitude(result.get().getLat());
+                                                        wp.setLongitude(result.get().getLon());
+                                                        log.info("[RESOLVE NULL] '{}' -> ({}, {}) ✓ (matched '{}')",
+                                                                        wp.getName(), result.get().getLat(),
+                                                                        result.get().getLon(), resultName);
+                                                } else {
+                                                        log.warn("[RESOLVE NULL] '{}' geocoded to unrelated '{}' — rejecting to avoid wrong pin",
+                                                                        wp.getName(), resultName);
+                                                }
                                         } else {
                                                 log.warn("[RESOLVE NULL] All strategies exhausted for '{}' — waypoint has no coordinates",
                                                                 wp.getName());
@@ -545,6 +564,35 @@ public class ChatProxyController {
                                 }
                         }
                 }
+        }
+
+        /**
+         * Returns true if the geocoding result name is reasonably related to the searched place name.
+         * Prevents wrong pins when Mapbox returns an unrelated POI (e.g. a restaurant instead of a bridge).
+         * Uses word-level overlap: at least one significant word (>3 chars) must be shared.
+         */
+        private static boolean isGeocodingNameCompatible(String queryName, String resultName) {
+                // Reject if either side is missing — don't silently accept unknown results
+                if (queryName == null || resultName == null) return false;
+                String q = queryName.toLowerCase(Locale.ROOT);
+                String r = resultName.toLowerCase(Locale.ROOT);
+                // Direct containment (handles "Golden Gate Bridge" ⊂ "Golden Gate Bridge, Presidio…")
+                if (r.contains(q) || q.contains(r)) return true;
+                // Word-level overlap — at least one significant word (>4 chars) must be an exact match.
+                // Prefix matching is intentionally disabled: "Bosphorus Bridge" vs "Bosphorus Strait"
+                // share the prefix "Bosphor" but are completely different places.
+                String[] qWords = q.split("[\\s,\\-/]+");
+                String[] rWords = r.split("[\\s,\\-/]+");
+                for (String qw : qWords) {
+                        if (qw.length() <= 4) continue;
+                        for (String rw : rWords) {
+                                if (rw.length() <= 4) continue;
+                                if (qw.equals(rw)) {
+                                        return true;
+                                }
+                        }
+                }
+                return false;
         }
 
         private UUID saveRoute(User user, UUID conversationId, AiChatDto.RouteData routeData) {
@@ -701,7 +749,10 @@ public class ChatProxyController {
                         all.addAll(pois);
                 }
 
-                // Forward-search each must_visit landmark so iconic places are guaranteed in the pool
+                // Forward-search each must_visit landmark so iconic places are guaranteed in the pool.
+                // Collected separately so they can OVERRIDE category-search duplicates during dedup
+                // (must-visit results have higher-confidence coordinates from a name-specific search).
+                List<PoiResult> mustVisitPois = new java.util.ArrayList<>();
                 if (mustVisit != null) {
                         for (String placeName : mustVisit) {
                                 if (placeName == null || placeName.isBlank()) continue;
@@ -709,18 +760,26 @@ public class ChatProxyController {
                                 var mvPois = mapboxPoiSearchClient.forwardSearchPoi(query,
                                                 dest.getMinLon(), dest.getMinLat(), dest.getMaxLon(), dest.getMaxLat())
                                         .blockOptional().orElse(List.of());
-                                all.addAll(mvPois);
+                                mustVisitPois.addAll(mvPois);
                                 if (!mvPois.isEmpty()) {
                                         log.info("[MUST_VISIT] '{}' resolved to {} POI(s)", placeName, mvPois.size());
                                 }
                         }
                 }
 
+                // Dedup: first pass — category-search results (putIfAbsent keeps first occurrence)
                 java.util.Map<String, PoiResult> dedup = new java.util.LinkedHashMap<>();
                 for (PoiResult p : all) {
                         if (p == null || p.getName() == null || p.getName().isBlank()) continue;
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.putIfAbsent(k, p);
+                }
+                // Second pass — must-visit results OVERRIDE category-search versions.
+                // This ensures the AI gets the highest-confidence coordinates for landmark entries.
+                for (PoiResult p : mustVisitPois) {
+                        if (p == null || p.getName() == null || p.getName().isBlank()) continue;
+                        String k = p.getName().toLowerCase(java.util.Locale.ROOT);
+                        dedup.put(k, p);  // force override
                 }
                 List<PoiResult> merged = personalizedPoiSelector.select(
                                 new java.util.ArrayList<>(dedup.values()),

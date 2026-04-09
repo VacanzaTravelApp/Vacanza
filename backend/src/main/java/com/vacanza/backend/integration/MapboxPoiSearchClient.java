@@ -141,6 +141,9 @@ public class MapboxPoiSearchClient {
     /**
      * Forward (text) search for a specific place name within a bbox.
      * Used to resolve must_visit landmarks that category search may miss.
+     *
+     * types=poi,place: "place" type catches named physical features (bridges, hills,
+     * viewpoints) that Mapbox may not index purely as "poi" in the Search Box API.
      */
     public Mono<List<PoiResult>> forwardSearchPoi(String query,
             double minLon, double minLat,
@@ -151,7 +154,7 @@ public class MapboxPoiSearchClient {
                         .path("/search/searchbox/v1/forward")
                         .queryParam("q", query)
                         .queryParam("limit", 3)
-                        .queryParam("types", "poi")
+                        .queryParam("types", "poi,place")
                         .queryParam("bbox", minLon + "," + minLat + "," + maxLon + "," + maxLat)
                         .queryParam("language", "en")
                         .build())
@@ -208,6 +211,19 @@ public class MapboxPoiSearchClient {
                     log.info("[RESOLVE] Step 4 (forward/no-bbox) for '{}'", placeName);
                     return forwardSearchPoiWithProximity(query,
                             (minLon + maxLon) / 2, (minLat + maxLat) / 2);
+                }))
+
+                // Step 5: Geocoding API v5 — broader coverage for bridges, hills, viewpoints,
+                // natural features and infrastructure that Search Box (Steps 1-4) may miss.
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.info("[RESOLVE] Step 5 (geocoding-v5/bbox) for '{}'", placeName);
+                    return geocodingV5Forward(query, minLon, minLat, maxLon, maxLat);
+                }))
+
+                // Step 6: Geocoding v5 without bbox — last-resort for very prominent landmarks
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.info("[RESOLVE] Step 6 (geocoding-v5/no-bbox) for '{}'", placeName);
+                    return geocodingV5Forward(query, -180, -90, 180, 90);
                 }))
 
                 .doOnNext(r -> log.info("[RESOLVE] '{}' -> ({}, {})", placeName, r.getLat(), r.getLon()));
@@ -311,6 +327,64 @@ public class MapboxPoiSearchClient {
                 })
                 .onErrorResume(e -> {
                     log.warn("[RETRIEVE] failed for mapboxId='{}': {}", mapboxId, e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    /**
+     * Mapbox Geocoding API v5 forward search.
+     *
+     * <p>The Search Box API (/search/searchbox) is optimised for businesses and POIs with Foursquare
+     * data. It often misses infrastructure (bridges, tunnels) and natural features (hills, bays,
+     * viewpoints) that are indexed under the legacy Geocoding v5 dataset.
+     *
+     * <p>Used as Steps 5/6 in {@link #resolvePlace} after all Search Box strategies fail.
+     * bbox="-180,-90,180,90" disables the bounding-box filter (global, proximity-biased by proximity param).
+     */
+    public Mono<PoiResult> geocodingV5Forward(String query,
+            double minLon, double minLat, double maxLon, double maxLat) {
+        boolean global = (minLon <= -179 && maxLon >= 179);
+        return webClient.get()
+                .uri(uriBuilder -> {
+                    var b = uriBuilder
+                            .path("/geocoding/v5/mapbox.places/{query}.json")
+                            .queryParam("limit", 3)
+                            .queryParam("types", "poi,address,place")
+                            .queryParam("language", "en");
+                    if (!global) {
+                        b = b.queryParam("bbox", minLon + "," + minLat + "," + maxLon + "," + maxLat);
+                    } else {
+                        // No bbox: use center of destination as proximity bias
+                        double proxLon = (minLon + maxLon) / 2;
+                        double proxLat = (minLat + maxLat) / 2;
+                        if (Double.isFinite(proxLon) && Double.isFinite(proxLat)) {
+                            b = b.queryParam("proximity", proxLon + "," + proxLat);
+                        }
+                    }
+                    return b.build(query);
+                })
+                .retrieve()
+                .bodyToMono(GeocodingV5Response.class)
+                .flatMap(resp -> {
+                    if (resp == null || resp.getFeatures() == null || resp.getFeatures().isEmpty()) {
+                        return Mono.<PoiResult>empty();
+                    }
+                    for (GeocodingV5Feature f : resp.getFeatures()) {
+                        if (f == null) continue;
+                        String name = f.getText();
+                        if (name == null || name.isBlank()) continue;
+                        Geometry geom = f.getGeometry();
+                        if (geom == null || geom.getCoordinates() == null
+                                || geom.getCoordinates().size() < 2) continue;
+                        double lon = geom.getCoordinates().get(0);
+                        double lat = geom.getCoordinates().get(1);
+                        log.info("[GEOCODING V5] hit: '{}' -> ({}, {})", name, lat, lon);
+                        return Mono.just(new PoiResult(name, "attraction", lat, lon));
+                    }
+                    return Mono.<PoiResult>empty();
+                })
+                .onErrorResume(e -> {
+                    log.warn("[GEOCODING V5] failed for '{}': {}", query, e.getMessage());
                     return Mono.empty();
                 });
     }
@@ -435,6 +509,32 @@ public class MapboxPoiSearchClient {
         private double minLat;
         private double maxLon;
         private double maxLat;
+    }
+
+    // ── Geocoding API v5 DTOs ────────────────────────────────────────────────
+    // Separate from the Search Box DTOs above; v5 uses "text" instead of "name"
+    // and puts coordinates only in geometry (no nested coordinates object).
+
+    @Data
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class GeocodingV5Response {
+        private List<GeocodingV5Feature> features;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class GeocodingV5Feature {
+        /** Short place name, e.g. "Golden Gate Bridge". */
+        private String text;
+        /** Full name with context, e.g. "Golden Gate Bridge, Presidio, San Francisco…" */
+        @JsonProperty("place_name")
+        private String placeName;
+        /** Feature geometry — reuses the same inner Geometry class (Point with [lon, lat]). */
+        private Geometry geometry;
+        @JsonProperty("place_type")
+        private List<String> placeType;
     }
 }
 
