@@ -52,4 +52,30 @@ public class ViatorProductSearchResponse {
     public static class PricingSummary {
         private BigDecimal fromPrice;
     }
+
+    /** Root JSON for {@code POST /search/freetext} (products branch). */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class FreetextWire {
+        private ProductsBlock products;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ProductsBlock {
+        private List<ProductRow> results;
+    }
+
+    public static ViatorProductSearchResponse fromFreetextWire(FreetextWire wire) {
+        ViatorProductSearchResponse out = new ViatorProductSearchResponse();
+        if (wire == null || wire.getProducts() == null || wire.getProducts().getResults() == null) {
+            return out;
+        }
+        out.setProducts(wire.getProducts().getResults());
+        return out;
+    }
 }
