@@ -125,6 +125,13 @@ public final class AiChatDto {
 
         @JsonProperty("departure_time_local")
         private String departureTimeLocal;
+
+        /**
+         * Set to {@code true} by adaptive adjustment when this stop is known to be
+         * closed or inaccessible. The frontend should render it with a visual indicator
+         * rather than removing it from the map, allowing users to see what was affected.
+         */
+        private Boolean unavailable;
     }
 
     /** One day's itinerary within a multi-day route. */

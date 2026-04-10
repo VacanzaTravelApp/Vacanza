@@ -45,6 +45,7 @@ public class SecurityConfigNonDev {
                         .requestMatchers("/pois/**").permitAll()   // POI endpoints public
                         .requestMatchers("/admin/**").hasRole("ADMIN") // Admin panel
                         .requestMatchers("/chat/**").authenticated()
+                        .requestMatchers("/api/routes/**").authenticated()
                         .requestMatchers("/api/behavior/**").authenticated()
                         .requestMatchers("/api/feedback/**").authenticated()
                         .anyRequest().authenticated()
