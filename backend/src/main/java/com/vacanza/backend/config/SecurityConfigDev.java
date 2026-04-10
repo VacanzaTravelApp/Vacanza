@@ -32,6 +32,7 @@ public class SecurityConfigDev {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/chat/**").authenticated()
+                        .requestMatchers("/api/routes/**").authenticated()
                         .requestMatchers("/api/behavior/**").authenticated()
                         .requestMatchers("/api/feedback/**").authenticated()
                         .requestMatchers("/users/me/trip-calendar/**").authenticated()

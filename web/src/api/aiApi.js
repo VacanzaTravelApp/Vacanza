@@ -96,6 +96,17 @@ export const aiApi = {
         const response = await http.post('/chat/routes/replan-day-from-polygon', body);
         return response.data;
     },
+
+    /**
+     * FReq5 — Adaptive itinerary adjustment.
+     * Triggers deterministic replanning for a single unavailable stop.
+     * Body: { triggerType, severity, reason?, affectedPoiName?, affectedDay? }
+     * Returns: { newRouteId, originalRouteId, version, actions, userMessage, idempotencyKey }
+     */
+    adjustRoute: async (routeId, body) => {
+        const response = await http.post(`/api/routes/${routeId}/adjust`, body);
+        return response.data;
+    },
 };
 
 export default aiApi;

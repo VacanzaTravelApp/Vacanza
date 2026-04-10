@@ -114,6 +114,8 @@ class RouteWaypoint(BaseModel):
     travel_from_previous_min: int | None = None
     arrival_time_local: str | None = None
     departure_time_local: str | None = None
+    # Set by adaptive adjustment when stop is known closed/unavailable
+    unavailable: bool | None = None
 
 
 class DayPlan(BaseModel):

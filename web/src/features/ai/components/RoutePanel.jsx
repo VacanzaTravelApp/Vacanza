@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { Button } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
 import { getCategoryColor } from "../../../constants/categoryColors";
@@ -89,7 +89,10 @@ export default function RoutePanel({
   onDayChange,
   onClose,
   onWaypointClick,
+  onMarkUnavailable,
 }) {
+  const [adjustingPoi, setAdjustingPoi] = useState(null);
+
   if (!route) return null;
 
   const days = route.days || [];
@@ -256,7 +259,7 @@ export default function RoutePanel({
                     </li>
                   )}
                   <li
-                    className={`route-panel-waypoint-row ${isLast ? "route-panel-waypoint-last" : ""}`}
+                    className={`route-panel-waypoint-row ${isLast ? "route-panel-waypoint-last" : ""} ${wp.unavailable ? "route-panel-waypoint-unavailable" : ""}`}
                     onClick={() => isClickable && onWaypointClick?.(wp)}
                     role={isClickable ? "button" : undefined}
                     tabIndex={isClickable ? 0 : undefined}
@@ -315,7 +318,30 @@ export default function RoutePanel({
                             {formatTimeSlot(wp.time_slot)}
                           </span>
                         )}
+                        {wp.unavailable && (
+                          <span className="route-panel-waypoint-closed-badge">
+                            Kapalı
+                          </span>
+                        )}
                       </div>
+                      {!wp.unavailable && onMarkUnavailable && (
+                        <button
+                          className="route-panel-mark-closed-btn"
+                          disabled={adjustingPoi === wp.name}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setAdjustingPoi(wp.name);
+                            try {
+                              await onMarkUnavailable(wp);
+                            } finally {
+                              setAdjustingPoi(null);
+                            }
+                          }}
+                          title="Bu yere ulaşamadım veya kapalı"
+                        >
+                          {adjustingPoi === wp.name ? "Güncelleniyor..." : "Bu yer kapalı"}
+                        </button>
+                      )}
                     </div>
                   </li>
                 </React.Fragment>

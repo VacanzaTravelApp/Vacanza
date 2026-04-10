@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, Spin, Popover, ConfigProvider, theme } from "antd";
+import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, notification, Spin, Popover, ConfigProvider, theme } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LogoutOutlined,
@@ -40,6 +40,7 @@ import { aiApi } from "../api/aiApi";
 import { postPoiFeedbackEvent } from "../api/feedbackApi";
 import { useFeedbackAffinity } from "../hooks/useFeedbackAffinity";
 import { normalizeRouteForMap } from "../features/ai/utils/routeMap";
+import { useAdjustmentStream } from "../hooks/useAdjustmentStream";
 import { buildMapPoiFeedbackPayload, deriveMapPoiFavorited } from "../features/ai/utils/feedbackVoteUtils";
 import "./MapPage.css";
 
@@ -700,6 +701,60 @@ export default function MapPage() {
   const [activeDay, setActiveDay] = useState(1);
   const [routeGeometry, setRouteGeometry] = useState(null);
 
+  // Fly to a waypoint when user clicks it in the RoutePanel
+  const handleWaypointClick = useCallback((wp) => {
+    const lat = Number(wp.latitude ?? wp.lat);
+    const lon = Number(wp.longitude ?? wp.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    map.flyTo({ center: [lon, lat], zoom: 17, duration: 700 });
+  }, []);
+
+  // FReq5 — "Bu yer kapalı" handler: triggers adaptive adjustment and reloads route
+  const handleMarkUnavailable = useCallback(async (wp) => {
+    const routeId = activeRoute?.routeId ?? activeRoute?.route_id;
+    if (!routeId) {
+      message.warning("Bu rotanın kaydedilmiş bir ID'si yok. Lütfen rotayı tekrar oluşturun.");
+      return;
+    }
+    try {
+      const result = await aiApi.adjustRoute(routeId, {
+        triggerType: "USER_REPORTED",
+        severity: "HIGH",
+        reason: `${wp.name} kapalı veya ulaşılamaz`,
+        affectedPoiName: wp.name,
+        affectedDay: wp.day,
+      });
+      if (result.newRouteId && result.newRouteId !== routeId) {
+        const detail = await aiApi.getRoute(result.newRouteId);
+        const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
+        setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? result.newRouteId }));
+      }
+      message.success(result.userMessage || "Rotanız güncellendi.");
+    } catch {
+      message.error("Güncelleme sırasında bir hata oluştu.");
+    }
+  }, [activeRoute]);
+
+  // FReq5 — SSE: receives route_updated push from backend (e.g. weather alerts)
+  useAdjustmentStream(async (data) => {
+    if (!data.newRouteId) return;
+    try {
+      const detail = await aiApi.getRoute(data.newRouteId);
+      const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
+      setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? data.newRouteId }));
+      notification.info({
+        message: "Rotanız güncellendi",
+        description: data.userMessage || "Bir veya daha fazla durak otomatik olarak güncellendi.",
+        placement: "topRight",
+        duration: 6,
+      });
+    } catch {
+      // silently ignore — route will update on next manual refresh
+    }
+  });
+
   /** Parametre modalı (sadece API göndermeden önce) */
   const [polygonRouteParamsOpen, setPolygonRouteParamsOpen] = useState(false);
   /** Üstteki rota isteği bandı kapatıldıysa; sonuç panelinde yedek CTA kalır */
@@ -1263,7 +1318,8 @@ export default function MapPage() {
         const res = await aiApi.createRouteFromPolygon(body);
         const routeData = res.route_data || res.routeData;
         if (routeData) {
-          setActiveRoute(normalizeRouteForMap(routeData));
+          const routeId = res.route_id ?? res.routeId ?? null;
+          setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
           setActiveDay(1);
           setPolygonRouteParamsOpen(false);
           setPolygonRouteBannerDismissed(false);
@@ -1342,7 +1398,8 @@ export default function MapPage() {
       const res = await aiApi.replanDayFromPolygon(body);
       const routeData = res.route_data || res.routeData;
       if (routeData) {
-        setActiveRoute(normalizeRouteForMap(routeData));
+        const routeId = res.route_id ?? res.routeId ?? activeRoute?.routeId ?? null;
+        setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
         setActiveDay(activeDay);
         setFilterOpen(false);
         setIsChatOpen(true);
@@ -1619,6 +1676,10 @@ export default function MapPage() {
         setRouteGeometry(null);
         return;
       }
+
+      // Clear stale geometry immediately so the previous route's line doesn't
+      // flicker on screen while the new geometry is being fetched.
+      setRouteGeometry(null);
 
       try {
         const body = {
@@ -1993,23 +2054,52 @@ export default function MapPage() {
           })}
 
           {activeWaypoints.length >= 2 && (
-            <Source id="route-src" type="geojson" data={routeLineGeoJSON} lineMetrics>
+            <Source
+              key={`route-src-${activeRoute?.routeId ?? activeRoute?.route_id ?? "r"}-${activeDay}`}
+              id="route-src"
+              type="geojson"
+              data={routeLineGeoJSON}
+              lineMetrics
+            >
               <Layer {...routeGlowLayer} />
               <Layer {...routeMainLayer} />
             </Source>
           )}
 
-          {activeWaypoints.map((wp, idx) => (
-            <Marker key={`route-wp-${wp.day}-${wp.order}`} longitude={wp.longitude} latitude={wp.latitude} anchor="center">
-              <Tooltip title={wp.name} placement="top">
-                <div style={{
-                  width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, #F97316, #EF4444)",
-                  border: "2.5px solid white", display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "white", fontSize: 13, fontWeight: 800, boxShadow: "0 2px 8px rgba(249,115,22,0.4)", cursor: "pointer"
-                }}>{idx + 1}</div>
-              </Tooltip>
-            </Marker>
-          ))}
+          {activeWaypoints.map((wp, idx) => {
+            const isUnavailable = wp.unavailable === true;
+            return (
+              <Marker key={`route-wp-${wp.day}-${wp.order}`} longitude={wp.longitude} latitude={wp.latitude} anchor="center">
+                <Tooltip
+                  title={isUnavailable ? `${wp.name} (Kapalı)` : wp.name}
+                  placement="top"
+                >
+                  <div style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: "50%",
+                    background: isUnavailable
+                      ? "linear-gradient(135deg, #9CA3AF, #6B7280)"
+                      : "linear-gradient(135deg, #F97316, #EF4444)",
+                    border: `2.5px solid ${isUnavailable ? "#D1D5DB" : "white"}`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    boxShadow: isUnavailable
+                      ? "0 2px 6px rgba(107,114,128,0.35)"
+                      : "0 2px 8px rgba(249,115,22,0.4)",
+                    cursor: "pointer",
+                    opacity: isUnavailable ? 0.6 : 1,
+                  }}>
+                    {idx + 1}
+                  </div>
+                </Tooltip>
+              </Marker>
+            );
+          })}
         </Map>
 
         {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel and chat are closed */}
@@ -2284,6 +2374,8 @@ export default function MapPage() {
             activeDay={activeDay}
             onDayChange={setActiveDay}
             onClose={() => setActiveRoute(null)}
+            onWaypointClick={handleWaypointClick}
+            onMarkUnavailable={handleMarkUnavailable}
           />
         )}
 
@@ -2294,7 +2386,8 @@ export default function MapPage() {
           onConversationIdChange={setMapChatConversationId}
           onRequestDrawToEdit={handleRequestDrawToEditFromChat}
           onRouteGenerated={(routeData, meta) => {
-            setActiveRoute(normalizeRouteForMap(routeData));
+            const routeId = meta?.routeId ?? routeData?.routeId ?? routeData?.route_id ?? null;
+            setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
             setActiveDay(1);
             setIsChatOpen(false);
           }}
