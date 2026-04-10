@@ -15,7 +15,6 @@ import java.time.Duration;
  *     api-key: ${VIATOR_API_KEY}
  *     connect-timeout: 10s
  *     read-timeout: 30s
- *     cache-ttl-minutes: 60
  */
 @Getter
 @Setter
@@ -43,9 +42,4 @@ public class ViatorProperties {
      * Read timeout for Viator requests.
      */
     private Duration readTimeout = Duration.ofSeconds(30);
-
-    /**
-     * TTL in minutes for the in-memory Caffeine cache (attraction → price).
-     */
-    private int cacheTtlMinutes = 60;
 }

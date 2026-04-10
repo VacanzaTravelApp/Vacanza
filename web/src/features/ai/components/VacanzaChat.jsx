@@ -363,6 +363,7 @@ function normalizePricingRow(raw) {
     minPriceUsd: raw.minPriceUsd ?? raw.min_price_usd,
     currency: raw.currency ?? "USD",
     bookingUrl: raw.bookingUrl ?? raw.booking_url,
+    productTitle: raw.productTitle ?? raw.product_title ?? null,
     found: Boolean(raw.found),
     status: raw.status,
     message: raw.message,
@@ -867,18 +868,11 @@ export default function VacanzaChat({
                         rawRows === undefined
                           ? null
                           : (Array.isArray(rawRows) ? rawRows : []).map(normalizePricingRow).filter(Boolean);
+                      const foundList = list ? list.filter((r) => r.found) : null;
                       const showTicketEmpty =
-                        hasRouteId &&
-                        list &&
-                        !ticketLoading &&
-                        (list.length === 0 ||
-                          (list.length > 0 && list.every((r) => !r.found)));
+                        hasRouteId && list && !ticketLoading && foundList.length === 0;
                       const showTicketCards =
-                        hasRouteId &&
-                        list &&
-                        list.length > 0 &&
-                        !ticketLoading &&
-                        !list.every((r) => !r.found);
+                        hasRouteId && list && !ticketLoading && foundList.length > 0;
                       return (
                         <div className="route-card-subsection route-card-subsection--viator">
                           <div className="route-card-subsection-head">
@@ -929,7 +923,7 @@ export default function VacanzaChat({
                           ) : null}
                           {showTicketCards ? (
                             <ul className="ticket-card-list">
-                              {list.map((row, ti) => (
+                              {foundList.map((row, ti) => (
                                 <li
                                   key={`${tk}-t${ti}-${row.day}-${row.order}`}
                                   className="ticket-card"
@@ -938,6 +932,9 @@ export default function VacanzaChat({
                                     <span className="ticket-waypoint-name">{row.waypointName}</span>
                                     <span className="ticket-day">Day {row.day}</span>
                                   </div>
+                                  {row.productTitle ? (
+                                    <div className="ticket-product-title">{row.productTitle}</div>
+                                  ) : null}
                                   {(() => {
                                     const priceLine = formatTicketPriceLine(row);
                                     if (priceLine) {
