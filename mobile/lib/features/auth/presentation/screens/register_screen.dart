@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 // Tema dosyaları (renkler, text stilleri, arkaplan animasyonu)
-import 'package:mobile/core/theme/app_colors.dart';
 import 'package:mobile/core/theme/app_text_styles.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/widgets/animated_background.dart';
+import 'package:mobile/core/theme/theme_cubit.dart';
 
 // Register form widget'ı (isim, email, password alanları burada)
 import 'package:mobile/features/auth/presentation/widgets/register_form.dart';
@@ -44,16 +45,21 @@ class RegisterScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.vacanzaTokens;
+    final isLight = theme.brightness == Brightness.light;
+    final accent = context.authAccent;
+
     // Başlık yazısı stilini temadan çekiyoruz.
     final titleStyle = AppTextStyles.titleLarge(context).copyWith(
-      color: AppColors.textHeading,
+      color: tokens.textMain,
     );
 
     // Orta boyutlu metin stilleri (açıklama ve CTA için)
     final bodyMedium = AppTextStyles.bodyMedium(context);
 
     // Açık gri metin rengi
-    final subtitleColor = AppColors.textMuted;
+    final subtitleColor = tokens.textSub;
 
     return AnimatedBackground(
       child: Scaffold(
@@ -127,31 +133,34 @@ class RegisterScreen extends StatelessWidget {
                       /// --------------------------------------------------
                       /// ✈️ Sol üstteki Vacanza LOGO baloncuğu
                       /// --------------------------------------------------
-                      Container(
-                        height: 56,
-                        width: 56,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            colors: [
-                              AppColors.primary,
-                              AppColors.accentMint,
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.25),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: () => context.read<ThemeCubit>().toggle(),
+                        child: Container(
+                          height: 56,
+                          width: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: context.authAccentGradientColors,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.flight_takeoff_rounded,
-                          color: Colors.white,
-                          size: 28,
+                            boxShadow: [
+                              BoxShadow(
+                                color: accent.withValues(alpha: 0.22),
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            isLight
+                                ? Icons.nightlight_round
+                                : Icons.wb_sunny_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
                         ),
                       ),
 
@@ -170,10 +179,15 @@ class RegisterScreen extends StatelessWidget {
                               text: 'Vacanza ',
                               style: TextStyle(
                                 foreground: Paint()
-                                  ..shader = const LinearGradient(
+                                  ..shader = LinearGradient(
                                     colors: [
-                                      AppColors.primary,
-                                      AppColors.accentMint,
+                                      accent,
+                                      Color.lerp(
+                                            accent,
+                                            Colors.white,
+                                            isLight ? 0.08 : 0.18,
+                                          ) ??
+                                          accent,
                                     ],
                                   ).createShader(
                                     const Rect.fromLTWH(0, 0, 160, 32),
@@ -225,12 +239,12 @@ class RegisterScreen extends StatelessWidget {
                         child: Text.rich(
                           TextSpan(
                             style: bodyMedium.copyWith(color: subtitleColor),
-                            children: const [
-                              TextSpan(text: 'Already have an account? '),
+                            children: [
+                              const TextSpan(text: 'Already have an account? '),
                               TextSpan(
                                 text: 'Log In',
                                 style: TextStyle(
-                                  color: AppColors.primary,
+                                  color: accent,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
 class GradientButton extends StatelessWidget {
   final String text;
@@ -23,24 +23,31 @@ class GradientButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tokens = context.vacanzaTokens;
+    final isLight = theme.brightness == Brightness.light;
+
     final bool canTap = enabled && !loading && onPressed != null;
     final BorderRadius radius = BorderRadius.circular(26);
+
+    final colors = context.authAccentGradientColors;
+    final Color a = colors[0];
+    final Color b = colors[1];
 
     final Decoration decoration = active
         ? BoxDecoration(
       borderRadius: radius,
-      gradient: const LinearGradient(
-        colors: [
-          AppColors.primary,
-          AppColors.accentMint,
-        ],
+      gradient: LinearGradient(
+        colors: [a, b],
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
       ),
       boxShadow: [
         BoxShadow(
-          color: AppColors.primary.withValues(alpha: 0.25),
-          blurRadius: 14,
+          color: (isLight ? a : tokens.pillShadowAccent)
+              .withValues(alpha: isLight ? 0.22 : 0.30),
+          blurRadius: isLight ? 14 : 20,
           spreadRadius: 0,
           offset: const Offset(0, 6),
         ),
@@ -48,7 +55,9 @@ class GradientButton extends StatelessWidget {
     )
         : BoxDecoration(
       borderRadius: radius,
-      color: AppColors.buttonDisabled,
+      color: theme.brightness == Brightness.light
+          ? cs.surfaceContainerHighest.withValues(alpha: 0.55)
+          : cs.surfaceContainerHighest.withValues(alpha: 0.35),
     );
 
     return ClipRRect(

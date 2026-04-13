@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:mobile/core/theme/app_colors.dart';
 import 'package:mobile/core/widgets/gradient_button.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 import 'package:mobile/features/auth/presentation/widgets/login_email_section.dart';
 import 'package:mobile/features/auth/presentation/widgets/login_password_section.dart';
@@ -136,11 +136,11 @@ class _LoginFormState extends State<LoginForm> {
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(0, 0),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Forgot Password?',
                     style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.primary,
+                      color: context.authAccent,
                     ),
                   ),
                 ),

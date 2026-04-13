@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_text_field.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 class RegisterNameSection extends StatelessWidget {
   final TextEditingController firstNameController;
@@ -30,6 +30,9 @@ class RegisterNameSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.vacanzaTokens;
+    final accent = context.authAccent;
+
     final first = firstNameController.text.trim();
     final middle = middleNameController.text.trim();
 
@@ -65,12 +68,12 @@ class RegisterNameSection extends StatelessWidget {
         if (hasBothNames) ...[
           const SizedBox(height: 12),
 
-          const Text(
+          Text(
             "Preferred Name",
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.textHeading,
+              color: tokens.textMain,
             ),
           ),
 
@@ -82,7 +85,7 @@ class RegisterNameSection extends StatelessWidget {
                 child: FilterChip(
                   label: Text(first.isEmpty ? "First name" : first),
                   selected: preferredFirst,
-                  selectedColor: AppColors.primary.withOpacity(0.15),
+                  selectedColor: accent.withValues(alpha: 0.16),
                   onSelected: onPreferredFirstChanged,
                 ),
               ),
@@ -91,7 +94,7 @@ class RegisterNameSection extends StatelessWidget {
                 child: FilterChip(
                   label: Text(middle.isEmpty ? "Middle name" : middle),
                   selected: preferredMiddle,
-                  selectedColor: AppColors.primary.withOpacity(0.15),
+                  selectedColor: accent.withValues(alpha: 0.16),
                   onSelected: onPreferredMiddleChanged,
                 ),
               ),
