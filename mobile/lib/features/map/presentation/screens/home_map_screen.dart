@@ -1,5 +1,6 @@
 // ======================= home_map_screen.dart =======================
 // lib/features/map/presentation/screens/home_map_screen.dart
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
@@ -40,6 +41,13 @@ import '../../../poi_search/presentation/widgets/poi_filter_panel.dart';
 import '../../../../features/booking/presentation/widgets/booking_bottom_sheet.dart';
 
 import '../../../chat/presentation/screens/chat_screen.dart';
+import '../../../ai/utils/route_map.dart';
+import '../../../ai/presentation/cubit/active_route_cubit.dart';
+import '../../../ai/presentation/cubit/active_route_state.dart';
+import '../../../ai/data/api/ai_route_api_client.dart';
+import '../../../chat/data/api/chat_api_client.dart';
+import '../widgets/home_map/route/route_bottom_sheet.dart';
+import '../widgets/home_map/route/route_mini_pill.dart';
 import '../../../trip_agenda/trip_agenda_calendar_sheet.dart';
 import '../../../profile/data/repositories/profile_repository.dart';
 import '../../../profile/presentation/bloc/profile_bloc.dart';
@@ -48,6 +56,7 @@ import '../../../ar/presentation/screens/ar_explore_page.dart';
 import '../bloc/map_bloc.dart';
 import '../bloc/map_event.dart';
 import '../bloc/map_state.dart';
+import '../widgets/create_route_from_area_options_sheet.dart';
 import '../widgets/home_map/home_map_scaffold.dart';
 import '../widgets/home_map/markers/poi_marker_detail_sheet.dart';
 
@@ -62,13 +71,18 @@ class HomeMapScreen extends StatelessWidget {
           create: (_) => StylePoiDiscoveryBinding(),
         ),
         RepositoryProvider<PoiSearchRepository>(
-          create: (ctx) => CompositePoiSearchRepository(
-            backend: PoiSearchRepositoryImpl(ctx.read<PoiSearchApiClient>()),
-            styleBinding: ctx.read<StylePoiDiscoveryBinding>(),
-          ),
+          create:
+              (ctx) => CompositePoiSearchRepository(
+                backend: PoiSearchRepositoryImpl(
+                  ctx.read<PoiSearchApiClient>(),
+                ),
+                styleBinding: ctx.read<StylePoiDiscoveryBinding>(),
+              ),
         ),
         RepositoryProvider<LocationService>(create: (_) => LocationService()),
-        RepositoryProvider<CheckinApiClient>(create: (ctx) => CheckinApiClient(ctx.read<Dio>())),
+        RepositoryProvider<CheckinApiClient>(
+          create: (ctx) => CheckinApiClient(ctx.read<Dio>()),
+        ),
         RepositoryProvider<CheckinRepository>(
           create: (ctx) => CheckinRepository(ctx.read<CheckinApiClient>()),
         ),
@@ -76,19 +90,31 @@ class HomeMapScreen extends StatelessWidget {
       child: MultiBlocProvider(
         providers: [
           BlocProvider<MapBloc>(create: (_) => MapBloc()),
+          BlocProvider<ActiveRouteCubit>(
+            create:
+                (ctx) => ActiveRouteCubit(
+                  chatApi: ctx.read<ChatApiClient>(),
+                  routeApi: ctx.read<AiRouteApiClient>(),
+                ),
+          ),
           BlocProvider<AreaQueryBloc>(create: (_) => AreaQueryBloc()),
           BlocProvider<PoiSearchBloc>(
-            create: (ctx) => PoiSearchBloc(repo: ctx.read<PoiSearchRepository>()),
+            create:
+                (ctx) => PoiSearchBloc(repo: ctx.read<PoiSearchRepository>()),
           ),
           BlocProvider<LocationBloc>(
-            create: (ctx) => LocationBloc(locationService: ctx.read<LocationService>()),
+            create:
+                (ctx) =>
+                    LocationBloc(locationService: ctx.read<LocationService>()),
           ),
           BlocProvider<CandidatePoiCubit>(create: (_) => CandidatePoiCubit()),
           BlocProvider<CheckinBloc>(
-            create: (ctx) => CheckinBloc(repository: ctx.read<CheckinRepository>()),
+            create:
+                (ctx) => CheckinBloc(repository: ctx.read<CheckinRepository>()),
           ),
           BlocProvider<ProfileBloc>(
-            create: (ctx) => ProfileBloc(repository: ctx.read<ProfileRepository>()),
+            create:
+                (ctx) => ProfileBloc(repository: ctx.read<ProfileRepository>()),
           ),
         ],
         child: const _HomeMapView(),
@@ -104,10 +130,13 @@ class _HomeMapView extends StatefulWidget {
   State<_HomeMapView> createState() => _HomeMapViewState();
 }
 
-class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver {
+class _HomeMapViewState extends State<_HomeMapView>
+    with WidgetsBindingObserver {
   bool _filtersOpen = false;
   bool _resultsOpen = false;
   bool _controlsMenuOpen = false;
+  bool _routeOpen = false;
+  bool _routeShowEventsInitially = false;
 
   /// Cached reference to avoid context.read in dispose/lifecycle callbacks.
   late final LocationBloc _locationBloc;
@@ -186,6 +215,93 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
     setState(() => _controlsMenuOpen = false);
   }
 
+  /// Closes results (and filters), then shows the two-step wizard + loading.
+  void _beginCreateRouteFromArea() {
+    if (!mounted) return;
+    setState(() {
+      _resultsOpen = false;
+      _activeChipKey = null;
+      if (_filtersOpen) {
+        _filtersOpen = false;
+        _filtersFromUserSelection = false;
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_createRouteFromAreaWithPrompt());
+    });
+  }
+
+  Future<void> _createRouteFromAreaWithPrompt() async {
+    final ctx = context.read<AreaQueryBloc>().state.context;
+    if (ctx.areaSource != AreaSource.userSelection ||
+        ctx.area is! PolygonArea) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Draw an area on the map first.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    final poly = ctx.area as PolygonArea;
+    final coords = poly.points
+        .map((p) => <double>[p.lng, p.lat])
+        .toList(growable: false);
+
+    final options = await showCreateRouteFromAreaOptionsSheet(context);
+    if (!mounted || options == null) return;
+
+    // Rota isteği başlarken çizimi ve poligon overlay’ini kaldır (koordinatlar zaten [coords]’ta).
+    context.read<MapBloc>().add(SetDrawingEnabled(false));
+    context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
+    context.read<PoiSearchBloc>().add(const poi.AreaCleared());
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (dialogCtx) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            content: Row(
+              children: [
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.6),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Text(
+                    'Creating your route…',
+                    style: Theme.of(dialogCtx).textTheme.bodyLarge,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    try {
+      await context.read<ActiveRouteCubit>().createFromPolygon(
+        coordinates: coords,
+        totalDays: options.totalDays,
+        travelStyle: options.travelStyle,
+        categories: null,
+      );
+    } finally {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -210,7 +326,8 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       // App going to background — stop GPS to save battery
       if (_locationBloc.state.status == LocationStatus.tracking) {
         _wasTracking = true;
@@ -236,7 +353,10 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
               'Please enable it from app settings to use check-in.',
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cancel'),
+              ),
               TextButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
@@ -260,7 +380,9 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             if (state.status == LocationStatus.permissionDenied) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Location permission is required for check-in.'),
+                  content: Text(
+                    'Location permission is required for check-in.',
+                  ),
                   duration: Duration(seconds: 3),
                 ),
               );
@@ -275,9 +397,11 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
           listenWhen:
               (prev, next) =>
                   next.status == LocationStatus.tracking &&
-                  (prev.latitude != next.latitude || prev.longitude != next.longitude),
+                  (prev.latitude != next.latitude ||
+                      prev.longitude != next.longitude),
           listener: (context, state) {
-            final candidates = context.read<CandidatePoiCubit>().state.candidatePoiIds;
+            final candidates =
+                context.read<CandidatePoiCubit>().state.candidatePoiIds;
             context.read<CheckinBloc>().add(
               TriggerAutoCheckin(
                 latitude: state.latitude!,
@@ -291,10 +415,13 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
         // ================= New check-in feedback (MOB-5) =================
         BlocListener<CheckinBloc, CheckinState>(
           listenWhen:
-              (prev, next) => prev.status != next.status && next.status == CheckinStatus.newCreated,
+              (prev, next) =>
+                  prev.status != next.status &&
+                  next.status == CheckinStatus.newCreated,
           listener: (context, state) {
             final poiName = state.response?.poiName;
-            final message = poiName != null ? 'Checked in at $poiName' : 'Checked in!';
+            final message =
+                poiName != null ? 'Checked in at $poiName' : 'Checked in!';
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(message),
@@ -337,7 +464,8 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             }
 
             // 2) User selection -> PoiSearch area event + filtre panelini aç
-            if (ctx.areaSource == AreaSource.userSelection && ctx.area is PolygonArea) {
+            if (ctx.areaSource == AreaSource.userSelection &&
+                ctx.area is PolygonArea) {
               context.read<PoiSearchBloc>().add(poi.AreaChanged(ctx.area));
 
               // ✅ polygon sonrası açılan filter -> blur preview ON
@@ -394,7 +522,8 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             }
 
             // Viewport’a dönünce -> sheet kapat
-            if (state.areaSource == AreaSource.viewport && state.status == PoiSearchStatus.idle) {
+            if (state.areaSource == AreaSource.viewport &&
+                state.status == PoiSearchStatus.idle) {
               if (_resultsOpen && mounted) {
                 setState(() {
                   _resultsOpen = false;
@@ -404,10 +533,59 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             }
           },
         ),
+
+        // ================= ActiveRoute -> open route sheet =================
+        BlocListener<ActiveRouteCubit, ActiveRouteState>(
+          listenWhen:
+              (prev, next) =>
+                  prev.status != next.status ||
+                  prev.route != next.route ||
+                  prev.errorMessage != next.errorMessage,
+          listener: (context, state) {
+            if (state.status == ActiveRouteStatus.ready &&
+                state.route != null) {
+              if (mounted) setState(() => _routeOpen = true);
+
+              final ps = context.read<PoiSearchBloc>().state;
+              // Çizilen alan akışı: sonuç sheet’i önceden kapatılmış olsa da (Create route sihirbazı)
+              // user selection + poligon overlay mutlaka temizlensin.
+              if (ps.areaSource == AreaSource.userSelection) {
+                if (mounted && _resultsOpen) {
+                  setState(() {
+                    _resultsOpen = false;
+                    _activeChipKey = null;
+                  });
+                }
+                context.read<MapBloc>().add(SetDrawingEnabled(false));
+                context.read<AreaQueryBloc>().add(
+                  const aq.ClearUserSelection(),
+                );
+                context.read<PoiSearchBloc>().add(const poi.AreaCleared());
+              }
+            }
+            if (state.status == ActiveRouteStatus.idle) {
+              if (mounted) setState(() => _routeOpen = false);
+            }
+            if (state.status == ActiveRouteStatus.failure &&
+                (state.errorMessage ?? '').isNotEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.errorMessage!),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+        ),
       ],
       child: BlocBuilder<MapBloc, MapState>(
         builder: (context, state) {
           final poiState = context.watch<PoiSearchBloc>().state;
+          final activeRouteState = context.watch<ActiveRouteCubit>().state;
+          final areaCtx = context.watch<AreaQueryBloc>().state.context;
+          final canCreateRouteFromArea =
+              poiState.areaSource == AreaSource.userSelection &&
+              areaCtx.area is PolygonArea;
 
           // resultsSheet widget (hem normal hem blur preview’da kullanılacak)
           final sheetWidget = AreaResultsSheet(
@@ -425,17 +603,24 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             onPoiTap: (poi) => showPoiMarkerDetailSheet(context, poi),
             hideZeroCountCategories:
                 poiState.areaSource == AreaSource.userSelection,
+            showCreateRouteFromArea: canCreateRouteFromArea,
+            isCreatingRoute:
+                activeRouteState.status == ActiveRouteStatus.loading,
+            onCreateRouteFromArea: _beginCreateRouteFromArea,
           );
 
           return HomeMapScaffold(
             basemap: state.basemap,
             perspective: state.perspective,
             isDrawing: state.isDrawing,
-            onCycleBasemap: () =>
-                context.read<MapBloc>().add(const CycleBasemapPressed()),
-            onTogglePerspective: () =>
-                context.read<MapBloc>().add(const TogglePerspectivePressed()),
-            onRecenter: () => context.read<MapBloc>().add(const RecenterPressed()),
+            onCycleBasemap:
+                () => context.read<MapBloc>().add(const CycleBasemapPressed()),
+            onTogglePerspective:
+                () => context.read<MapBloc>().add(
+                  const TogglePerspectivePressed(),
+                ),
+            onRecenter:
+                () => context.read<MapBloc>().add(const RecenterPressed()),
             onToggleDrawing: () {
               final isDrawingNow = context.read<MapBloc>().state.isDrawing;
 
@@ -460,10 +645,11 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             onOpenArMode: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => BlocProvider.value(
-                    value: context.read<CheckinBloc>(),
-                    child: const ArExplorePage(),
-                  ),
+                  builder:
+                      (_) => BlocProvider.value(
+                        value: context.read<CheckinBloc>(),
+                        child: const ArExplorePage(),
+                      ),
                 ),
               );
             },
@@ -486,8 +672,62 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             },
 
             // ✅ Chatbot
-            onOpenChat: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
+            onOpenChat: () async {
+              _closeControlsMenu();
+              final nav = await Navigator.push<ChatScreenNavResult?>(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatScreen()),
+              );
+              if (!context.mounted) return;
+              if (nav == null) return;
+              final res = nav.response;
+              final routeCubit = context.read<ActiveRouteCubit>();
+              if (res.routeData != null) {
+                routeCubit.setFromChatResponse(res);
+              } else if (res.routeId != null &&
+                  res.routeId!.trim().isNotEmpty) {
+                await routeCubit.loadSavedRoute(res.routeId!.trim());
+                if (!context.mounted) return;
+                if (routeCubit.state.status != ActiveRouteStatus.ready) {
+                  return;
+                }
+              } else {
+                return;
+              }
+              setState(() {
+                _routeShowEventsInitially = nav.openEventsInitially;
+                _routeOpen = true;
+              });
+              void applyRouteFit() {
+                if (!context.mounted) return;
+                final routeModel = context.read<ActiveRouteCubit>().state.route;
+                if (routeModel == null) return;
+                // Frame the whole trip (all days), not only the first calendar day — avoids
+                // "nothing happens until I tap Day 2" when the map stayed on the wrong extent.
+                var wps = allWaypointsForMap(routeModel);
+                if (wps.isEmpty) {
+                  wps = waypointsForInitialMapDay(routeModel);
+                }
+                final b = boundsOfWaypoints(wps);
+                final brg = bearingFirstToLast(wps);
+                if (b == null) return;
+                context.read<MapBloc>().add(
+                  FitRouteBoundsRequested(
+                    minLat: b.minLat,
+                    maxLat: b.maxLat,
+                    minLng: b.minLng,
+                    maxLng: b.maxLng,
+                    bearing: brg,
+                  ),
+                );
+              }
+
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                applyRouteFit();
+              });
+              Future<void>.delayed(const Duration(milliseconds: 280), () {
+                if (context.mounted) applyRouteFit();
+              });
             },
 
             // ===== Filters overlay =====
@@ -507,6 +747,53 @@ class _HomeMapViewState extends State<_HomeMapView> with WidgetsBindingObserver 
             // ===== Results sheet (normal) =====
             isResultsOpen: _resultsOpen,
             resultsSheet: sheetWidget,
+
+            // ===== Route sheet (AI route) =====
+            isRouteOpen:
+                _routeOpen &&
+                activeRouteState.route != null &&
+                (activeRouteState.status == ActiveRouteStatus.ready ||
+                    activeRouteState.status == ActiveRouteStatus.loading),
+            routeSheet:
+                _routeOpen &&
+                        activeRouteState.route != null &&
+                        (activeRouteState.status == ActiveRouteStatus.ready ||
+                            activeRouteState.status ==
+                                ActiveRouteStatus.loading)
+                    ? DraggableRouteBottomSheet(
+                      initialEvents: _routeShowEventsInitially,
+                      onClose: () {
+                        context.read<ActiveRouteCubit>().hideRouteFromMap();
+                        if (mounted) setState(() => _routeOpen = false);
+                      },
+                    )
+                    : null,
+
+            // ===== Mini route pill =====
+            showRouteMiniPill:
+                activeRouteState.status == ActiveRouteStatus.ready &&
+                activeRouteState.route != null &&
+                !activeRouteState.showRouteOnMap &&
+                !_filtersOpen &&
+                !_resultsOpen &&
+                !state.isDrawing,
+            routeMiniPill:
+                activeRouteState.status == ActiveRouteStatus.ready &&
+                        activeRouteState.route != null &&
+                        !activeRouteState.showRouteOnMap
+                    ? RouteMiniPill(
+                      day: activeRouteState.activeDay,
+                          onOpen: () {
+                            if (!mounted) return;
+                            context.read<ActiveRouteCubit>().showRouteOnMapAgain();
+                            setState(() => _routeOpen = true);
+                          },
+                      onClear: () {
+                        context.read<ActiveRouteCubit>().reset();
+                        if (mounted) setState(() => _routeOpen = false);
+                      },
+                    )
+                    : null,
 
             // ===== Blur preview sadece polygon sonrası filter açıldıysa =====
             showResultsBlurUnderFilters: _filtersFromUserSelection,
