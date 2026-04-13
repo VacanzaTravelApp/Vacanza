@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_text_field.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 class RegisterPasswordSection extends StatefulWidget {
   final TextEditingController passwordController;
@@ -39,19 +39,21 @@ class _RegisterPasswordSectionState
   bool _passwordVisible = false;
   bool _confirmVisible = false;
 
-  Widget _rule(String text, bool ok) {
+  Widget _rule(BuildContext context, String text, bool ok) {
+    final tokens = context.vacanzaTokens;
+    final accent = context.authAccent;
     return Row(
       children: [
         Icon(
           ok ? Icons.check_circle : Icons.radio_button_unchecked,
           size: 14,
-          color: ok ? AppColors.accentMint : AppColors.inputBorder,
+          color: ok ? accent : tokens.cardBorder,
         ),
         const SizedBox(width: 4),
         Text(
           text,
           style: TextStyle(
-            color: ok ? AppColors.accentMint : AppColors.textMuted,
+            color: ok ? accent : tokens.textSub,
             fontSize: 12,
           ),
         ),
@@ -61,6 +63,8 @@ class _RegisterPasswordSectionState
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.vacanzaTokens;
+
     final confirmGlow = widget.confirmGlow;
 
     return Column(
@@ -78,7 +82,7 @@ class _RegisterPasswordSectionState
                   ? Icons.visibility_rounded
                   : Icons.visibility_off_rounded,
               size: 18,
-              color: AppColors.inputPlaceholder,
+              color: tokens.textSub.withValues(alpha: 0.70),
             ),
             onPressed: () {
               setState(() => _passwordVisible = !_passwordVisible);
@@ -102,16 +106,16 @@ class _RegisterPasswordSectionState
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _rule("1+ uppercase", widget.up),
-                _rule("1+ lowercase", widget.low),
-                _rule("1 number", widget.dig),
+                _rule(context, "1+ uppercase", widget.up),
+                _rule(context, "1+ lowercase", widget.low),
+                _rule(context, "1 number", widget.dig),
               ],
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _rule("1 special char", widget.spe),
-                _rule("8+ characters", widget.len8),
+                _rule(context, "1 special char", widget.spe),
+                _rule(context, "8+ characters", widget.len8),
               ],
             ),
           ],
@@ -131,7 +135,7 @@ class _RegisterPasswordSectionState
                   ? Icons.visibility_rounded
                   : Icons.visibility_off_rounded,
               size: 18,
-              color: AppColors.inputPlaceholder,
+              color: tokens.textSub.withValues(alpha: 0.70),
             ),
             onPressed: () {
               setState(() => _confirmVisible = !_confirmVisible);
@@ -147,7 +151,7 @@ class _RegisterPasswordSectionState
             child: Text(
               "Passwords do not match",
               style: TextStyle(
-                color: Colors.red.withOpacity(0.9),
+                color: Colors.red.withValues(alpha: 0.90),
                 fontSize: 12,
               ),
             ),

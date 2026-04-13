@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/widgets/app_text_field.dart';
-import 'package:mobile/core/theme/app_colors.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 class LoginPasswordSection extends StatefulWidget {
   final TextEditingController passwordController;
@@ -19,6 +19,8 @@ class _LoginPasswordSectionState extends State<LoginPasswordSection> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.vacanzaTokens;
+
     return AppTextField(
       controller: widget.passwordController,
       label: "Password",
@@ -32,7 +34,7 @@ class _LoginPasswordSectionState extends State<LoginPasswordSection> {
         icon: Icon(
           visible ? Icons.visibility_rounded : Icons.visibility_off_rounded,
           size: 18,
-          color: AppColors.inputPlaceholder,
+          color: tokens.textSub.withValues(alpha: 0.70),
         ),
         onPressed: () => setState(() => visible = !visible),
       ),

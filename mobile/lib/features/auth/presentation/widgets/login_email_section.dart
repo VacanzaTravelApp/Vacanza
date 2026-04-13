@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/widgets/app_text_field.dart';
-import 'package:mobile/core/theme/app_colors.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 class LoginEmailSection extends StatelessWidget {
   final TextEditingController emailController;
@@ -14,6 +14,9 @@ class LoginEmailSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.vacanzaTokens;
+    final accent = context.authAccent;
+
     final email = emailController.text.trim();
     final ok = emailRegex.hasMatch(email);
 
@@ -36,7 +39,7 @@ class LoginEmailSection extends StatelessWidget {
           children: [
             Icon(
               ok ? Icons.check_circle : Icons.radio_button_unchecked,
-              color: ok ? AppColors.accentMint : AppColors.inputBorder,
+              color: ok ? accent : tokens.cardBorder,
               size: 14,
             ),
             const SizedBox(width: 4),
@@ -44,7 +47,7 @@ class LoginEmailSection extends StatelessWidget {
               "Valid email format",
               style: TextStyle(
                 fontSize: 12,
-                color: ok ? AppColors.accentMint : AppColors.textMuted,
+                color: ok ? accent : tokens.textSub,
               ),
             ),
           ],
