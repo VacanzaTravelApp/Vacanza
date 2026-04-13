@@ -29,6 +29,7 @@ import 'features/booking/data/api/booking_api_client.dart';
 import 'features/booking/data/repositories/booking_repository.dart';
 
 import 'features/chat/data/api/chat_api_client.dart';
+import 'features/ai/data/api/ai_route_api_client.dart';
 
 import 'features/profile/data/datasources/profile_remote_data_source.dart';
 import 'features/profile/data/repositories/profile_repository.dart';
@@ -40,7 +41,14 @@ import 'features/auth/presentation/screens/auth_gate.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  MapboxOptions.setAccessToken(MapboxConfig.accessToken);
+  final mapboxToken = MapboxConfig.accessToken.trim();
+  MapboxOptions.setAccessToken(mapboxToken);
+  if (mapboxToken.isEmpty || !mapboxToken.startsWith('pk.')) {
+    debugPrint(
+      '[Mapbox] Public access token missing or not pk.* — vector tiles will 401 until '
+      'mobile/lib/core/config/mapbox_access_token.dart is set.',
+    );
+  }
 
   // Firebase init
   await Firebase.initializeApp(
@@ -113,6 +121,11 @@ class VacanzaApp extends StatelessWidget {
         /// Chat API client (AI chatbot)
         RepositoryProvider<ChatApiClient>(
           create: (ctx) => ChatApiClient(ctx.read<Dio>()),
+        ),
+
+        /// Saved AI routes + directions (shared by map AI route UI)
+        RepositoryProvider<AiRouteApiClient>(
+          create: (ctx) => AiRouteApiClient(ctx.read<Dio>()),
         ),
 
         /// Profile (MOB-9 / profile feature)
