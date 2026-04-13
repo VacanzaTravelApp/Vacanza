@@ -12,6 +12,12 @@ class MapState {
   final double? flyToPoiLat;
   final double? flyToPoiLng;
   final double flyToPoiZoom;
+  final int fitRouteTick;
+  final double? fitRouteMinLat;
+  final double? fitRouteMaxLat;
+  final double? fitRouteMinLng;
+  final double? fitRouteMaxLng;
+  final double? fitRouteBearing;
   final String? lastErrorMessage;
   final bool isDrawing;
 
@@ -24,22 +30,34 @@ class MapState {
     this.flyToPoiLat,
     this.flyToPoiLng,
     this.flyToPoiZoom = 16.0,
+    required this.fitRouteTick,
+    this.fitRouteMinLat,
+    this.fitRouteMaxLat,
+    this.fitRouteMinLng,
+    this.fitRouteMaxLng,
+    this.fitRouteBearing,
     required this.isDrawing,
     this.lastErrorMessage,
   });
 
   factory MapState.initial() => const MapState(
-        basemap: MapBasemap.streets,
-        perspective: MapPerspective.mode2D,
-        isMapReady: false,
-        recenterTick: 0,
-        flyToPoiTick: 0,
-        flyToPoiLat: null,
-        flyToPoiLng: null,
-        flyToPoiZoom: 16.0,
-        lastErrorMessage: null,
-        isDrawing: false,
-      );
+    basemap: MapBasemap.streets,
+    perspective: MapPerspective.mode2D,
+    isMapReady: false,
+    recenterTick: 0,
+    flyToPoiTick: 0,
+    flyToPoiLat: null,
+    flyToPoiLng: null,
+    flyToPoiZoom: 16.0,
+    fitRouteTick: 0,
+    fitRouteMinLat: null,
+    fitRouteMaxLat: null,
+    fitRouteMinLng: null,
+    fitRouteMaxLng: null,
+    fitRouteBearing: null,
+    lastErrorMessage: null,
+    isDrawing: false,
+  );
 
   MapState copyWith({
     MapBasemap? basemap,
@@ -50,6 +68,12 @@ class MapState {
     double? flyToPoiLat,
     double? flyToPoiLng,
     double? flyToPoiZoom,
+    int? fitRouteTick,
+    double? fitRouteMinLat,
+    double? fitRouteMaxLat,
+    double? fitRouteMinLng,
+    double? fitRouteMaxLng,
+    double? fitRouteBearing,
     String? lastErrorMessage,
     bool? isDrawing,
   }) {
@@ -62,6 +86,12 @@ class MapState {
       flyToPoiLat: flyToPoiLat ?? this.flyToPoiLat,
       flyToPoiLng: flyToPoiLng ?? this.flyToPoiLng,
       flyToPoiZoom: flyToPoiZoom ?? this.flyToPoiZoom,
+      fitRouteTick: fitRouteTick ?? this.fitRouteTick,
+      fitRouteMinLat: fitRouteMinLat ?? this.fitRouteMinLat,
+      fitRouteMaxLat: fitRouteMaxLat ?? this.fitRouteMaxLat,
+      fitRouteMinLng: fitRouteMinLng ?? this.fitRouteMinLng,
+      fitRouteMaxLng: fitRouteMaxLng ?? this.fitRouteMaxLng,
+      fitRouteBearing: fitRouteBearing ?? this.fitRouteBearing,
       lastErrorMessage: lastErrorMessage ?? this.lastErrorMessage,
       isDrawing: isDrawing ?? this.isDrawing,
     );
