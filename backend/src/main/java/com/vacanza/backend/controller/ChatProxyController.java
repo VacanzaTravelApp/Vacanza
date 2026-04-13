@@ -142,6 +142,7 @@ public class ChatProxyController {
                 // Uses the same __EXISTING_ROUTE__ marker as the polygon-replan flow.
                 // Only injected for plain chat messages (not tool results or polygon requests).
                 String originalContent = body.getContent();
+                AiRoute parentRouteForTurn3 = null;
                 if (originalContent != null && !originalContent.contains("__TOOL_RESULT__")) {
                         try {
                                 List<AiRoute> existingRoutes = aiRouteService.getRoutesForConversation(user, conversationId);
@@ -150,6 +151,7 @@ public class ChatProxyController {
                                         String routeJson = latest.getRouteJson();
                                         if (routeJson != null && !routeJson.isBlank()) {
                                                 body.setContent(originalContent + "\n__EXISTING_ROUTE__\n" + routeJson);
+                                                parentRouteForTurn3 = latest;
                                         }
                                 }
                         } catch (Exception e) {
@@ -213,7 +215,19 @@ public class ChatProxyController {
                 }
 
                 saveExtractedPreferencesIfAny(user, response);
-                applyRouteEnrichmentAndSave(user, conversationId, response, routePlanningWeather, profile);
+
+                // Turn3: if the AI edited an existing route (no tool call was made, but route_data is present
+                // and we had a parent route), save it as a new version instead of a fresh v1 route.
+                boolean isTurn3Response = parentRouteForTurn3 != null
+                        && response != null
+                        && response.getRouteData() != null
+                        && routePlanningWeather == null; // Turn2 always sets routePlanningWeather; Turn3 does not
+                if (isTurn3Response) {
+                        applyTurn3RouteEnrichmentAndSave(user, conversationId, response, profile,
+                                parentRouteForTurn3, originalContent);
+                } else {
+                        applyRouteEnrichmentAndSave(user, conversationId, response, routePlanningWeather, profile);
+                }
 
                 return ResponseEntity.ok(response);
         }
@@ -507,6 +521,50 @@ public class ChatProxyController {
                         }
                 } catch (Exception e) {
                         log.warn("Failed to process route data (non-blocking): {}", e.getMessage());
+                }
+        }
+
+        /**
+         * Turn3 variant: enriches the route and saves it as a new version linked to the parent route.
+         * Called when the AI edited an existing route via chat (no fresh POI search was performed).
+         */
+        private void applyTurn3RouteEnrichmentAndSave(
+                        User user,
+                        UUID conversationId,
+                        AiChatDto.MessageSendResponse response,
+                        UserProfileForAi profile,
+                        AiRoute parentRoute,
+                        String userMessage) {
+                try {
+                        if (response == null || response.getRouteData() == null) return;
+                        resolveNullCoordinates(response.getRouteData());
+                        routeTimelineService.enrichTimeline(response.getRouteData(), profile);
+
+                        // Build a short human-readable reason from the user's edit request
+                        String reason = "Chat edit";
+                        if (userMessage != null && !userMessage.isBlank()) {
+                                String trimmed = userMessage.split("\n__EXISTING_ROUTE__")[0].trim();
+                                reason = trimmed.length() > 200 ? trimmed.substring(0, 197) + "..." : trimmed;
+                        }
+
+                        String routeJson = objectMapper.writeValueAsString(response.getRouteData());
+                        AiRoute saved = aiRouteService.saveVersionedRoute(
+                                        user, conversationId,
+                                        response.getRouteData().getTitle(),
+                                        response.getRouteData().getDestination(),
+                                        response.getRouteData().getTotalDays(),
+                                        routeJson,
+                                        parentRoute,
+                                        reason);
+                        response.setRouteId(saved.getRouteId());
+
+                        String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
+                                        response.getRouteData(), profile);
+                        if (summaryMessage != null) {
+                                response.setRouteSummaryMessage(summaryMessage);
+                        }
+                } catch (Exception e) {
+                        log.warn("[TURN3] Failed to save versioned route (non-blocking): {}", e.getMessage());
                 }
         }
 

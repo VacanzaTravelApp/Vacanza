@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +49,32 @@ public class AiRouteService {
     @Transactional(readOnly = true)
     public List<AiRoute> getRoutesForConversation(User user, UUID conversationId) {
         return repository.findByUserAndConversationIdOrderByGeneratedAtAsc(user, conversationId);
+    }
+
+    /**
+     * Save a new versioned route derived from a parent (e.g. Turn3 chat edit).
+     * Increments version by 1 and links parentRouteId so the full edit history is preserved.
+     */
+    @Transactional
+    public AiRoute saveVersionedRoute(User user, UUID conversationId, String title,
+                                      String destination, int totalDays, String routeJson,
+                                      AiRoute parent, String adjustmentReason) {
+        AiRoute route = AiRoute.builder()
+                .user(user)
+                .conversationId(conversationId)
+                .title(title)
+                .destination(destination)
+                .totalDays(totalDays)
+                .routeJson(routeJson)
+                .version(parent.getVersion() + 1)
+                .parentRouteId(parent.getRouteId())
+                .adjustedAt(LocalDateTime.now())
+                .adjustmentReason(adjustmentReason)
+                .build();
+        AiRoute saved = repository.save(route);
+        log.info("Saved versioned AI route '{}' v{} (parent={}) for user {}",
+                title, saved.getVersion(), parent.getRouteId(), user.getUserId());
+        return saved;
     }
 
     @Transactional
