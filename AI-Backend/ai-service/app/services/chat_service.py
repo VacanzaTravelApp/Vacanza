@@ -441,8 +441,39 @@ def _is_route_edit_request(user_content: str, history: list[HumanMessage | AIMes
     return False
 
 
-def _extract_latest_route_from_history(history: list[HumanMessage | AIMessage]) -> "RouteData | None":
-    """Return the most recently generated RouteData from conversation history, or None."""
+def _extract_latest_route_from_history(
+    history: list[HumanMessage | AIMessage],
+    user_content: str = "",
+) -> "RouteData | None":
+    """Return the most recently generated RouteData, or None.
+
+    Two sources are checked in priority order:
+
+    1. ``user_content`` — Java backend may inject the latest saved route via the
+       ``__EXISTING_ROUTE__`` marker (same mechanism used by the polygon-replan
+       flow).  This is the most reliable source because it bypasses the sliding-
+       window limit of the in-memory history.
+
+    2. ``history`` — fallback scan of the last ~20 messages for a message that
+       contains ``---ROUTE_JSON---``.  Works when the route was generated within
+       the current sliding window and the Java backend did not inject the marker.
+    """
+    # 1. Java backend injection (most reliable)
+    if user_content:
+        idx = user_content.find(EXISTING_ROUTE_MARKER)
+        if idx != -1:
+            raw = user_content[idx + len(EXISTING_ROUTE_MARKER):].strip()
+            json_str = _extract_first_json_object_str(raw)
+            if json_str:
+                try:
+                    return RouteData.model_validate_json(json_str)
+                except Exception:
+                    logger.warning(
+                        "[TURN3] Failed to parse %s from user_content", EXISTING_ROUTE_MARKER,
+                        exc_info=True,
+                    )
+
+    # 2. Sliding-window history scan (fallback)
     for msg in reversed(history):
         content = getattr(msg, "content", "") or ""
         if ROUTE_JSON_SEPARATOR not in content:
@@ -450,6 +481,7 @@ def _extract_latest_route_from_history(history: list[HumanMessage | AIMessage]) 
         _, route = _parse_route_from_response(content)
         if route is not None:
             return route
+
     return None
 
 
@@ -1859,7 +1891,7 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
 
     # Turn3: user wants to edit an already-generated route via chat
     elif _is_route_edit_request(user_content, history):
-        existing_route = _extract_latest_route_from_history(history)
+        existing_route = _extract_latest_route_from_history(history, user_content)
         logger.info(
             "[TURN3] Route edit intent detected. existing_route=%s",
             existing_route.destination if existing_route else None,
