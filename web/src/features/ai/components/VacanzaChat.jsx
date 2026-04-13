@@ -625,6 +625,11 @@ export default function VacanzaChat({
 
         const norm = routeData ? normalizeRouteForMap(routeData) : null;
         const routeIdFromResponse = response.route_id ?? response.routeId ?? null;
+        // Detect Turn3: route came back but conversation already had a route → this is a chat-edit
+        const hadExistingRoute = messages.some(
+          (m) => m.routeDataList?.length > 0 || m.routeData
+        );
+        const isRouteEdit = !!norm && hadExistingRoute;
         const aiMsg = {
           id: `local-${Date.now() + 1}`,
           type: "ai",
@@ -634,6 +639,7 @@ export default function VacanzaChat({
           routeIdList: norm ? [routeIdFromResponse ?? null] : undefined,
           routeFeedbackList: norm ? [null] : undefined,
           noRouteHint: !routeData && wasRouteRequest && !aiAskedFollowUp,
+          isRouteEdit,
           time: formatMessageTime(new Date()),
         };
         setMessages((prev) => [...prev, aiMsg]);
@@ -796,6 +802,12 @@ export default function VacanzaChat({
                 </div>
                 {routeList.map((rd, rIdx) => (
                   <div key={`${msg.id}-route-${rIdx}`} className="route-card-outer">
+                    {msg.isRouteEdit && rIdx === 0 ? (
+                      <div className="route-updated-badge" role="note">
+                        <EditOutlined aria-hidden />
+                        Updated via chat
+                      </div>
+                    ) : null}
                     {onRequestDrawToEdit ? (
                       <div
                         className={`route-card-preface ${rIdx > 0 ? "route-card-preface--stacked" : ""}`}
@@ -1007,33 +1019,94 @@ export default function VacanzaChat({
 
       {!initialLoading && (
         <div className="chat-footer-refined">
-          <div className="chat-quick-actions">
-            <span className="chat-quick-label">Plan a route:</span>
-            <button
-              type="button"
-              className="chat-quick-chip"
-              onClick={() => handleSendMessage("Plan a 3-day trip to Istanbul")}
-              disabled={loading || messagesLoading}
-            >
-              3-day Istanbul
-            </button>
-            <button
-              type="button"
-              className="chat-quick-chip"
-              onClick={() => handleSendMessage("Plan a 2-day trip to Rome")}
-              disabled={loading || messagesLoading}
-            >
-              2-day Rome
-            </button>
-            <button
-              type="button"
-              className="chat-quick-chip"
-              onClick={() => handleSendMessage("Create a 4-day Antalya vacation plan for me")}
-              disabled={loading || messagesLoading}
-            >
-              4-day Antalya
-            </button>
-          </div>
+          {(() => {
+            const hasExistingRoute = messages.some(
+              (m) => m.routeDataList?.length > 0 || m.routeData
+            );
+            const lastRouteMsg = [...messages]
+              .reverse()
+              .find((m) => m.routeDataList?.length > 0 || m.routeData);
+            const lastRoute =
+              lastRouteMsg?.routeDataList?.[0] || lastRouteMsg?.routeData;
+            const totalDays =
+              lastRoute?.days?.length || lastRoute?.total_days || 0;
+
+            if (hasExistingRoute) {
+              return (
+                <div className="chat-quick-actions">
+                  <span className="chat-quick-label">Edit route:</span>
+                  {totalDays >= 1 && (
+                    <button
+                      type="button"
+                      className="chat-quick-chip"
+                      onClick={() => handleSendMessage("Make day 1 more museum-focused")}
+                      disabled={loading || messagesLoading}
+                    >
+                      Day 1: more museums
+                    </button>
+                  )}
+                  {totalDays >= 2 && (
+                    <button
+                      type="button"
+                      className="chat-quick-chip"
+                      onClick={() => handleSendMessage("Slow down day 2")}
+                      disabled={loading || messagesLoading}
+                    >
+                      Slow down day 2
+                    </button>
+                  )}
+                  {totalDays >= 3 && (
+                    <button
+                      type="button"
+                      className="chat-quick-chip"
+                      onClick={() => handleSendMessage("Add more dining options to day 3")}
+                      disabled={loading || messagesLoading}
+                    >
+                      Day 3: more dining
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="chat-quick-chip"
+                    onClick={() => handleSendMessage("Change the pace to slow for the whole trip")}
+                    disabled={loading || messagesLoading}
+                  >
+                    Slower pace
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <div className="chat-quick-actions">
+                <span className="chat-quick-label">Plan a route:</span>
+                <button
+                  type="button"
+                  className="chat-quick-chip"
+                  onClick={() => handleSendMessage("Plan a 3-day trip to Istanbul")}
+                  disabled={loading || messagesLoading}
+                >
+                  3-day Istanbul
+                </button>
+                <button
+                  type="button"
+                  className="chat-quick-chip"
+                  onClick={() => handleSendMessage("Plan a 2-day trip to Rome")}
+                  disabled={loading || messagesLoading}
+                >
+                  2-day Rome
+                </button>
+                <button
+                  type="button"
+                  className="chat-quick-chip"
+                  onClick={() => handleSendMessage("Create a 4-day Antalya vacation plan for me")}
+                  disabled={loading || messagesLoading}
+                >
+                  4-day Antalya
+                </button>
+              </div>
+            );
+          })()}
           <div className="chat-input-field-group">
             <input
               type="text"
@@ -1052,7 +1125,7 @@ export default function VacanzaChat({
               <SendOutlined />
             </button>
           </div>
-          </div>
+        </div>
         )}
           </>
         )}
