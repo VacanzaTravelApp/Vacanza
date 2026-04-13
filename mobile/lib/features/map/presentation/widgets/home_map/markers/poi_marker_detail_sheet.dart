@@ -57,7 +57,8 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
                 Expanded(
                   child: Text(
                     poi.name,
-                    style: theme.textTheme.titleLarge?.copyWith(
+                    style:
+                        theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.3,
                           color: cs.onSurface,
@@ -86,15 +87,16 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
               ),
             ),
             const SizedBox(height: 16),
-            _DistanceRow(
-              distanceMeters: distanceMeters,
-              locationState: loc,
-            ),
+            _DistanceRow(distanceMeters: distanceMeters, locationState: loc),
             if (poi.rating != null && poi.rating! > 0) ...[
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.star_rounded, size: 20, color: Colors.amber.shade700),
+                  Icon(
+                    Icons.star_rounded,
+                    size: 20,
+                    color: Colors.amber.shade700,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     poi.rating!.toStringAsFixed(1),
@@ -112,17 +114,18 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
               width: double.infinity,
               child: _MapAccentCtaButton(
                 enabled: _canFlyTo(poi),
-                onPressed: _canFlyTo(poi)
-                    ? () {
-                        Navigator.of(ctx).pop();
-                        mapBloc.add(
-                          FlyToPoiRequested(
-                            latitude: poi.latitude,
-                            longitude: poi.longitude,
-                          ),
-                        );
-                      }
-                    : null,
+                onPressed:
+                    _canFlyTo(poi)
+                        ? () {
+                          Navigator.of(ctx).pop();
+                          mapBloc.add(
+                            FlyToPoiRequested(
+                              latitude: poi.latitude,
+                              longitude: poi.longitude,
+                            ),
+                          );
+                        }
+                        : null,
               ),
             ),
           ],
@@ -137,10 +140,7 @@ bool _canFlyTo(Poi poi) {
 }
 
 class _MapAccentCtaButton extends StatelessWidget {
-  const _MapAccentCtaButton({
-    required this.enabled,
-    required this.onPressed,
-  });
+  const _MapAccentCtaButton({required this.enabled, required this.onPressed});
 
   final bool enabled;
   final VoidCallback? onPressed;
@@ -228,10 +228,7 @@ class _DistanceRow extends StatelessWidget {
           Expanded(
             child: Text(
               'Distance unavailable (turn on location)',
-              style: TextStyle(
-                fontSize: 14,
-                color: cs.onSurfaceVariant,
-              ),
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
             ),
           ),
         ],
