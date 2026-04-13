@@ -10,10 +10,7 @@ import 'poi_markers_controller.dart';
 class PoiMarkersListener extends StatefulWidget {
   final PoiMarkersController? poiMarkers;
 
-  const PoiMarkersListener({
-    super.key,
-    required this.poiMarkers,
-  });
+  const PoiMarkersListener({super.key, required this.poiMarkers});
 
   @override
   State<PoiMarkersListener> createState() => _PoiMarkersListenerState();
