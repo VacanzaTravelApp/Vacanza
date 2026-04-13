@@ -138,6 +138,25 @@ public class ChatProxyController {
 
                 var existingAiPrefs = userPreferenceAiService.getExistingPreferences(user);
 
+                // Inject the latest saved route so the AI service can detect route-edit intent (Turn3).
+                // Uses the same __EXISTING_ROUTE__ marker as the polygon-replan flow.
+                // Only injected for plain chat messages (not tool results or polygon requests).
+                String originalContent = body.getContent();
+                if (originalContent != null && !originalContent.contains("__TOOL_RESULT__")) {
+                        try {
+                                List<AiRoute> existingRoutes = aiRouteService.getRoutesForConversation(user, conversationId);
+                                if (!existingRoutes.isEmpty()) {
+                                        AiRoute latest = existingRoutes.get(existingRoutes.size() - 1);
+                                        String routeJson = latest.getRouteJson();
+                                        if (routeJson != null && !routeJson.isBlank()) {
+                                                body.setContent(originalContent + "\n__EXISTING_ROUTE__\n" + routeJson);
+                                        }
+                                }
+                        } catch (Exception e) {
+                                log.warn("Could not inject existing route for conversation {}: {}", conversationId, e.getMessage());
+                        }
+                }
+
                 AiChatDto.MessageSendResponse response = aiServiceClient
                                 .sendMessage(user.getUserId(), conversationId, body, profile, existingAiPrefs)
                                 .block();
