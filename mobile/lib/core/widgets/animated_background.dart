@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
 class AnimatedBackground extends StatefulWidget {
   final Widget child;
@@ -31,53 +31,73 @@ class _AnimatedBackgroundState extends State<AnimatedBackground>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.vacanzaTokens;
+    final isLight = theme.brightness == Brightness.light;
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (_, __) {
         final t = _controller.value;
 
+        final bgA = tokens.bgMain;
+        final bgB = isLight
+            ? Color.alphaBlend(
+                Colors.white.withValues(alpha: 0.55),
+                tokens.glassBg,
+              )
+            : Color.alphaBlend(
+                tokens.vividSubtleBg.withValues(alpha: 0.22),
+                tokens.bgMain,
+              );
+        final bgC = isLight
+            ? Color.alphaBlend(
+                Colors.white.withValues(alpha: 0.65),
+                tokens.bgMain,
+              )
+            : Color.alphaBlend(
+                tokens.vividSubtleBg.withValues(alpha: 0.12),
+                tokens.bgMain,
+              );
+
         return Stack(
           children: [
-            // Ana gradient (Figma)
+            // Theme-aware gradient base (day/night)
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    AppColors.bgFrom,
-                    AppColors.bgVia,
-                    AppColors.bgTo,
-                  ],
+                  colors: [bgA, bgB, bgC],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
               ),
             ),
 
-            // Üst sağ mavi glow
+            // Top-right glow
             _BlurCircle(
-              color: AppColors.blobBlue,
-              size: 260,
-              blur: 120,
+              color: isLight ? tokens.vividCoral : tokens.vividBlue,
+              size: isLight ? 260 : 240,
+              blur: isLight ? 120 : 140,
               alignment: Alignment(0.7, -0.8 + 0.04 * t),
-              opacity: 0.15 + 0.05 * t,
+              opacity: (isLight ? 0.14 : 0.10) + (isLight ? 0.05 : 0.03) * t,
             ),
 
-            // Alt sol turkuaz glow
+            // Bottom-left glow
             _BlurCircle(
-              color: AppColors.blobTeal,
-              size: 230,
-              blur: 100,
+              color: tokens.vividCoral,
+              size: isLight ? 230 : 220,
+              blur: isLight ? 100 : 140,
               alignment: Alignment(-0.8, 0.7 + 0.03 * t),
-              opacity: 0.12,
+              opacity: isLight ? 0.10 : 0.07,
             ),
 
-            // Ortada hafif mavi glow
+            // Mid glow
             _BlurCircle(
-              color: AppColors.blobBlue,
-              size: 200,
-              blur: 100,
+              color: tokens.vividAmber,
+              size: isLight ? 200 : 190,
+              blur: isLight ? 100 : 150,
               alignment: Alignment(-0.1, 0.1 - 0.03 * t),
-              opacity: 0.10,
+              opacity: isLight ? 0.06 : 0.04,
             ),
 
             // (İstersek dotted orbitleri sonra ekleriz)
