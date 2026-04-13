@@ -2,6 +2,7 @@
 // lib/features/poi_search/presentation/widgets/area_results/area_results_bottom_sheet.dart
 import 'dart:ui';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/theme/vacanza_tokens.dart';
@@ -43,6 +44,14 @@ class AreaResultsSheet extends StatelessWidget {
   /// Viewport / genel harita akışında `false` — tüm seçili kategoriler chip’te kalır.
   final bool hideZeroCountCategories;
 
+  /// Drawn-area flow: show primary action to generate an AI route from the polygon.
+  final bool showCreateRouteFromArea;
+
+  /// While the route is being generated (shared loading state).
+  final bool isCreatingRoute;
+
+  final VoidCallback? onCreateRouteFromArea;
+
   const AreaResultsSheet({
     super.key,
     required this.isVisible,
@@ -55,6 +64,9 @@ class AreaResultsSheet extends StatelessWidget {
     required this.onClose,
     this.onPoiTap,
     this.hideZeroCountCategories = false,
+    this.showCreateRouteFromArea = false,
+    this.isCreatingRoute = false,
+    this.onCreateRouteFromArea,
   });
 
   String _labelFor(String key) {
@@ -88,8 +100,9 @@ class AreaResultsSheet extends StatelessWidget {
       set.addAll(countsByCategory.keys.map((e) => e.trim().toLowerCase()));
     }
 
-    final baseOrder =
-        PoiCategoryCatalog.all.map((e) => e.key).toList(growable: false);
+    final baseOrder = PoiCategoryCatalog.all
+        .map((e) => e.key)
+        .toList(growable: false);
     final ordered = <String>[];
 
     for (final k in baseOrder) {
@@ -117,18 +130,18 @@ class AreaResultsSheet extends StatelessWidget {
       }
     }
 
-    final baseOrder =
-        PoiCategoryCatalog.all.map((e) => e.key).toList(growable: false);
+    final baseOrder = PoiCategoryCatalog.all
+        .map((e) => e.key)
+        .toList(growable: false);
     final ordered = <String>[];
 
     for (final k in baseOrder) {
       if (set.contains(k) && _countFor(k) > 0) ordered.add(k);
     }
 
-    final extras = set
-        .where((k) => !baseOrder.contains(k) && _countFor(k) > 0)
-        .toList()
-      ..sort();
+    final extras =
+        set.where((k) => !baseOrder.contains(k) && _countFor(k) > 0).toList()
+          ..sort();
     ordered.addAll(extras);
 
     return ordered;
@@ -143,18 +156,20 @@ class AreaResultsSheet extends StatelessWidget {
     final cs = theme.colorScheme;
     final isLight = theme.brightness == Brightness.light;
 
-    final chips = hideZeroCountCategories
-        ? _normalizedSelectedCategoriesPositiveOnly()
-        : _normalizedSelectedCategoriesAll();
+    final chips =
+        hideZeroCountCategories
+            ? _normalizedSelectedCategoriesPositiveOnly()
+            : _normalizedSelectedCategoriesAll();
 
     final rawActive = activeChipKey?.trim().toLowerCase();
     final String? activeKey;
     if (hideZeroCountCategories) {
-      activeKey = (rawActive != null &&
-              rawActive.isNotEmpty &&
-              chips.contains(rawActive))
-          ? rawActive
-          : null;
+      activeKey =
+          (rawActive != null &&
+                  rawActive.isNotEmpty &&
+                  chips.contains(rawActive))
+              ? rawActive
+              : null;
     } else {
       activeKey =
           (rawActive != null && rawActive.isNotEmpty) ? rawActive : null;
@@ -162,14 +177,18 @@ class AreaResultsSheet extends StatelessWidget {
     final allActive = activeKey == null || activeKey.isEmpty;
 
     // ✅ UI filtreleme: backend'e gitmeden mevcut pois içinde gez
-    final List<Poi> visiblePois = allActive
-        ? pois
-        : pois.where((p) {
-            final ui = PoiCategoryCatalog.poiCategoryForRaw(p.category)?.key;
-            return ui == activeKey;
-          }).toList();
+    final List<Poi> visiblePois =
+        allActive
+            ? pois
+            : pois.where((p) {
+              final ui = PoiCategoryCatalog.poiCategoryForRaw(p.category)?.key;
+              return ui == activeKey;
+            }).toList();
 
     final visibleCount = visiblePois.length;
+
+    final screenH = MediaQuery.sizeOf(context).height;
+    final sheetHeight = (screenH * 0.52).clamp(300.0, 560.0);
 
     final sheet = ClipRRect(
       borderRadius: BorderRadius.circular(24),
@@ -178,68 +197,103 @@ class AreaResultsSheet extends StatelessWidget {
           sigmaX: isLight ? 14 : 14,
           sigmaY: isLight ? 14 : 14,
         ),
-        child: Container(
-          constraints: const BoxConstraints(maxHeight: 500),
-          decoration: BoxDecoration(
-            // Night theme: keep the glass surface that you liked.
-            // Day theme: also glass, but neutral (avoid bluish tint).
-            color: isLight ? context.lightGlassPanelColor : t.glassBg,
-            borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isLight
-              ? context.mapControlAccent.withValues(alpha: 0.22)
-              : t.cardBorder,
-        ),
-            boxShadow: [
-              BoxShadow(
-                color: (isLight ? cs.shadow : t.overlayScrim)
-                    .withValues(alpha: isLight ? 0.12 : 0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
+        child: SizedBox(
+          height: sheetHeight,
+          child: Container(
+            decoration: BoxDecoration(
+              // Night theme: keep the glass surface that you liked.
+              // Day theme: also glass, but neutral (avoid bluish tint).
+              color: isLight ? context.lightGlassPanelColor : t.glassBg,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color:
+                    isLight
+                        ? context.mapControlAccent.withValues(alpha: 0.22)
+                        : t.cardBorder,
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-            // handle bar
-            const SizedBox(height: 10),
-            Container(
-              width: 46,
-              height: 4,
-              decoration: BoxDecoration(
-                color: t.textSub.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(8),
-              ),
+              boxShadow: [
+                BoxShadow(
+                  color: (isLight ? cs.shadow : t.overlayScrim).withValues(
+                    alpha: isLight ? 0.12 : 0.35,
+                  ),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // handle bar
+                const SizedBox(height: 10),
+                Container(
+                  width: 46,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: t.textSub.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 10),
 
-            AreaResultsHeader(
-              title: 'Results in Your Area',
-              subtitle:
-                  allActive ? '$count places found' : '$visibleCount places found',
-              onClose: onClose,
+                AreaResultsHeader(
+                  title: 'Results in Your Area',
+                  subtitle:
+                      allActive
+                          ? '$count places found'
+                          : '$visibleCount places found',
+                  onClose: onClose,
+                ),
+
+                // ✅ CHIP BAR (NO COUNTS)
+                _ChipBar(
+                  chips: chips,
+                  activeChipKey: allActive ? null : activeKey,
+                  labelFor: _labelFor,
+                  iconFor: _iconFor,
+                  colorFor: (key) => _colorFor(context, key),
+                  onChipSelected: onChipSelected,
+                ),
+
+                Divider(height: 1, color: t.cardBorder),
+
+                Expanded(
+                  child: AreaResultsList(pois: visiblePois, onPoiTap: onPoiTap),
+                ),
+
+                if (showCreateRouteFromArea &&
+                    onCreateRouteFromArea != null) ...[
+                  Divider(height: 1, color: t.cardBorder),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                    child: CupertinoTheme(
+                      data: CupertinoThemeData(
+                        primaryColor: context.mapControlAccent,
+                      ),
+                      child: CupertinoButton.filled(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        borderRadius: BorderRadius.circular(14),
+                        onPressed:
+                            isCreatingRoute ? null : onCreateRouteFromArea,
+                        child:
+                            isCreatingRoute
+                                ? const CupertinoActivityIndicator(
+                                  color: CupertinoColors.white,
+                                )
+                                : const Text(
+                                  'Create a route',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-
-            // ✅ CHIP BAR (NO COUNTS)
-            _ChipBar(
-              chips: chips,
-              activeChipKey: allActive ? null : activeKey,
-              labelFor: _labelFor,
-              iconFor: _iconFor,
-              colorFor: (key) => _colorFor(context, key),
-              onChipSelected: onChipSelected,
-            ),
-
-            Divider(height: 1, color: t.cardBorder),
-
-            Expanded(
-              child: AreaResultsList(
-                pois: visiblePois,
-                onPoiTap: onPoiTap,
-              ),
-            ),
-            ],
           ),
         ),
       ),
@@ -330,20 +384,14 @@ class _ChipBar extends StatelessWidget {
           color: selected ? color.withValues(alpha: 0.14) : t.pillSurface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected
-                ? color.withValues(alpha: 0.45)
-                : t.cardBorder,
+            color: selected ? color.withValues(alpha: 0.45) : t.cardBorder,
             width: 1,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 16,
-              color: selected ? color : t.textSub,
-            ),
+            Icon(icon, size: 16, color: selected ? color : t.textSub),
             const SizedBox(width: 8),
             Text(
               label,
