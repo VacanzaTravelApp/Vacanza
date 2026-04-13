@@ -405,6 +405,54 @@ def _is_itinerary_followup(history: list[HumanMessage | AIMessage]) -> bool:
     return bool(_DESTINATION_CLARIFICATION_RE.search(ai_text))
 
 
+_ROUTE_EDIT_RE = re.compile(
+    # Türkçe düzenleme fiilleri
+    r"\b(güncelle|değiştir|düzenle|yenile|revize)\w*\b"
+    # İngilizce düzenleme fiilleri
+    r"|update|change|modify|edit|replace|redo"
+    # Miktar değişikliği: "daha çok müze", "daha az yürüyüş"
+    r"|daha\s+(çok|fazla|az)\b"
+    # Ekleme / çıkarma
+    r"|\b(ekle|çıkar|kaldır)\w*\b"
+    r"|\badd\b|\bremove\b"
+    # Yemek zamanı kaydırma: "öğleyi öne al", "akşam yemeğini geciktir"
+    r"|\b(öğle|akşam|sabah|lunch|dinner|breakfast)\w*.{0,25}(al|kaydır|değiştir|öne|sonra|move|shift|earlier|later)\b"
+    # Tempo değişikliği
+    r"|\b(tempo|pace|hız)\w*.{0,20}(yavaşlat|hızlandır|slow|fast)\b"
+    # Belirli gün referansı: "3. gün", "gün 2", "day 3"
+    r"|\bgün\s*\d+\b"
+    r"|\bday\s*\d+\b",
+    flags=re.I,
+)
+
+
+def _is_route_edit_request(user_content: str, history: list[HumanMessage | AIMessage]) -> bool:
+    """Detect if the user wants to edit an already-generated route via chat.
+
+    Two conditions must both be true:
+    1. The message contains an editing signal (verb or day reference).
+    2. The conversation history contains at least one previously generated route JSON.
+    """
+    if not user_content or not _ROUTE_EDIT_RE.search(user_content):
+        return False
+    for msg in reversed(history):
+        if isinstance(msg, AIMessage) and ROUTE_JSON_SEPARATOR in (getattr(msg, "content", "") or ""):
+            return True
+    return False
+
+
+def _extract_latest_route_from_history(history: list[HumanMessage | AIMessage]) -> "RouteData | None":
+    """Return the most recently generated RouteData from conversation history, or None."""
+    for msg in reversed(history):
+        content = getattr(msg, "content", "") or ""
+        if ROUTE_JSON_SEPARATOR not in content:
+            continue
+        _, route = _parse_route_from_response(content)
+        if route is not None:
+            return route
+    return None
+
+
 def _extract_json_object(text: str) -> dict | None:
     """Extract a JSON object from raw model output (expects object-only, but is defensive)."""
     if not text:
@@ -1808,6 +1856,19 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             route_data = _fix_geographic_spread(route_data)
             route_data = _optimize_route_order(route_data)
             _log_route("FINAL", route_data)            # what is actually sent to the user
+
+    # Turn3: user wants to edit an already-generated route via chat
+    elif _is_route_edit_request(user_content, history):
+        existing_route = _extract_latest_route_from_history(history)
+        logger.info(
+            "[TURN3] Route edit intent detected. existing_route=%s",
+            existing_route.destination if existing_route else None,
+        )
+        # TODO: Turn3 prompt ve kısmi güncelleme mantığı burada çalışacak.
+        # Şimdilik default chat'e düşüyor; bir sonraki adımda Turn3 sistemi eklenecek.
+        response = await llm.ainvoke(llm_messages)
+        raw_ai_content = str(response.content)
+        ai_content, route_data = _parse_route_from_response(raw_ai_content)
 
     # Turn1: itinerary request OR answering a Mode-A clarification => tool-call JSON
     elif _is_itinerary_request(user_content) or _is_itinerary_followup(history):
