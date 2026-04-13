@@ -6,10 +6,7 @@ import 'package:mobile/core/theme/app_theme.dart';
 class MapModeBadge extends StatelessWidget {
   final String label;
 
-  const MapModeBadge({
-    super.key,
-    required this.label,
-  });
+  const MapModeBadge({super.key, required this.label});
 
   @override
   Widget build(BuildContext context) {

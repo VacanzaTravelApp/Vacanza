@@ -3,42 +3,34 @@ import 'package:mobile/core/theme/app_theme.dart';
 
 /// Aktif kalem / harita kontrolü ile aynı gradyan ([mapControlActiveGradientColors]).
 class VacanzaChatFloatingPill extends StatelessWidget {
-  const VacanzaChatFloatingPill({
-    super.key,
-    required this.onPressed,
-  });
+  const VacanzaChatFloatingPill({super.key, required this.onPressed});
 
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final gradientColors = context.mapControlActiveGradientColors;
-    final shadowColor = context.mapControlAccent;
+    final radius = BorderRadius.circular(999);
 
     return Material(
       color: Colors.transparent,
       elevation: 0,
+      shadowColor: Colors.transparent,
+      borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: radius,
         splashColor: Colors.white.withValues(alpha: 0.15),
         highlightColor: Colors.white.withValues(alpha: 0.08),
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: radius,
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: gradientColors,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: shadowColor.withValues(alpha: 0.32),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-                spreadRadius: -4,
-              ),
-            ],
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),

@@ -59,8 +59,7 @@ class _AreaResultsSheetHostState extends State<AreaResultsSheetHost> {
       activeChipKey: _activeChipKey,
       onChipSelected: _onChipSelected,
       onClose: () => _handleClose(context),
-      hideZeroCountCategories:
-          poiState.areaSource == AreaSource.userSelection,
+      hideZeroCountCategories: poiState.areaSource == AreaSource.userSelection,
     );
   }
 }
