@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:mobile/core/theme/app_colors.dart';
 import 'package:mobile/core/theme/app_text_styles.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/widgets/animated_background.dart';
+import 'package:mobile/core/theme/theme_cubit.dart';
 
 import 'package:mobile/features/auth/presentation/widgets/login_form.dart';
 import 'package:mobile/features/auth/presentation/screens/register_screen.dart';
@@ -44,11 +45,16 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.vacanzaTokens;
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    final accent = context.authAccent;
+
     final titleStyle = AppTextStyles.titleLarge(context).copyWith(
-      color: AppColors.textHeading,
+      color: tokens.textMain,
     );
     final bodyMedium = AppTextStyles.bodyMedium(context);
-    final subtitleColor = AppColors.textMuted;
+    final subtitleColor = tokens.textSub;
 
     return BlocListener<LoginBloc, LoginState>(
       // Status değişmediği sürece listener tetiklenmesin (gereksiz çalışmayı engeller).
@@ -78,29 +84,32 @@ class LoginScreen extends StatelessWidget {
                         const SizedBox(height: 55),
 
                         // ---------- LOGO ----------
-                        Container(
-                          height: 56,
-                          width: 56,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              colors: [
-                                AppColors.primary,
-                                AppColors.accentMint,
+                        InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: () => context.read<ThemeCubit>().toggle(),
+                          child: Container(
+                            height: 56,
+                            width: 56,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: context.authAccentGradientColors,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: accent.withValues(alpha: 0.22),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 8),
+                                ),
                               ],
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.primary.withOpacity(0.25),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.flight_takeoff_rounded,
-                            color: Colors.white,
-                            size: 28,
+                            child: Icon(
+                              isLight
+                                  ? Icons.nightlight_round
+                                  : Icons.wb_sunny_rounded,
+                              color: Colors.white,
+                              size: 26,
+                            ),
                           ),
                         ),
 
@@ -117,10 +126,15 @@ class LoginScreen extends StatelessWidget {
                                 text: 'Vacanza',
                                 style: TextStyle(
                                   foreground: Paint()
-                                    ..shader = const LinearGradient(
+                                    ..shader = LinearGradient(
                                       colors: [
-                                        AppColors.primary,
-                                        AppColors.accentMint,
+                                        accent,
+                                        Color.lerp(
+                                              accent,
+                                              Colors.white,
+                                              isLight ? 0.08 : 0.18,
+                                            ) ??
+                                            accent,
                                       ],
                                     ).createShader(
                                       const Rect.fromLTWH(0, 0, 160, 32),
@@ -162,12 +176,12 @@ class LoginScreen extends StatelessWidget {
                             TextSpan(
                               style:
                               bodyMedium.copyWith(color: subtitleColor),
-                              children: const [
-                                TextSpan(text: "Don't have an account? "),
+                              children: [
+                                const TextSpan(text: "Don't have an account? "),
                                 TextSpan(
                                   text: 'Sign Up',
                                   style: TextStyle(
-                                    color: AppColors.primary,
+                                    color: accent,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
