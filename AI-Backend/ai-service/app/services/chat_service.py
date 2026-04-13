@@ -286,6 +286,84 @@ route_data format (preserve trip_dates_user_specified and trip_start_date if the
 REPLAN_PREFIX = "[Replan day request]"
 EXISTING_ROUTE_MARKER = "__EXISTING_ROUTE__"
 
+TURN3_SYSTEM = """You are a travel planning assistant. The user wants to edit their existing itinerary via chat.
+
+EXISTING ROUTE (do NOT change anything you are not asked to change):
+{existing_route_json}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT YOU MUST DO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Read the user's edit request carefully.
+2. Identify WHICH day(s) and WHICH waypoints need changing.
+3. Apply ONLY the requested change — keep everything else identical.
+4. Output the COMPLETE updated route JSON (all days, including unchanged ones).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EDIT TYPES AND HOW TO HANDLE THEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DAY-LEVEL REBUILD ("make day 3 more museum-focused", "3. günü daha aktif yap"):
+- Regenerate that day's waypoints from scratch using your world knowledge.
+- Keep: day number, day_start_local (unless pace changed), destination cluster.
+- Mandatory dining rhythm still applies: morning cafe → lunch restaurant → afternoon cafe → dinner restaurant.
+- 6–8 waypoints total, day ends no earlier than 18:00.
+
+PACE CHANGE ("slow down day 2", "tempoyu yavaşlat"):
+- SLOW: day_start_local ~09:30–10:00, fewer waypoints (6), longer durations.
+- FAST: day_start_local ~08:30–09:00, more waypoints (8), tighter durations.
+- Adjust estimated_duration_min accordingly; do NOT change the day's POI list otherwise.
+
+TIME SHIFT ("move lunch to 13:00", "öğle yemeğini öne al"):
+- Shift ONLY the named meal slot and recalculate subsequent arrival/departure times.
+- Keep all other waypoints and their order unchanged.
+
+ADD A PLACE ("add Kapalıçarşı to day 1", "1. güne Topkapı Sarayı ekle"):
+- Insert the new waypoint at the geographically logical position in that day.
+- Use official English/international name; set latitude: null, longitude: null (app will geocode).
+- Adjust surrounding arrival/departure times to remain realistic.
+- Do NOT violate dining adjacency rule: never two dining stops back-to-back.
+
+REMOVE A PLACE ("remove the morning cafe on day 2", "2. gündeki sabah kafesini çıkar"):
+- Delete that waypoint and renumber order fields.
+- Recalculate surrounding times so the day still makes sense.
+- If removing a mandatory meal (lunch/dinner), add a replacement from your world knowledge.
+
+SWAP A PLACE ("replace the restaurant on day 1 with a better one"):
+- Replace ONLY that waypoint; keep category, time_slot, and order position the same.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RULES THAT ALWAYS APPLY (same as route generation)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Every day MUST have: 1× lunch restaurant (12:00–14:00) + 1× dinner restaurant (18:00–21:00).
+- NEVER two dining stops adjacent — at least one sightseeing stop between them.
+- Museums/galleries/palaces open at 09:00 at the earliest; visits must end by 17:00.
+- day_start_local NEVER before 08:30.
+- All stops in a single day must be within ~3 km of each other (same neighborhood cluster).
+- Waypoint "name" field: OFFICIAL ENGLISH/INTERNATIONAL name only (for geocoding).
+  ✅ "Grand Bazaar, Fatih" — NOT "Kapalı Çarşı"
+  ✅ "Blue Mosque, Sultanahmet" — NOT "Sultanahmet Camii"
+- Use the user's language for day titles and descriptions; keep "name" in English.
+- If adding a new sightseeing POI not in the original list: set latitude: null, longitude: null.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OUTPUT FORMAT (MANDATORY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. One SHORT confirmation sentence (same language as the user, max ~20 words).
+   Example TR: "3. gün müze ağırlıklı olarak güncellendi."
+   Example EN: "Day 3 has been updated with more museums."
+2. Next line exactly: ---ROUTE_JSON---
+3. Next line: the complete updated route_data JSON (no markdown, no code block).
+   — Same structure as the existing route above.
+   — Include ALL days (modified and unchanged).
+   — Do NOT add fields that were not in the original route."""
+
+
+def _build_turn3_system(existing_route: RouteData) -> str:
+    """Inject the existing route JSON into the Turn3 system prompt."""
+    er = json.dumps(existing_route.model_dump(exclude_none=True), ensure_ascii=False)
+    return TURN3_SYSTEM.format(existing_route_json=er)
+
 
 def _extract_first_json_object_str(s: str) -> str | None:
     """Return the first top-level JSON object substring."""
@@ -1896,11 +1974,38 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             "[TURN3] Route edit intent detected. existing_route=%s",
             existing_route.destination if existing_route else None,
         )
-        # TODO: Turn3 prompt ve kısmi güncelleme mantığı burada çalışacak.
-        # Şimdilik default chat'e düşüyor; bir sonraki adımda Turn3 sistemi eklenecek.
-        response = await llm.ainvoke(llm_messages)
-        raw_ai_content = str(response.content)
-        ai_content, route_data = _parse_route_from_response(raw_ai_content)
+        if existing_route is not None:
+            turn3_system = _build_turn3_system(existing_route)
+            if itinerary_user_context:
+                turn3_system = f"{turn3_system}\n\n{TURN2_TOOL_CONTEXT_RULES}\n\n{itinerary_user_context}"
+            # Strip the __EXISTING_ROUTE__ block from user_content before sending to the LLM
+            # (it is already baked into the system prompt; sending it twice wastes tokens).
+            clean_user_content = user_content.split("\n" + EXISTING_ROUTE_MARKER)[0].strip()
+            turn3 = await llm.ainvoke(
+                [SystemMessage(content=turn3_system)]
+                + history
+                + [HumanMessage(content=clean_user_content)]
+            )
+            raw_ai_content = str(turn3.content)
+            ai_content, route_data = _parse_route_from_response(raw_ai_content)
+            if route_data is None:
+                logger.error(
+                    "[TURN3] Failed to return valid route JSON. Response (first 600 chars): %s",
+                    raw_ai_content[:600],
+                )
+            if route_data:
+                _log_route("TURN3_RAW", route_data)
+                route_data = _fix_route_dining(route_data)
+                route_data = _fix_opening_hours(route_data)
+                route_data = _fix_geographic_spread(route_data)
+                route_data = _optimize_route_order(route_data)
+                _log_route("TURN3_FINAL", route_data)
+        else:
+            # No existing route found — fall back to default chat
+            logger.warning("[TURN3] Edit intent detected but no existing route found; falling back to chat.")
+            response = await llm.ainvoke(llm_messages)
+            raw_ai_content = str(response.content)
+            ai_content, route_data = _parse_route_from_response(raw_ai_content)
 
     # Turn1: itinerary request OR answering a Mode-A clarification => tool-call JSON
     elif _is_itinerary_request(user_content) or _is_itinerary_followup(history):
