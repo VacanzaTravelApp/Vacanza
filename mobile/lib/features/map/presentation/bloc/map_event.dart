@@ -1,4 +1,4 @@
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' show MapboxMap;
 
 /// Map ekranından gelen event'ler.
 abstract class MapEvent {
@@ -53,4 +53,21 @@ class FlyToPoiRequested extends MapEvent {
   final double latitude;
   final double longitude;
   final double zoom;
+}
+
+/// Fit camera to a geographic bounding box (e.g. full AI route), optional bearing in degrees.
+class FitRouteBoundsRequested extends MapEvent {
+  const FitRouteBoundsRequested({
+    required this.minLat,
+    required this.maxLat,
+    required this.minLng,
+    required this.maxLng,
+    this.bearing,
+  });
+
+  final double minLat;
+  final double maxLat;
+  final double minLng;
+  final double maxLng;
+  final double? bearing;
 }

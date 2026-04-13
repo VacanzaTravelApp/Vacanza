@@ -69,11 +69,7 @@ class PoiMarkerBitmapBuilder {
     // Web `transform: rotate(-45deg)` — sol alt köşe keskin (CSS sırası TL TR BR yuvarlak, BL 0).
     canvas.rotate(-math.pi / 4);
 
-    final rect = Rect.fromCenter(
-      center: Offset.zero,
-      width: d,
-      height: d,
-    );
+    final rect = Rect.fromCenter(center: Offset.zero, width: d, height: d);
     final rrect = RRect.fromRectAndCorners(
       rect,
       topLeft: Radius.circular(d / 2),
@@ -83,11 +79,12 @@ class PoiMarkerBitmapBuilder {
     );
 
     final fillPaint = Paint()..color = fillColor;
-    final strokePaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeW
-      ..isAntiAlias = true;
+    final strokePaint =
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeW
+          ..isAntiAlias = true;
 
     canvas.drawShadow(
       Path()..addRRect(rrect),
@@ -140,10 +137,7 @@ class PoiMarkerBitmapBuilder {
 
     tp.paint(
       canvas,
-      Offset(
-        center.dx - tp.width / 2,
-        center.dy - tp.height / 2,
-      ),
+      Offset(center.dx - tp.width / 2, center.dy - tp.height / 2),
     );
   }
 }

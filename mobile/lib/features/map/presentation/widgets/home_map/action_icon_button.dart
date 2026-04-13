@@ -23,9 +23,8 @@ class ActionIconButton extends StatelessWidget {
 
     final bgColor = isActive ? null : t.actionBarInactiveBg;
 
-    final borderColor = isActive
-        ? vivid.withValues(alpha: 0.35)
-        : t.actionBarBorder;
+    final borderColor =
+        isActive ? vivid.withValues(alpha: 0.35) : t.actionBarBorder;
 
     final iconColor = isActive ? Colors.white : t.actionBarIcon;
 
@@ -41,13 +40,14 @@ class ActionIconButton extends StatelessWidget {
             height: 54,
             decoration: BoxDecoration(
               color: bgColor,
-              gradient: isActive
-                  ? LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: activeGradient,
-                    )
-                  : null,
+              gradient:
+                  isActive
+                      ? LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: activeGradient,
+                      )
+                      : null,
               borderRadius: BorderRadius.circular(999),
               border: Border.all(color: borderColor, width: 1),
               boxShadow: [

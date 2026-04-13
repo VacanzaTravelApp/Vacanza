@@ -102,9 +102,7 @@ class ActionBar extends StatelessWidget {
               bottom: -10,
               left: 0,
               right: 0,
-              child: Center(
-                child: MapModeBadge(label: basemap.label),
-              ),
+              child: Center(child: MapModeBadge(label: basemap.label)),
             ),
           ],
         ),
@@ -123,9 +121,7 @@ class ActionBar extends StatelessWidget {
               bottom: -10,
               left: 0,
               right: 0,
-              child: Center(
-                child: MapModeBadge(label: perspective.label),
-              ),
+              child: Center(child: MapModeBadge(label: perspective.label)),
             ),
           ],
         ),

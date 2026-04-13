@@ -121,7 +121,8 @@ class _MapControlsMenuState extends State<MapControlsMenu>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ActionIconButton(
-                        tooltip: widget.isDrawing ? 'Drawing: ON' : 'Drawing: OFF',
+                        tooltip:
+                            widget.isDrawing ? 'Drawing: ON' : 'Drawing: OFF',
                         icon: Icons.edit_rounded,
                         isActive: widget.isDrawing,
                         onPressed: widget.onToggleDrawing,
@@ -206,4 +207,3 @@ class _MapControlsMenuState extends State<MapControlsMenu>
     };
   }
 }
-

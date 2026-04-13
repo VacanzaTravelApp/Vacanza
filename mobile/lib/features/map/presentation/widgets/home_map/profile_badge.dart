@@ -32,8 +32,7 @@ class ProfileBadge extends StatelessWidget {
   static const double _avatarSize = 38;
 
   Widget _buildAvatar(BuildContext context) {
-    final hasBytes =
-        profilePhotoBytes != null && profilePhotoBytes!.isNotEmpty;
+    final hasBytes = profilePhotoBytes != null && profilePhotoBytes!.isNotEmpty;
     if (hasBytes) {
       return ClipOval(
         child: SizedBox(

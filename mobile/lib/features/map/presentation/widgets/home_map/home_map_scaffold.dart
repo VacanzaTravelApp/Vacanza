@@ -10,6 +10,7 @@ import 'package:mobile/features/map/presentation/widgets/home_map/mapbox/map_can
 import 'package:mobile/features/map/presentation/widgets/home_map/action_icon_button.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/map_controls_menu.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/vacanza_chat_floating_pill.dart';
+import 'package:mobile/features/map/presentation/widgets/home_map/animated_route_sheet_entrance.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/profile_badge.dart';
 import 'package:mobile/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:mobile/features/profile/presentation/bloc/profile_state.dart';
@@ -57,6 +58,14 @@ class HomeMapScaffold extends StatelessWidget {
   final bool isResultsOpen;
   final Widget? resultsSheet;
 
+  /// ✅ Active AI route bottom sheet (HomeMapScreen yönetir)
+  final bool isRouteOpen;
+  final Widget? routeSheet;
+
+  /// ✅ Mini route pill (rota haritadan gizlendiğinde sol altta “show route”)
+  final bool showRouteMiniPill;
+  final Widget? routeMiniPill;
+
   /// ✅ Filter açıkken resultsSheet'i arkada blur preview göstermek için
   /// (sadece polygon sonrası filter açılınca true göndereceksin)
   final bool showResultsBlurUnderFilters;
@@ -83,6 +92,10 @@ class HomeMapScaffold extends StatelessWidget {
     this.onCloseFilters,
     this.isResultsOpen = false,
     this.resultsSheet,
+    this.isRouteOpen = false,
+    this.routeSheet,
+    this.showRouteMiniPill = false,
+    this.routeMiniPill,
     this.showResultsBlurUnderFilters = false,
   });
 
@@ -94,13 +107,21 @@ class HomeMapScaffold extends StatelessWidget {
 
     // normal sheet: filter kapalıyken
     final showResults = isResultsOpen && resultsSheet != null && !showFilters;
+    final showRoute =
+        isRouteOpen && routeSheet != null && !showFilters && !showResults;
+    final baseMiniPill =
+        showRouteMiniPill &&
+        routeMiniPill != null &&
+        !showFilters &&
+        !showResults;
 
     // blur preview: filter açıkken, sadece belirli senaryoda
     final showBlurPreview =
         showFilters && showResultsBlurUnderFilters && resultsSheet != null;
 
-    // Alt yüzen sohbet pill’i: sonuç / filtre / çizim modunda gizle (sağ üst menü açıkken kalır).
-    final showChatPill = !showResults && !showFilters && !isDrawing;
+    // Route mini pill: sol altta, recenter ile aynı bottom; Ask Vacanza ortada.
+    final showChatPill =
+        !showResults && !showRoute && !showFilters && !isDrawing;
 
     return Scaffold(
       extendBody: true,
@@ -108,25 +129,25 @@ class HomeMapScaffold extends StatelessWidget {
       body: Stack(
         children: [
           // ================= MAP (tam ekran, safe area'yı aşar) =================
-          const Positioned.fill(
-            child: MapCanvasMapbox(),
-          ),
+          const Positioned.fill(child: MapCanvasMapbox()),
 
           // ================= PROFILE (SOL ÜST) =================
           Positioned(
             top: padding.top + 12,
             left: 16,
             child: BlocBuilder<ProfileBloc, ProfileState>(
-              buildWhen: (prev, curr) =>
-                  prev.profile != curr.profile ||
-                  prev.profilePhotoBytes != curr.profilePhotoBytes,
+              buildWhen:
+                  (prev, curr) =>
+                      prev.profile != curr.profile ||
+                      prev.profilePhotoBytes != curr.profilePhotoBytes,
               builder: (context, profileState) {
                 final p = profileState.profile;
-                final displayName = p != null
-                    ? (p.displayName.trim().isNotEmpty
-                        ? p.displayName
-                        : p.displayNameFallback)
-                    : '—';
+                final displayName =
+                    p != null
+                        ? (p.displayName.trim().isNotEmpty
+                            ? p.displayName
+                            : p.displayNameFallback)
+                        : '—';
                 final profileBloc = context.read<ProfileBloc>();
                 return ProfileBadge(
                   name: displayName,
@@ -137,10 +158,11 @@ class HomeMapScaffold extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => BlocProvider.value(
-                          value: profileBloc,
-                          child: const ProfileScreen(),
-                        ),
+                        builder:
+                            (_) => BlocProvider.value(
+                              value: profileBloc,
+                              child: const ProfileScreen(),
+                            ),
                       ),
                     );
                   },
@@ -180,13 +202,22 @@ class HomeMapScaffold extends StatelessWidget {
             ),
           ),
 
+          // ================= ROUTE MINI (sol alt, recenter ile aynı bottom) =================
+          if (baseMiniPill)
+            Positioned(
+              left: 16,
+              bottom: padding.bottom + 18,
+              child: routeMiniPill!,
+            ),
+
           // ================= ASK VACANZA (floating pill, bottom) =================
           if (showChatPill)
             Positioned(
-              left: 20,
-              right: 20,
+              left: 0,
+              right: 0,
               bottom: padding.bottom + 18,
-              child: Center(
+              child: Align(
+                alignment: Alignment.bottomCenter,
                 child: VacanzaChatFloatingPill(onPressed: onOpenChat),
               ),
             ),
@@ -203,10 +234,7 @@ class HomeMapScaffold extends StatelessWidget {
                   borderRadius: BorderRadius.circular(24),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 2.2, sigmaY: 2.2),
-                    child: Opacity(
-                      opacity: 0.55,
-                      child: resultsSheet!,
-                    ),
+                    child: Opacity(opacity: 0.55, child: resultsSheet!),
                   ),
                 ),
               ),
@@ -219,7 +247,10 @@ class HomeMapScaffold extends StatelessWidget {
                 behavior: HitTestBehavior.translucent,
                 onTap: onCloseFilters,
                 child: Container(
-                  color: Theme.of(context).extension<VacanzaTokens>()?.overlayScrim ??
+                  color:
+                      Theme.of(
+                        context,
+                      ).extension<VacanzaTokens>()?.overlayScrim ??
                       Colors.black.withValues(alpha: 0.10),
                 ),
               ),
@@ -228,10 +259,7 @@ class HomeMapScaffold extends StatelessWidget {
             Positioned(
               top: padding.top + 86,
               right: 16,
-              child: Material(
-                color: Colors.transparent,
-                child: filtersPanel!,
-              ),
+              child: Material(color: Colors.transparent, child: filtersPanel!),
             ),
           ],
 
@@ -242,6 +270,16 @@ class HomeMapScaffold extends StatelessWidget {
               right: 16,
               bottom: padding.bottom + 16,
               child: resultsSheet!,
+            ),
+
+          // ================= ROUTE SHEET (BOTTOM, draggable + entrance anim) =================
+          if (showRoute)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: padding.bottom + 16,
+              top: padding.top + 56,
+              child: AnimatedRouteSheetEntrance(child: routeSheet!),
             ),
         ],
       ),
