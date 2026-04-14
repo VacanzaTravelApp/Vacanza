@@ -19,7 +19,7 @@ class ChatCubit extends Cubit<ChatState> {
   static final ChatMessage _greeting = ChatMessage(
     id: 'greeting',
     role: 'assistant',
-    content: 'Merhaba, ben Vacanza AI. Bugün nereyi keşfetmek istersin?',
+    content: 'Hi, I’m Vacanza AI. Where would you like to explore today?',
     createdAt: DateTime.now(),
   );
 
@@ -27,6 +27,7 @@ class ChatCubit extends Cubit<ChatState> {
   Future<void> startConversation() async {
     try {
       if (_conversationId == null) {
+        if (isClosed) return;
         emit(
           ChatLoaded(
             messages: [_greeting],
@@ -36,8 +37,10 @@ class ChatCubit extends Cubit<ChatState> {
         );
         return;
       }
+      if (isClosed) return;
       emit(const ChatLoading());
       final messages = await _loadMessagesWithMergedRoutes(_conversationId!);
+      if (isClosed) return;
       emit(
         ChatLoaded(
           messages: messages,
@@ -51,6 +54,7 @@ class ChatCubit extends Cubit<ChatState> {
         name: 'ChatCubit',
         stackTrace: st,
       );
+      if (isClosed) return;
       emit(ChatError(message: e.toString()));
     }
   }
@@ -67,6 +71,7 @@ class ChatCubit extends Cubit<ChatState> {
         activeConvId = _conversationId!;
       } else {
         final res = await _apiClient.createConversation();
+        if (isClosed) return;
         activeConvId = res.id;
         _conversationId = activeConvId;
       }
@@ -76,6 +81,7 @@ class ChatCubit extends Cubit<ChatState> {
         name: 'ChatCubit',
         stackTrace: st,
       );
+      if (isClosed) return;
       emit(
         ChatLoaded(
           messages: current.messages,
@@ -105,6 +111,7 @@ class ChatCubit extends Cubit<ChatState> {
 
     try {
       final res = await _apiClient.sendMessage(activeConvId, content.trim());
+      if (isClosed) return;
       final assistantMsg = ChatMessage(
         id: 'ai-${DateTime.now().millisecondsSinceEpoch}',
         role: 'assistant',
@@ -125,6 +132,7 @@ class ChatCubit extends Cubit<ChatState> {
       );
     } catch (e, st) {
       developer.log('Chat API error: $e', name: 'ChatCubit', stackTrace: st);
+      if (isClosed) return;
       emit(
         ChatLoaded(
           messages: [...current.messages, userMsg],
@@ -359,6 +367,7 @@ class ChatCubit extends Cubit<ChatState> {
   void clearLastError() {
     final s = state;
     if (s is ChatLoaded && s.error != null) {
+      if (isClosed) return;
       emit(
         ChatLoaded(
           messages: s.messages,
@@ -373,10 +382,12 @@ class ChatCubit extends Cubit<ChatState> {
 
   /// Load an existing conversation by ID.
   Future<void> loadConversation(String conversationId) async {
+    if (isClosed) return;
     emit(const ChatLoading());
     try {
       _conversationId = conversationId;
       final messages = await _loadMessagesWithMergedRoutes(conversationId);
+      if (isClosed) return;
       emit(
         ChatLoaded(
           messages: messages,
@@ -390,6 +401,7 @@ class ChatCubit extends Cubit<ChatState> {
         name: 'ChatCubit',
         stackTrace: st,
       );
+      if (isClosed) return;
       emit(ChatError(message: e.toString()));
     }
   }
@@ -397,6 +409,7 @@ class ChatCubit extends Cubit<ChatState> {
   /// Yeni taslak: API çağrısı yok; kullanıcı mesaj gönderene kadar conversation oluşturulmaz.
   void newConversation() {
     _conversationId = null;
+    if (isClosed) return;
     emit(
       ChatLoaded(
         messages: [_greeting],
