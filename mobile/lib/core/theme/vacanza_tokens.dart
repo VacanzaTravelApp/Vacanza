@@ -14,6 +14,8 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
     required this.vividAmber,
     required this.vividCoral,
     required this.vividSubtleBg,
+    required this.accentGradient,
+    required this.userBubbleGradient,
     required this.pillSurface,
     required this.pillBorder,
     required this.pillShadowAccent,
@@ -53,6 +55,12 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
   /// `--vivid-subtle-bg`
   final Color vividSubtleBg;
 
+  /// Web `--vc-accent-line` (header + route card top hairline).
+  final List<Color> accentGradient;
+
+  /// User message bubble gradient (web: `--vc-bubble-user-bg`).
+  final List<Color> userBubbleGradient;
+
   /// Chat pill vb. yüzen yüzey
   final Color pillSurface;
   final Color pillBorder;
@@ -80,6 +88,16 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
     vividAmber: Color(0xFFFFB347),
     vividCoral: Color(0xFFFF6B6B),
     vividSubtleBg: Color(0x0A000000),
+    accentGradient: <Color>[
+      Color(0xFF00B4D8),
+      Color(0xFF2DD4A8),
+      Color(0xFFFFB347),
+    ],
+    // Light mode: match the "Ask Vacanza" pill (coral accent) for user messages.
+    userBubbleGradient: <Color>[
+      Color(0xFFFF6B6B),
+      Color(0xFFEE5253),
+    ],
     pillSurface: Color(0xEBFFFFFF),
     pillBorder: Color(0xF2FFFFFF),
     pillShadowAccent: Color(0x2338BDF8),
@@ -101,6 +119,15 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
     vividAmber: Color(0xFFFFB347),
     vividCoral: Color(0xFFFF6B6B),
     vividSubtleBg: Color(0x14FFFFFF),
+    accentGradient: <Color>[
+      Color(0xFF38BDF8),
+      Color(0xFF2DD4A8),
+      Color(0xFFFFB347),
+    ],
+    userBubbleGradient: <Color>[
+      Color(0xFF0284C7),
+      Color(0xFF0369A1),
+    ],
     pillSurface: Color(0xD9262732),
     pillBorder: Color(0x3338BDF8),
     pillShadowAccent: Color(0x4038BDF8),
@@ -122,6 +149,8 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
     Color? vividAmber,
     Color? vividCoral,
     Color? vividSubtleBg,
+    List<Color>? accentGradient,
+    List<Color>? userBubbleGradient,
     Color? pillSurface,
     Color? pillBorder,
     Color? pillShadowAccent,
@@ -141,6 +170,8 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
       vividAmber: vividAmber ?? this.vividAmber,
       vividCoral: vividCoral ?? this.vividCoral,
       vividSubtleBg: vividSubtleBg ?? this.vividSubtleBg,
+      accentGradient: accentGradient ?? this.accentGradient,
+      userBubbleGradient: userBubbleGradient ?? this.userBubbleGradient,
       pillSurface: pillSurface ?? this.pillSurface,
       pillBorder: pillBorder ?? this.pillBorder,
       pillShadowAccent: pillShadowAccent ?? this.pillShadowAccent,
@@ -165,6 +196,24 @@ class VacanzaTokens extends ThemeExtension<VacanzaTokens> {
       vividAmber: Color.lerp(vividAmber, other.vividAmber, t)!,
       vividCoral: Color.lerp(vividCoral, other.vividCoral, t)!,
       vividSubtleBg: Color.lerp(vividSubtleBg, other.vividSubtleBg, t)!,
+      accentGradient:
+          accentGradient.length == other.accentGradient.length
+              ? List<Color>.generate(
+                accentGradient.length,
+                (i) => Color.lerp(accentGradient[i], other.accentGradient[i], t)!,
+              )
+              : other.accentGradient,
+      userBubbleGradient:
+          userBubbleGradient.length == other.userBubbleGradient.length
+              ? List<Color>.generate(
+                userBubbleGradient.length,
+                (i) => Color.lerp(
+                  userBubbleGradient[i],
+                  other.userBubbleGradient[i],
+                  t,
+                )!,
+              )
+              : other.userBubbleGradient,
       pillSurface: Color.lerp(pillSurface, other.pillSurface, t)!,
       pillBorder: Color.lerp(pillBorder, other.pillBorder, t)!,
       pillShadowAccent: Color.lerp(pillShadowAccent, other.pillShadowAccent, t)!,

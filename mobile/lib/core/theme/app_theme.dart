@@ -103,4 +103,27 @@ extension VacanzaTokensX on BuildContext {
       cs.surface.withValues(alpha: 0.98),
     );
   }
+
+  /// Assistant message bubble fill in light mode.
+  ///
+  /// More contrast than [lightGlassFieldFill] (which is tuned for inputs/chips),
+  /// but still keeps the airy “glass” feel.
+  Color get lightGlassBubbleFill {
+    final cs = Theme.of(this).colorScheme;
+    if (Theme.of(this).brightness != Brightness.light) {
+      return cs.surfaceContainerHighest.withValues(alpha: 0.45);
+    }
+
+    final base = vacanzaTokens.glassBg;
+    // Nudge towards opaque white to stand off from bgMain.
+    final lifted = Color.alphaBlend(
+      Colors.white.withValues(alpha: 0.86),
+      base.withValues(alpha: 0.92),
+    );
+    // Then blend slightly with surface to avoid “chalky” whites.
+    return Color.alphaBlend(
+      cs.surface.withValues(alpha: 0.10),
+      lifted,
+    );
+  }
 }

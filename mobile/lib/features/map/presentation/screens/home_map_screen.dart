@@ -8,6 +8,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'package:mobile/features/chat/presentation/cubit/chat_cubit.dart';
+
 import '../../../checkin/data/api/checkin_api_client.dart';
 import '../../../checkin/data/repositories/checkin_repository.dart';
 import '../../../checkin/data/services/location_service.dart';
@@ -140,6 +142,7 @@ class _HomeMapViewState extends State<_HomeMapView>
 
   /// Cached reference to avoid context.read in dispose/lifecycle callbacks.
   late final LocationBloc _locationBloc;
+  late final ChatCubit _chatCubit;
 
   /// GPS tracking was active before app went to background
   bool _wasTracking = false;
@@ -307,6 +310,10 @@ class _HomeMapViewState extends State<_HomeMapView>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _locationBloc = context.read<LocationBloc>();
+    _chatCubit = ChatCubit(
+      context.read<ChatApiClient>(),
+      context.read<AiRouteApiClient>(),
+    )..startConversation();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _locationBloc.add(const StartTracking());
@@ -319,6 +326,7 @@ class _HomeMapViewState extends State<_HomeMapView>
     WidgetsBinding.instance.removeObserver(this);
     // Stop GPS tracking before disposal (use cached ref — context is unsafe here)
     _locationBloc.add(const StopTracking());
+    _chatCubit.close();
     super.dispose();
   }
 
@@ -676,10 +684,20 @@ class _HomeMapViewState extends State<_HomeMapView>
               _closeControlsMenu();
               final nav = await Navigator.push<ChatScreenNavResult?>(
                 context,
-                MaterialPageRoute(builder: (_) => const ChatScreen()),
+                MaterialPageRoute(
+                  builder:
+                      (_) => BlocProvider.value(
+                        value: _chatCubit,
+                        child: const ChatScreen(),
+                      ),
+                ),
               );
               if (!context.mounted) return;
               if (nav == null) return;
+              if (nav.startDrawAreaOnMap) {
+                context.read<MapBloc>().add(SetDrawingEnabled(true));
+                return;
+              }
               final res = nav.response;
               final routeCubit = context.read<ActiveRouteCubit>();
               if (res.routeData != null) {
