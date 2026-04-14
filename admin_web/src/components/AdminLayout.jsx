@@ -19,16 +19,8 @@ const { Header, Content, Footer, Sider } = Layout;
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
-const THEME = {
-    navy: '#1A2332',
-    coral: '#FF6B6B',
-    teal: '#00B4D8',
-    white: '#FFFFFF',
-    text: '#1A2332',
-    subtext: '#5A6B7A',
-    glass: 'rgba(255, 255, 255, 0.85)',
-    border: 'rgba(26, 35, 50, 0.08)'
-};
+const BRAND_COLOR = '#FF6B6B'; // Web App Coral
+const SIDEBAR_DARK = '#1A2332'; // Web App Navy
 
 export default function AdminLayout() {
     const screens = useBreakpoint();
@@ -84,7 +76,18 @@ export default function AdminLayout() {
                     boxShadow: '12px 0 40px rgba(26, 35, 50, 0.12)'
                 }}
             >
-                <div style={{ padding: '32px 24px', display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+                <div
+                    onClick={() => window.location.reload()}
+                    style={{
+                        height: "64px",
+                        margin: "24px 16px 32px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: 'transparent',
+                        overflow: 'hidden',
+                        cursor: 'pointer'
+                    }}>
                     <VacanzaLogo size={44} color="white" showText={!collapsed} />
                 </div>
 
@@ -125,8 +128,7 @@ export default function AdminLayout() {
                         onClick={() => setCollapsed(!collapsed)}
                         style={{ fontSize: "18px", width: 44, height: 44, borderRadius: '12px', color: THEME.navy, background: 'rgba(26, 35, 50, 0.04)' }}
                     />
-
-                    <Space size={isMobile ? 12 : 32}>
+                    <Space size="large">
                         <Dropdown menu={userMenuItems} placement="bottomRight" arrow>
                             <Space style={{ cursor: "pointer", padding: isMobile ? '4px' : '8px 16px', borderRadius: 16, background: 'rgba(26, 35, 50, 0.04)' }}>
                                 <Avatar shape="square" src={user?.photoURL} icon={<UserOutlined />} style={{ background: THEME.coral, borderRadius: 10 }} />

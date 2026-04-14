@@ -8,12 +8,12 @@ import { motion } from "framer-motion";
 const { Title, Text } = Typography;
 
 const THEME = {
-    navy: '#1A2332',
-    coral: '#FF6B6B',
-    teal: '#00B4D8',
-    green: '#2DD4A8',
-    amber: '#FFB347',
-    subtext: '#5A6B7A'
+    primary: '#FF6B6B',
+    success: '#2DD4A8',
+    warning: '#FFB347',
+    error: '#FF4D4F',
+    info: '#00B4D8',
+    purple: '#1A2332'
 };
 
 const Analytics = () => {

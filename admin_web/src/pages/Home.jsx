@@ -12,6 +12,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import VacanzaLogo from "../components/VacanzaLogo";
 import http from "../api/http";
 import dayjs from "dayjs";
 import { useAuth } from "../context/useAuth";
@@ -20,12 +21,11 @@ const { Title, Text } = Typography;
 
 // Brand Tokens from Web UI
 const THEME = {
-    navy: '#1A2332',
-    coral: '#FF6B6B',
-    teal: '#00B4D8',
-    green: '#2DD4A8',
-    amber: '#FFB347',
-    subtext: '#5A6B7A'
+    primary: '#FF6B6B',
+    success: '#2DD4A8',
+    warning: '#FFB347',
+    error: '#FF4D4F',
+    info: '#00B4D8',
 };
 
 export default function Home() {
@@ -79,8 +79,40 @@ export default function Home() {
                         <Text style={{ fontSize: '20px', color: THEME.subtext, fontWeight: 500, maxWidth: 650, display: 'block' }}>
                             Your Vacanza administrative platform is synced and monitoring all global travel vectors.
                         </Text>
-                    </motion.div>
-                </Col>
+                    }
+                    type={healthPercent > 90 ? "success" : "warning"}
+                    showIcon={false}
+                    closable
+                    style={{
+                        marginBottom: "32px",
+                        borderRadius: '16px',
+                        background: healthPercent > 90 ? 'hsla(142, 70%, 45%, 0.1)' : 'hsla(38, 92%, 50%, 0.1)',
+                        border: `1px solid ${healthPercent > 90 ? 'hsla(142, 70%, 45%, 0.2)' : 'hsla(38, 92%, 50%, 0.2)'}`
+                    }}
+                />
+            </motion.div>
+
+            {/* Welcome Header */}
+            <motion.div variants={item} style={{ marginBottom: 40 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+                    <div
+                        onClick={() => window.location.reload()}
+                        style={{
+                            width: 56,
+                            height: 56,
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            cursor: 'pointer'
+                        }}>
+                        <VacanzaLogo size={56} showText={false} />
+                    </div>
+                    <div>
+                        <Title level={1} style={{ margin: 0, letterSpacing: -1.2, fontWeight: 800 }}>Command Center</Title>
+                        <Text type="secondary" style={{ fontSize: 16 }}>Real-time orchestration of user growth, system telemetry, and strategic assets.</Text>
+                    </div>
+                </div>
+            </motion.div>
 
                 {stats.map((stat, i) => (
                     <Col xs={24} md={8} key={i}>

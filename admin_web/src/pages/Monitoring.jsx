@@ -9,20 +9,143 @@ import dayjs from "dayjs";
 const { Title, Text } = Typography;
 
 const THEME = {
-    navy: '#1A2332',
-    coral: '#FF6B6B',
-    teal: '#00B4D8',
-    green: '#2DD4A8',
-    amber: '#FFB347',
-    subtext: '#5A6B7A'
+    primary: '#FF6B6B',
+    success: '#2DD4A8',
+    warning: '#FFB347',
+    error: '#FF4D4F',
+    cardBg: 'rgba(255, 255, 255, 0.85)',
+    darkBg: '#1A2332'
 };
 
 const Monitoring = () => {
     const { data, loading } = useFetch('/admin/monitoring');
 
-    if (loading && !data) return (
-        <div style={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: THEME.coral }} spin />} />
+    const fetchMonitoringData = useCallback(async (isInitial = false) => {
+        if (isInitial) setLoading(true);
+        try {
+            const response = await http.get("/admin/monitoring");
+            const newData = response.data;
+            setData(newData);
+            setLastUpdated(new Date());
+
+            // Build chart history
+            setChartData(prev => {
+                const metrics = newData.apiMetrics || newData.operationalStats || [];
+                const avgLatency = metrics?.length > 0
+                    ? metrics.reduce((acc, curr) => acc + (curr.avgResponseMs || 0), 0) / metrics.length
+                    : 0;
+                const newPoint = {
+                    time: new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                    latency: Math.round(avgLatency),
+                    health: (newData.systemHealth || 0) * 100
+                };
+                return [...prev, newPoint].slice(-24);
+            });
+
+            setError(null);
+        } catch (err) {
+            console.error("Monitoring fetch error:", err);
+            setError("Connectivity issue with telemetry engine.");
+        } finally {
+            if (isInitial) setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchMonitoringData(true);
+        const interval = setInterval(() => fetchMonitoringData(), 60000);
+        return () => clearInterval(interval);
+    }, [fetchMonitoringData]);
+
+    const serviceColumns = [
+        {
+            title: "Provider Node",
+            dataIndex: "name",
+            key: "name",
+            render: (text) => (
+                <Space>
+                    <div className="status-pulse-up" style={{ display: 'none' }} />
+                    <DatabaseOutlined style={{ color: THEME.primary, opacity: 0.8 }} />
+                    <Text strong style={{ fontSize: '14px' }}>{text}</Text>
+                </Space>
+            )
+        },
+        {
+            title: "Operational Status",
+            dataIndex: "status",
+            key: "status",
+            render: (status) => {
+                const isUp = status === "UP" || status === "Active";
+                return (
+                    <Tag
+                        bordered={false}
+                        style={{
+                            borderRadius: '20px',
+                            padding: '4px 12px',
+                            background: isUp ? 'hsla(142, 70%, 45%, 0.1)' : 'hsla(0, 84%, 60%, 0.1)',
+                            color: isUp ? THEME.success : THEME.error,
+                            border: `1px solid ${isUp ? 'hsla(142, 70%, 45%, 0.2)' : 'hsla(0, 84%, 60%, 0.2)'}`
+                        }}
+                        icon={isUp ? <CheckCircleFilled /> : <CloseCircleFilled />}
+                    >
+                        {status?.toUpperCase() || "UNKNOWN"}
+                    </Tag>
+                );
+            },
+        }
+    ];
+
+    const metricColumns = [
+        { title: "Metric Key", dataIndex: "apiName", key: "apiName", render: (t) => <code style={{ color: THEME.primary, background: 'rgba(99, 102, 241, 0.05)', padding: '2px 6px', borderRadius: '4px' }}>{t || 'Unknown'}</code> },
+        { title: "Total Calls", dataIndex: "totalCalls", key: "totalCalls", align: 'center', render: (val) => <Text strong>{val?.toLocaleString() || 0}</Text> },
+        {
+            title: "Error Ratio",
+            dataIndex: "errorCount",
+            key: "errorCount",
+            render: (count, record) => {
+                const ratio = ((count / (record.totalCalls || 1)) * 100).toFixed(1);
+                return (
+                    <Space direction="vertical" size={0}>
+                        <Text type={count > 0 ? "danger" : "secondary"}>{count} ({ratio}%)</Text>
+                        {record.consecutiveErrors > 0 && (
+                            <AntTooltip title={`${record.consecutiveErrors} consecutive blocks`}>
+                                <Text code type="danger" style={{ fontSize: 10 }}>STRIKE: {record.consecutiveErrors}</Text>
+                            </AntTooltip>
+                        )}
+                    </Space>
+                );
+            }
+        },
+        {
+            title: "Performance",
+            dataIndex: "avgResponseMs",
+            key: "avgResponseMs",
+            render: (ms) => (
+                <div style={{ minWidth: 100 }}>
+                    <Text size="small" type={ms > 600 ? "danger" : ms > 300 ? "warning" : "secondary"}>{ms}ms</Text>
+                    <Progress percent={Math.min(100, (ms / 1000) * 100)} showInfo={false} size={4} strokeColor={ms > 600 ? THEME.error : ms > 300 ? THEME.warning : THEME.primary} />
+                </div>
+            )
+        },
+    ];
+
+    if (loading) return (
+        <div style={{ minHeight: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f8fafc' }}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+                <Spin indicator={<LoadingOutlined style={{ fontSize: 60, color: THEME.primary }} spin />} />
+                <div style={{ marginTop: 24, textAlign: 'center' }}>
+                    <Title level={4} className="gradient-text">Syncing System Matrix</Title>
+                    <Text type="secondary">Establishing secure administrative tunnel...</Text>
+                </div>
+            </motion.div>
+        </div>
+    );
+
+    if (error) return (
+        <div style={{ padding: 40, textAlign: 'center' }}>
+            <Empty description={error} image={Empty.PRESENTED_IMAGE_SIMPLE}>
+                <Button type="primary" onClick={() => fetchMonitoringData(true)}>Retry Connection</Button>
+            </Empty>
         </div>
     );
 
