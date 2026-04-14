@@ -257,6 +257,7 @@ export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, 
                 width={eventDetail ? 1080 : 820}
                 centered
                 closable={false}
+                maskClosable={false}
                 styles={{
                     mask: { backdropFilter: 'blur(8px)', background: isDarkMode ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.1)' },
                     content: { background: 'transparent', border: 'none', boxShadow: 'none' },

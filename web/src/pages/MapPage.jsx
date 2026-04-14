@@ -12,10 +12,11 @@ import {
   UserOutlined,
   CompassOutlined,
   CloseOutlined,
-  UnorderedListOutlined,
+  ControlOutlined,
   HeartOutlined,
   HeartFilled,
 } from "@ant-design/icons";
+import { FiFilter } from "react-icons/fi";
 import defaultAvatar from "../assets/default-avatar.png";
 import { useNavigate } from "react-router-dom";
 
@@ -1825,14 +1826,22 @@ export default function MapPage() {
       {/* 1. Header (TOPBAR) */}
       <header className={`vivid-map-header ${themeClass}`}>
         <div className="header-left">
-          <button className="hamburger-btn vivid-interactive" onClick={() => setSidebarOpen(true)}>
-            <div className="line" />
-            <div className="line" />
-            <div className="line" />
-          </button>
-          <div className="brand-logo vivid-brand">Vacanza</div>
+          <div 
+            className="brand-logo vivid-brand" 
+            style={{ cursor: 'pointer' }} 
+            onClick={() => window.location.reload()}
+          >
+            Vacanza
+          </div>
         </div>
-        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            className="header-action-btn vivid-interactive"
+            onClick={() => setBookingOpen(true)}
+            title="Book Flights & Hotels"
+          >
+            <span className="header-action-label" style={{ padding: "0 4px" }}>Book</span>
+          </button>
           <div
             className="vivid-theme-toggle"
             onClick={toggleTheme}
@@ -1842,11 +1851,22 @@ export default function MapPage() {
               {isDarkMode ? <SunOutlined /> : <MoonOutlined />}
             </button>
           </div>
+          <button
+            className="header-profile-btn"
+            onClick={() => setSidebarOpen(true)}
+            title="Profile & Settings"
+          >
+            <Avatar
+              size={36}
+              src={profilePhotoUrl || profile?.profileImageUrl || defaultAvatar}
+              style={{ cursor: "pointer", border: `2px solid ${isDarkMode ? 'rgba(56,189,248,0.4)' : 'rgba(255,107,107,0.3)'}` }}
+            />
+          </button>
         </div>
       </header>
 
       {/* 2. Sidebar (Hamburger Menu Content) */}
-      <div className="vivid-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      <div className="vivid-sidebar-overlay" onClick={(e) => { e.stopPropagation(); setSidebarOpen(false); }} />
       <aside className="vivid-sidebar">
         <div className="sidebar-header" style={{ marginBottom: 24 }}>
           <span className="brand-logo" style={{ marginLeft: 0, fontSize: 24 }}>Settings</span>
@@ -2071,7 +2091,7 @@ export default function MapPage() {
             return (
               <Marker key={`route-wp-${wp.day}-${wp.order}`} longitude={wp.longitude} latitude={wp.latitude} anchor="center">
                 <Tooltip
-                  title={isUnavailable ? `${wp.name} (Kapalı)` : wp.name}
+                  title={isUnavailable ? `${wp.name} (Closed)` : wp.name}
                   placement="top"
                 >
                   <div style={{
@@ -2139,17 +2159,12 @@ export default function MapPage() {
                 setFilterOpen(next);
                 setFabExpanded(false);
               }}>
-                <UnorderedListOutlined />
+                <FiFilter style={{ fontSize: 20 }} />
               </button>
             </Tooltip>
             <Tooltip title="Draw Area" placement="left">
               <button className="sub-fab vivid-interactive" onClick={() => { startFreehand(); setFabExpanded(false); }}>
                 <PencilIcon />
-              </button>
-            </Tooltip>
-            <Tooltip title="Book Flights & Hotels" placement="left">
-              <button className="sub-fab vivid-interactive" onClick={() => { setBookingOpen(true); setFabExpanded(false); }}>
-                <CalendarOutlined />
               </button>
             </Tooltip>
             <Tooltip title={is3D ? "Reset to 2D View" : "Enable 3D Perspective"} placement="left">
@@ -2210,7 +2225,7 @@ export default function MapPage() {
                     type="primary" 
                     shape="round" 
                     onClick={openPolygonRouteParams} 
-                    className="vivid-create-route-btn"
+                    className="vivid-create-route-btn-glass"
                   >
                     Create AI Route
                   </Button>
@@ -2316,7 +2331,7 @@ export default function MapPage() {
             algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
             token: {
               borderRadius: 14,
-              colorPrimary: "#FF6B6B",
+              colorPrimary: "#38bdf8",
             }
           }}
         >
@@ -2325,6 +2340,7 @@ export default function MapPage() {
             open={polygonRouteParamsOpen} 
             onCancel={() => setPolygonRouteParamsOpen(false)} 
             footer={null} 
+            maskClosable={false}
             zIndex={1150}
             className={`vivid-premium-modal route-plan-modal ${themeClass}`}
             rootClassName={themeClass}
@@ -2333,7 +2349,7 @@ export default function MapPage() {
             styles={{
               mask: { backdropFilter: 'blur(10px)', background: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.2)' },
               content: {
-                background: isDarkMode ? "#06080b" : "#fff",
+                background: isDarkMode ? "#0f172a" : "#fff",
                 padding: '32px',
                 overflow: 'hidden'
               }
@@ -2344,7 +2360,8 @@ export default function MapPage() {
                 <Form.Item name="totalDays" label="Trip Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
                 <Form.Item name="travelStyle" label="Preferred Travel Style">
                   <Select 
-                    popupClassName="route-plan-select-dropdown"
+                    className="route-plan-select"
+                    popupClassName="vivid-premium-dropdown route-plan-select-dropdown"
                     getPopupContainer={(trigger) => trigger.parentNode}
                     options={[{ value: "general", label: "Balanced" }, { value: "history", label: "Historical" }, { value: "food", label: "Gourmet" }, { value: "nature", label: "Outdoors" }]} 
                   />

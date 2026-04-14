@@ -141,12 +141,12 @@ const SectionCard = ({ title, subtitle, children, icon, iconBg, onClick }) => (
                 {icon && (
                     <div style={{
                         width: 44, height: 44, borderRadius: 12,
-                        background: iconBg.startsWith("var") ? `rgba(var(--vivid-blue-rgb, 0,150,255), 0.12)` : iconBg,
+                        background: iconBg.startsWith("var") ? `rgba(var(--theme-primary-rgb, 255,107,107), 0.12)` : iconBg,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         flexShrink: 0,
                         border: `1px solid ${iconBg.startsWith("var") ? 'rgba(0,0,0,0.05)' : 'transparent'}`
                     }}>
-                        {React.cloneElement(icon, { style: { fontSize: 20, color: iconBg.startsWith("var") ? "var(--vivid-blue, #0096FF)" : "#fff" } })}
+                        {React.cloneElement(icon, { style: { fontSize: 20, color: iconBg.startsWith("var") ? "var(--theme-primary)" : "#fff" } })}
                     </div>
                 )}
                 <div>
@@ -204,7 +204,7 @@ const ProfileCharacterCard = ({ name, role, level, xp, progress, imageUrl }) => 
                     {role || "—"}
                 </div>
                 <div style={{
-                    fontSize: 13, fontWeight: 800, color: "var(--vivid-blue, #0096FF)", marginTop: 8
+                    fontSize: 13, fontWeight: 800, color: "var(--theme-primary)", marginTop: 8
                 }}>
                     Level {level} • {new Intl.NumberFormat().format(xp)} XP
                 </div>
@@ -235,7 +235,7 @@ const CheckinItem = ({ name, category, date }) => (
         borderBottom: "1px solid var(--card-border, #f3f4f6)"
     }}>
         <div style={{ width: 40, height: 40, borderRadius: 12, background: "var(--card-border, rgba(128,128,128,0.1))", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <EnvironmentOutlined style={{ color: "#0096FF" }} />
+            <EnvironmentOutlined style={{ color: "var(--theme-primary)" }} />
         </div>
         <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: "var(--card-text, #1c1c1e)" }}>{name}</div>
@@ -262,7 +262,7 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
         }}>
             <GrabHandle />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, marginTop: 12 }}>
-                <div style={{ fontSize: 24, fontWeight: 900, color: "var(--text-main, #FFFFFF)", letterSpacing: "-0.5px" }}>Profile</div>
+                <div style={{ fontFamily: "var(--font-display)", fontVariationSettings: "'SOFT' 80, 'WONK' 1", fontSize: 26, fontWeight: 800, color: "var(--text-main, #FFFFFF)", letterSpacing: "-1px" }}>Profile</div>
                 <Button
                     icon={<CloseOutlined style={{ fontSize: 14 }} />}
                     type="text"
@@ -290,7 +290,7 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
                 title="Edit Profile"
                 subtitle="Update your personal information"
                 icon={<ControlOutlined />}
-                iconBg="var(--vivid-blue, #38BDF8)"
+                iconBg="var(--theme-primary)"
                 onClick={() => setView('EDIT_PROFILE')}
             />
 
@@ -299,7 +299,7 @@ const MainView = ({ profile, gamification, stats, checkins, user, setView, onClo
             <SectionCard
                 title="Account Details"
                 icon={<UserOutlined />}
-                iconBg="var(--vivid-blue, #0096FF)"
+                iconBg="var(--theme-primary)"
             >
                 <div style={{ padding: "12px 16px 4px" }}>
                     <InfoRow label="Email" value={profile?.email || user?.email} />
@@ -393,10 +393,10 @@ const GamificationView = ({ gamification, setView, onClose, isDarkMode = true })
                         onClick={() => setView('MAIN')}
                     />
                     <div style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                        <div style={{ fontSize: 12, fontWeight: 900, color: "var(--vivid-blue, #0096FF)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>
+                        <div style={{ fontSize: 12, fontWeight: 900, color: "var(--theme-primary)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>
                             Experience
                         </div>
-                        <div style={{ fontSize: 19, fontWeight: 900, color: "var(--card-text, #1c1c1e)", letterSpacing: "-0.5px" }}>Level & Badges</div>
+                        <div style={{ fontFamily: "var(--font-display)", fontVariationSettings: "'SOFT' 80, 'WONK' 1", fontSize: 22, fontWeight: 800, color: "var(--card-text, #1c1c1e)", letterSpacing: "-0.5px" }}>Level and Badges</div>
                     </div>
                     <Button
                         icon={<CloseOutlined style={{ fontSize: 14 }} />}
@@ -494,7 +494,7 @@ const GenderSelector = ({ value, onChange, isDarkMode = true }) => {
                     colorBgContainer: 'transparent',
                     colorText: 'var(--text-main, #FFFFFF)',
                     colorTextPlaceholder: 'rgba(255,255,255,0.5)',
-                    colorPrimary: '#38BDF8',
+                    colorPrimary: isDarkMode ? '#38BDF8' : '#FF6B6B',
                     colorBgElevated: isDarkMode ? '#1A2333' : '#FFFFFF',
                     colorIcon: 'var(--text-sub)',
                 }
@@ -556,8 +556,8 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                             onClick={() => setView('MAIN')}
                         />
                         <div>
-                            <div style={{ fontSize: 10, fontWeight: 900, color: "var(--vivid-blue, #38BDF8)", textTransform: "uppercase", letterSpacing: "1px" }}>Details</div>
-                            <div style={{ fontSize: 19, fontWeight: 900, color: "var(--text-main, #FFFFFF)", letterSpacing: "-0.5px" }}>Edit Profile</div>
+                            <div style={{ fontSize: 10, fontWeight: 900, color: "var(--theme-primary)", textTransform: "uppercase", letterSpacing: "1px" }}>Details</div>
+                            <div style={{ fontFamily: "var(--font-display)", fontVariationSettings: "'SOFT' 80, 'WONK' 1", fontSize: 22, fontWeight: 800, color: "var(--text-main, #FFFFFF)", letterSpacing: "-0.5px" }}>Edit Profile</div>
                         </div>
                     </div>
                     <Button
@@ -589,7 +589,7 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                         <div
                             style={{
                                 position: "absolute", bottom: 2, right: 2, width: 32, height: 32,
-                                background: "#38BDF8", borderRadius: "50%", border: "3px solid #0D1526",
+                                background: "var(--theme-primary)", borderRadius: "50%", border: "3px solid var(--bg-main, #0D1526)",
                                 display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
                             }}
                             onClick={() => fileInputRef.current?.click()}
@@ -633,8 +633,8 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                     border: "1px solid var(--card-border, rgba(255,255,255,0.05))"
                 }}>
                     <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(56, 189, 248, 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <MailOutlined style={{ color: "#38BDF8", fontSize: 18 }} />
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(var(--theme-primary-rgb, 56,189,248), 0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <MailOutlined style={{ color: "var(--theme-primary, #38BDF8)", fontSize: 18 }} />
                         </div>
                         <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 10, fontWeight: 900, color: "var(--text-sub, rgba(255,255,255,0.4))", letterSpacing: "1px", marginBottom: 2 }}>ACCOUNT EMAIL</div>
@@ -740,7 +740,7 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                             }}
                         >
                             <span>Additional Info</span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#38BDF8", fontSize: 11, fontWeight: 800, textTransform: "none", letterSpacing: "0" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--theme-primary)", fontSize: 11, fontWeight: 800, textTransform: "none", letterSpacing: "0" }}>
                                 {showAdditionalInfo ? "Hide" : "Expand"}
                                 {showAdditionalInfo ? <UpOutlined style={{ fontSize: 10 }} /> : <DownOutlined style={{ fontSize: 10 }} />}
                             </div>
@@ -776,7 +776,7 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                                                 colorText: isDarkMode ? '#FFFFFF' : '#1A2332',
                                                 colorTextPlaceholder: isDarkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.4)',
                                                 colorBorder: 'transparent',
-                                                colorPrimary: '#38BDF8',
+                                                colorPrimary: isDarkMode ? '#38BDF8' : '#FF6B6B',
                                                 colorIcon: isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)',
                                                 colorTextHeading: isDarkMode ? '#FFFFFF' : '#1A2332',
                                             }
@@ -819,7 +819,7 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
             {/* FIXED FOOTER */}
             <div style={{ padding: "20px 24px 30px", display: "flex", gap: 12, background: "var(--bg-main, #0D1526)", borderTop: "1px solid var(--card-border, rgba(255,255,255,0.1))", zIndex: 10 }}>
                 <Button block size="large" onClick={() => setView('MAIN')} style={{ height: 56, borderRadius: 16, fontSize: 16, fontWeight: 800, color: "var(--text-main, #FFFFFF)", background: "var(--card-border, rgba(255,255,255,0.1))", border: "none" }}>Cancel</Button>
-                <Button type="primary" block size="large" onClick={() => form.submit()} loading={updateMutation.isPending} style={{ height: 56, borderRadius: 16, fontSize: 16, fontWeight: 800, background: "var(--vivid-blue, #00B4D8)", border: "none", color: "#fff" }}>Save Changes</Button>
+                <Button type="primary" block size="large" onClick={() => form.submit()} loading={updateMutation.isPending} style={{ height: 56, borderRadius: 16, fontSize: 16, fontWeight: 800, background: "var(--theme-primary)", border: "none", color: "#fff" }}>Save Changes</Button>
             </div>
         </div>
     );
@@ -932,7 +932,8 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
                 onCancel={onClose}
                 footer={null}
                 closable={false}
-                width={480}
+                maskClosable={false}
+                width={600}
                 centered
                 styles={{
                     body: {

@@ -1066,12 +1066,12 @@ export default function VacanzaChat({
   return (
     <Rnd
       default={{
-        x: window.innerWidth - 420,
+        x: window.innerWidth - 460,
         y: 100,
-        width: 380,
+        width: 420,
         height: 620,
       }}
-      minWidth={340}
+      minWidth={380}
       minHeight={400}
       dragHandleClassName="chat-header-refined"
       bounds="parent"

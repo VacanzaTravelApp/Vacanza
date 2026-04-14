@@ -176,11 +176,13 @@ html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 .brand-tagline {
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text-main);
-  opacity: 0.8;
+  opacity: 1;
   transition: color 1.5s ease;
   text-shadow: var(--text-shadow);
+  letter-spacing: 0.02em;
 }
 
 .local-time-badge {

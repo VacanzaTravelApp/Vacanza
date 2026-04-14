@@ -44,16 +44,19 @@ const CustomCheckbox = ({ checked, themeColor }) => (
     </div>
 );
 
-const ChipSelector = ({ options, value, onChange, color = "#0096FF", isMulti = false, maxVisible = 100, onToggleMore, isExpanded, circle = false }) => {
-    const values = isMulti ? (Array.isArray(value) ? value : []) : [value];
+const ChipSelector = ({ options, value, onChange, color = "var(--theme-primary)", isMulti = false, maxVisible = 100, onToggleMore, isExpanded, circle = false }) => {
+    const valuesStr = isMulti ? (Array.isArray(value) ? value : []).map(v => String(v).toUpperCase()) : [];
+    const valStr = value ? String(value).toUpperCase() : "";
     const visibleOptions = isExpanded ? options : options.slice(0, maxVisible);
     const hasMore = options.length > maxVisible;
 
     const handleToggle = (opt) => {
+        const uOpt = String(opt).toUpperCase();
         if (isMulti) {
-            const newVals = values.includes(opt)
-                ? values.filter(v => v !== opt)
-                : [...values, opt];
+            const currentVals = Array.isArray(value) ? value : [];
+            const newVals = valuesStr.includes(uOpt)
+                ? currentVals.filter(v => String(v).toUpperCase() !== uOpt)
+                : [...currentVals, opt];
             onChange(newVals);
         } else {
             onChange(opt);
@@ -63,7 +66,8 @@ const ChipSelector = ({ options, value, onChange, color = "#0096FF", isMulti = f
     return (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
             {visibleOptions.map(opt => {
-                const isSelected = isMulti ? values.includes(opt) : value === opt;
+                const uOpt = String(opt).toUpperCase();
+                const isSelected = isMulti ? valuesStr.includes(uOpt) : valStr === uOpt;
                 return (
                     <div
                         key={opt}
@@ -88,7 +92,7 @@ const ChipSelector = ({ options, value, onChange, color = "#0096FF", isMulti = f
             {hasMore && (
                 <div
                     onClick={onToggleMore}
-                    style={{ padding: "8px 16px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "var(--vivid-subtle-bg, rgba(0,0,0,0.05))", color: "var(--vivid-blue, #38BDF8)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                    style={{ padding: "8px 16px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "var(--vivid-subtle-bg, rgba(0,0,0,0.05))", color: "var(--theme-primary)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
                 >
                     {isExpanded ? "Less" : "More..."}
                 </div>
@@ -104,7 +108,7 @@ const SegmentedControl = ({ value, onChange, options, isDarkMode = true }) => (
         border: "1px solid var(--card-border, transparent)"
     }}>
         {options.map(opt => {
-            const isSelected = value === opt;
+            const isSelected = value && String(value).toUpperCase() === String(opt).toUpperCase();
             return (
                 <div
                     key={opt}
@@ -112,7 +116,7 @@ const SegmentedControl = ({ value, onChange, options, isDarkMode = true }) => (
                     style={{
                         flex: 1, textAlign: "center", padding: "10px 0",
                         borderRadius: 11, cursor: "pointer", transition: "all 0.2s ease",
-                        background: isSelected ? "#38BDF8" : "transparent",
+                        background: isSelected ? "var(--theme-primary)" : "transparent",
                         color: isSelected ? "#fff" : "var(--text-sub, rgba(255,255,255,0.4))",
                         fontWeight: 700, fontSize: 14,
                     }}
@@ -132,7 +136,7 @@ const CurrencySelector = ({ value, onChange, isDarkMode = true }) => (
                 colorText: isDarkMode ? '#FFFFFF' : '#1A2333',
                 colorTextPlaceholder: isDarkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.4)',
                 colorBorder: 'transparent',
-                colorPrimary: '#38BDF8',
+                colorPrimary: isDarkMode ? '#38BDF8' : '#FF6B6B',
                 colorBgElevated: isDarkMode ? '#1A2333' : '#FFFFFF',
                 colorIcon: isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)',
             }
@@ -153,7 +157,7 @@ const CurrencySelector = ({ value, onChange, isDarkMode = true }) => (
 const FieldLabel = ({ text, subtext, color = "var(--text-sub, rgba(255,255,255,0.4))" }) => (
     <div style={{ marginBottom: 12, marginTop: 24 }}>
         <div style={{ fontSize: 12, fontWeight: 900, color: color, letterSpacing: "1.5px" }}>{text.toUpperCase()}</div>
-        {subtext && <div style={{ fontSize: 12, color: "var(--vivid-blue, #38BDF8)", marginTop: 6, display: "flex", alignItems: "center", gap: 4, fontWeight: 700 }}>
+        {subtext && <div style={{ fontSize: 12, color: "var(--theme-primary)", marginTop: 6, display: "flex", alignItems: "center", gap: 4, fontWeight: 700 }}>
             <ThunderboltOutlined style={{ fontSize: 11 }} /> {subtext}
         </div>}
     </div>
@@ -194,10 +198,12 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
 
     const filteredOptions = options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()));
 
-    const toggleSelection = (val) => {
-        const newValues = selectedValues.includes(val)
-            ? selectedValues.filter(v => v !== val)
-            : [...selectedValues, val];
+    const toggleSelection = (opt) => {
+        const uOpt = String(opt).toUpperCase();
+        const currentUpper = selectedValues.map(v => String(v).toUpperCase());
+        const newValues = currentUpper.includes(uOpt)
+            ? selectedValues.filter(v => String(v).toUpperCase() !== uOpt)
+            : [...selectedValues, opt];
         setSelectedValues(newValues);
     };
 
@@ -240,7 +246,7 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
             <div style={{ padding: "0 24px", flex: 1, overflowY: "auto" }}>
                 <div style={{ padding: "12px 0 30px" }}>
                     {filteredOptions.length > 0 ? filteredOptions.map(opt => {
-                        const isSelected = selectedValues.includes(opt);
+                        const isSelected = selectedValues.map(v => String(v).toUpperCase()).includes(String(opt).toUpperCase());
                         return (
                             <div
                                 key={opt}
@@ -269,7 +275,7 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
             </div>
             
             <div style={{ padding: "20px 24px 30px", background: "var(--bg-main, #0D1526)", borderTop: "1px solid var(--card-border, rgba(255,255,255,0.1))" }}>
-                <Button type="primary" block size="large" onClick={handleDone} style={{ height: 56, borderRadius: 16, fontSize: 16, fontWeight: 900, background: "var(--vivid-blue, #38BDF8)", border: "none", color: "#fff" }}>
+                <Button type="primary" block size="large" onClick={handleDone} style={{ height: 56, borderRadius: 16, fontSize: 16, fontWeight: 900, background: "var(--theme-primary)", border: "none", color: "#fff" }}>
                     Done ({selectedValues.length})
                 </Button>
             </div>
@@ -295,7 +301,7 @@ const MainView = ({
         }}>
             <GrabHandle />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, marginTop: 12 }}>
-                <div style={{ fontSize: 24, fontWeight: 900, color: "var(--text-main, #FFFFFF)", letterSpacing: "-0.5px" }}>Preferences</div>
+                <div style={{ fontFamily: "var(--font-display)", fontVariationSettings: "'SOFT' 80, 'WONK' 1", fontSize: 26, fontWeight: 800, color: "var(--text-main, #FFFFFF)", letterSpacing: "-1px" }}>Preferences</div>
                 <Button
                     icon={<CloseOutlined style={{ fontSize: 14 }} />}
                     type="text"
@@ -371,56 +377,38 @@ const MainView = ({
                     </Col>
                 </Row>
 
-                <div 
-                    onClick={() => setShowAdvanced(!showAdvanced)} 
-                    style={{ 
-                        display: "flex", justifyContent: "space-between", alignItems: "center", 
-                        padding: "24px 12px 12px", cursor: "pointer", marginTop: 24,
-                        fontSize: 12, fontWeight: 900, color: "var(--text-sub, rgba(255,255,255,0.4))", letterSpacing: "1.5px"
-                    }}
-                >
-                    <span>ADVANCED PREFERENCES</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#38BDF8", fontSize: 11, fontWeight: 800 }}>
-                        {showAdvanced ? "Hide" : "Expand"} {showAdvanced ? <UpOutlined style={{ fontSize: 10 }} /> : <DownOutlined style={{ fontSize: 10 }} />}
-                    </div>
-                </div>
+                <FieldLabel text="Activity Level" />
+                <SegmentedControl isDarkMode={isDarkMode} options={["LOW", "MODERATE", "HIGH"]} value={watchActivityLevel} onChange={v => preferencesForm.setFieldsValue({ activityLevel: v })} />
 
-                {showAdvanced && (
-                    <div style={{ paddingBottom: 40 }}>
-                        <FieldLabel text="Activity Level" />
-                        <SegmentedControl isDarkMode={isDarkMode} options={["LOW", "MODERATE", "HIGH"]} value={watchActivityLevel} onChange={v => preferencesForm.setFieldsValue({ activityLevel: v })} />
+                <FieldLabel text="Cuisine Preferences" />
+                <ChipSelector options={watchCuisines} value={watchCuisines} isMulti={true} color={accentOrange} maxVisible={3} />
+                <MultiSelectRow label="Select cuisines" values={watchCuisines} color={accentOrange} onClick={() => handleOpenPicker('cuisines')} />
 
-                        <FieldLabel text="Cuisine Preferences" />
-                        <ChipSelector options={watchCuisines} value={watchCuisines} isMulti={true} color={accentOrange} maxVisible={3} />
-                        <MultiSelectRow label="Select cuisines" values={watchCuisines} color={accentOrange} onClick={() => handleOpenPicker('cuisines')} />
+                <FieldLabel text="Dietary Restrictions" subtext="Used by AI filter" />
+                <ChipSelector options={watchDietary} value={watchDietary} isMulti={true} color={accentRed} maxVisible={3} />
+                <MultiSelectRow label="Select dietary" values={watchDietary} color={accentRed} onClick={() => handleOpenPicker('dietary')} />
 
-                        <FieldLabel text="Dietary Restrictions" subtext="Used by AI filter" />
-                        <ChipSelector options={watchDietary} value={watchDietary} isMulti={true} color={accentRed} maxVisible={3} />
-                        <MultiSelectRow label="Select dietary" values={watchDietary} color={accentRed} onClick={() => handleOpenPicker('dietary')} />
+                <FieldLabel text="Accessibility Needs" />
+                <MultiSelectRow label="Select accessibility" values={watchAccessibility} color={accentPurple} onClick={() => handleOpenPicker('accessibility')} />
 
-                        <FieldLabel text="Accessibility Needs" />
-                        <MultiSelectRow label="Select accessibility" values={watchAccessibility} color={accentPurple} onClick={() => handleOpenPicker('accessibility')} />
+                <FieldLabel text="Trip Pace" />
+                <SegmentedControl isDarkMode={isDarkMode} options={optionTripPace} value={watchTripPace} onChange={v => preferencesForm.setFieldsValue({ tripPace: v })} />
 
-                        <FieldLabel text="Trip Pace" />
-                        <SegmentedControl isDarkMode={isDarkMode} options={optionTripPace} value={watchTripPace} onChange={v => preferencesForm.setFieldsValue({ tripPace: v })} />
+                <FieldLabel text="Accommodation" />
+                <ChipSelector options={optionAccommodationType} value={watchAccommodationType} onChange={v => preferencesForm.setFieldsValue({ accommodationType: v })} color={accentBlue} maxVisible={3} isExpanded={showMoreAccommodation} onToggleMore={() => setShowMoreAccommodation(!showMoreAccommodation)} />
 
-                        <FieldLabel text="Accommodation" />
-                        <ChipSelector options={optionAccommodationType} value={watchAccommodationType} onChange={v => preferencesForm.setFieldsValue({ accommodationType: v })} color={accentBlue} maxVisible={3} isExpanded={showMoreAccommodation} onToggleMore={() => setShowMoreAccommodation(!showMoreAccommodation)} />
+                <FieldLabel text="Transport" />
+                <ChipSelector options={optionTransportPreference} value={watchTransportPreference} onChange={v => preferencesForm.setFieldsValue({ transportPreference: v })} color={accentBlue} maxVisible={3} isExpanded={showMoreTransport} onToggleMore={() => setShowMoreTransport(!showMoreTransport)} />
 
-                        <FieldLabel text="Transport" />
-                        <ChipSelector options={optionTransportPreference} value={watchTransportPreference} onChange={v => preferencesForm.setFieldsValue({ transportPreference: v })} color={accentBlue} maxVisible={3} isExpanded={showMoreTransport} onToggleMore={() => setShowMoreTransport(!showMoreTransport)} />
-
-                        <FieldLabel text="Languages" />
-                        <ChipSelector options={optionLanguages} value={watchLanguage} onChange={v => preferencesForm.setFieldsValue({ preferredLanguage: v })} color={accentBlue} circle={true} maxVisible={7} />
-                        <MultiSelectRow label="Spoken languages" values={watchSpokenLanguages} color={accentGreen} onClick={() => handleOpenPicker('spokenLanguages')} />
-                    </div>
-                )}
+                <FieldLabel text="Languages" />
+                <ChipSelector options={optionLanguages} value={watchLanguage} onChange={v => preferencesForm.setFieldsValue({ preferredLanguage: v })} color={accentBlue} circle={true} maxVisible={7} />
+                <MultiSelectRow label="Spoken languages" values={watchSpokenLanguages} color={accentGreen} onClick={() => handleOpenPicker('spokenLanguages')} />
             </Form>
         </div>
 
         <div style={{ padding: "20px 24px 30px", display: "flex", gap: 12, background: "var(--bg-main, #0D1526)", borderTop: "1px solid var(--card-border, rgba(255,255,255,0.1))", zIndex: 10 }}>
             <Button block size="large" onClick={onClose} style={{ height: 56, borderRadius: 16, fontSize: 16, fontWeight: 800, color: "var(--text-main, #FFFFFF)", background: "var(--card-border, rgba(255,255,255,0.1))", border: "none" }}>Cancel</Button>
-            <Button type="primary" block size="large" onClick={() => preferencesForm.submit()} loading={updatePrefsMutation.isPending} style={{ height: 56, borderRadius: 16, fontSize: 16, fontWeight: 800, background: "var(--vivid-blue, #00B4D8)", border: "none", color: "#fff" }}>Save</Button>
+            <Button type="primary" block size="large" onClick={() => preferencesForm.submit()} loading={updatePrefsMutation.isPending} style={{ height: 56, borderRadius: 16, fontSize: 16, fontWeight: 800, background: "var(--theme-primary)", border: "none", color: "#fff" }}>Save</Button>
         </div>
     </div>
 );
@@ -471,11 +459,11 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
     };
 
     const pickerData = useMemo(() => {
-        if (pickerField === 'categories') return { title: "Categories", options: ["MUSEUMS", "NATURE", "NIGHTLIFE", "SHOPPING", "FOOD", "BEACH", "HISTORY", "ADVENTURE", "ART", "MUSIC", "SPORTS", "RELAXATION"], color: "#0096FF" };
+        if (pickerField === 'categories') return { title: "Categories", options: ["MUSEUMS", "NATURE", "NIGHTLIFE", "SHOPPING", "FOOD", "BEACH", "HISTORY", "ADVENTURE", "ART", "MUSIC", "SPORTS", "RELAXATION"], color: isDarkMode ? "#38BDF8" : "#FF6B6B" };
         if (pickerField === 'cuisines') return { title: "Cuisines", options: ["ITALIAN", "FRENCH", "JAPANESE", "CHINESE", "MEXICAN", "INDIAN", "THAI", "SPANISH", "GREEK", "TURKISH", "LEBANESE", "VIETNAMESE", "KOREAN", "MEDITERRANEAN", "VEGETARIAN", "VEGAN", "LOCAL_SPECIALTY", "SEAFOOD", "BBQ"], color: "#F4A261" };
         if (pickerField === 'dietary') return { title: "Dietary", options: ["NO_RESTRICTIONS", "VEGETARIAN", "VEGAN", "PESCATARIAN", "GLUTEN_FREE", "DAIRY_FREE", "NUT_ALLERGY", "SHELLFISH_ALLERGY", "KOSHER", "HALAL", "KETO", "PALEO"], color: "#FF6B6B" };
         if (pickerField === 'accessibility') return { title: "Accessibility", options: ["WHEELCHAIR_ACCESSIBLE", "NO_STAIRS", "ELEVATOR", "VISUAL_IMPAIRMENT", "HEARING_IMPAIRMENT", "SERVICE_ANIMAL", "EASY_WALKING"], color: "#9C27B0" };
-        if (pickerField === 'spokenLanguages') return { title: "Languages", options: ["en", "tr", "de", "fr", "es", "it", "pt", "ar", "zh", "ja", "ko", "ru", "nl", "sv", "no", "da", "fi", "pl", "el", "hi", "bn", "ur"], color: "#38BDF8" };
+        if (pickerField === 'spokenLanguages') return { title: "Languages", options: ["en", "tr", "de", "fr", "es", "it", "pt", "ar", "zh", "ja", "ko", "ru", "nl", "sv", "no", "da", "fi", "pl", "el", "hi", "bn", "ur"], color: isDarkMode ? "#38BDF8" : "#FF6B6B" };
         return { title: "", options: [], color: "#000" };
     }, [pickerField]);
 
@@ -497,7 +485,7 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
     const optionTravelStyle = ["RELAXATION", "ADVENTURE", "LUXURY", "BACKPACKER", "CULTURAL", "NIGHTLIFE", "FAMILY", "ROMANTIC"];
     const optionLanguages = ["en", "tr", "de", "fr", "es", "it", "pt", "ar", "zh", "ja", "ko", "ru"];
 
-    const accentBlue = "#38BDF8";
+    const accentBlue = isDarkMode ? "#38BDF8" : "#FF6B6B";
     const accentOrange = "#F4A261";
     const accentRed = "#FF6B6B";
     const accentPurple = "#9C27B0";
@@ -524,7 +512,8 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
                 onCancel={onClose}
                 footer={null}
                 closable={false}
-                width={480}
+                maskClosable={false}
+                width={600}
                 centered
                 styles={{
                     body: {
