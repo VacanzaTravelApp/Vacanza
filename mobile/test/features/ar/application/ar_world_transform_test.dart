@@ -9,6 +9,8 @@ void main() {
         id: 'near',
         name: 'Near',
         categoryKey: 'food',
+        latitude: 41.0,
+        longitude: 29.0,
         distanceMeters: 20,
         bearingDegrees: 0,
       );
@@ -16,6 +18,8 @@ void main() {
         id: 'far',
         name: 'Far',
         categoryKey: 'park',
+        latitude: 41.001,
+        longitude: 29.001,
         distanceMeters: 80,
         bearingDegrees: 0,
       );
@@ -51,6 +55,8 @@ void main() {
         id: 'near',
         name: 'Near',
         categoryKey: 'food',
+        latitude: 41.0,
+        longitude: 29.0,
         distanceMeters: 20,
         bearingDegrees: 10,
       );
@@ -58,6 +64,8 @@ void main() {
         id: 'far',
         name: 'Far',
         categoryKey: 'park',
+        latitude: 41.001,
+        longitude: 29.001,
         distanceMeters: 80,
         bearingDegrees: 11,
       );

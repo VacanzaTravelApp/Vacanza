@@ -57,6 +57,15 @@ export default function BookingSheet({ open, onClose }) {
     }
   }, [open]);
 
+  // Clear local text state when switching between flights/hotels
+  useEffect(() => {
+    setOriginLabel("");
+    setDestLabel("");
+    setSearchQuery("");
+    setAirportResults([]);
+    setActiveSearchField(null);
+  }, [state.bookingType]);
+
   useEffect(() => {
     const delayDebounce = setTimeout(async () => {
       const q = searchQuery.trim();
@@ -183,74 +192,78 @@ export default function BookingSheet({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="custom-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="custom-backdrop">
       <div className="custom-sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="drag-handle-line" />
-        <button className="close-circle-btn-top" onClick={() => { if (state.view === 'filters') dispatch({ type: "CLOSE_FILTERS" }); else onClose(); }}><MdClose /></button>
-
-        <div className="sheet-scrollable-content" ref={scrollRef}>
-          {state.view === 'search' && (
-            <div className="search-form-container">
-              <div className="tab-pill-container-mock" style={{ width: '100%', justifyContent: 'center' }}>
-                <button style={{ flex: 1 }} className={state.bookingType === 'hotels' ? 'pill-active-mock' : ''} onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'hotels' } })}>
-                  <MdHotel size={16} color={state.bookingType === 'hotels' ? '#fff' : '#999'} /> Hotels
+        <div className="sheet-header-unified">
+          <div className="header-left-area">
+            {(state.view === 'results' || state.view === 'filters') && (
+              <button className="sheet-header-btn" onClick={() => { if (state.view === 'filters') dispatch({ type: "CLOSE_FILTERS" }); else dispatch({ type: "RETRY" }); }}>
+                <MdChevronLeft />
+              </button>
+            )}
+          </div>
+          <div className="header-center-area">
+            {state.view === 'search' ? (
+              <div className="tab-pill-container-mock">
+                <button className={state.bookingType === 'hotels' ? 'pill-active-mock' : ''} onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'hotels' } })}>
+                  <MdHotel size={16} /> Hotels
                 </button>
-                <button style={{ flex: 1 }} className={state.bookingType === 'flights' ? 'pill-active-mock' : ''} onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'flights' } })}>
-                  <MdFlightTakeoff size={16} color={state.bookingType === 'flights' ? '#fff' : '#999'} /> Flights
+                <button className={state.bookingType === 'flights' ? 'pill-active-mock' : ''} onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { bookingType: 'flights' } })}>
+                  <MdFlightTakeoff size={16} /> Flights
                 </button>
               </div>
+            ) : (
+              <div className="sheet-header-title-stack">
+                <h3>{state.view === 'filters' ? 'Filters' : `${filteredAndSortedItems.length} ${state.bookingType === 'hotels' ? 'Hotels' : 'Flights'} Found`}</h3>
+                <span>
+                  {state.bookingType === 'hotels'
+                    ? `${state.searchParams.destination}`
+                    : `${state.searchParams.origin}→${state.searchParams.destination}`}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="header-right-area">
+            {state.view === 'results' && (
+              <button className="sheet-header-btn" onClick={() => dispatch({ type: "OPEN_FILTERS" })}>
+                <MdTune />
+              </button>
+            )}
+            <button className="sheet-header-btn" onClick={onClose}>
+              <MdClose />
+            </button>
+          </div>
+        </div>
 
-              <div className="inputs-grid-refined">
+        <div className="sheet-main-layout">
+          {state.view === 'search' && (
+            <div className="search-form-container">
+              <div className="sheet-scroll-area">
+                <div className="inputs-grid-refined">
                 {state.bookingType === 'flights' && (
                   <div className="input-group-modern" ref={originRef}>
                     <label className="input-label-mobile">ORIGIN</label>
                     <div className="input-with-icon-mobile">
                       <MdFlightTakeoff className="input-icon-prefix" />
                       <input
-                        type="text" placeholder=""
+                        type="text"
                         value={activeSearchField === 'origin' ? searchQuery : (originLabel || state.searchParams.origin)}
-                        onFocus={() => {
-                          setActiveSearchField('origin');
-                          isTypingRef.current = false;
-                          setSearchQuery(originLabel || state.searchParams.origin || "");
-                        }}
-                        onChange={(e) => {
-                          setActiveSearchField('origin');
-                          isTypingRef.current = true;
-                          setSearchQuery(e.target.value);
-                          dispatch({ type: "UPDATE_PARAM", payload: { origin: e.target.value } });
-                          if (originLabel) setOriginLabel("");
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSearch();
-                        }}
+                        onFocus={() => { setActiveSearchField('origin'); isTypingRef.current = false; setSearchQuery(originLabel || state.searchParams.origin || ""); }}
+                        onChange={(e) => { setActiveSearchField('origin'); isTypingRef.current = true; setSearchQuery(e.target.value); dispatch({ type: "UPDATE_PARAM", payload: { origin: e.target.value } }); if (originLabel) setOriginLabel(""); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
                       />
                     </div>
                     {activeSearchField === 'origin' && (searchQuery.length > 0 || isSearching) && (
                       <div className="airport-dropdown-refined">
-                        {isSearching ? (
-                          <div className="dropdown-status-msg">Searching...</div>
-                        ) : airportResults.length > 0 ? (
-                          airportResults.map((item, i) => (
-                            <div key={i} className="airport-item" onClick={() => {
-                              const searchId = item.iataCode ?? item.kgmid;
-                              dispatch({ type: "UPDATE_PARAM", payload: { origin: searchId } });
-                              setOriginLabel(item.kgmid ? `All airports — ${item.city}` : `${item.city} (${item.iataCode})`);
-                              setAirportResults([]); setActiveSearchField(null);
-                            }}>
-                              <div className="airport-item-row">
-                                <span className="airport-type-icon">{item.kgmid ? <MdLocationCity /> : <MdLocalAirport />}</span>
-                                <div className="airport-item-info">
-                                  <span className="aname">{item.name}</span>
-                                  <span className="city">{item.city}, {item.country}</span>
-                                </div>
-                                {!item.kgmid && <span className="iata-badge">{item.iataCode}</span>}
-                              </div>
+                        {isSearching ? <div className="dropdown-status-msg">Searching...</div> : airportResults.length > 0 ? airportResults.map((item, i) => (
+                          <div key={i} className="airport-item" onClick={() => { const searchId = item.iataCode ?? item.kgmid; dispatch({ type: "UPDATE_PARAM", payload: { origin: searchId } }); setOriginLabel(item.kgmid ? `All airports — ${item.city}` : `${item.city} (${item.iataCode})`); setAirportResults([]); setActiveSearchField(null); }}>
+                            <div className="airport-item-row">
+                              <span className="airport-type-icon">{item.kgmid ? <MdLocationCity /> : <MdLocalAirport />}</span>
+                              <div className="airport-item-info"><span className="aname">{item.name}</span><span className="city">{item.city}, {item.country}</span></div>
+                              {!item.kgmid && <span className="iata-badge">{item.iataCode}</span>}
                             </div>
-                          ))
-                        ) : (
-                          <div className="dropdown-status-msg">No suggestions found</div>
-                        )}
+                          </div>
+                        )) : <div className="dropdown-status-msg">No suggestions found</div>}
                       </div>
                     )}
                     {renderError('origin')}
@@ -263,61 +276,24 @@ export default function BookingSheet({ open, onClose }) {
                     {state.bookingType === 'hotels' ? <MdHotel className="input-icon-prefix" /> : <MdLocationOn className="input-icon-prefix" />}
                     <input
                       type="text" placeholder={state.bookingType === 'hotels' ? "City or hotel" : ""}
-                      autoComplete="off"
                       value={activeSearchField === 'destination' ? searchQuery : (destLabel || state.searchParams.destination)}
-                      onFocus={() => {
-                        setActiveSearchField('destination');
-                        isTypingRef.current = false;
-                        setSearchQuery(destLabel || state.searchParams.destination || "");
-                      }}
-                      onChange={(e) => {
-                        setActiveSearchField('destination');
-                        isTypingRef.current = true;
-                        setSearchQuery(e.target.value);
-                        dispatch({ type: "UPDATE_PARAM", payload: { destination: e.target.value } });
-                        if (destLabel) setDestLabel("");
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSearch();
-                      }}
+                      onFocus={() => { setActiveSearchField('destination'); isTypingRef.current = false; setSearchQuery(destLabel || state.searchParams.destination || ""); }}
+                      onChange={(e) => { setActiveSearchField('destination'); isTypingRef.current = true; setSearchQuery(e.target.value); dispatch({ type: "UPDATE_PARAM", payload: { destination: e.target.value } }); if (destLabel) setDestLabel(""); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                      autoComplete="off"
                     />
                   </div>
                   {activeSearchField === 'destination' && state.bookingType !== 'hotels' && (searchQuery.length > 0 || isSearching) && (
                     <div className="airport-dropdown-refined">
-                      {isSearching ? (
-                        <div className="dropdown-status-msg">Searching...</div>
-                      ) : airportResults.length > 0 ? (
-                        airportResults.map((item, i) => (
-                          <div key={i} className="airport-item" onClick={() => {
-                            if (state.bookingType === 'hotels') {
-                              if (item.iataCode || item.kgmid) {
-                                const q = `Hotels in ${item.city || item.name}`;
-                                dispatch({ type: "UPDATE_PARAM", payload: { destination: q } });
-                                setDestLabel(item.name);
-                              } else {
-                                dispatch({ type: "UPDATE_PARAM", payload: { destination: item.searchQuery } });
-                                setDestLabel(item.displayName);
-                              }
-                            } else {
-                              const searchId = item.iataCode ?? item.kgmid;
-                              dispatch({ type: "UPDATE_PARAM", payload: { destination: searchId } });
-                              setDestLabel(item.kgmid ? `All airports — ${item.city}` : `${item.city} (${item.iataCode})`);
-                            }
-                            setAirportResults([]); setActiveSearchField(null);
-                          }}>
-                            <div className="airport-item-row">
-                              <span className="airport-type-icon">{item.kgmid ? <MdLocationCity /> : <MdLocalAirport />}</span>
-                              <div className="airport-item-info">
-                                <span className="aname">{item.name}</span>
-                                <span className="city">{item.city}, {item.country}</span>
-                              </div>
-                              {!item.kgmid && <span className="iata-badge">{item.iataCode}</span>}
-                            </div>
+                      {isSearching ? <div className="dropdown-status-msg">Searching...</div> : airportResults.length > 0 ? airportResults.map((item, i) => (
+                        <div key={i} className="airport-item" onClick={() => { const searchId = item.iataCode ?? item.kgmid; dispatch({ type: "UPDATE_PARAM", payload: { destination: searchId } }); setDestLabel(item.kgmid ? `All airports — ${item.city}` : `${item.city} (${item.iataCode})`); setAirportResults([]); setActiveSearchField(null); }}>
+                          <div className="airport-item-row">
+                            <span className="airport-type-icon">{item.kgmid ? <MdLocationCity /> : <MdLocalAirport />}</span>
+                            <div className="airport-item-info"><span className="aname">{item.name}</span><span className="city">{item.city}, {item.country}</span></div>
+                            {!item.kgmid && <span className="iata-badge">{item.iataCode}</span>}
                           </div>
-                        ))
-                      ) : (
-                        <div className="dropdown-status-msg">No suggestions found</div>
-                      )}
+                        </div>
+                      )) : <div className="dropdown-status-msg">No suggestions found</div>}
                     </div>
                   )}
                   {renderError('destination')}
@@ -325,9 +301,7 @@ export default function BookingSheet({ open, onClose }) {
 
                 {state.bookingType === 'flights' && (
                   <div className="round-trip-toggle-mobile" onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { isRoundTrip: !state.searchParams.isRoundTrip } })}>
-                    <div className={`checkbox-custom-mobile ${state.searchParams.isRoundTrip ? 'checked' : ''}`}>
-                      {state.searchParams.isRoundTrip && <MdCheck size={14} color="#fff" />}
-                    </div>
+                    <div className={`checkbox-custom-mobile ${state.searchParams.isRoundTrip ? 'checked' : ''}`}>{state.searchParams.isRoundTrip && <MdCheck size={14} color="#fff" />}</div>
                     <span>Round trip</span>
                   </div>
                 )}
@@ -335,29 +309,15 @@ export default function BookingSheet({ open, onClose }) {
                 <div className="row-compact">
                   <div className="input-group-modern half">
                     <label className="input-label-mobile">{state.bookingType === 'hotels' ? 'CHECK-IN' : 'DATE'}</label>
-                    <input
-                      type="date"
-                      className={state.searchParams.dates ? 'date-filled' : 'date-empty'}
-                      onFocus={() => setActiveSearchField(null)}
-                      min={new Date().toISOString().split('T')[0]}
-                      value={state.searchParams.dates}
-                      onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { dates: e.target.value } })}
-                    />
+                    <input type="date" className={state.searchParams.dates ? 'date-filled' : 'date-empty'} onFocus={() => setActiveSearchField(null)} min={new Date().toISOString().split('T')[0]} value={state.searchParams.dates} onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { dates: e.target.value } })} />
                     {renderError('dates')}
                   </div>
-                  {state.bookingType === 'hotels' || state.searchParams.isRoundTrip ? (
+                  {(state.bookingType === 'hotels' || state.searchParams.isRoundTrip) && (
                     <div className="input-group-modern half">
                       <label className="input-label-mobile">{state.bookingType === 'hotels' ? 'CHECK-OUT' : 'RETURN'}</label>
-                      <input
-                        type="date"
-                        className={state.searchParams.checkOutDate ? 'date-filled' : 'date-empty'}
-                        onFocus={() => setActiveSearchField(null)}
-                        min={state.searchParams.dates || new Date().toISOString().split('T')[0]}
-                        value={state.searchParams.checkOutDate}
-                        onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { checkOutDate: e.target.value } })}
-                      />
+                      <input type="date" className={state.searchParams.checkOutDate ? 'date-filled' : 'date-empty'} onFocus={() => setActiveSearchField(null)} min={state.searchParams.dates || new Date().toISOString().split('T')[0]} value={state.searchParams.checkOutDate} onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { checkOutDate: e.target.value } })} />
                     </div>
-                  ) : <div className="half" />}
+                  )}
                 </div>
 
                 <div className="row-compact">
@@ -371,164 +331,72 @@ export default function BookingSheet({ open, onClose }) {
                   </div>
                   <div className="input-group-modern half">
                     <label className="input-label-mobile">BUDGET (MAX)</label>
-                    <input
-                      type="number" min="0" placeholder="$"
-                      onFocus={() => setActiveSearchField(null)}
-                      value={state.searchParams.budget}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "" || parseFloat(val) >= 0) {
-                          dispatch({ type: "UPDATE_PARAM", payload: { budget: val.replace('-', '') } });
-                        }
-                      }}
-                    />
+                    <input type="number" min="0" placeholder="$" onFocus={() => setActiveSearchField(null)} value={state.searchParams.budget} onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { budget: e.target.value.replace('-', '') } })} />
                   </div>
                 </div>
 
                 <div className="input-group-modern">
                   <label className="input-label-mobile">SORT BY</label>
-                  <select
-                    className="custom-select-refined"
-                    onFocus={() => setActiveSearchField(null)}
-                    value={state.sortBy}
-                    onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { sortBy: e.target.value } })}
-                  >
+                  <select className="custom-select-refined" onFocus={() => setActiveSearchField(null)} value={state.sortBy} onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { sortBy: e.target.value } })}>
                     <option value="low">Price: Low to High</option>
                     <option value="high">Price: High to Low</option>
                   </select>
                 </div>
               </div>
-              <div className="search-footer-modern">
-                {state.status === 'error' && (
-                  <div className="form-error-banner">
-                    {state.error?.message || "Search failed. Please check your connection."}
-                  </div>
-                )}
-                <button className="search-submit-btn-premium" onClick={handleSearch} disabled={state.loading}>
-                  {state.loading ? 'Searching...' : (state.bookingType === 'hotels' ? 'Search Hotels' : 'Search Flights')}
-                </button>
+            </div>
+            <div className="search-footer-modern">
+                {state.status === 'error' && <div className="form-error-banner">{state.error?.message || "Search failed."}</div>}
+                <button className="search-submit-btn-premium" onClick={handleSearch} disabled={state.loading}>{state.loading ? 'Searching...' : (state.bookingType === 'hotels' ? 'Search Hotels' : 'Search Flights')}</button>
               </div>
             </div>
           )}
 
           {state.view === 'results' && (
             <div className="results-list-refined">
-              <div className="results-header-premium">
-                <button className="back-btn-circle" onClick={() => dispatch({ type: "RETRY" })}><MdChevronLeft /></button>
-                <div className="results-title-stack">
-                  <h3 className="results-count-text">{filteredAndSortedItems.length} {state.bookingType === 'hotels' ? 'Hotels' : 'Flights'} Found</h3>
-                  <span className="results-summary-sub">
-                    {state.bookingType === 'hotels'
-                      ? `${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)} – ${formatFriendlyDate(state.searchParams.checkOutDate)} · ${state.searchParams.adults} adult`
-                      : `${state.searchParams.origin}→${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)}${state.searchParams.isRoundTrip ? ` – ${formatFriendlyDate(state.searchParams.checkOutDate)}` : ''} · ${state.searchParams.adults} adult`}
-                  </span>
-                </div>
-                <button className="filter-tune-btn" onClick={() => dispatch({ type: "OPEN_FILTERS" })}><MdTune /></button>
-              </div>
-
-              <div className="results-grid-mobile">
-                {filteredAndSortedItems.map((item, idx) => {
-                  if (state.bookingType === 'hotels') {
-                    return (
-                      <div key={idx} className="mobile-card hotel">
-                        <div className="hotel-thumb-box">
-                          <HotelImage src={item.imageUrl || item.thumbnailUrl} />
-                        </div>
+              <div className="sheet-scroll-area" ref={scrollRef}>
+                {filteredAndSortedItems.map((item, idx) => (
+                  <div key={idx} className={`mobile-card ${state.bookingType === 'hotels' ? 'hotel' : 'flight'}`}>
+                    {state.bookingType === 'hotels' ? (
+                      <>
+                        <div className="hotel-thumb-box"><HotelImage src={item.imageUrl || item.thumbnailUrl} /></div>
                         <div className="hotel-details-col">
-                          <div className="hotel-name-row">
-                            <h4 className="hotel-name-text">{item.hotelName}</h4>
-                            <span className="price-text-blue">${item.pricePerNight || item.price}</span>
-                          </div>
-                          <div className="rating-row-mobile" style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div className="hotel-name-row"><h4 className="hotel-name-text">{item.hotelName}</h4><span className="price-text-blue">${item.pricePerNight || item.price}</span></div>
+                          <div className="rating-row-mobile" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {item.rating && <span className="star-rating"><MdStar color="#FFD166" size={16} /> {item.rating}</span>}
                             {item.totalReviews && <span className="review-count-sub">({item.totalReviews} reviews)</span>}
                           </div>
-                          {item.providerName && <span className="hotel-provider-text">{item.providerName}</span>}
-                          <div className="hotel-book-btn-row">
-                            <button className="hotel-book-btn-mobile" onClick={() => window.open(item.externalBookingUrl, '_blank')}>Open booking</button>
-                          </div>
+                          <div className="hotel-book-btn-row"><button className="hotel-book-btn-mobile" onClick={() => window.open(item.externalBookingUrl, '_blank')}>Open booking</button></div>
                         </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={idx} className="mobile-card flight">
-                      <div className="card-top-row">
-                        <div className="airline-logo-circle">
-                          {item.airlineLogo ? <img src={item.airlineLogo} alt="" /> : <span className="fallback-text">{item.carrier?.substring(0, 2)}</span>}
+                      </>
+                    ) : (
+                      <>
+                        <div className="card-top-row">
+                          <div className="airline-logo-circle">{item.airlineLogo ? <img src={item.airlineLogo} alt="" /> : <span className="fallback-text" style={{ color: '#1a1a1a' }}>{item.carrier?.substring(0, 2)}</span>}</div>
+                          <div className="card-main-info"><span className="flight-date-subtext">{formatDateShort(item.departureTime)}</span><span className="time-range-text">{formatTime(item.departureTime)} – {formatTime(item.arrivalTime)}</span><span className="carrier-subtext">{[item.carrier, item.flightNumber].filter(Boolean).join(' · ')}</span></div>
+                          <div className="card-right-price"><span className="price-text-blue">${item.price}</span>{item.travelClass && <span className="class-tag">{item.travelClass}</span>}</div>
                         </div>
-                        <div className="card-main-info">
-                          <span className="flight-date-subtext">{formatDateShort(item.departureTime)}</span>
-                          <span className="time-range-text">{formatTime(item.departureTime)} – {formatTime(item.arrivalTime)}</span>
-                          <span className="carrier-subtext">{[item.carrier, item.flightNumber].filter(Boolean).join(' · ')}</span>
+                        <div className="route-section">
+                          <div className="route-labels-row"><span>{item.origin}</span><span>{item.duration || 'Auto'}</span><span>{item.destination}</span></div>
+                          <div className="path-line-stack"><div className="gray-line" />{item.stops > 0 && <div className="stop-dot" />}</div>
                         </div>
-                        <div className="card-right-price">
-                          <span className="price-text-blue">${item.price}</span>
-                          {item.travelClass && <span className="class-tag">{item.travelClass}</span>}
-                        </div>
-                      </div>
-                      <div className="route-section">
-                        <div className="route-labels-row">
-                          <span>{item.origin}</span>
-                          <span>{item.duration || 'Auto'}</span>
-                          <span>{item.destination}</span>
-                        </div>
-                        <div className="path-line-stack">
-                          <div className="gray-line" />
-                          {item.stops > 0 && <div className="stop-dot" />}
-                        </div>
-                      </div>
-                      <div className="stops-badge-row">
-                        <div className={`stops-badge ${item.stops === 0 ? 'direct' : 'stops'}`}>
-                          {item.stops === 0 ? 'Direct' : `${item.stops} stop${item.stops > 1 ? 's' : ''}`}
-                        </div>
-                      </div>
-                      <div style={{ marginTop: 14 }}>
-                        <button className="launch-btn-mobile" onClick={() => window.open(item.externalBookingUrl, '_blank')}>
-                          Open in Google Flights <MdArrowForward size={14} style={{ marginLeft: 6 }} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                        <div className="stops-badge-row"><div className={`stops-badge ${item.stops === 0 ? 'direct' : 'stops'}`}>{item.stops === 0 ? 'Direct' : `${item.stops} stop`}</div></div>
+                        <div style={{ marginTop: 14 }}><button className="launch-btn-mobile" onClick={() => window.open(item.externalBookingUrl, '_blank')}>Open Google Flights</button></div>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
           {state.view === 'filters' && (
             <div className="filters-view-premium">
-              <div className="filters-header-mobile" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <button className="back-btn-circle" onClick={() => dispatch({ type: "CLOSE_FILTERS" })}><MdChevronLeft /></button>
-                <div className="filters-title-stack">
-                  <h3 className="results-count-text" style={{ fontSize: 18, marginBottom: 4 }}>Filters</h3>
-                  <span className="results-summary-sub" style={{ color: '#888' }}>
-                    {state.bookingType === 'hotels'
-                      ? `${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)}`
-                      : `${state.searchParams.origin}→${state.searchParams.destination} · ${formatFriendlyDate(state.searchParams.dates)}`}
-                  </span>
-                </div>
-              </div>
-              <div className="filters-content">
+              <div className="sheet-scroll-area">
                 <div className="filter-item">
-                  <label className="filter-section-label">{state.bookingType === 'hotels' ? 'Budget per night' : 'Budget'}</label>
-                  <div className="budget-input-wrapper">
-                    <span className="prefix">$</span>
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="No limit"
-                      value={state.searchParams.budget}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "" || parseFloat(val) >= 0) {
-                          dispatch({ type: "UPDATE_PARAM", payload: { budget: val.replace('-', '') } });
-                        }
-                      }}
-                    />
-                    <span className="suffix">USD</span>
-                  </div>
+                  <label className="filter-section-label">Budget</label>
+                  <div className="budget-input-wrapper"><span className="prefix">$</span><input type="number" value={state.searchParams.budget} onChange={(e) => dispatch({ type: "UPDATE_PARAM", payload: { budget: e.target.value } })} /><span className="suffix">USD</span></div>
                 </div>
-                <div className="filter-item">
+                <div className="filter-item" style={{ marginTop: 20 }}>
                   <label className="filter-section-label">Sort by</label>
                   <div className="sort-chips-wrap">
                     <button className={`sort-chip ${state.sortBy === 'low' ? 'active' : ''}`} onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { sortBy: 'low' } })}>Price ↑</button>
@@ -537,12 +405,7 @@ export default function BookingSheet({ open, onClose }) {
                 </div>
               </div>
               <div className="filter-footer-mobile">
-                <button className="apply-btn-blue" onClick={() => { handleSearch(); dispatch({ type: "CLOSE_FILTERS" }); }}>
-                  <MdCheck size={18} /> Apply Filters
-                </button>
-                <button className="reset-btn-gray" onClick={() => dispatch({ type: "UPDATE_PARAM", payload: { budget: '', sortBy: 'low' } })}>
-                  <MdRefresh size={16} /> Reset Filters
-                </button>
+                <button className="apply-btn-blue" onClick={() => { handleSearch(); dispatch({ type: "CLOSE_FILTERS" }); }}>Apply Filters</button>
               </div>
             </div>
           )}

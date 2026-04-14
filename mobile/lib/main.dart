@@ -16,6 +16,9 @@ import 'core/network/app_dio.dart';
 import 'features/auth/data/repositories/auth_repository.dart';
 import 'features/auth/data/storage/secure_storage_service.dart';
 
+import 'features/behavior/data/api/feedback_api_client.dart';
+import 'features/behavior/presentation/cubit/favorite_poi_cubit.dart';
+
 import 'features/poi_search/data/api/poi_search_api_client.dart';
 
 import 'features/gamification/data/api/gamification_api_client.dart';
@@ -26,6 +29,7 @@ import 'features/booking/data/api/booking_api_client.dart';
 import 'features/booking/data/repositories/booking_repository.dart';
 
 import 'features/chat/data/api/chat_api_client.dart';
+import 'features/ai/data/api/ai_route_api_client.dart';
 
 import 'features/profile/data/datasources/profile_remote_data_source.dart';
 import 'features/profile/data/repositories/profile_repository.dart';
@@ -37,7 +41,14 @@ import 'features/auth/presentation/screens/auth_gate.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  MapboxOptions.setAccessToken(MapboxConfig.accessToken);
+  final mapboxToken = MapboxConfig.accessToken.trim();
+  MapboxOptions.setAccessToken(mapboxToken);
+  if (mapboxToken.isEmpty || !mapboxToken.startsWith('pk.')) {
+    debugPrint(
+      '[Mapbox] Public access token missing or not pk.* — vector tiles will 401 until '
+      'mobile/lib/core/config/mapbox_access_token.dart is set.',
+    );
+  }
 
   // Firebase init
   await Firebase.initializeApp(
@@ -79,6 +90,10 @@ class VacanzaApp extends StatelessWidget {
           create: (ctx) => PoiSearchApiClient(ctx.read<Dio>()),
         ),
 
+        RepositoryProvider<FeedbackApiClient>(
+          create: (ctx) => FeedbackApiClient(ctx.read<Dio>()),
+        ),
+
         /// Gamification API client (MOB-8)
         RepositoryProvider<GamificationApiClient>(
           create: (ctx) => GamificationApiClient(ctx.read<Dio>()),
@@ -108,6 +123,11 @@ class VacanzaApp extends StatelessWidget {
           create: (ctx) => ChatApiClient(ctx.read<Dio>()),
         ),
 
+        /// Saved AI routes + directions (shared by map AI route UI)
+        RepositoryProvider<AiRouteApiClient>(
+          create: (ctx) => AiRouteApiClient(ctx.read<Dio>()),
+        ),
+
         /// Profile (MOB-9 / profile feature)
         RepositoryProvider<ProfileRemoteDataSource>(
           create: (ctx) => ProfileRemoteDataSource(ctx.read<Dio>()),
@@ -135,6 +155,12 @@ class VacanzaApp extends StatelessWidget {
           BlocProvider<GamificationCubit>(
             create: (context) => GamificationCubit(
               repository: context.read<GamificationRepository>(),
+            ),
+          ),
+
+          BlocProvider<FavoritePoiCubit>(
+            create: (context) => FavoritePoiCubit(
+              context.read<FeedbackApiClient>(),
             ),
           ),
         ],

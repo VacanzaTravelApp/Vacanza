@@ -21,6 +21,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<ToggleDrawingPressed>(_onToggleDrawingPressed);
     on<SetDrawingEnabled>(_onSetDrawingEnabled);
     on<SyncBasemapToAppTheme>(_onSyncBasemapToAppTheme);
+    on<FitRouteBoundsRequested>(_onFitRouteBounds);
   }
 
   void _onInitialized(MapInitialized event, Emitter<MapState> emit) {
@@ -38,7 +39,9 @@ class MapBloc extends Bloc<MapEvent, MapState> {
   }
 
   void _onTogglePerspective(
-      TogglePerspectivePressed event, Emitter<MapState> emit) {
+    TogglePerspectivePressed event,
+    Emitter<MapState> emit,
+  ) {
     final next = state.perspective.toggle();
     emit(state.copyWith(perspective: next));
     // ignore: avoid_print
@@ -48,7 +51,9 @@ class MapBloc extends Bloc<MapEvent, MapState> {
   void _onRecenter(RecenterPressed event, Emitter<MapState> emit) {
     emit(state.copyWith(recenterTick: state.recenterTick + 1));
     // ignore: avoid_print
-    print('[MapBloc] RecenterPressed -> recenterTick=${state.recenterTick + 1}');
+    print(
+      '[MapBloc] RecenterPressed -> recenterTick=${state.recenterTick + 1}',
+    );
   }
 
   void _onFlyToPoi(FlyToPoiRequested event, Emitter<MapState> emit) {
@@ -66,6 +71,27 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     );
   }
 
+  void _onFitRouteBounds(
+    FitRouteBoundsRequested event,
+    Emitter<MapState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        fitRouteTick: state.fitRouteTick + 1,
+        fitRouteMinLat: event.minLat,
+        fitRouteMaxLat: event.maxLat,
+        fitRouteMinLng: event.minLng,
+        fitRouteMaxLng: event.maxLng,
+        fitRouteBearing: event.bearing,
+      ),
+    );
+    log(
+      '[MapBloc] FitRouteBoundsRequested '
+      'lat=[${event.minLat},${event.maxLat}] lng=[${event.minLng},${event.maxLng}] '
+      'bearing=${event.bearing}',
+    );
+  }
+
   void _onToggleDrawingPressed(
     ToggleDrawingPressed event,
     Emitter<MapState> emit,
@@ -74,10 +100,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     log('[MapBloc] ToggleDrawingPressed -> isDrawing=${!state.isDrawing}');
   }
 
-  void _onSetDrawingEnabled(
-    SetDrawingEnabled event,
-    Emitter<MapState> emit,
-  ) {
+  void _onSetDrawingEnabled(SetDrawingEnabled event, Emitter<MapState> emit) {
     if (state.isDrawing == event.enabled) return;
     emit(state.copyWith(isDrawing: event.enabled));
     log('[MapBloc] SetDrawingEnabled -> isDrawing=${event.enabled}');
@@ -87,8 +110,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     SyncBasemapToAppTheme event,
     Emitter<MapState> emit,
   ) {
-    final target =
-        event.isDark ? MapBasemap.dark : MapBasemap.streets;
+    final target = event.isDark ? MapBasemap.dark : MapBasemap.streets;
     if (state.basemap == target) return;
     emit(state.copyWith(basemap: target));
     log('[MapBloc] SyncBasemapToAppTheme -> basemap=${target.label}');

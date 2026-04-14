@@ -59,6 +59,9 @@ class UserProfileForAi(BaseModel):
     preferredLanguage: str | None = None
     spokenLanguages: list[str] | None = None
 
+    # Favorited / saved POIs (injected by Java backend from user_interactions table)
+    savedPoiNames: list[str] | None = None
+
 
 class ConversationCreateResponse(BaseModel):
     """Response when creating a new conversation."""
@@ -111,6 +114,8 @@ class RouteWaypoint(BaseModel):
     travel_from_previous_min: int | None = None
     arrival_time_local: str | None = None
     departure_time_local: str | None = None
+    # Set by adaptive adjustment when stop is known closed/unavailable
+    unavailable: bool | None = None
 
 
 class DayPlan(BaseModel):

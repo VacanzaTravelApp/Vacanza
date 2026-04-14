@@ -15,12 +15,14 @@ public record WaypointPricing(
         BigDecimal minPriceUsd,
         String currency,
         String bookingUrl,
+        /** Title of the cheapest matching Viator product (e.g. "SFMOMA Guided Tour"). */
+        String productTitle,
         boolean found,
         WaypointPricingStatus status,
-        /** Present when {@link #status} is {@link WaypointPricingStatus#PARTNER_UNAVAILABLE} or for extra context. */
+        /** Present when {@link #status} is {@link WaypointPricingStatus#PARTNER_UNAVAILABLE}. */
         String message
 ) {
     public static WaypointPricing noName(int day, int order) {
-        return new WaypointPricing("", day, order, null, null, null, false, WaypointPricingStatus.NO_MATCH, null);
+        return new WaypointPricing("", day, order, null, null, null, null, false, WaypointPricingStatus.NO_MATCH, null);
     }
 }

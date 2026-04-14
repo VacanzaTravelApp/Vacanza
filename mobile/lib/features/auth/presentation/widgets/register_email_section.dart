@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/app_text_field.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 class RegisterEmailSection extends StatelessWidget {
   final TextEditingController emailController;
@@ -12,19 +12,21 @@ class RegisterEmailSection extends StatelessWidget {
     required this.emailRegex,
   });
 
-  Widget _rule(String text, bool ok) {
+  Widget _rule(BuildContext context, String text, bool ok) {
+    final tokens = context.vacanzaTokens;
+    final accent = context.authAccent;
     return Row(
       children: [
         Icon(
           ok ? Icons.check_circle : Icons.radio_button_unchecked,
           size: 14,
-          color: ok ? AppColors.accentMint : AppColors.inputBorder,
+          color: ok ? accent : tokens.cardBorder,
         ),
         const SizedBox(width: 4),
         Text(
           text,
           style: TextStyle(
-            color: ok ? AppColors.accentMint : AppColors.textMuted,
+            color: ok ? accent : tokens.textSub,
             fontSize: 12,
           ),
         ),
@@ -50,7 +52,7 @@ class RegisterEmailSection extends StatelessWidget {
               : "Enter a valid email",
         ),
         const SizedBox(height: 6),
-        _rule("Valid email format", emailValid),
+        _rule(context, "Valid email format", emailValid),
       ],
     );
   }

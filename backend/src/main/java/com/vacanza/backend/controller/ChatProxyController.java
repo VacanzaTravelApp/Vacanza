@@ -11,6 +11,7 @@ import com.vacanza.backend.integration.ai.AiChatDto;
 import com.vacanza.backend.integration.ai.AiServiceClient;
 import com.vacanza.backend.integration.ai.UserProfileForAi;
 import com.vacanza.backend.integration.MapboxPoiSearchClient;
+import com.vacanza.backend.integration.MapboxPoiSearchClient.DestinationGeocodeResult;
 import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.security.CurrentUserProvider;
 import com.vacanza.backend.util.PolygonRouteGeometry;
@@ -51,6 +52,15 @@ public class ChatProxyController {
                         "museum", "monument", "historic_site", "church", "park", "neighborhood",
                         "landmark", "art_gallery", "tourist_attraction", "restaurant", "cafe", "bar");
 
+        /**
+         * Dining categories that should be fetched using a tight bbox around sightseeing POIs,
+         * not the full destination bbox. This keeps recommended restaurants/cafes near the
+         * day's actual sightseeing spots.
+         */
+        private static final java.util.Set<String> DINING_CATS = java.util.Set.of(
+                        "restaurant", "cafe", "bar", "fast_food",
+                        "nightclub", "nightlife", "pub", "food", "market", "bakery");
+
         /** Resolve search categories from request or fall back to defaults. */
         private List<String> resolveSearchCategories(List<String> fromRequest) {
                 if (fromRequest != null && !fromRequest.isEmpty()) {
@@ -85,6 +95,7 @@ public class ChatProxyController {
         private final RouteTimelineService routeTimelineService;
         private final WeatherService weatherService;
         private final PersonalizedPoiSelector personalizedPoiSelector;
+        private final com.vacanza.backend.repo.UserInteractionRepository userInteractionRepository;
 
         @PostMapping("/conversations")
         public ResponseEntity<AiChatDto.ConversationCreateResponse> createConversation() {
@@ -113,6 +124,17 @@ public class ChatProxyController {
                 var infoDto = userInfoService.getUserInfoByUser(user).orElse(null);
                 var prefsDto = userPreferencesService.getPreferencesByUser(user).orElse(null);
                 UserProfileForAi profile = UserProfileForAi.from(infoDto, prefsDto);
+
+                // Inject favorited POI names so the AI can prioritize them in routes
+                try {
+                        List<String> savedPoiNames = userInteractionRepository
+                                        .findFavoritePoiNamesByUserId(user.getUserId());
+                        if (!savedPoiNames.isEmpty() && profile != null) {
+                                profile = profile.toBuilder().savedPoiNames(savedPoiNames).build();
+                        }
+                } catch (Exception e) {
+                        log.warn("Could not fetch saved POI names for user {}: {}", user.getUserId(), e.getMessage());
+                }
 
                 var existingAiPrefs = userPreferenceAiService.getExistingPreferences(user);
 
@@ -484,36 +506,93 @@ public class ChatProxyController {
         /**
          * Resolve waypoints that have null lat/lon via Mapbox forward search.
          * LLM may add iconic landmarks not in the POI list with null coordinates.
+         * <p>
+         * Uses the trip destination's bounding box so generic names (e.g. "Blue Mosque") resolve
+         * in the correct city instead of a same-named POI elsewhere (e.g. Jakarta).
          */
         private void resolveNullCoordinates(AiChatDto.RouteData routeData) {
                 if (routeData == null || routeData.getDays() == null) return;
                 String destination = routeData.getDestination();
+                double minLon = -180;
+                double minLat = -90;
+                double maxLon = 180;
+                double maxLat = 90;
+                if (destination != null && !destination.isBlank()) {
+                        var bboxOpt = mapboxPoiSearchClient.geocodeDestination(destination.trim()).blockOptional();
+                        if (bboxOpt.isPresent()) {
+                                DestinationGeocodeResult g = bboxOpt.get();
+                                minLon = g.getMinLon();
+                                minLat = g.getMinLat();
+                                maxLon = g.getMaxLon();
+                                maxLat = g.getMaxLat();
+                                log.info("[RESOLVE NULL] bbox from destination '{}' -> {},{},{},{}",
+                                                destination, minLon, minLat, maxLon, maxLat);
+                        } else {
+                                log.warn("[RESOLVE NULL] Could not geocode destination '{}'; forward search may be ambiguous",
+                                                destination);
+                        }
+                }
                 for (AiChatDto.DayPlan dayPlan : routeData.getDays()) {
                         if (dayPlan.getWaypoints() == null) continue;
                         for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
                                 if (wp.getLatitude() != null && wp.getLongitude() != null) continue;
                                 if (wp.getName() == null || wp.getName().isBlank()) continue;
                                 try {
-                                        String query = wp.getName().contains(",")
-                                                        ? wp.getName()
-                                                        : wp.getName() + (destination != null ? ", " + destination : "");
-                                        var results = mapboxPoiSearchClient.forwardSearchPoi(query,
-                                                        -180, -90, 180, 90)
-                                                .blockOptional().orElse(List.of());
-                                        if (!results.isEmpty()) {
-                                                var best = results.get(0);
-                                                wp.setLatitude(best.getLat());
-                                                wp.setLongitude(best.getLon());
-                                                log.info("[RESOLVE NULL] '{}' -> ({}, {})", wp.getName(),
-                                                                best.getLat(), best.getLon());
+                                        var result = mapboxPoiSearchClient.resolvePlace(
+                                                        wp.getName(),
+                                                        destination != null ? destination : "",
+                                                        minLon, minLat, maxLon, maxLat)
+                                                .blockOptional();
+                                        if (result.isPresent()) {
+                                                String resultName = result.get().getName();
+                                                if (isGeocodingNameCompatible(wp.getName(), resultName)) {
+                                                        wp.setLatitude(result.get().getLat());
+                                                        wp.setLongitude(result.get().getLon());
+                                                        log.info("[RESOLVE NULL] '{}' -> ({}, {}) ✓ (matched '{}')",
+                                                                        wp.getName(), result.get().getLat(),
+                                                                        result.get().getLon(), resultName);
+                                                } else {
+                                                        log.warn("[RESOLVE NULL] '{}' geocoded to unrelated '{}' — rejecting to avoid wrong pin",
+                                                                        wp.getName(), resultName);
+                                                }
                                         } else {
-                                                log.warn("[RESOLVE NULL] No result for '{}'", wp.getName());
+                                                log.warn("[RESOLVE NULL] All strategies exhausted for '{}' — waypoint has no coordinates",
+                                                                wp.getName());
                                         }
                                 } catch (Exception e) {
                                         log.warn("[RESOLVE NULL] Failed for '{}': {}", wp.getName(), e.getMessage());
                                 }
                         }
                 }
+        }
+
+        /**
+         * Returns true if the geocoding result name is reasonably related to the searched place name.
+         * Prevents wrong pins when Mapbox returns an unrelated POI (e.g. a restaurant instead of a bridge).
+         * Uses word-level overlap: at least one significant word (>3 chars) must be shared.
+         */
+        private static boolean isGeocodingNameCompatible(String queryName, String resultName) {
+                // Reject if either side is missing — don't silently accept unknown results
+                if (queryName == null || resultName == null) return false;
+                String q = queryName.toLowerCase(Locale.ROOT);
+                String r = resultName.toLowerCase(Locale.ROOT);
+                // Direct containment (handles "Golden Gate Bridge" ⊂ "Golden Gate Bridge, Presidio…")
+                if (r.contains(q) || q.contains(r)) return true;
+                // Word-level overlap — at least one significant word (>4 chars) must be an exact match.
+                // Prefix matching is intentionally disabled: "Bosphorus Bridge" vs "Bosphorus Strait"
+                // share the prefix "Bosphor" but are completely different places.
+                String[] qWords = q.split("[\\s,\\-/]+");
+                String[] rWords = r.split("[\\s,\\-/]+");
+                for (String qw : qWords) {
+                        if (qw.length() <= 4) continue;
+                        for (String rw : rWords) {
+                                if (rw.length() <= 4) continue;
+                                if (qw.equals(rw)) {
+                                        return true;
+                                }
+                        }
+                }
+                return false;
         }
 
         private UUID saveRoute(User user, UUID conversationId, AiChatDto.RouteData routeData) {
@@ -638,9 +717,17 @@ public class ChatProxyController {
                         cats.add("tourist_attraction");
                 }
 
+                // Phase 1: fetch sightseeing categories with full destination bbox
+                List<String> sightCats = cats.stream()
+                                .filter(c -> c != null && !DINING_CATS.contains(c.toLowerCase(java.util.Locale.ROOT)))
+                                .toList();
+                List<String> diningCats = cats.stream()
+                                .filter(c -> c != null && DINING_CATS.contains(c.toLowerCase(java.util.Locale.ROOT)))
+                                .toList();
+
                 List<PoiResult> all = new java.util.ArrayList<>();
-                for (String c : cats) {
-                        if (c == null || c.isBlank()) continue;
+                for (String c : sightCats) {
+                        if (c.isBlank()) continue;
                         var pois = mapboxPoiSearchClient
                                         .searchByCategory(c, dest.getMinLon(), dest.getMinLat(), dest.getMaxLon(), dest.getMaxLat())
                                         .blockOptional()
@@ -648,7 +735,24 @@ public class ChatProxyController {
                         all.addAll(pois);
                 }
 
-                // Forward-search each must_visit landmark so iconic places are guaranteed in the pool
+                // Phase 2: compute a tight bbox around sightseeing POIs (+1500 m padding)
+                // so dining results stay near where the traveller will actually be.
+                double[] dBbox = tightBboxWithPaddingMeters(all, dest, 1500.0);
+
+                // Phase 3: fetch dining categories with tight bbox
+                for (String c : diningCats) {
+                        if (c.isBlank()) continue;
+                        var pois = mapboxPoiSearchClient
+                                        .searchByCategory(c, dBbox[0], dBbox[1], dBbox[2], dBbox[3])
+                                        .blockOptional()
+                                        .orElse(List.of());
+                        all.addAll(pois);
+                }
+
+                // Forward-search each must_visit landmark so iconic places are guaranteed in the pool.
+                // Collected separately so they can OVERRIDE category-search duplicates during dedup
+                // (must-visit results have higher-confidence coordinates from a name-specific search).
+                List<PoiResult> mustVisitPois = new java.util.ArrayList<>();
                 if (mustVisit != null) {
                         for (String placeName : mustVisit) {
                                 if (placeName == null || placeName.isBlank()) continue;
@@ -656,24 +760,132 @@ public class ChatProxyController {
                                 var mvPois = mapboxPoiSearchClient.forwardSearchPoi(query,
                                                 dest.getMinLon(), dest.getMinLat(), dest.getMaxLon(), dest.getMaxLat())
                                         .blockOptional().orElse(List.of());
-                                all.addAll(mvPois);
+                                mustVisitPois.addAll(mvPois);
                                 if (!mvPois.isEmpty()) {
                                         log.info("[MUST_VISIT] '{}' resolved to {} POI(s)", placeName, mvPois.size());
                                 }
                         }
                 }
 
+                // Dedup: first pass — category-search results (putIfAbsent keeps first occurrence)
                 java.util.Map<String, PoiResult> dedup = new java.util.LinkedHashMap<>();
                 for (PoiResult p : all) {
                         if (p == null || p.getName() == null || p.getName().isBlank()) continue;
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.putIfAbsent(k, p);
                 }
+                // Second pass — must-visit results OVERRIDE category-search versions.
+                // This ensures the AI gets the highest-confidence coordinates for landmark entries.
+                for (PoiResult p : mustVisitPois) {
+                        if (p == null || p.getName() == null || p.getName().isBlank()) continue;
+                        String k = p.getName().toLowerCase(java.util.Locale.ROOT);
+                        dedup.put(k, p);  // force override
+                }
                 List<PoiResult> merged = personalizedPoiSelector.select(
                                 new java.util.ArrayList<>(dedup.values()),
                                 profile,
                                 PersonalizedPoiParams.forUser(userId));
+
+                // ── POI POOL DIAGNOSTIC LOG ──────────────────────────────────────────
+                // Shows exactly what is sent to the AI. Check this first when debugging
+                // bad routes: wrong POIs here = backend problem; correct POIs but bad
+                // route = AI or post-processing problem.
+                long sightCount = merged.stream().filter(p -> !DINING_CATS.contains(
+                                (p.getCategory() == null ? "" : p.getCategory()).toLowerCase(java.util.Locale.ROOT))).count();
+                long diningCount = merged.size() - sightCount;
+                log.info("[POI_POOL] destination='{}' total={} (sight={} dining={})",
+                                destination, merged.size(), sightCount, diningCount);
+                for (PoiResult p : merged) {
+                        log.info("[POI_POOL]   [{}] {} → lat:{} lon:{}",
+                                        p.getCategory(), p.getName(), p.getLat(), p.getLon());
+                }
+                // ─────────────────────────────────────────────────────────────────────
+
                 return new PoiToolExecutionResult(merged, planning);
+        }
+
+        /**
+         * Compute a bounding box that tightly wraps the given POIs and adds {@code paddingMeters}
+         * on every side. Used to restrict dining POI searches to the area where sightseeing happens.
+         *
+         * <p>Fallback: if {@code pois} has no valid coordinates, returns a small box centred on
+         * {@code dest} with radius {@code paddingMeters}.
+         *
+         * @return [minLon, minLat, maxLon, maxLat]
+         */
+        /**
+         * Maximum distance from the sightseeing centroid that a POI may be and still
+         * influence the dining bbox. Outliers beyond this radius (e.g. Yoros Castle 19 km
+         * away, Senlikkoy 23 km away) would otherwise stretch the bbox across the whole
+         * city and pull in restaurants from totally different districts.
+         */
+        private static final double CLUSTER_FILTER_RADIUS_M = 7_000.0;
+
+        private static double[] tightBboxWithPaddingMeters(
+                        List<PoiResult> pois,
+                        DestinationGeocodeResult dest,
+                        double paddingMeters) {
+
+                if (pois.isEmpty()) {
+                        // No sightseeing POIs — small box around city centre
+                        double padLat0 = paddingMeters / 111_000.0;
+                        double padLon0 = paddingMeters / (111_000.0 * Math.cos(Math.toRadians(dest.getCenterLat())));
+                        return new double[]{
+                                dest.getCenterLon() - padLon0, dest.getCenterLat() - padLat0,
+                                dest.getCenterLon() + padLon0, dest.getCenterLat() + padLat0
+                        };
+                }
+
+                // Step 1: compute raw centroid of ALL sightseeing POIs
+                double sumLat = 0, sumLon = 0;
+                for (PoiResult p : pois) { sumLat += p.getLat(); sumLon += p.getLon(); }
+                double centLat = sumLat / pois.size();
+                double centLon = sumLon / pois.size();
+
+                // Step 2: keep only POIs within CLUSTER_FILTER_RADIUS_M of the centroid
+                // This removes outliers (castles, suburbs, far museums) that would
+                // otherwise stretch the bbox across the entire city.
+                List<PoiResult> core = pois.stream()
+                        .filter(p -> haversineMeters(centLat, centLon, p.getLat(), p.getLon()) <= CLUSTER_FILTER_RADIUS_M)
+                        .collect(java.util.stream.Collectors.toList());
+
+                if (core.isEmpty()) {
+                        core = pois; // safety: if every POI is an outlier, use all
+                }
+
+                log.info("[POI_DINING_BBOX] centroid=({},{}) cluster={}/{} POIs within {}m",
+                        centLat, centLon, core.size(), pois.size(), (int) CLUSTER_FILTER_RADIUS_M);
+
+                // Step 3: min/max of the core cluster
+                double minLat = Double.MAX_VALUE, maxLat = -Double.MAX_VALUE;
+                double minLon = Double.MAX_VALUE, maxLon = -Double.MAX_VALUE;
+                for (PoiResult p : core) {
+                        minLat = Math.min(minLat, p.getLat());
+                        maxLat = Math.max(maxLat, p.getLat());
+                        minLon = Math.min(minLon, p.getLon());
+                        maxLon = Math.max(maxLon, p.getLon());
+                }
+                double centerLat = (minLat + maxLat) / 2.0;
+                double padLat = paddingMeters / 111_000.0;
+                double padLon = paddingMeters / (111_000.0 * Math.cos(Math.toRadians(centerLat)));
+                double[] bbox = new double[]{
+                        minLon - padLon, minLat - padLat,
+                        maxLon + padLon, maxLat + padLat
+                };
+                log.info("[POI_DINING_BBOX] result: minLon={} minLat={} maxLon={} maxLat={}",
+                        bbox[0], bbox[1], bbox[2], bbox[3]);
+                return bbox;
+        }
+
+        /** Haversine distance in metres between two lat/lon points. */
+        private static double haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+                final double R = 6_371_000.0;
+                double phi1 = Math.toRadians(lat1), phi2 = Math.toRadians(lat2);
+                double dPhi = Math.toRadians(lat2 - lat1);
+                double dLam = Math.toRadians(lon2 - lon1);
+                double a = Math.sin(dPhi / 2) * Math.sin(dPhi / 2)
+                        + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLam / 2) * Math.sin(dLam / 2);
+                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         }
 
         /**

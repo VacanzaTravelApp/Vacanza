@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, Spin, Popover, ConfigProvider, theme } from "antd";
+import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, notification, Spin, Popover, ConfigProvider, theme } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LogoutOutlined,
@@ -12,10 +12,11 @@ import {
   UserOutlined,
   CompassOutlined,
   CloseOutlined,
-  UnorderedListOutlined,
+  ControlOutlined,
   HeartOutlined,
   HeartFilled,
 } from "@ant-design/icons";
+import { FiFilter } from "react-icons/fi";
 import defaultAvatar from "../assets/default-avatar.png";
 import { useNavigate } from "react-router-dom";
 
@@ -40,6 +41,7 @@ import { aiApi } from "../api/aiApi";
 import { postPoiFeedbackEvent } from "../api/feedbackApi";
 import { useFeedbackAffinity } from "../hooks/useFeedbackAffinity";
 import { normalizeRouteForMap } from "../features/ai/utils/routeMap";
+import { useAdjustmentStream } from "../hooks/useAdjustmentStream";
 import { buildMapPoiFeedbackPayload, deriveMapPoiFavorited } from "../features/ai/utils/feedbackVoteUtils";
 import "./MapPage.css";
 
@@ -700,6 +702,60 @@ export default function MapPage() {
   const [activeDay, setActiveDay] = useState(1);
   const [routeGeometry, setRouteGeometry] = useState(null);
 
+  // Fly to a waypoint when user clicks it in the RoutePanel
+  const handleWaypointClick = useCallback((wp) => {
+    const lat = Number(wp.latitude ?? wp.lat);
+    const lon = Number(wp.longitude ?? wp.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    map.flyTo({ center: [lon, lat], zoom: 17, duration: 700 });
+  }, []);
+
+  // FReq5 — "Bu yer kapalı" handler: triggers adaptive adjustment and reloads route
+  const handleMarkUnavailable = useCallback(async (wp) => {
+    const routeId = activeRoute?.routeId ?? activeRoute?.route_id;
+    if (!routeId) {
+      message.warning("Bu rotanın kaydedilmiş bir ID'si yok. Lütfen rotayı tekrar oluşturun.");
+      return;
+    }
+    try {
+      const result = await aiApi.adjustRoute(routeId, {
+        triggerType: "USER_REPORTED",
+        severity: "HIGH",
+        reason: `${wp.name} kapalı veya ulaşılamaz`,
+        affectedPoiName: wp.name,
+        affectedDay: wp.day,
+      });
+      if (result.newRouteId && result.newRouteId !== routeId) {
+        const detail = await aiApi.getRoute(result.newRouteId);
+        const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
+        setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? result.newRouteId }));
+      }
+      message.success(result.userMessage || "Rotanız güncellendi.");
+    } catch {
+      message.error("Güncelleme sırasında bir hata oluştu.");
+    }
+  }, [activeRoute]);
+
+  // FReq5 — SSE: receives route_updated push from backend (e.g. weather alerts)
+  useAdjustmentStream(async (data) => {
+    if (!data.newRouteId) return;
+    try {
+      const detail = await aiApi.getRoute(data.newRouteId);
+      const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
+      setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? data.newRouteId }));
+      notification.info({
+        message: "Rotanız güncellendi",
+        description: data.userMessage || "Bir veya daha fazla durak otomatik olarak güncellendi.",
+        placement: "topRight",
+        duration: 6,
+      });
+    } catch {
+      // silently ignore — route will update on next manual refresh
+    }
+  });
+
   /** Parametre modalı (sadece API göndermeden önce) */
   const [polygonRouteParamsOpen, setPolygonRouteParamsOpen] = useState(false);
   /** Üstteki rota isteği bandı kapatıldıysa; sonuç panelinde yedek CTA kalır */
@@ -1263,7 +1319,8 @@ export default function MapPage() {
         const res = await aiApi.createRouteFromPolygon(body);
         const routeData = res.route_data || res.routeData;
         if (routeData) {
-          setActiveRoute(normalizeRouteForMap(routeData));
+          const routeId = res.route_id ?? res.routeId ?? null;
+          setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
           setActiveDay(1);
           setPolygonRouteParamsOpen(false);
           setPolygonRouteBannerDismissed(false);
@@ -1342,7 +1399,8 @@ export default function MapPage() {
       const res = await aiApi.replanDayFromPolygon(body);
       const routeData = res.route_data || res.routeData;
       if (routeData) {
-        setActiveRoute(normalizeRouteForMap(routeData));
+        const routeId = res.route_id ?? res.routeId ?? activeRoute?.routeId ?? null;
+        setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
         setActiveDay(activeDay);
         setFilterOpen(false);
         setIsChatOpen(true);
@@ -1620,6 +1678,10 @@ export default function MapPage() {
         return;
       }
 
+      // Clear stale geometry immediately so the previous route's line doesn't
+      // flicker on screen while the new geometry is being fetched.
+      setRouteGeometry(null);
+
       try {
         const body = {
           waypoints: activeWaypoints.map((w) => ({
@@ -1764,14 +1826,22 @@ export default function MapPage() {
       {/* 1. Header (TOPBAR) */}
       <header className={`vivid-map-header ${themeClass}`}>
         <div className="header-left">
-          <button className="hamburger-btn vivid-interactive" onClick={() => setSidebarOpen(true)}>
-            <div className="line" />
-            <div className="line" />
-            <div className="line" />
-          </button>
-          <div className="brand-logo vivid-brand">Vacanza</div>
+          <div 
+            className="brand-logo vivid-brand" 
+            style={{ cursor: 'pointer' }} 
+            onClick={() => window.location.reload()}
+          >
+            Vacanza
+          </div>
         </div>
-        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            className="header-action-btn vivid-interactive"
+            onClick={() => setBookingOpen(true)}
+            title="Book Flights & Hotels"
+          >
+            <span className="header-action-label" style={{ padding: "0 4px" }}>Book</span>
+          </button>
           <div
             className="vivid-theme-toggle"
             onClick={toggleTheme}
@@ -1781,11 +1851,22 @@ export default function MapPage() {
               {isDarkMode ? <SunOutlined /> : <MoonOutlined />}
             </button>
           </div>
+          <button
+            className="header-profile-btn"
+            onClick={() => setSidebarOpen(true)}
+            title="Profile & Settings"
+          >
+            <Avatar
+              size={36}
+              src={profilePhotoUrl || profile?.profileImageUrl || defaultAvatar}
+              style={{ cursor: "pointer", border: `2px solid ${isDarkMode ? 'rgba(56,189,248,0.4)' : 'rgba(255,107,107,0.3)'}` }}
+            />
+          </button>
         </div>
       </header>
 
       {/* 2. Sidebar (Hamburger Menu Content) */}
-      <div className="vivid-sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+      <div className="vivid-sidebar-overlay" onClick={(e) => { e.stopPropagation(); setSidebarOpen(false); }} />
       <aside className="vivid-sidebar">
         <div className="sidebar-header" style={{ marginBottom: 24 }}>
           <span className="brand-logo" style={{ marginLeft: 0, fontSize: 24 }}>Settings</span>
@@ -1993,23 +2074,52 @@ export default function MapPage() {
           })}
 
           {activeWaypoints.length >= 2 && (
-            <Source id="route-src" type="geojson" data={routeLineGeoJSON} lineMetrics>
+            <Source
+              key={`route-src-${activeRoute?.routeId ?? activeRoute?.route_id ?? "r"}-${activeDay}`}
+              id="route-src"
+              type="geojson"
+              data={routeLineGeoJSON}
+              lineMetrics
+            >
               <Layer {...routeGlowLayer} />
               <Layer {...routeMainLayer} />
             </Source>
           )}
 
-          {activeWaypoints.map((wp, idx) => (
-            <Marker key={`route-wp-${wp.day}-${wp.order}`} longitude={wp.longitude} latitude={wp.latitude} anchor="center">
-              <Tooltip title={wp.name} placement="top">
-                <div style={{
-                  width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, #F97316, #EF4444)",
-                  border: "2.5px solid white", display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "white", fontSize: 13, fontWeight: 800, boxShadow: "0 2px 8px rgba(249,115,22,0.4)", cursor: "pointer"
-                }}>{idx + 1}</div>
-              </Tooltip>
-            </Marker>
-          ))}
+          {activeWaypoints.map((wp, idx) => {
+            const isUnavailable = wp.unavailable === true;
+            return (
+              <Marker key={`route-wp-${wp.day}-${wp.order}`} longitude={wp.longitude} latitude={wp.latitude} anchor="center">
+                <Tooltip
+                  title={isUnavailable ? `${wp.name} (Closed)` : wp.name}
+                  placement="top"
+                >
+                  <div style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: "50%",
+                    background: isUnavailable
+                      ? "linear-gradient(135deg, #9CA3AF, #6B7280)"
+                      : "linear-gradient(135deg, #F97316, #EF4444)",
+                    border: `2.5px solid ${isUnavailable ? "#D1D5DB" : "white"}`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    boxShadow: isUnavailable
+                      ? "0 2px 6px rgba(107,114,128,0.35)"
+                      : "0 2px 8px rgba(249,115,22,0.4)",
+                    cursor: "pointer",
+                    opacity: isUnavailable ? 0.6 : 1,
+                  }}>
+                    {idx + 1}
+                  </div>
+                </Tooltip>
+              </Marker>
+            );
+          })}
         </Map>
 
         {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel and chat are closed */}
@@ -2049,17 +2159,12 @@ export default function MapPage() {
                 setFilterOpen(next);
                 setFabExpanded(false);
               }}>
-                <UnorderedListOutlined />
+                <FiFilter style={{ fontSize: 20 }} />
               </button>
             </Tooltip>
             <Tooltip title="Draw Area" placement="left">
               <button className="sub-fab vivid-interactive" onClick={() => { startFreehand(); setFabExpanded(false); }}>
                 <PencilIcon />
-              </button>
-            </Tooltip>
-            <Tooltip title="Book Flights & Hotels" placement="left">
-              <button className="sub-fab vivid-interactive" onClick={() => { setBookingOpen(true); setFabExpanded(false); }}>
-                <CalendarOutlined />
               </button>
             </Tooltip>
             <Tooltip title={is3D ? "Reset to 2D View" : "Enable 3D Perspective"} placement="left">
@@ -2120,7 +2225,7 @@ export default function MapPage() {
                     type="primary" 
                     shape="round" 
                     onClick={openPolygonRouteParams} 
-                    className="vivid-create-route-btn"
+                    className="vivid-create-route-btn-glass"
                   >
                     Create AI Route
                   </Button>
@@ -2226,7 +2331,7 @@ export default function MapPage() {
             algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
             token: {
               borderRadius: 14,
-              colorPrimary: "#FF6B6B",
+              colorPrimary: "#38bdf8",
             }
           }}
         >
@@ -2235,6 +2340,7 @@ export default function MapPage() {
             open={polygonRouteParamsOpen} 
             onCancel={() => setPolygonRouteParamsOpen(false)} 
             footer={null} 
+            maskClosable={false}
             zIndex={1150}
             className={`vivid-premium-modal route-plan-modal ${themeClass}`}
             rootClassName={themeClass}
@@ -2243,7 +2349,7 @@ export default function MapPage() {
             styles={{
               mask: { backdropFilter: 'blur(10px)', background: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.2)' },
               content: {
-                background: isDarkMode ? "#06080b" : "#fff",
+                background: isDarkMode ? "#0f172a" : "#fff",
                 padding: '32px',
                 overflow: 'hidden'
               }
@@ -2254,7 +2360,8 @@ export default function MapPage() {
                 <Form.Item name="totalDays" label="Trip Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
                 <Form.Item name="travelStyle" label="Preferred Travel Style">
                   <Select 
-                    popupClassName="route-plan-select-dropdown"
+                    className="route-plan-select"
+                    popupClassName="vivid-premium-dropdown route-plan-select-dropdown"
                     getPopupContainer={(trigger) => trigger.parentNode}
                     options={[{ value: "general", label: "Balanced" }, { value: "history", label: "Historical" }, { value: "food", label: "Gourmet" }, { value: "nature", label: "Outdoors" }]} 
                   />
@@ -2284,6 +2391,8 @@ export default function MapPage() {
             activeDay={activeDay}
             onDayChange={setActiveDay}
             onClose={() => setActiveRoute(null)}
+            onWaypointClick={handleWaypointClick}
+            onMarkUnavailable={handleMarkUnavailable}
           />
         )}
 
@@ -2294,7 +2403,8 @@ export default function MapPage() {
           onConversationIdChange={setMapChatConversationId}
           onRequestDrawToEdit={handleRequestDrawToEditFromChat}
           onRouteGenerated={(routeData, meta) => {
-            setActiveRoute(normalizeRouteForMap(routeData));
+            const routeId = meta?.routeId ?? routeData?.routeId ?? routeData?.route_id ?? null;
+            setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
             setActiveDay(1);
             setIsChatOpen(false);
           }}
@@ -2325,6 +2435,26 @@ export default function MapPage() {
           onClose={() => setCalendarOpen(false)}
           themeClass={themeClass}
           isDarkMode={isDarkMode}
+          onOpenRouteFromCalendar={async (routeId) => {
+            setCalendarOpen(false);
+            try {
+              const d = await aiApi.getRoute(routeId);
+              const raw = d?.routeData && typeof d.routeData === "object" ? d.routeData : {};
+              setActiveRoute(
+                normalizeRouteForMap({
+                  ...raw,
+                  title: d.title ?? raw.title,
+                  destination: d.destination ?? raw.destination,
+                  total_days: d.totalDays ?? raw.total_days,
+                  totalDays: d.totalDays ?? raw.totalDays,
+                })
+              );
+              setActiveDay(1);
+              setIsChatOpen(false);
+            } catch (e) {
+              message.error(e?.friendlyMessage || "Could not load route.");
+            }
+          }}
         />
       </main>
     </div>

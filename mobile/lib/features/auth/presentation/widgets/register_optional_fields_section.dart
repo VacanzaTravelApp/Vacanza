@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import '../../../profile/data/profile_profile_options.dart';
 import '../../../profile/presentation/widgets/searchable_multi_select_picker_sheet.dart';
 
@@ -59,7 +59,9 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
         final theme = Theme.of(ctx);
         return Theme(
           data: theme.copyWith(
-            colorScheme: theme.colorScheme.copyWith(primary: AppColors.primary),
+            colorScheme: theme.colorScheme.copyWith(
+              primary: theme.colorScheme.primary,
+            ),
           ),
           child: child!,
         );
@@ -72,6 +74,10 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.vacanzaTokens;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final accent = context.authAccent;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -80,7 +86,7 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
+            color: tokens.textMain,
           ),
         ),
         const SizedBox(height: 10),
@@ -98,7 +104,7 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
                 initialSelected:
                     country != null && country!.isNotEmpty ? [country!] : [],
                 searchable: true,
-                accentColor: AppColors.primary,
+                accentColor: accent,
                 onDone: (selected) {
                   onCountryChanged(selected.isEmpty ? null : selected.first);
                 },
@@ -113,7 +119,10 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
               onPressed: () => onCountryChanged(null),
               child: Text(
                 'Clear country',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: tokens.textSub,
+                ),
               ),
             ),
           ),
@@ -134,7 +143,7 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
               onPressed: () => onBirthDateChanged(null),
               child: Text(
                 'Clear date',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, color: tokens.textSub),
               ),
             ),
           ),
@@ -144,7 +153,7 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: Colors.grey.shade600,
+            color: tokens.textSub,
           ),
         ),
         const SizedBox(height: 6),
@@ -156,7 +165,8 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
               ChoiceChip(
                 label: Text(formatGenderLabel(g)),
                 selected: gender == g,
-                selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                selectedColor:
+                    accent.withValues(alpha: isLight ? 0.16 : 0.22),
                 onSelected: (_) {
                   onGenderChanged(gender == g ? null : g);
                 },
@@ -174,6 +184,10 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
     required String placeholder,
     required VoidCallback onTap,
   }) {
+    final tokens = context.vacanzaTokens;
+    final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -182,12 +196,12 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: Colors.grey.shade600,
+            color: tokens.textSub,
           ),
         ),
         const SizedBox(height: 6),
         Material(
-          color: Colors.white,
+          color: isLight ? context.lightGlassFieldFill : tokens.pillSurface,
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             onTap: onTap,
@@ -197,7 +211,7 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.inputBorder),
+                border: Border.all(color: tokens.cardBorder),
               ),
               child: Row(
                 children: [
@@ -207,13 +221,14 @@ class RegisterOptionalFieldsSection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                        color: value != null
-                            ? const Color(0xFF111827)
-                            : Colors.grey.shade500,
+                        color: value != null ? tokens.textMain : tokens.textSub,
                       ),
                     ),
                   ),
-                  Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: tokens.textSub.withValues(alpha: 0.70),
+                  ),
                 ],
               ),
             ),

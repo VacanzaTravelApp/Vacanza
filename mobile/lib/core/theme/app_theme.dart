@@ -49,6 +49,22 @@ extension VacanzaTokensX on BuildContext {
   VacanzaTokens get vacanzaTokens =>
       Theme.of(this).extension<VacanzaTokens>() ?? VacanzaTokens.light;
 
+  /// Auth accent: light uses amber, dark uses blue.
+  Color get authAccent {
+    final t = vacanzaTokens;
+    return Theme.of(this).brightness == Brightness.light
+        ? t.vividCoral
+        : t.vividBlue;
+  }
+
+  /// Auth gradient ends for logo/title/button in light/dark.
+  List<Color> get authAccentGradientColors {
+    final a = authAccent;
+    final isLight = Theme.of(this).brightness == Brightness.light;
+    final b = Color.lerp(a, Colors.white, isLight ? 0.16 : 0.18) ?? a;
+    return <Color>[a, b];
+  }
+
   /// Harita rozetleri / aktif action: sabah web coral (AI pill), gece mavi.
   Color get mapControlAccent {
     final t = vacanzaTokens;

@@ -198,7 +198,7 @@ public class WebClientConfig {
                         }
                     })
                     .doOnError(throwable -> {
-                        log.error("{} Error {} {} -> {}", tag, request.method(), request.url(), throwable.getMessage());
+                        log.warn("{} Error {} {} -> {}", tag, request.method(), request.url(), throwable.getMessage());
                         apiMetricsCollector.recordError(apiName);
                     });
         };

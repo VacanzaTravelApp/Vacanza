@@ -151,6 +151,18 @@ Instructions:
             parsed = EventRecommendResponse(
                 message=FALLBACK_MESSAGE_TR, recommended_events=parsed.recommended_events
             )
+
+        # Validate matched_day is within route bounds; clear invalid values so
+        # the frontend doesn't show events pinned to non-existent days.
+        total_days = request.route_summary.total_days or 1
+        for evt in parsed.recommended_events:
+            if evt.matched_day is not None and not (1 <= evt.matched_day <= total_days):
+                logger.warning(
+                    "Event %s has matched_day=%d outside route range [1, %d] — clearing",
+                    evt.event_id, evt.matched_day, total_days,
+                )
+                evt.matched_day = None
+
         return parsed
     except Exception as e:
         logger.warning("Event recommendation LLM error: %s", e)

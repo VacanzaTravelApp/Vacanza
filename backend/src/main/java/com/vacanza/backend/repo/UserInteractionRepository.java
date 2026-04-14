@@ -68,4 +68,19 @@ public interface UserInteractionRepository extends JpaRepository<UserInteraction
             ORDER BY cnt DESC
             """, nativeQuery = true)
     List<Object[]> countInteractionTypesByUser(@Param("userId") UUID userId);
+
+    /**
+     * Returns the names of the most recently favorited POIs for a user (max 10).
+     * Used to inject into the AI profile so the route builder can prioritize them.
+     */
+    @Query(value = """
+            SELECT p.name
+            FROM user_interactions ui
+            JOIN points_of_interest p ON p.poi_id = ui.target_id
+            WHERE ui.user_id = :userId
+              AND ui.interaction_type = 'POI_FAVORITE'
+            ORDER BY ui.created_at DESC
+            LIMIT 10
+            """, nativeQuery = true)
+    List<String> findFavoritePoiNamesByUserId(@Param("userId") UUID userId);
 }

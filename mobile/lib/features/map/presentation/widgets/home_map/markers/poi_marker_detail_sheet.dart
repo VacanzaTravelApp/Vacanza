@@ -8,6 +8,8 @@ import '../../../../../poi_search/data/models/poi.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 
 import '../../../../../poi_search/data/models/poi_category_catalog.dart';
+import '../../../../../behavior/domain/feedback_poi_ref.dart';
+import '../../../../../behavior/presentation/widgets/poi_favorite_heart_button.dart';
 import '../../../bloc/map_bloc.dart';
 import '../../../bloc/map_event.dart';
 
@@ -49,19 +51,31 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              poi.name,
-              style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                    color: cs.onSurface,
-                  ) ??
-                  TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                    color: cs.onSurface,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    poi.name,
+                    style:
+                        theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: cs.onSurface,
+                        ) ??
+                        TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: cs.onSurface,
+                        ),
                   ),
+                ),
+                PoiFavoriteHeartButton(
+                  ref: FeedbackPoiRef.fromPoi(poi),
+                  iconSize: 26,
+                ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(
@@ -73,15 +87,16 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
               ),
             ),
             const SizedBox(height: 16),
-            _DistanceRow(
-              distanceMeters: distanceMeters,
-              locationState: loc,
-            ),
+            _DistanceRow(distanceMeters: distanceMeters, locationState: loc),
             if (poi.rating != null && poi.rating! > 0) ...[
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.star_rounded, size: 20, color: Colors.amber.shade700),
+                  Icon(
+                    Icons.star_rounded,
+                    size: 20,
+                    color: Colors.amber.shade700,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     poi.rating!.toStringAsFixed(1),
@@ -99,17 +114,18 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
               width: double.infinity,
               child: _MapAccentCtaButton(
                 enabled: _canFlyTo(poi),
-                onPressed: _canFlyTo(poi)
-                    ? () {
-                        Navigator.of(ctx).pop();
-                        mapBloc.add(
-                          FlyToPoiRequested(
-                            latitude: poi.latitude,
-                            longitude: poi.longitude,
-                          ),
-                        );
-                      }
-                    : null,
+                onPressed:
+                    _canFlyTo(poi)
+                        ? () {
+                          Navigator.of(ctx).pop();
+                          mapBloc.add(
+                            FlyToPoiRequested(
+                              latitude: poi.latitude,
+                              longitude: poi.longitude,
+                            ),
+                          );
+                        }
+                        : null,
               ),
             ),
           ],
@@ -124,10 +140,7 @@ bool _canFlyTo(Poi poi) {
 }
 
 class _MapAccentCtaButton extends StatelessWidget {
-  const _MapAccentCtaButton({
-    required this.enabled,
-    required this.onPressed,
-  });
+  const _MapAccentCtaButton({required this.enabled, required this.onPressed});
 
   final bool enabled;
   final VoidCallback? onPressed;
@@ -215,10 +228,7 @@ class _DistanceRow extends StatelessWidget {
           Expanded(
             child: Text(
               'Distance unavailable (turn on location)',
-              style: TextStyle(
-                fontSize: 14,
-                color: cs.onSurfaceVariant,
-              ),
+              style: TextStyle(fontSize: 14, color: cs.onSurfaceVariant),
             ),
           ),
         ],

@@ -19,5 +19,7 @@ public class ArNearbyPoiResponseDTO {
     private Double latitude;
     private Double longitude;
     private Double distanceMeters;
+    /** Foursquare / external id — aligns map + AR feedback keys with search-in-area. */
+    private String externalId;
 }
 

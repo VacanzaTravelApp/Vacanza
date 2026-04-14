@@ -53,6 +53,20 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Herhangi bir input, text veya mesaj balonunun kopyalanabilmesine izin ver */
+input, textarea, [contenteditable="true"],
+.vacanza-chat .msg-text,
+.route-panel-notes,
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  -ms-user-select: text;
+  cursor: text;
 }
 
 /* React root'u tüm ekranı kaplasın */

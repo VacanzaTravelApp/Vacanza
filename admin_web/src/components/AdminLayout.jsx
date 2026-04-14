@@ -1,66 +1,63 @@
 import React, { useState } from "react";
-import { Layout, Menu, Button, theme, Typography, Avatar, Dropdown, Space, Badge } from "antd";
+import { Layout, Menu, Button, Typography, Avatar, Dropdown, Space, Badge, message, Grid } from "antd";
 import {
-    DesktopOutlined,
-    PieChartOutlined,
     UserOutlined,
     LogoutOutlined,
-    SettingOutlined,
     MenuFoldOutlined,
     MenuUnfoldOutlined,
     DashboardOutlined,
-    BellOutlined,
     ThunderboltOutlined,
-    GlobalOutlined
+    GlobalOutlined,
+    RocketOutlined
 } from "@ant-design/icons";
-import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { useNavigate, useLocation, Outlet, Link } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
 import VacanzaLogo from "./VacanzaLogo";
 
 const { Header, Content, Footer, Sider } = Layout;
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const BRAND_COLOR = '#FF6B6B'; // Web App Coral
 const SIDEBAR_DARK = '#1A2332'; // Web App Navy
 
 export default function AdminLayout() {
+    const screens = useBreakpoint();
+    const isMobile = !screens.md;
     const [collapsed, setCollapsed] = useState(false);
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
 
     const menuItems = [
-        {
-            key: "/",
-            icon: <DashboardOutlined style={{ fontSize: 18 }} />,
-            label: "Home Console",
-        },
-        {
-            key: "/monitoring",
-            icon: <ThunderboltOutlined style={{ fontSize: 18 }} />,
-            label: "System Matrix",
-        },
-        {
-            key: "/analytics",
-            icon: <GlobalOutlined style={{ fontSize: 18 }} />,
-            label: "Analytics Core",
-        },
+        { key: "/", icon: <DashboardOutlined style={{ fontSize: 18 }} />, label: "Home Console" },
+        { key: "/monitoring", icon: <ThunderboltOutlined style={{ fontSize: 18 }} />, label: "System Matrix" },
+        { key: "/analytics", icon: <GlobalOutlined style={{ fontSize: 18 }} />, label: "Analytics Core" },
     ];
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            message.success("Session terminated accurately.");
+        } catch (error) {
+            message.error("Security protocols blocked disconnect.");
+        }
+    };
 
     const userMenuItems = {
         items: [
             {
                 key: "logout",
                 icon: <LogoutOutlined />,
-                label: <span style={{ color: '#ff4d4f' }}>Disconnect Session</span>,
-                onClick: logout
+                label: <span style={{ color: THEME.coral, fontWeight: 700 }}>Disconnect</span>,
+                onClick: handleLogout
             },
         ]
     };
 
     return (
-        <Layout style={{ minHeight: "100vh", background: '#f8fafc' }}>
+        <Layout style={{ minHeight: "100vh", background: '#f8faff' }}>
             <Sider
                 trigger={null}
                 collapsible
@@ -68,15 +65,15 @@ export default function AdminLayout() {
                 breakpoint="lg"
                 collapsedWidth="0"
                 onCollapse={(c) => setCollapsed(c)}
-                width={260}
+                width={280}
                 style={{
                     position: 'sticky',
                     top: 0,
                     height: '100vh',
                     left: 0,
                     zIndex: 100,
-                    background: SIDEBAR_DARK,
-                    boxShadow: '4px 0 24px rgba(0,0,0,0.1)'
+                    background: THEME.navy,
+                    boxShadow: '12px 0 40px rgba(26, 35, 50, 0.12)'
                 }}
             >
                 <div
@@ -93,67 +90,77 @@ export default function AdminLayout() {
                     }}>
                     <VacanzaLogo size={44} color="white" showText={!collapsed} />
                 </div>
+
                 <Menu
                     theme="dark"
                     mode="inline"
                     selectedKeys={[location.pathname]}
-                    items={menuItems}
-                    onClick={({ key }) => navigate(key)}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: '0 12px'
-                    }}
-                    className="custom-sidebar-menu"
+                    style={{ background: 'transparent', border: 'none', padding: '0 16px' }}
+                    items={menuItems.map(item => ({
+                        ...item,
+                        style: {
+                            borderRadius: '14px', marginBottom: '8px', fontSize: '14px', fontWeight: 600, height: '52px', lineHeight: '52px',
+                            backgroundColor: location.pathname === item.key ? 'rgba(255, 107, 107, 0.12)' : 'transparent',
+                            color: location.pathname === item.key ? THEME.coral : 'rgba(255,255,255,0.6)'
+                        },
+                        label: <Link to={item.key}>{item.label}</Link>
+                    }))}
                 />
             </Sider>
+
             <Layout>
                 <Header style={{
-                    padding: '0 32px',
-                    background: 'rgba(255,255,255,0.8)',
-                    backdropFilter: 'blur(10px)',
+                    padding: isMobile ? '0 16px' : '0 40px',
+                    background: THEME.glass,
+                    backdropFilter: 'blur(24px)',
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    height: '72px',
-                    borderBottom: '1px solid #f1f5f9',
-                    zIndex: 10
+                    height: isMobile ? '72px' : '88px',
+                    borderBottom: `1px solid ${THEME.border}`,
+                    zIndex: 90,
+                    position: 'sticky',
+                    top: 0
                 }}>
                     <Button
                         type="text"
                         icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
                         onClick={() => setCollapsed(!collapsed)}
-                        style={{ fontSize: "18px", width: 44, height: 44, borderRadius: '12px' }}
+                        style={{ fontSize: "18px", width: 44, height: 44, borderRadius: '12px', color: THEME.navy, background: 'rgba(26, 35, 50, 0.04)' }}
                     />
                     <Space size="large">
                         <Dropdown menu={userMenuItems} placement="bottomRight" arrow>
-                            <Space style={{ cursor: "pointer", padding: '6px 12px', borderRadius: 12, transition: 'all 0.3s', background: '#f1f5f9' }}>
-                                <Avatar shape="square" icon={<UserOutlined />} style={{ background: BRAND_COLOR, borderRadius: 8, boxShadow: `0 4px 10px ${BRAND_COLOR}33` }} />
-                                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, marginLeft: 4 }}>
-                                    <Text strong style={{ fontSize: '13px', color: '#1e293b' }}>
-                                        {user?.displayName || user?.email?.split('@')[0] || "Matrix.Admin"}
-                                    </Text>
-                                    <Text type="secondary" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: 0.5 }}>System Administrator</Text>
-                                </div>
+                            <Space style={{ cursor: "pointer", padding: isMobile ? '4px' : '8px 16px', borderRadius: 16, background: 'rgba(26, 35, 50, 0.04)' }}>
+                                <Avatar shape="square" src={user?.photoURL} icon={<UserOutlined />} style={{ background: THEME.coral, borderRadius: 10 }} />
+                                {!isMobile && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+                                        <Text strong style={{ fontSize: '14px', color: THEME.navy }}>{user?.displayName || "Admin"}</Text>
+                                        <Text style={{ fontSize: '10px', color: THEME.subtext, textTransform: 'uppercase', fontWeight: 700 }}>System Core</Text>
+                                    </div>
+                                )}
                             </Space>
                         </Dropdown>
                     </Space>
                 </Header>
-                <Content style={{ margin: "32px", minHeight: 280 }}>
+
+                <Content>
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={location.pathname}
-                            initial={{ opacity: 0, scale: 0.99, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.99, y: -10 }}
-                            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.3 }}
                         >
                             <Outlet />
                         </motion.div>
                     </AnimatePresence>
                 </Content>
-                <Footer style={{ textAlign: "center", background: 'transparent', color: '#94a3b8', fontSize: '12px', padding: '24px' }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>Vacanza Admin Console • v1.0.0-PROD • Professional Core Engine © 2026</Text>
+
+                <Footer style={{ textAlign: "center", background: 'transparent', padding: '32px' }}>
+                    <Text style={{ fontSize: 11, color: THEME.subtext, fontWeight: 600, opacity: 0.6 }}>
+                        VACANZA INFRASTRUCTURE • v1.0.0-PROD • © 2026
+                    </Text>
                 </Footer>
             </Layout>
         </Layout>

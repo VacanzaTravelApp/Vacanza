@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 
-import 'package:mobile/core/theme/app_colors.dart';
 import 'package:mobile/core/theme/app_text_styles.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/widgets/animated_background.dart';
 import 'package:mobile/core/navigation/navigation_service.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
@@ -134,8 +134,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.vacanzaTokens;
+    final accent = context.authAccent;
+
     final titleStyle = AppTextStyles.titleLarge(context).copyWith(
-      color: AppColors.textHeading,
+      color: tokens.textMain,
     );
     final bodyMedium = AppTextStyles.bodyMedium(context);
 
@@ -160,7 +163,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       Icon(
                         Icons.mark_email_read_rounded,
                         size: 64,
-                        color: AppColors.primary,
+                        color: accent,
                       ),
                       const SizedBox(height: 24),
                       Text(
@@ -173,7 +176,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                         'We sent a verification link to your email address. '
                         'Please verify your email to continue to Vacanza.',
                         textAlign: TextAlign.center,
-                        style: bodyMedium.copyWith(color: AppColors.textMuted),
+                        style: bodyMedium.copyWith(color: tokens.textSub),
                       ),
                       const SizedBox(height: 32),
                       SizedBox(
@@ -181,7 +184,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                         child: ElevatedButton(
                           onPressed: isBusy ? null : _resendVerification,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
+                            backgroundColor: accent,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),

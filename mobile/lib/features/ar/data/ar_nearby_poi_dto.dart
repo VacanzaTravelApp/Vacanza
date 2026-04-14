@@ -5,6 +5,7 @@ class ArNearbyPoiDto {
   final double latitude;
   final double longitude;
   final double distanceMeters;
+  final String? externalId;
 
   const ArNearbyPoiDto({
     required this.poiId,
@@ -13,9 +14,11 @@ class ArNearbyPoiDto {
     required this.latitude,
     required this.longitude,
     required this.distanceMeters,
+    this.externalId,
   });
 
   factory ArNearbyPoiDto.fromJson(Map<String, dynamic> json) {
+    final ext = json['externalId']?.toString().trim();
     return ArNearbyPoiDto(
       poiId: (json['poiId'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
@@ -23,6 +26,7 @@ class ArNearbyPoiDto {
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
       distanceMeters: (json['distanceMeters'] as num).toDouble(),
+      externalId: (ext == null || ext.isEmpty) ? null : ext,
     );
   }
 }
