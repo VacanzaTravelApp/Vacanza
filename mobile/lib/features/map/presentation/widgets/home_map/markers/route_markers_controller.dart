@@ -35,7 +35,9 @@ class RouteMarkersController {
 
   Future<void> dispose() async {
     _epoch++;
-    _opLock?.complete();
+    if (_opLock != null && !_opLock!.isCompleted) {
+      _opLock!.complete();
+    }
     _opLock = null;
     try {
       await _mgr?.deleteAll();
@@ -124,7 +126,9 @@ class RouteMarkersController {
     } catch (e, st) {
       log('[RouteMarkersController] setWaypoints failed: $e\n$st');
     } finally {
-      lock.complete();
+      if (!lock.isCompleted) {
+        lock.complete();
+      }
       if (identical(_opLock, lock)) _opLock = null;
     }
   }

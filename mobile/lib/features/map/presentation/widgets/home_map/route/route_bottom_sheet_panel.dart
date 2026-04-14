@@ -46,6 +46,9 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
   late int _segment;
   ScrollController? _ownedScrollController;
   int _eventsRefresh = 0;
+  Future<Map<String, dynamic>>? _eventsFuture;
+  String? _eventsFutureRouteId;
+  int? _eventsFutureDay;
 
   /// 1-based stop index in the active day list when user last flew to a waypoint (Plan).
   int? _lastFlyToDisplayOrder;
@@ -441,6 +444,20 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
 
         if (widget.scrollController != null) {
           final api = context.read<AiRouteApiClient>();
+          // Cache event recommendations future to avoid spamming the endpoint on rebuilds.
+          if (_segment == 1 && routeId != null) {
+            if (_eventsFuture == null ||
+                _eventsFutureRouteId != routeId ||
+                _eventsFutureDay != activeDay) {
+              _eventsFutureRouteId = routeId;
+              _eventsFutureDay = activeDay;
+              _eventsFuture = api.getEventRecommendations(routeId, day: activeDay);
+            }
+          } else {
+            _eventsFuture = null;
+            _eventsFutureRouteId = null;
+            _eventsFutureDay = null;
+          }
           return _container(
             context,
             child: _wrapWhenRouteBusy(
@@ -452,9 +469,7 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
                     '${routeId}_$activeDay$_segment$_eventsRefresh',
                   ),
                   future:
-                      _segment == 1 && routeId != null
-                          ? api.getEventRecommendations(routeId, day: activeDay)
-                          : null,
+                      _segment == 1 && routeId != null ? _eventsFuture : null,
                   builder: (context, eventSnap) {
                     return LayoutBuilder(
                       builder: (context, lc) {

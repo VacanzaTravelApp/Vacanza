@@ -33,15 +33,33 @@ class RouteSheetEventsTab extends StatefulWidget {
 
 class _RouteSheetEventsTabState extends State<RouteSheetEventsTab> {
   int _refresh = 0;
+  Future<Map<String, dynamic>>? _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = context
+        .read<AiRouteApiClient>()
+        .getEventRecommendations(widget.routeId, day: widget.day);
+  }
+
+  @override
+  void didUpdateWidget(covariant RouteSheetEventsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.routeId != widget.routeId || oldWidget.day != widget.day) {
+      _future = context
+          .read<AiRouteApiClient>()
+          .getEventRecommendations(widget.routeId, day: widget.day);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.vacanzaTokens;
-    final api = context.read<AiRouteApiClient>();
     final _ = _refresh;
 
     return FutureBuilder<Map<String, dynamic>>(
-      future: api.getEventRecommendations(widget.routeId, day: widget.day),
+      future: _future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return CustomScrollView(
@@ -99,7 +117,17 @@ class _RouteSheetEventsTabState extends State<RouteSheetEventsTab> {
                 alignment: Alignment.centerRight,
                 child: CupertinoButton(
                   padding: EdgeInsets.zero,
-                  onPressed: () => setState(() => _refresh++),
+                  onPressed: () {
+                    setState(() {
+                      _refresh++;
+                      _future = context
+                          .read<AiRouteApiClient>()
+                          .getEventRecommendations(
+                            widget.routeId,
+                            day: widget.day,
+                          );
+                    });
+                  },
                   child: Text(
                     'Refresh',
                     style: TextStyle(
