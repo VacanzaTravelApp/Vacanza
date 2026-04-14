@@ -287,8 +287,8 @@
 }
 
 .route-panel-tab-active {
-  border-color: var(--vc-text);
-  background: var(--vc-text);
+  border-color: var(--vc-primary-soft-strong);
+  background: var(--vc-primary-soft);
 }
 
 .route-panel-tab-label {
@@ -299,7 +299,7 @@
 }
 
 .route-panel-tab-active .route-panel-tab-label {
-  color: var(--vc-card-bg);
+  color: var(--vc-primary);
 }
 
 .route-panel-tab-sublabel {
@@ -312,7 +312,7 @@
 }
 
 .route-panel-tab-active .route-panel-tab-sublabel {
-  color: var(--vc-card-bg);
+  color: var(--vc-primary);
   opacity: 0.8;
 }
 
@@ -562,7 +562,7 @@
 .route-panel-event-recs-desc {
   display: block;
   font-size: 12px;
-  color: var(--vc-subtext);
+  color: var(--vc-text-secondary);
   font-weight: 600;
   line-height: 1.4;
 }

@@ -780,6 +780,11 @@ button.cal-event-pill-main {
     background: var(--cal-item-bg) !important;
     color: var(--cal-text) !important;
     font-size: 13px !important;
+    padding-right: 18px !important; /* Tighter padding to match arrow */
+}
+
+.cal-popup-select .ant-select-arrow {
+    right: 8px !important; /* Move arrow closer to text */
 }
 
 .cal-popup-add-btn {

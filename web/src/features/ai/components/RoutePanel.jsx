@@ -320,7 +320,7 @@ export default function RoutePanel({
                         )}
                         {wp.unavailable && (
                           <span className="route-panel-waypoint-closed-badge">
-                            Kapalı
+                            Closed
                           </span>
                         )}
                       </div>
@@ -337,9 +337,9 @@ export default function RoutePanel({
                               setAdjustingPoi(null);
                             }
                           }}
-                          title="Bu yere ulaşamadım veya kapalı"
+                          title="I couldn't reach this place or it is closed"
                         >
-                          {adjustingPoi === wp.name ? "Güncelleniyor..." : "Bu yer kapalı"}
+                          {adjustingPoi === wp.name ? "Updating..." : "This place is closed"}
                         </button>
                       )}
                     </div>
