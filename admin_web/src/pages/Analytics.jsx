@@ -26,12 +26,12 @@ const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const THEME = {
-    primary: 'hsl(250, 89%, 66%)',
-    success: 'hsl(142, 70%, 45%)',
-    warning: 'hsl(38, 92%, 50%)',
-    error: 'hsl(0, 84%, 60%)',
-    info: 'hsl(199, 89%, 48%)',
-    purple: 'hsl(271, 91%, 65%)'
+    primary: '#FF6B6B',
+    success: '#2DD4A8',
+    warning: '#FFB347',
+    error: '#FF4D4F',
+    info: '#00B4D8',
+    purple: '#1A2332'
 };
 
 const CHART_COLORS = [THEME.primary, THEME.success, THEME.warning, THEME.info, THEME.purple, '#FF8042'];

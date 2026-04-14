@@ -16,13 +16,13 @@ import {
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdFlightTakeoff } from "react-icons/md";
+import VacanzaLogo from "./VacanzaLogo";
 
 const { Header, Content, Footer, Sider } = Layout;
 const { Title, Text } = Typography;
 
-const BRAND_COLOR = 'hsl(250, 89%, 66%)';
-const SIDEBAR_DARK = 'hsl(222, 47%, 11%)';
+const BRAND_COLOR = '#FF6B6B'; // Web App Coral
+const SIDEBAR_DARK = '#1A2332'; // Web App Navy
 
 export default function AdminLayout() {
     const [collapsed, setCollapsed] = useState(false);
@@ -50,8 +50,6 @@ export default function AdminLayout() {
 
     const userMenuItems = {
         items: [
-            { key: "settings", icon: <SettingOutlined />, label: "Profile Matrix" },
-            { type: "divider" },
             {
                 key: "logout",
                 icon: <LogoutOutlined />,
@@ -81,44 +79,19 @@ export default function AdminLayout() {
                     boxShadow: '4px 0 24px rgba(0,0,0,0.1)'
                 }}
             >
-                <div style={{
-                    height: "64px",
-                    margin: "24px 16px 32px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: 'rgba(255,255,255,0.03)',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    border: '1px solid rgba(255,255,255,0.05)'
-                }}>
-                    <motion.div
-                        initial={false}
-                        animate={{ gap: collapsed ? 0 : 12 }}
-                        style={{ display: 'flex', alignItems: 'center' }}
-                    >
-                        <div style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: '8px',
-                            background: BRAND_COLOR,
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            boxShadow: `0 0 15px ${BRAND_COLOR}44`
-                        }}>
-                            <MdFlightTakeoff style={{ fontSize: '18px', color: 'white' }} />
-                        </div>
-                        {!collapsed && (
-                            <Title level={4} style={{
-                                color: "white",
-                                margin: 0,
-                                letterSpacing: '2px',
-                                fontFamily: "'Outfit', sans-serif",
-                                fontWeight: 700
-                            }}>VACANZA</Title>
-                        )}
-                    </motion.div>
+                <div
+                    onClick={() => window.location.reload()}
+                    style={{
+                        height: "64px",
+                        margin: "24px 16px 32px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: 'transparent',
+                        overflow: 'hidden',
+                        cursor: 'pointer'
+                    }}>
+                    <VacanzaLogo size={44} color="white" showText={!collapsed} />
                 </div>
                 <Menu
                     theme="dark"
@@ -153,9 +126,6 @@ export default function AdminLayout() {
                         style={{ fontSize: "18px", width: 44, height: 44, borderRadius: '12px' }}
                     />
                     <Space size="large">
-                        <Badge dot status="error" offset={[-4, 4]}>
-                            <Button type="text" icon={<BellOutlined />} style={{ fontSize: '20px', color: '#64748b' }} />
-                        </Badge>
                         <Dropdown menu={userMenuItems} placement="bottomRight" arrow>
                             <Space style={{ cursor: "pointer", padding: '6px 12px', borderRadius: 12, transition: 'all 0.3s', background: '#f1f5f9' }}>
                                 <Avatar shape="square" icon={<UserOutlined />} style={{ background: BRAND_COLOR, borderRadius: 8, boxShadow: `0 4px 10px ${BRAND_COLOR}33` }} />

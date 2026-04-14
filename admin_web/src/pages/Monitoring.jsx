@@ -24,12 +24,12 @@ const { Title, Text } = Typography;
 
 // Custom Gradient Colors (HSL based for vibrancy)
 const THEME = {
-    primary: 'hsl(250, 89%, 66%)',
-    success: 'hsl(142, 70%, 45%)',
-    warning: 'hsl(38, 92%, 50%)',
-    error: 'hsl(0, 84%, 60%)',
+    primary: '#FF6B6B',
+    success: '#2DD4A8',
+    warning: '#FFB347',
+    error: '#FF4D4F',
     cardBg: 'rgba(255, 255, 255, 0.85)',
-    darkBg: 'hsl(222, 47%, 11%)'
+    darkBg: '#1A2332'
 };
 
 export default function Monitoring() {
@@ -115,7 +115,7 @@ export default function Monitoring() {
     ];
 
     const metricColumns = [
-        { title: "Metric Key", dataIndex: "name", key: "name", render: (t) => <code style={{ color: THEME.primary, background: 'rgba(99, 102, 241, 0.05)', padding: '2px 6px', borderRadius: '4px' }}>{t}</code> },
+        { title: "Metric Key", dataIndex: "apiName", key: "apiName", render: (t) => <code style={{ color: THEME.primary, background: 'rgba(99, 102, 241, 0.05)', padding: '2px 6px', borderRadius: '4px' }}>{t || 'Unknown'}</code> },
         { title: "Total Calls", dataIndex: "totalCalls", key: "totalCalls", align: 'center', render: (val) => <Text strong>{val?.toLocaleString() || 0}</Text> },
         {
             title: "Error Ratio",

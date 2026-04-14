@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  --primary-gradient: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
   --sidebar-width: 260px;
   --bg-main: #f8fafc;
   --card-bg: rgba(255, 255, 255, 0.8);
