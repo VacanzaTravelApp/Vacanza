@@ -303,6 +303,25 @@ WHAT YOU MUST DO
 EDIT TYPES AND HOW TO HANDLE THEM
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+FULL DAY REGENERATION ("redo day 1", "1. günü tekrar yap", "1. günü yeniden oluştur", "recreate day 2", "redesign day 3"):
+- The user wants a COMPLETELY FRESH itinerary for that day — different places, different vibe.
+- DELETE every existing waypoint for that day. Do NOT reuse any of them.
+- Choose 6–8 brand-new POIs from your world knowledge that are NOT already in the existing route.
+- Spread across the day: morning activity → lunch → afternoon activities → dinner.
+- Keep: day number, day_start_local (~09:00–09:30), same city/destination cluster.
+- Mandatory dining rhythm still applies: 1× lunch restaurant (12:00–14:00) + 1× dinner restaurant (18:00–21:00).
+- Day ends no earlier than 18:00.
+- Set latitude: null, longitude: null for all new waypoints (app will geocode).
+
+PARTIAL DAY REBUILD ("keep Hagia Sophia and Blue Mosque, change the rest", "Ayasofya kalsın diğerlerini değiştir"):
+- The user explicitly names which waypoints to KEEP. Preserve those exactly (same name, times, order position).
+- DELETE all other sightseeing/activity waypoints for that day and replace them with fresh POIs from your world knowledge.
+- Mandatory meals (lunch restaurant, dinner restaurant) are always preserved unless the user explicitly asks to change them.
+- New POIs must NOT already appear elsewhere in the route.
+- Recalculate all arrival/departure times so the full day flows logically.
+- Set latitude: null, longitude: null for any new waypoints (app will geocode).
+- 6–8 total waypoints, day ends no earlier than 18:00.
+
 DAY-LEVEL REBUILD ("make day 3 more museum-focused", "3. günü daha aktif yap"):
 - Regenerate that day's waypoints from scratch using your world knowledge.
 - Keep: day number, day_start_local (unless pace changed), destination cluster.
@@ -486,8 +505,11 @@ def _is_itinerary_followup(history: list[HumanMessage | AIMessage]) -> bool:
 _ROUTE_EDIT_RE = re.compile(
     # Türkçe düzenleme fiilleri
     r"\b(güncelle|değiştir|düzenle|yenile|revize)\w*\b"
+    # Türkçe yeniden oluşturma / tasarlama fiilleri
+    r"|\b(tekrardan|yeniden|tekrar)\b"
+    r"|\b(oluştur|olustur|tasarla|yarat|planla)\w*\b"
     # İngilizce düzenleme fiilleri
-    r"|update|change|modify|edit|replace|redo"
+    r"|update|change|modify|edit|replace|redo|redesign|recreate|regenerate|rebuild"
     # Miktar değişikliği: "daha çok müze", "daha az yürüyüş"
     r"|daha\s+(çok|fazla|az)\b"
     # Ekleme / çıkarma
@@ -497,8 +519,9 @@ _ROUTE_EDIT_RE = re.compile(
     r"|\b(öğle|akşam|sabah|lunch|dinner|breakfast)\w*.{0,25}(al|kaydır|değiştir|öne|sonra|move|shift|earlier|later)\b"
     # Tempo değişikliği
     r"|\b(tempo|pace|hız)\w*.{0,20}(yavaşlat|hızlandır|slow|fast)\b"
-    # Belirli gün referansı: "3. gün", "gün 2", "day 3"
+    # Belirli gün referansı: "3. gün", "gün 2", "day 3", "1. günü", "1. gün"
     r"|\bgün\s*\d+\b"
+    r"|\b\d+\.\s*gün[üu]?\b"
     r"|\bday\s*\d+\b",
     flags=re.I,
 )
@@ -509,10 +532,15 @@ def _is_route_edit_request(user_content: str, history: list[HumanMessage | AIMes
 
     Two conditions must both be true:
     1. The message contains an editing signal (verb or day reference).
-    2. The conversation history contains at least one previously generated route JSON.
+    2. An existing route is available — either injected by the Java backend via
+       __EXISTING_ROUTE__ marker (most reliable) or found in conversation history.
     """
     if not user_content or not _ROUTE_EDIT_RE.search(user_content):
         return False
+    # Java backend injects __EXISTING_ROUTE__ whenever a saved route exists for this conversation.
+    # This is the authoritative signal — no need to scan history.
+    if EXISTING_ROUTE_MARKER in user_content:
+        return True
     for msg in reversed(history):
         if isinstance(msg, AIMessage) and ROUTE_JSON_SEPARATOR in (getattr(msg, "content", "") or ""):
             return True

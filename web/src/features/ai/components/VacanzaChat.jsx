@@ -644,6 +644,14 @@ export default function VacanzaChat({
         };
         setMessages((prev) => [...prev, aiMsg]);
 
+        // Auto-update the map route card when AI edits an existing route via chat
+        if (isRouteEdit && norm && onRouteGenerated) {
+          onRouteGenerated(norm, {
+            conversationId: activeConvId ?? undefined,
+            routeId: routeIdFromResponse ?? undefined,
+          });
+        }
+
         const extractedPrefs =
           response.extracted_preferences ?? response.extractedPreferences ?? null;
         if (Array.isArray(extractedPrefs) && extractedPrefs.length > 0) {
