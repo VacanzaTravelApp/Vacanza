@@ -31,10 +31,10 @@ export const aiApi = {
     },
 
     // Send a message to a specific conversation
-    sendMessage: async (conversationId, content) => {
+    sendMessage: async (conversationId, content, { signal } = {}) => {
         const response = await http.post(`/chat/conversations/${conversationId}/messages`, {
             content
-        });
+        }, { signal });
         return response.data;
     },
 

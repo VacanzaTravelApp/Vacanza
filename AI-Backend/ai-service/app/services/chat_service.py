@@ -212,6 +212,7 @@ Dining placement rules (STRICT):
 - NEVER place two dining stops in adjacent slots. There must be at least one sightseeing slot between any two dining/drink stops.
 - Each POI in the list has a scheduling hint (e.g. "→ LUNCH or DINNER — NEVER before 11:00"). Follow these hints.
 - If the user has cuisine preferences or dietary restrictions, prioritize dining POIs that match.
+- CRITICAL — category field values: NEVER use compound values like "lunch restaurant" or "dinner restaurant". Use ONLY single-word categories: "restaurant" (for any dining stop), "cafe" (for any cafe/bakery), etc. The time_slot field (morning/afternoon/evening/lunch/dinner) is separate from the category field.
 
 Day duration (STRICT):
 - Each day: 6–8 waypoints total (including 2–3 dining stops + 4–5 sightseeing stops).
@@ -253,6 +254,7 @@ OUTPUT FORMAT (MANDATORY — the map will NOT work without the JSON):
 3. On the next line: the full route_data JSON (no markdown, no code block)
 
 Do NOT output a long formatted list with coordinates. The JSON is the ONLY format the app reads.
+CRITICAL — "name" field: NEVER use generic terms ("restaurant", "cafe", "lunch restaurant", "dinner restaurant"). Always use the real venue name (e.g. "Trattoria Luzzi", "Caffè Sant'Eustachio"). category field: single word only ("restaurant", "cafe" — never compound).
 
 route_data format (preserve trip_dates_user_specified and trip_start_date if the user gave dates anywhere in the conversation above):
 {{
@@ -288,16 +290,21 @@ EXISTING_ROUTE_MARKER = "__EXISTING_ROUTE__"
 
 TURN3_SYSTEM = """You are a travel planning assistant. The user wants to edit their existing itinerary via chat.
 
+⚠️ SINGLE-RESPONSE RULE (ABSOLUTE — no exceptions):
+You MUST produce the complete updated route in THIS response. NEVER say "biraz bekleyin", "please wait", "one moment", "Yeni bir gün ekliyorum", or ANY text implying a follow-up response is coming. If you say "wait" or "adding now" without the JSON, the edit FAILS and the user sees a broken experience. Output the confirmation sentence + ---ROUTE_JSON--- + JSON all at once, right now.
+
 EXISTING ROUTE (do NOT change anything you are not asked to change):
 {existing_route_json}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 WHAT YOU MUST DO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Read the user's edit request carefully.
+1. Read the user's edit request carefully — also check the conversation history above if the request is a short confirmation (e.g. "Osteria da Fortunata seçiyorum" / "I'll go with Da Enzo"). The history will show which place the user asked to replace and which alternatives were suggested.
 2. Identify WHICH day(s) and WHICH waypoints need changing.
 3. Apply ONLY the requested change — keep everything else identical.
 4. Output the COMPLETE updated route JSON (all days, including unchanged ones).
+
+CONFIRMATION PATTERN (very common): The user previously asked "suggest an alternative for X" and you offered options A and B. Now the user says "I choose A" or "seçiyorum". In this case: replace X with A in the route, then output the full updated route JSON. Do NOT ask for further confirmation — just apply and output.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EDIT TYPES AND HOW TO HANDLE THEM
@@ -351,17 +358,34 @@ REMOVE A PLACE ("remove the morning cafe on day 2", "2. gündeki sabah kafesini 
 SWAP A PLACE ("replace the restaurant on day 1 with a better one"):
 - Replace ONLY that waypoint; keep category, time_slot, and order position the same.
 
+ADD A DAY ("işim uzadı 4 gün kalacağım", "add a day", "extend to 4 days", "one more day"):
+- Increase total_days by the needed amount.
+- Generate entirely new waypoints for each new day using your world knowledge of that destination.
+- New days must NOT reuse any place name that already appears in the existing route (any day).
+- Apply the same dining rhythm: morning cafe → lunch restaurant → afternoon cafe → dinner restaurant.
+- Append new days at the end (day N+1, N+2 …).
+- Update total_days in the JSON to reflect the new total.
+
+REMOVE A DAY ("3. günü çıkar", "remove day 2", "2. günü sil", "trip is shorter now"):
+- Delete the specified day entirely.
+- Renumber remaining days sequentially (day 1, 2, 3 …).
+- Update total_days in the JSON.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RULES THAT ALWAYS APPLY (same as route generation)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - Every day MUST have: 1× lunch restaurant (12:00–14:00) + 1× dinner restaurant (18:00–21:00).
 - NEVER two dining stops adjacent — at least one sightseeing stop between them.
+- CRITICAL — category field: NEVER use "lunch restaurant" or "dinner restaurant". Use only "restaurant". The time_slot field handles meal timing (morning/afternoon/evening/lunch/dinner).
 - Museums/galleries/palaces open at 09:00 at the earliest; visits must end by 17:00.
 - day_start_local NEVER before 08:30.
 - All stops in a single day must be within ~3 km of each other (same neighborhood cluster).
 - Waypoint "name" field: OFFICIAL ENGLISH/INTERNATIONAL name only (for geocoding).
   ✅ "Grand Bazaar, Fatih" — NOT "Kapalı Çarşı"
   ✅ "Blue Mosque, Sultanahmet" — NOT "Sultanahmet Camii"
+  ✅ "Trattoria Luzzi" — NOT "restaurant" or "lunch restaurant" or "dinner restaurant"
+  CRITICAL: NEVER use generic terms like "restaurant", "cafe", "lunch restaurant", "dinner restaurant", "Dinner at a restaurant", "Lunch restaurant" as the "name" value. The "name" MUST always be the real venue name (e.g. "Da Enzo al 29", "Caffè Sant'Eustachio"). If you do not know a specific venue, invent a plausible real-sounding name for that city — do NOT use category words.
+- CRITICAL — NO DUPLICATE NAMES: Before adding or suggesting any new waypoint (including new days), scan every waypoint in the ENTIRE EXISTING ROUTE. NEVER use a venue name that already appears on ANY day. This applies especially when adding new days — if "Husrev" is already a lunch stop on day 1, it cannot appear on day 3 or any new day either. Choose completely different venues for new days.
 - Use the user's language for day titles and descriptions; keep "name" in English.
 - If adding a new sightseeing POI not in the original list: set latitude: null, longitude: null.
 
@@ -371,6 +395,7 @@ OUTPUT FORMAT (MANDATORY)
 1. One SHORT confirmation sentence (same language as the user, max ~20 words).
    Example TR: "3. gün müze ağırlıklı olarak güncellendi."
    Example EN: "Day 3 has been updated with more museums."
+   CRITICAL: Do NOT say "biraz bekleyin", "please wait", "one moment" or any placeholder text. Output everything in a single response.
 2. Next line exactly: ---ROUTE_JSON---
 3. Next line: the complete updated route_data JSON (no markdown, no code block).
    — Same structure as the existing route above.
@@ -447,7 +472,8 @@ RULES:
 - Keep the same "title", "destination", and "total_days" ({td}) as the existing route unless there is an obvious inconsistency to fix.
 - Use 5–8 stops on day {day_num} (including dining) when enough POIs exist; otherwise use at least 3 stops.
 - CRITICAL: For the replaced day, latitude and longitude must match the POI list exactly — do not invent coordinates.
-- Order waypoints geographically (minimize walking). Set realistic estimated_duration_min and time_slot (morning/afternoon/evening).
+- Order waypoints geographically (minimize walking). Set realistic estimated_duration_min and time_slot (morning/afternoon/evening/lunch/dinner).
+- CRITICAL — category field: NEVER use "lunch restaurant" or "dinner restaurant". Use only "restaurant" for any dining stop.
 - travel_style for the new day: {travel_style}
 
 AVAILABLE POIs (inside the drawn area):
@@ -522,7 +548,24 @@ _ROUTE_EDIT_RE = re.compile(
     # Belirli gün referansı: "3. gün", "gün 2", "day 3", "1. günü", "1. gün"
     r"|\bgün\s*\d+\b"
     r"|\b\d+\.\s*gün[üu]?\b"
-    r"|\bday\s*\d+\b",
+    r"|\bday\s*\d+\b"
+    # Gün sayısı değişikliği: "4 gün kalacağım", "4 güne genişlet", "gün sayısını 5 yap", "4 days"
+    r"|\b\d+\s*gün\b"
+    r"|\b\d+\s*days?\b"
+    r"|\bgün\s*say[ıi]\w*\b"
+    # Ayarlama / düzenleme kelimeleri
+    r"|\bayarla\w*\b"
+    r"|\bgenişlet\w*\b|\bkısalt\w*\b|\buzat\w*\b"
+    r"|\badjust\b|\bextend\b|\bshorten\b|\bexpand\b"
+    # Gün silme / çıkarma
+    r"|\bgünü?\s*(sil|çıkar|kaldır)\w*\b"
+    r"|\b(sil|remove)\s*day\b"
+    # Seçim/onay — AI öneri sunmuş ve kullanıcı birini seçiyor
+    # Örn: "Osteria da Fortunata seçiyorum", "I'll go with Da Enzo", "let's pick Luzzi"
+    r"|\bseçiyorum\b|\bseçtim\b|\bseçeceğim\b|\bonu\s+seç\w*\b"
+    r"|\bchoose\b|\bselect\b|\bpick\b"
+    r"|\bi'?ll\s+(go\s+with|take|use|choose|pick|select)\b"
+    r"|\blet'?s\s+(go\s+with|use|pick|choose)\b",
     flags=re.I,
 )
 
@@ -1444,7 +1487,18 @@ def _parse_route_from_response(raw_content: str) -> tuple[str, RouteData | None]
             break
 
     if not json_str:
-        # Fallback: AI may have output formatted list instead of JSON
+        # Fallback 1: AI output raw JSON inline without separator (e.g. Turn3 "gün eklendi. {...}")
+        raw_json_str = _extract_first_json_object_str(raw_content)
+        if raw_json_str:
+            try:
+                route_data = RouteData.model_validate_json(raw_json_str)
+                # Use everything before the JSON as the display text
+                json_start = raw_content.find(raw_json_str)
+                text_part = raw_content[:json_start].strip() if json_start > 0 else raw_content
+                return text_part, route_data
+            except (ValueError, Exception):
+                pass
+        # Fallback 2: AI may have output a formatted list instead of JSON
         route_data = _parse_route_from_formatted_text(raw_content)
         if route_data:
             return raw_content, route_data
@@ -2017,10 +2071,27 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             raw_ai_content = str(turn3.content)
             ai_content, route_data = _parse_route_from_response(raw_ai_content)
             if route_data is None:
-                logger.error(
-                    "[TURN3] Failed to return valid route JSON. Response (first 600 chars): %s",
-                    raw_ai_content[:600],
+                logger.warning(
+                    "[TURN3] No route JSON in first attempt (first 200 chars): %s — retrying.",
+                    raw_ai_content[:200],
                 )
+                # Retry: AI likely said "please wait" without producing JSON.
+                # Inject the failed response into history so AI knows not to repeat it,
+                # then demand the JSON explicitly.
+                retry_turn3 = await llm.ainvoke(
+                    [SystemMessage(content=turn3_system)]
+                    + history
+                    + [HumanMessage(content=clean_user_content)]
+                    + [AIMessage(content=raw_ai_content)]
+                    + [HumanMessage(content="Apply the change now and output ---ROUTE_JSON--- followed by the complete updated route JSON. Do not say 'please wait' again.")]
+                )
+                raw_ai_content = str(retry_turn3.content)
+                ai_content, route_data = _parse_route_from_response(raw_ai_content)
+                if route_data is None:
+                    logger.error(
+                        "[TURN3] Retry also failed to return valid route JSON. Response (first 600 chars): %s",
+                        raw_ai_content[:600],
+                    )
             if route_data:
                 _log_route("TURN3_RAW", route_data)
                 route_data = _fix_route_dining(route_data)

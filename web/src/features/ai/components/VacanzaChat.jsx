@@ -83,35 +83,9 @@ function ChatBubbleRichText({ text }) {
 }
 
 /**
- * Rota kartı eklenecek asistan balonları (yemek önerisi, genel sohbet vb. hariç).
- * Zaman eşlemesi bu havuzda yapılır; aksi halde "en yakın asistan" yanlışlıkla yemek cevabı oluyordu.
- */
-function looksLikeItineraryRouteReply(text) {
-  const s = (text ?? "").trim();
-  if (!s) return false;
-  const lower = s.toLowerCase();
-  if (/i['']?m here to help with travel/i.test(lower)) return false;
-  if (/^i['']?m here to help\b/i.test(lower)) return false;
-  if (/here is your .+ itinerary\b/i.test(lower)) return true;
-  if (/\bitinerary\b/i.test(lower) && /here is\b/i.test(lower)) return true;
-  return false;
-}
-
-/** Harita replan / gün güncelleme gibi kısa asistan cevapları — rota kartı bu balonlara bağlanmalı. */
-function looksLikeRouteRelatedReply(text) {
-  if (looksLikeItineraryRouteReply(text)) return true;
-  const s = (text ?? "").trim();
-  if (!s) return false;
-  const lower = s.toLowerCase();
-  if (/day\s+\d+\s+is\s+updated\b/i.test(s)) return true;
-  if (/updated\s+for\s+your\s+map\s+area/i.test(lower)) return true;
-  if (/---\s*route_json\s*---/i.test(s)) return true;
-  return false;
-}
-
-/**
- * Kayıtlı rotaları, üretim zamanına göre en uygun asistan mesajına bağlar (aynı sohbette birden çok rota).
- * Her rotayı mümkünse ayrı asistan balonuna verir; aksi halde tüm “rota ile ilgili” balonlar havuza alınır.
+ * Kayıtlı rotaları asistan mesajlarına bağlar (aynı sohbette birden çok rota).
+ * Dil veya metin kalıbına bakılmaz: her rota, kayıttaki generatedAt ile zaman olarak en yakın
+ * ve henüz başka rotaya atanmamış asistan balonuna düşer; böylece kart her dilde ilgili cevabın altında kalır.
  */
 function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
   const list = Array.isArray(routeDetails) ? routeDetails : [];
@@ -137,11 +111,7 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
     .filter((x) => x.data)
     .sort((a, b) => a.t - b.t);
 
-  const assistantMsgs = msgs.filter((m) => m._isAssistant).sort((a, b) => a._createdAtMs - b._createdAtMs);
-  let assistantPool = assistantMsgs.filter((m) => looksLikeRouteRelatedReply(m.text));
-  if (assistantPool.length === 0) {
-    assistantPool = assistantMsgs;
-  }
+  const assistantPool = msgs.filter((m) => m._isAssistant).sort((a, b) => a._createdAtMs - b._createdAtMs);
 
   const byMessageId = new Map();
   const usedAssistantIds = new Set();
@@ -327,10 +297,23 @@ function isSearchPoisPipelineMessage(content) {
   }
 }
 
+function stripExistingRouteBlock(text) {
+  if (typeof text !== "string") return text;
+  const marker = "\n__EXISTING_ROUTE__";
+  const idx = text.indexOf(marker);
+  if (idx !== -1) return text.slice(0, idx).trim();
+  // Also handle no leading newline
+  if (text.includes("__EXISTING_ROUTE__")) {
+    return text.split("__EXISTING_ROUTE__")[0].trim();
+  }
+  return text;
+}
+
 function mapHistoryMessage(m) {
   const role = (m.role ?? "").toLowerCase();
   const type = role === "user" ? "user" : "ai";
   let text = m.content ?? "";
+  if (type === "user") text = stripExistingRouteBlock(text);
   if (type === "user" && isPolygonMapRouteUserMessage(text)) {
     text = "Route created from the area drawn on the map.";
   }
@@ -393,6 +376,7 @@ export default function VacanzaChat({
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sendError, setSendError] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -404,6 +388,8 @@ export default function VacanzaChat({
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const dragNodeRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  const lastSentTextRef = useRef(null);
 
   const ticketStateKey = (msgId, rIdx) => `${msgId}-r${rIdx}`;
 
@@ -570,9 +556,18 @@ export default function VacanzaChat({
     setHistoryPanelOpen(false);
   };
 
+  const handleStop = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
+
   const handleSendMessage = async (customText = null) => {
     const textToSend = (customText || inputText)?.trim();
     if (!textToSend || loading || messagesLoading) return;
+
+    setSendError(false);
+    lastSentTextRef.current = textToSend;
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     setLoading(true);
     let activeConvId = conversationId;
@@ -601,7 +596,7 @@ export default function VacanzaChat({
     setInputText("");
 
     try {
-      const response = await aiApi.sendMessage(activeConvId, textToSend);
+      const response = await aiApi.sendMessage(activeConvId, textToSend, { signal });
       if (response && response.content) {
         const routeData = response.route_data || response.routeData || null;
         const wasRouteRequest = /plan|rota|gün|tatil|itinerary|day/i.test(textToSend);
@@ -673,12 +668,35 @@ export default function VacanzaChat({
         }
       }
       await refreshConversations();
-    } catch {
-      message.error("We are currently busy. Please try again in a few seconds.");
+    } catch (e) {
+      const isAbort =
+        e?.name === "CanceledError" ||
+        e?.code === "ERR_CANCELED" ||
+        e?.name === "AbortError";
+      if (!isAbort) {
+        message.error("We are currently busy. Please try again in a few seconds.");
+        setSendError(true);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const handleRetry = useCallback(() => {
+    const text = lastSentTextRef.current;
+    if (!text) return;
+    setSendError(false);
+    // Remove the optimistically added user message from the failed send
+    setMessages((prev) => {
+      const idx = [...prev].map((m, i) => ({ m, i }))
+        .reverse()
+        .find(({ m }) => m.type === "user" && m.text === text);
+      if (idx == null) return prev;
+      return prev.filter((_, i) => i !== idx.i);
+    });
+    handleSendMessage(text);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!isOpen) return null;
 
@@ -1024,6 +1042,22 @@ export default function VacanzaChat({
           </>
         )}
       </div>
+
+      {loading && (
+        <div className="chat-stop-bar">
+          <button type="button" className="chat-stop-btn" onClick={handleStop}>
+            <span className="chat-stop-icon" aria-hidden>■</span>
+            Stop generating
+          </button>
+        </div>
+      )}
+      {sendError && !loading && (
+        <div className="chat-stop-bar">
+          <button type="button" className="chat-retry-btn" onClick={handleRetry}>
+            ↺ Retry
+          </button>
+        </div>
+      )}
 
       {!initialLoading && (
         <div className="chat-footer-refined">
