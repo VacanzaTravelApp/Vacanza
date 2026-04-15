@@ -18,10 +18,12 @@ import org.springframework.boot.actuate.health.Status;
 import org.springframework.stereotype.Service;
 
 
+import java.lang.management.ManagementFactory;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -56,18 +58,24 @@ public class AdminServiceImpl implements AdminService {
         List<ServiceStatus> services = buildServiceStatuses(apiMetrics);
 
         // Calculate overall health score based on derived microservice statuses
-
         long upCount = services.stream()
                 .filter(s -> "UP".equals(s.getStatus()))
                 .count();
         double systemHealth = services.isEmpty() ? 0.0
                 : Math.round(((double) upCount / services.size()) * 100.0) / 100.0;
 
+        // System uptime from JVM runtime
+        long uptimeMs = ManagementFactory.getRuntimeMXBean().getUptime();
+        long uptimeSeconds = uptimeMs / 1000;
+        Instant startTime = Instant.now().minusMillis(uptimeMs);
+
         // Recent logs from login history
         List<LogEntry> logs = buildRecentLogs();
 
         return SystemMonitoringDTO.builder()
                 .systemHealth(systemHealth)
+                .uptimeSeconds(uptimeSeconds)
+                .serverStartTime(startTime.toString())
                 .services(services)
                 .apiMetrics(apiMetrics)
                 .logs(logs)
@@ -218,11 +226,16 @@ public class AdminServiceImpl implements AdminService {
                 })
                 .collect(Collectors.toList());
 
+        // Active sessions: users who logged in within the last 30 minutes
+        long activeSessions = loginHistoryRepository.countByLoginTimeAfter(
+                Instant.now().minus(30, ChronoUnit.MINUTES));
+
         return AdminAnalyticsDTO.builder()
                 .matrixUsers(matrixUsers)
                 .globalRevenue(globalRevenue)
                 .activeNodes(activeNodes)
                 .avgDuration(avgDuration)
+                .activeSessions(activeSessions)
                 .growthTrajectory(growthTrajectory)
                 .categoryBreakdown(categoryBreakdown)
                 .highPerformanceAssets(highPerformanceAssets)

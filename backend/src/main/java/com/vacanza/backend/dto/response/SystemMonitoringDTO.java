@@ -24,6 +24,16 @@ public class SystemMonitoringDTO {
     private double systemHealth;
 
     /**
+     * JVM uptime in seconds since server start.
+     */
+    private long uptimeSeconds;
+
+    /**
+     * ISO-8601 timestamp of when the server was started.
+     */
+    private String serverStartTime;
+
+    /**
      * Current status of each backend service.
      */
     private List<ServiceStatus> services;
