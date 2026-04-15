@@ -48,6 +48,12 @@ public class SystemMonitoringDTO {
      */
     private List<LogEntry> logs;
 
+    /**
+     * ISO-8601 timestamp of when this data was generated.
+     * Helps the frontend enforce the ≤ 60-second refresh interval (FReq13).
+     */
+    private String lastRefreshedAt;
+
     // ── Inner DTOs ──────────────────────────────────────────────
 
     @Data
