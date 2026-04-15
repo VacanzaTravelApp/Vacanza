@@ -83,35 +83,9 @@ function ChatBubbleRichText({ text }) {
 }
 
 /**
- * Rota kartı eklenecek asistan balonları (yemek önerisi, genel sohbet vb. hariç).
- * Zaman eşlemesi bu havuzda yapılır; aksi halde "en yakın asistan" yanlışlıkla yemek cevabı oluyordu.
- */
-function looksLikeItineraryRouteReply(text) {
-  const s = (text ?? "").trim();
-  if (!s) return false;
-  const lower = s.toLowerCase();
-  if (/i['']?m here to help with travel/i.test(lower)) return false;
-  if (/^i['']?m here to help\b/i.test(lower)) return false;
-  if (/here is your .+ itinerary\b/i.test(lower)) return true;
-  if (/\bitinerary\b/i.test(lower) && /here is\b/i.test(lower)) return true;
-  return false;
-}
-
-/** Harita replan / gün güncelleme gibi kısa asistan cevapları — rota kartı bu balonlara bağlanmalı. */
-function looksLikeRouteRelatedReply(text) {
-  if (looksLikeItineraryRouteReply(text)) return true;
-  const s = (text ?? "").trim();
-  if (!s) return false;
-  const lower = s.toLowerCase();
-  if (/day\s+\d+\s+is\s+updated\b/i.test(s)) return true;
-  if (/updated\s+for\s+your\s+map\s+area/i.test(lower)) return true;
-  if (/---\s*route_json\s*---/i.test(s)) return true;
-  return false;
-}
-
-/**
- * Kayıtlı rotaları, üretim zamanına göre en uygun asistan mesajına bağlar (aynı sohbette birden çok rota).
- * Her rotayı mümkünse ayrı asistan balonuna verir; aksi halde tüm “rota ile ilgili” balonlar havuza alınır.
+ * Kayıtlı rotaları asistan mesajlarına bağlar (aynı sohbette birden çok rota).
+ * Dil veya metin kalıbına bakılmaz: her rota, kayıttaki generatedAt ile zaman olarak en yakın
+ * ve henüz başka rotaya atanmamış asistan balonuna düşer; böylece kart her dilde ilgili cevabın altında kalır.
  */
 function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
   const list = Array.isArray(routeDetails) ? routeDetails : [];
@@ -137,11 +111,7 @@ function mergeHistoryWithSavedRoutes(historyRaw, routeDetails) {
     .filter((x) => x.data)
     .sort((a, b) => a.t - b.t);
 
-  const assistantMsgs = msgs.filter((m) => m._isAssistant).sort((a, b) => a._createdAtMs - b._createdAtMs);
-  let assistantPool = assistantMsgs.filter((m) => looksLikeRouteRelatedReply(m.text));
-  if (assistantPool.length === 0) {
-    assistantPool = assistantMsgs;
-  }
+  const assistantPool = msgs.filter((m) => m._isAssistant).sort((a, b) => a._createdAtMs - b._createdAtMs);
 
   const byMessageId = new Map();
   const usedAssistantIds = new Set();
