@@ -638,7 +638,7 @@ export default function VacanzaChat({
           routeDataList: norm ? [norm] : undefined,
           routeIdList: norm ? [routeIdFromResponse ?? null] : undefined,
           routeFeedbackList: norm ? [null] : undefined,
-          noRouteHint: !routeData && wasRouteRequest && !aiAskedFollowUp,
+          noRouteHint: !routeData && wasRouteRequest && !aiAskedFollowUp && !hadExistingRoute,
           isRouteEdit,
           time: formatMessageTime(new Date()),
         };
