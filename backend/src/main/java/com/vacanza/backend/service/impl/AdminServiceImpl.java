@@ -79,6 +79,7 @@ public class AdminServiceImpl implements AdminService {
                 .services(services)
                 .apiMetrics(apiMetrics)
                 .logs(logs)
+                .lastRefreshedAt(Instant.now().toString())
                 .build();
     }
 
@@ -239,6 +240,7 @@ public class AdminServiceImpl implements AdminService {
                 .growthTrajectory(growthTrajectory)
                 .categoryBreakdown(categoryBreakdown)
                 .highPerformanceAssets(highPerformanceAssets)
+                .lastRefreshedAt(Instant.now().toString())
                 .build();
     }
 
