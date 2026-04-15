@@ -21,6 +21,12 @@ public class AdminAnalyticsDTO {
     private double globalRevenue;
     private long activeNodes;
     private double avgDuration;
+
+    /**
+     * Number of users who logged in within the last 30 minutes (approximate active sessions).
+     */
+    private long activeSessions;
+
     private List<GrowthMetric> growthTrajectory;
     private List<CategoryMetric> categoryBreakdown;
     private List<HighPerformanceAssetMetric> highPerformanceAssets;
