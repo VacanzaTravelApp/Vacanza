@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.preference_extraction import ExtractedPreference
 
@@ -98,6 +98,23 @@ class MessageItem(BaseModel):
     created_at: datetime
 
 
+_COMPOUND_CATEGORY_MAP = {
+    "lunch restaurant": "restaurant",
+    "dinner restaurant": "restaurant",
+    "lunch cafe": "cafe",
+    "dinner cafe": "cafe",
+    "morning cafe": "cafe",
+    "afternoon cafe": "cafe",
+}
+
+_COMPOUND_TIME_SLOT_MAP = {
+    "lunch restaurant": "lunch",
+    "dinner restaurant": "dinner",
+    "morning cafe": "morning",
+    "afternoon cafe": "afternoon",
+}
+
+
 class RouteWaypoint(BaseModel):
     """A single stop/place in a day's route plan."""
 
@@ -110,12 +127,29 @@ class RouteWaypoint(BaseModel):
     longitude: float | None = None
     estimated_duration_min: int | None = None
     time_slot: str | None = None
+
     # Filled by Java backend after generation (Mapbox walking + dwell times)
     travel_from_previous_min: int | None = None
     arrival_time_local: str | None = None
     departure_time_local: str | None = None
     # Set by adaptive adjustment when stop is known closed/unavailable
     unavailable: bool | None = None
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
+        normalized = v.strip().lower()
+        return _COMPOUND_CATEGORY_MAP.get(normalized, v)
+
+    @field_validator("time_slot", mode="before")
+    @classmethod
+    def normalize_time_slot(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
+        normalized = v.strip().lower()
+        return _COMPOUND_TIME_SLOT_MAP.get(normalized, v)
 
 
 class DayPlan(BaseModel):

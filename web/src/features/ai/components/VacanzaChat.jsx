@@ -327,10 +327,23 @@ function isSearchPoisPipelineMessage(content) {
   }
 }
 
+function stripExistingRouteBlock(text) {
+  if (typeof text !== "string") return text;
+  const marker = "\n__EXISTING_ROUTE__";
+  const idx = text.indexOf(marker);
+  if (idx !== -1) return text.slice(0, idx).trim();
+  // Also handle no leading newline
+  if (text.includes("__EXISTING_ROUTE__")) {
+    return text.split("__EXISTING_ROUTE__")[0].trim();
+  }
+  return text;
+}
+
 function mapHistoryMessage(m) {
   const role = (m.role ?? "").toLowerCase();
   const type = role === "user" ? "user" : "ai";
   let text = m.content ?? "";
+  if (type === "user") text = stripExistingRouteBlock(text);
   if (type === "user" && isPolygonMapRouteUserMessage(text)) {
     text = "Route created from the area drawn on the map.";
   }
@@ -393,6 +406,7 @@ export default function VacanzaChat({
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sendError, setSendError] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -404,6 +418,8 @@ export default function VacanzaChat({
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const dragNodeRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  const lastSentTextRef = useRef(null);
 
   const ticketStateKey = (msgId, rIdx) => `${msgId}-r${rIdx}`;
 
@@ -570,9 +586,18 @@ export default function VacanzaChat({
     setHistoryPanelOpen(false);
   };
 
+  const handleStop = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
+
   const handleSendMessage = async (customText = null) => {
     const textToSend = (customText || inputText)?.trim();
     if (!textToSend || loading || messagesLoading) return;
+
+    setSendError(false);
+    lastSentTextRef.current = textToSend;
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     setLoading(true);
     let activeConvId = conversationId;
@@ -601,7 +626,7 @@ export default function VacanzaChat({
     setInputText("");
 
     try {
-      const response = await aiApi.sendMessage(activeConvId, textToSend);
+      const response = await aiApi.sendMessage(activeConvId, textToSend, { signal });
       if (response && response.content) {
         const routeData = response.route_data || response.routeData || null;
         const wasRouteRequest = /plan|rota|gün|tatil|itinerary|day/i.test(textToSend);
@@ -673,12 +698,35 @@ export default function VacanzaChat({
         }
       }
       await refreshConversations();
-    } catch {
-      message.error("We are currently busy. Please try again in a few seconds.");
+    } catch (e) {
+      const isAbort =
+        e?.name === "CanceledError" ||
+        e?.code === "ERR_CANCELED" ||
+        e?.name === "AbortError";
+      if (!isAbort) {
+        message.error("We are currently busy. Please try again in a few seconds.");
+        setSendError(true);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const handleRetry = useCallback(() => {
+    const text = lastSentTextRef.current;
+    if (!text) return;
+    setSendError(false);
+    // Remove the optimistically added user message from the failed send
+    setMessages((prev) => {
+      const idx = [...prev].map((m, i) => ({ m, i }))
+        .reverse()
+        .find(({ m }) => m.type === "user" && m.text === text);
+      if (idx == null) return prev;
+      return prev.filter((_, i) => i !== idx.i);
+    });
+    handleSendMessage(text);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!isOpen) return null;
 
@@ -1024,6 +1072,22 @@ export default function VacanzaChat({
           </>
         )}
       </div>
+
+      {loading && (
+        <div className="chat-stop-bar">
+          <button type="button" className="chat-stop-btn" onClick={handleStop}>
+            <span className="chat-stop-icon" aria-hidden>■</span>
+            Stop generating
+          </button>
+        </div>
+      )}
+      {sendError && !loading && (
+        <div className="chat-stop-bar">
+          <button type="button" className="chat-retry-btn" onClick={handleRetry}>
+            ↺ Retry
+          </button>
+        </div>
+      )}
 
       {!initialLoading && (
         <div className="chat-footer-refined">
