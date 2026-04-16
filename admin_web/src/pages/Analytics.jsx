@@ -9,11 +9,15 @@ const { Title, Text } = Typography;
 
 const THEME = {
     primary: '#FF6B6B',
+    coral: '#FF6B6B',
     success: '#2DD4A8',
     warning: '#FFB347',
     error: '#FF4D4F',
     info: '#00B4D8',
-    purple: '#1A2332'
+    purple: '#1A2332',
+    navy: '#1A2332',
+    teal: '#00B4D8',
+    subtext: '#5A6B7A'
 };
 
 const Analytics = () => {
@@ -62,13 +66,13 @@ const Analytics = () => {
             <Row gutter={[48, 48]}>
                 <Col span={24}>
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                        <Title className="gradient-text" style={{ fontSize: '56px', marginBottom: 8, marginTop: 0, letterSpacing: '-1.5px' }}>Analytics Core</Title>
+                        <Title className="gradient-text" style={{ fontSize: '42px', marginBottom: 8, marginTop: 0, letterSpacing: '-1.5px' }}>Analytics Core</Title>
                         <Text style={{ fontSize: '18px', color: THEME.subtext, fontWeight: 500 }}>Structural intelligence and revenue trajectory monitoring across the Vacanza ecosystem.</Text>
                     </motion.div>
                 </Col>
 
                 <Col xs={24} lg={16}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 24 }}>Growth Trajectory</span>}>
+                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Growth Trajectory</span>}>
                         <div style={{ height: 400, width: '100%', marginTop: 24 }}>
                             <ResponsiveContainer>
                                 <AreaChart data={data?.growthTrajectory || []}>
@@ -122,18 +126,6 @@ const Analytics = () => {
                             </Card>
                         </Col>
                     </Row>
-                </Col>
-
-                <Col span={24}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 24 }}>High Performance Asset Ranking</span>}>
-                        <Table
-                            columns={assetColumns}
-                            dataSource={data?.highPerformanceAssets || []}
-                            pagination={false}
-                            className="premium-table"
-                            rowKey="name"
-                        />
-                    </Card>
                 </Col>
             </Row>
         </div>

@@ -1,8 +1,8 @@
-import React from "react";
-import { Row, Col, Card, Typography, Tag, Space, Spin, Badge, Progress } from "antd";
+import React, { useState, useEffect, useCallback } from "react";
+import { Row, Col, Card, Typography, Tag, Space, Spin, Badge, Progress, Table, message } from "antd";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from "recharts";
-import { LoadingOutlined, CloudServerOutlined, BugFilled, CheckCircleFilled, WarningFilled } from "@ant-design/icons";
-import useFetch from "../hooks/useFetch";
+import { LoadingOutlined, DatabaseOutlined, CloudServerOutlined, BugFilled, CheckCircleFilled, WarningFilled, CopyOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import http from "../api/http";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
 
@@ -10,15 +10,66 @@ const { Title, Text } = Typography;
 
 const THEME = {
     primary: '#FF6B6B',
+    coral: '#FF6B6B',
+    navy: '#1A2332',
     success: '#2DD4A8',
     warning: '#FFB347',
     error: '#FF4D4F',
+    teal: '#00B4D8',
+    subtext: '#5A6B7A',
+    green: '#2DD4A8',
+    amber: '#FFB347',
     cardBg: 'rgba(255, 255, 255, 0.85)',
     darkBg: '#1A2332'
 };
 
+const TerminalCommandBlock = ({ cmdString }) => {
+    const [copied, setCopied] = useState(false);
+    const handleCopy = () => {
+        navigator.clipboard.writeText(cmdString);
+        setCopied(true);
+        message.success('Command copied to clipboard!');
+        setTimeout(() => setCopied(false), 2000);
+    };
+    return (
+        <div
+            onClick={handleCopy}
+            style={{
+                background: '#06080b',
+                color: THEME.green,
+                fontFamily: 'var(--font-mono), monospace',
+                padding: '10px 16px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                border: `1px solid ${THEME.green}33`,
+                whiteSpace: 'normal',
+                wordBreak: 'break-word',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                width: '100%',
+                transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.border = `1px solid ${THEME.green}`}
+            onMouseOut={(e) => e.currentTarget.style.border = `1px solid ${THEME.green}33`}
+        >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <span style={{ color: '#5A6B7A', fontWeight: 800 }}>$</span>
+                <span style={{ letterSpacing: '0.5px', fontSize: '12px' }}>{cmdString}</span>
+            </div>
+            {copied ? <CheckCircleOutlined style={{ color: THEME.success, fontSize: '14px' }} title="Copied!" /> : <CopyOutlined style={{ color: '#5A6B7A', fontSize: '14px' }} title="Copy command" />}
+        </div>
+    );
+};
+
 const Monitoring = () => {
-    const { data, loading } = useFetch('/admin/monitoring');
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [chartData, setChartData] = useState([]);
+    const [lastUpdated, setLastUpdated] = useState(new Date());
 
     const fetchMonitoringData = useCallback(async (isInitial = false) => {
         if (isInitial) setLoading(true);
@@ -157,7 +208,7 @@ const Monitoring = () => {
                         <Title level={4} style={{ color: THEME.coral, marginBottom: 8, letterSpacing: 2, textTransform: 'uppercase', fontSize: 13, fontWeight: 700 }}>
                             INFRASTRUCTURE OVERWATCH
                         </Title>
-                        <Title className="gradient-text" style={{ fontSize: '56px', margin: '0 0 16px 0', lineHeight: 1.1, letterSpacing: '-1.5px' }}>
+                        <Title className="gradient-text" style={{ fontSize: '42px', margin: '0 0 16px 0', lineHeight: 1.1, letterSpacing: '-1.5px' }}>
                             System Matrix
                         </Title>
                         <Text style={{ fontSize: '18px', color: THEME.subtext, fontWeight: 500 }}>Global telemetry, service node health, and live execution tracing.</Text>
@@ -165,7 +216,7 @@ const Monitoring = () => {
                 </Col>
 
                 <Col xs={24} lg={16}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 24 }}>API Performance Index</span>}>
+                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>API Performance Index</span>}>
                         <div style={{ height: 350, width: '100%', marginTop: 24 }}>
                             <ResponsiveContainer>
                                 <LineChart data={data?.apiMetrics || []}>
@@ -183,36 +234,40 @@ const Monitoring = () => {
                         </div>
                     </Card>
 
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 24 }}>Service Node Topography</span>} style={{ marginTop: 48 }}>
-                        <Row gutter={[24, 24]}>
-                            {(data?.services || []).map((service, idx) => (
-                                <Col xs={24} sm={12} key={idx}>
-                                    <div style={{
-                                        padding: '28px',
-                                        background: 'rgba(26, 35, 50, 0.03)',
-                                        borderRadius: '24px',
-                                        border: '1px solid rgba(26, 35, 50, 0.06)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 16
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Space size={12}>
-                                                <CloudServerOutlined style={{ fontSize: 22, color: THEME.navy }} />
-                                                <Text strong style={{ fontSize: 17, color: THEME.navy }}>{service.name}</Text>
-                                            </Space>
-                                            <Tag color={service.status === 'UP' ? 'success' : 'error'} bordered={false} style={{ borderRadius: 8, fontWeight: 800 }}>{service.status}</Tag>
-                                        </div>
-
-                                    </div>
-                                </Col>
-                            ))}
-                        </Row>
+                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Service Node Topography</span>} style={{ marginTop: 48 }}>
+                        <Table
+                            columns={[
+                                { title: "Provider Node", dataIndex: "name", key: "name", width: '25%', render: (text) => <Space><DatabaseOutlined style={{ color: THEME.navy }} /><Text strong style={{ fontSize: 16, whiteSpace: 'nowrap' }}>{text}</Text></Space> },
+                                { title: "Operational Status", dataIndex: "status", key: "status", width: '15%', render: (status) => <Tag color={status === 'UP' ? 'success' : 'error'} bordered={false} style={{ borderRadius: 8, fontWeight: 800, padding: '4px 12px' }}>{status}</Tag> },
+                                {
+                                    title: "Test Command", key: "testCommand", width: '60%', render: (_, record) => {
+                                        const getCommand = (name) => {
+                                            if (name.includes('Auth')) return 'vacanza-cli auth:health-check';
+                                            if (name.includes('User')) return 'vacanza-cli user:sync-status';
+                                            if (name.includes('Gamification')) return 'vacanza-cli game:ping-engine';
+                                            if (name.includes('Mapbox')) return 'curl -I https://api.mapbox.com/health';
+                                            if (name.includes('Foursquare')) return 'curl -I https://api.foursquare.com/v3';
+                                            if (name.includes('SerpApi')) return 'curl -I https://serpapi.com/status';
+                                            if (name.includes('Ticketmaster')) return 'curl -I https://app.ticketmaster.com/discovery';
+                                            if (name.includes('Viator')) return 'curl -I https://api.viator.com/';
+                                            if (name.includes('Internal')) return `vacanza-cli core:diagnostics ${name.split(' ')[1]}`;
+                                            return `vacanza-cli service:ping --target="${name}"`;
+                                        };
+                                        const cmdString = record.testCommand || getCommand(record.name);
+                                        return <TerminalCommandBlock cmdString={cmdString} />;
+                                    }
+                                }
+                            ]}
+                            dataSource={data?.services || []}
+                            pagination={false}
+                            rowKey="name"
+                            style={{ marginTop: 24 }}
+                        />
                     </Card>
                 </Col>
 
                 <Col xs={24} lg={8}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 24 }}>System Telemetry</span>}>
+                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Core Infrastructure Pulse</span>}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
                             <div style={{ padding: '32px', background: 'rgba(26, 35, 50, 0.04)', borderRadius: '24px' }}>
                                 <Text style={{ fontSize: 12, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 12 }}>Infrastructure Health</Text>
