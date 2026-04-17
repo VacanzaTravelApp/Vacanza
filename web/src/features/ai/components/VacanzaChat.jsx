@@ -1105,14 +1105,6 @@ export default function VacanzaChat({
         )}
       </div>
 
-      {loading && (
-        <div className="chat-stop-bar">
-          <button type="button" className="chat-stop-btn" onClick={handleStop}>
-            <span className="chat-stop-icon" aria-hidden>■</span>
-            Stop generating
-          </button>
-        </div>
-      )}
       {sendError && !loading && (
         <div className="chat-stop-bar">
           <button type="button" className="chat-retry-btn" onClick={handleRetry}>
@@ -1221,12 +1213,12 @@ export default function VacanzaChat({
             />
             <button
               type="button"
-              className="chat-send-icon"
-              onClick={() => handleSendMessage()}
-              disabled={loading || messagesLoading || !inputText.trim()}
-              aria-label="Send"
+              className={`chat-send-icon${loading ? " chat-send-icon--stop" : ""}`}
+              onClick={loading ? handleStop : () => handleSendMessage()}
+              disabled={!loading && (!inputText.trim() || messagesLoading)}
+              aria-label={loading ? "Stop generating" : "Send"}
             >
-              <SendOutlined />
+              {loading ? <span className="chat-stop-square" aria-hidden /> : <SendOutlined />}
             </button>
           </div>
         </div>
