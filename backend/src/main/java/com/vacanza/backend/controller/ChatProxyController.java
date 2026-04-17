@@ -502,6 +502,7 @@ public class ChatProxyController {
                 try {
                         if (response != null && response.getRouteData() != null) {
                                 resolveNullCoordinates(response.getRouteData());
+                                stripNullCoordinateWaypoints(response.getRouteData());
                                 if (routePlanningWeather != null && !routePlanningWeather.daily().isEmpty()) {
                                         response.getRouteData().setWeatherForecast(routePlanningWeather.daily());
                                 }
@@ -538,6 +539,7 @@ public class ChatProxyController {
                 try {
                         if (response == null || response.getRouteData() == null) return;
                         resolveNullCoordinates(response.getRouteData());
+                        stripNullCoordinateWaypoints(response.getRouteData());
                         routeTimelineService.enrichTimeline(response.getRouteData(), profile);
 
                         // Build a short human-readable reason from the user's edit request
@@ -644,6 +646,29 @@ public class ChatProxyController {
         }
 
         /**
+         * Removes any waypoints that still have null coordinates after geocoding and renumbers order fields.
+         * Prevents frontend from receiving route entries with no map position.
+         */
+        private void stripNullCoordinateWaypoints(AiChatDto.RouteData routeData) {
+                if (routeData == null || routeData.getDays() == null) return;
+                for (AiChatDto.DayPlan dayPlan : routeData.getDays()) {
+                        if (dayPlan.getWaypoints() == null) continue;
+                        int before = dayPlan.getWaypoints().size();
+                        dayPlan.getWaypoints().removeIf(
+                                wp -> wp.getLatitude() == null || wp.getLongitude() == null);
+                        int removed = before - dayPlan.getWaypoints().size();
+                        if (removed > 0) {
+                                log.warn("[STRIP NULL] Day {} — removed {} waypoint(s) with no coordinates; renumbering",
+                                                dayPlan.getDay(), removed);
+                                int order = 1;
+                                for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
+                                        wp.setOrder(order++);
+                                }
+                        }
+                }
+        }
+
+        /**
          * Returns true if the geocoding result name is reasonably related to the searched place name.
          * Prevents wrong pins when Mapbox returns an unrelated POI (e.g. a restaurant instead of a bridge).
          * Uses word-level overlap: at least one significant word (>3 chars) must be shared.
@@ -655,19 +680,30 @@ public class ChatProxyController {
                 String r = resultName.toLowerCase(Locale.ROOT);
                 // Direct containment (handles "Golden Gate Bridge" ⊂ "Golden Gate Bridge, Presidio…")
                 if (r.contains(q) || q.contains(r)) return true;
-                // Word-level overlap — at least one significant word (>4 chars) must be an exact match.
+                // Compact containment: strip spaces/punctuation then compare.
+                // Handles compound-word vs spaced variants: "Göbeklitepe" ↔ "Göbekli Tepe",
+                // "Atatürkmausoleum" ↔ "Atatürk Mausoleum", etc.
+                String qCompact = q.replaceAll("[\\s,\\-/.']+", "");
+                String rCompact = r.replaceAll("[\\s,\\-/.']+", "");
+                if (qCompact.length() > 4 && (rCompact.contains(qCompact) || qCompact.contains(rCompact))) return true;
+                // Word-level overlap — count significant words (>4 chars) that match exactly.
                 // Prefix matching is intentionally disabled: "Bosphorus Bridge" vs "Bosphorus Strait"
                 // share the prefix "Bosphor" but are completely different places.
+                // Threshold: queries with 2+ significant words require AT LEAST 2 matches to avoid
+                // false positives like "Galata Tower" → "Galata Port" (only "galata" would match).
                 String[] qWords = q.split("[\\s,\\-/]+");
                 String[] rWords = r.split("[\\s,\\-/]+");
-                for (String qw : qWords) {
-                        if (qw.length() <= 4) continue;
+                java.util.List<String> qSig = new java.util.ArrayList<>();
+                for (String w : qWords) { if (w.length() > 4) qSig.add(w); }
+                if (qSig.isEmpty()) return false;
+                int required = qSig.size() >= 2 ? 2 : 1;
+                int matched = 0;
+                for (String qw : qSig) {
                         for (String rw : rWords) {
                                 if (rw.length() <= 4) continue;
-                                if (qw.equals(rw)) {
-                                        return true;
-                                }
+                                if (qw.equals(rw)) { matched++; break; }
                         }
+                        if (matched >= required) return true;
                 }
                 return false;
         }
@@ -826,20 +862,30 @@ public class ChatProxyController {
                         all.addAll(pois);
                 }
 
-                // Forward-search each must_visit landmark so iconic places are guaranteed in the pool.
-                // Collected separately so they can OVERRIDE category-search duplicates during dedup
-                // (must-visit results have higher-confidence coordinates from a name-specific search).
+                // Resolve each must_visit landmark via the full resolvePlace strategy (suggest+retrieve,
+                // expanded bbox, geocoding v5 fallbacks) and validate name compatibility before accepting.
+                // Previously used forwardSearchPoi (limit=3, no name check) which blindly added all results
+                // including wrong POIs that could override correct category-search coordinates.
                 List<PoiResult> mustVisitPois = new java.util.ArrayList<>();
                 if (mustVisit != null) {
                         for (String placeName : mustVisit) {
                                 if (placeName == null || placeName.isBlank()) continue;
-                                String query = placeName.contains(",") ? placeName : placeName + ", " + destination;
-                                var mvPois = mapboxPoiSearchClient.forwardSearchPoi(query,
+                                var result = mapboxPoiSearchClient.resolvePlace(
+                                                placeName, destination,
                                                 dest.getMinLon(), dest.getMinLat(), dest.getMaxLon(), dest.getMaxLat())
-                                        .blockOptional().orElse(List.of());
-                                mustVisitPois.addAll(mvPois);
-                                if (!mvPois.isEmpty()) {
-                                        log.info("[MUST_VISIT] '{}' resolved to {} POI(s)", placeName, mvPois.size());
+                                        .blockOptional();
+                                if (result.isPresent()) {
+                                        if (isGeocodingNameCompatible(placeName, result.get().getName())) {
+                                                mustVisitPois.add(result.get());
+                                                log.info("[MUST_VISIT] '{}' → ({}, {}) matched '{}'",
+                                                        placeName, result.get().getLat(), result.get().getLon(),
+                                                        result.get().getName());
+                                        } else {
+                                                log.warn("[MUST_VISIT] '{}' geocoded to unrelated '{}' — rejecting to avoid wrong pin",
+                                                        placeName, result.get().getName());
+                                        }
+                                } else {
+                                        log.warn("[MUST_VISIT] '{}' — all resolution strategies exhausted", placeName);
                                 }
                         }
                 }
