@@ -254,7 +254,7 @@ export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, 
                 open={open}
                 onCancel={() => { onClose(); resetSelection(); }}
                 footer={null}
-                width={eventDetail ? 1080 : 820}
+                width={eventDetail ? "min(1080px, 96vw)" : "min(820px, 96vw)"}
                 centered
                 closable={false}
                 maskClosable={false}

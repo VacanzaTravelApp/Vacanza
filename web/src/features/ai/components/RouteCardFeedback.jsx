@@ -191,6 +191,8 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
             okText="Add"
             confirmLoading={calendarSaving}
             destroyOnClose
+            wrapClassName="vacanza-chat vc-calendar-add-modal-wrap"
+            className="vc-calendar-add-modal"
           >
             <p style={{ marginBottom: 12, opacity: 0.85 }}>
               {tripDays > 1 ? (

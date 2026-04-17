@@ -10,7 +10,8 @@
 .vivid-calendar-modal {
     --cal-font: "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --cal-display: "Fraunces", Georgia, "Times New Roman", serif;
-    --cal-accent: #00b4d8;
+    /* Prefer app theme primary when available */
+    --cal-accent: var(--theme-primary, #00b4d8);
     --cal-bg: #f8faff;
     --cal-text: #1a2332;
     --cal-text-muted: #5a6b7a;
@@ -26,7 +27,7 @@
     --cal-popup-border: rgba(0, 0, 0, 0.06);
     --cal-item-bg: #f4f6fa;
     --cal-pill-surface: rgba(255, 255, 255, 0.98);
-    --cal-pill-route-accent: #00b4d8;
+    --cal-pill-route-accent: var(--cal-accent);
     font-family: var(--cal-font);
 }
 
@@ -59,26 +60,22 @@
 }
 
 .cal-modal-row--split {
-    border-radius: 28px;
-    border: 1px solid var(--cal-border);
-    box-shadow:
-        0 24px 80px rgba(0, 0, 0, 0.12),
-        0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-    overflow: hidden;
-    background: var(--cal-bg);
+    /* Decouple inspector: two separate cards with a gap */
+    gap: 14px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
 }
 
 .theme-night .cal-modal-row--split {
-    box-shadow:
-        0 32px 100px rgba(0, 0, 0, 0.55),
-        0 0 0 1px rgba(56, 189, 248, 0.08) inset;
-    backdrop-filter: blur(12px);
+    backdrop-filter: none;
 }
 
 .cal-container {
     background: var(--cal-bg);
     color: var(--cal-text);
-    padding: 36px 40px 40px;
+    padding: 28px 30px 30px;
     border-radius: 28px;
     transition: background 0.3s ease, color 0.3s ease;
     border: 1px solid var(--cal-border);
@@ -90,10 +87,13 @@
 .cal-container--split-left {
     flex: 1 1 auto;
     min-width: 0;
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
-    background: transparent;
+    /* Make calendar side its own card */
+    background: var(--cal-bg);
+    border: 1px solid var(--cal-border);
+    border-radius: 28px;
+    box-shadow:
+        0 24px 80px rgba(0, 0, 0, 0.12),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 
 .theme-night .cal-container {
@@ -104,8 +104,87 @@
 }
 
 .theme-night .cal-container--split-left {
-    box-shadow: none;
-    backdrop-filter: none;
+    box-shadow:
+        0 32px 100px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(56, 189, 248, 0.08) inset;
+    backdrop-filter: blur(12px);
+}
+
+/* Responsive: avoid cramped/overflow on smaller screens */
+@media (max-width: 960px) {
+    .cal-container {
+        padding: 22px 20px 22px;
+        border-radius: 22px;
+    }
+
+    .cal-month-name {
+        font-size: 1.45rem;
+    }
+
+    .cal-year {
+        font-size: 1.15rem;
+    }
+
+    .cal-help-line {
+        margin-top: 10px;
+        max-width: 100%;
+    }
+
+    .cal-cell {
+        min-height: 86px;
+        padding: 10px 8px 12px;
+    }
+}
+
+@media (max-width: 720px) {
+    .cal-nav {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding-bottom: 16px;
+    }
+
+    .cal-nav-right {
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .cal-help-line {
+        display: none;
+    }
+
+    .cal-modal-row {
+        flex-direction: column;
+    }
+
+    .cal-modal-row--split {
+        border-radius: 22px;
+    }
+
+    .cal-event-detail-aside {
+        width: 100%;
+        flex: 0 0 auto;
+        border-left: none;
+        border-top: 1px solid var(--cal-border);
+        box-shadow: none;
+    }
+
+    .cal-modal-row--split .cal-event-detail-aside {
+        border-radius: 0 0 22px 22px;
+        max-height: none;
+    }
+
+    .cal-event-detail-inner {
+        padding: 14px 14px 16px;
+        max-height: 40vh;
+    }
+
+    .cal-popup {
+        width: min(320px, calc(100vw - 32px));
+        left: 16px !important;
+        right: 16px !important;
+    }
 }
 
 /* Navigation */
@@ -249,7 +328,7 @@
 
 .cal-cell {
     min-width: 0;
-    min-height: 96px;
+    min-height: 88px;
     padding: 12px 10px 14px;
     border-bottom: 1px solid var(--cal-cell-border);
     border-right: 1px solid var(--cal-cell-border);
@@ -257,6 +336,7 @@
     transition: background 0.2s ease;
     box-sizing: border-box;
     overflow: hidden;
+    position: relative;
 }
 
 .cal-cell:hover {
@@ -278,15 +358,39 @@
 
 /* Selection / Range */
 .cal-cell-selected {
-    background: rgba(56, 189, 248, 0.12) !important;
+    background: color-mix(in srgb, var(--cal-accent) 10%, transparent) !important;
 }
 
 .cal-range-start {
-    box-shadow: inset 4px 0 0 #38BDF8 !important;
+    box-shadow: inset 4px 0 0 var(--cal-accent) !important;
 }
 
 .cal-range-end {
-    box-shadow: inset -4px 0 0 #38BDF8 !important;
+    box-shadow: inset -4px 0 0 var(--cal-accent) !important;
+}
+
+/* Premium selected-day treatment (works even with event pills) */
+.cal-cell-selected::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 14px;
+    box-shadow:
+        inset 0 0 0 2px color-mix(in srgb, var(--cal-accent) 55%, transparent),
+        0 10px 28px color-mix(in srgb, var(--cal-accent) 18%, transparent);
+    pointer-events: none;
+}
+
+.theme-night .cal-cell-selected::after {
+    box-shadow:
+        inset 0 0 0 2px color-mix(in srgb, var(--cal-accent) 45%, transparent),
+        0 14px 34px rgba(0, 0, 0, 0.35);
+}
+
+/* Keep content above selection halo */
+.cal-cell > * {
+    position: relative;
+    z-index: 1;
 }
 
 .cal-selecting {
@@ -304,6 +408,10 @@
     margin-bottom: 8px;
 }
 
+.cal-cell-selected .cal-cell-top {
+    margin-bottom: 10px;
+}
+
 .cal-add-icon {
     font-size: 10px;
     color: var(--cal-text-muted);
@@ -313,7 +421,7 @@
 
 .cal-cell:hover .cal-add-icon {
     opacity: 0.8;
-    color: #38BDF8;
+    color: var(--cal-accent);
     transform: scale(1.1);
 }
 
@@ -329,6 +437,21 @@
     transition: all 0.2s;
 }
 
+.cal-cell-selected .cal-day-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--cal-accent) 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cal-accent) 35%, transparent);
+    color: var(--cal-text);
+    font-weight: 800;
+}
+
+.cal-cell-selected .cal-add-icon {
+    opacity: 0;
+    transform: none;
+}
+
 .cal-today-num {
     background: #FF6B6B;
     color: white !important;
@@ -336,6 +459,14 @@
     font-weight: 800;
     font-size: 12px;
     box-shadow: 0 4px 10px rgba(255, 107, 107, 0.3);
+}
+
+/* Today + selected: keep today visible but harmonize with accent halo */
+.cal-cell-selected .cal-today-num {
+    border-radius: 10px;
+    box-shadow:
+        0 6px 18px rgba(255, 107, 107, 0.22),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
 /* Event pills — glass + teal accent (Vacanza map / chat) */
@@ -347,6 +478,7 @@
     max-width: 100%;
     min-width: 0;
     overflow: hidden;
+    margin-top: 2px;
 }
 
 .cal-event-pill {
@@ -372,6 +504,12 @@
 .cal-event-pill:hover {
     border-color: rgba(56, 189, 248, 0.22);
     box-shadow: 0 6px 22px rgba(15, 23, 42, 0.08);
+}
+
+/* When the day is selected, don't let the background tint make pills look "dirty" */
+.cal-cell-selected .cal-event-pill {
+    background: var(--cal-pill-surface);
+    border-color: color-mix(in srgb, var(--cal-accent) 22%, var(--cal-border));
 }
 
 .theme-night .cal-event-pill:hover {
@@ -500,22 +638,44 @@ button.cal-event-pill-main {
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    background: transparent;
-    border-left: 1px solid var(--cal-border);
+    background: var(--cal-pill-surface);
+    border: 1px solid var(--cal-border);
+    position: relative;
+    border-radius: 22px;
+    box-shadow:
+        0 18px 60px rgba(0, 0, 0, 0.10),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 
 .cal-event-detail-aside--route {
-    box-shadow: inset 3px 0 0 var(--cal-pill-route-accent);
+    /* Use a softer accent rail (not a harsh divider) */
+    border-left-color: transparent;
 }
 
 .cal-event-detail-aside--local {
-    box-shadow: inset 3px 0 0 var(--detail-accent, #64748b);
+    border-left-color: transparent;
+}
+
+.cal-event-detail-aside--route::before,
+.cal-event-detail-aside--local::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 14px;
+    bottom: 14px;
+    width: 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--cal-pill-route-accent) 65%, transparent);
+    opacity: 0.9;
+}
+
+.cal-event-detail-aside--local::before {
+    background: color-mix(in srgb, var(--detail-accent, #64748b) 70%, transparent);
 }
 
 .cal-modal-row--split .cal-event-detail-aside {
-    align-self: center;
-    max-height: calc(100% - 20px);
-    border-radius: 0 20px 20px 0;
+    align-self: stretch;
+    max-height: none;
 }
 
 .cal-event-detail-inner {
@@ -526,12 +686,47 @@ button.cal-event-pill-main {
     min-height: 0;
     box-sizing: border-box;
     overflow: auto;
+    position: relative;
+}
+
+/* Make the inspector feel less cramped and more “card-like” */
+.cal-event-detail-inner {
+    padding: 52px 18px 18px;
+}
+
+/* Add a subtle header divider inside the inspector */
+.cal-event-detail-inner::before {
+    content: "";
+    display: block;
+    height: 1px;
+    background: var(--cal-border);
+    opacity: 0.65;
+    margin: 0 0 14px;
+}
+
+.cal-event-detail-top {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+
+.cal-event-detail-kicker {
+    opacity: 0.75;
+}
+
+.cal-event-detail-actions {
+    padding-top: 8px;
+}
+
+.cal-event-detail-btn {
+    border-radius: 14px;
+    min-height: 38px;
 }
 
 .cal-event-detail-top {
     display: flex;
     justify-content: flex-end;
-    margin-bottom: 4px;
+    margin-bottom: 10px;
 }
 
 .cal-event-detail-close {
@@ -543,40 +738,46 @@ button.cal-event-pill-main {
     padding: 0;
     border: none;
     border-radius: 12px;
-    background: var(--cal-nav-bg);
+    background: color-mix(in srgb, var(--cal-accent) 8%, var(--cal-nav-bg));
     color: var(--cal-text-muted);
     cursor: pointer;
     transition: background 0.2s ease, color 0.2s ease;
 }
 
 .cal-event-detail-close:hover {
-    background: var(--cal-border);
-    color: var(--cal-text);
+    background: color-mix(in srgb, var(--cal-accent) 16%, var(--cal-border));
+    color: var(--cal-accent);
 }
 
 .cal-event-detail-kicker {
     margin: 0 0 8px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.10em;
     text-transform: uppercase;
     color: var(--cal-text-muted);
-    opacity: 0.9;
+    opacity: 0.8;
 }
 
 .cal-event-detail-daytag {
     margin: 0 0 10px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--cal-accent);
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--cal-text);
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--cal-item-bg);
+    border: 1px solid var(--cal-border);
 }
 
 .cal-event-detail-title {
     margin: 0 0 16px;
     font-family: var(--cal-display);
-    font-size: 1.05rem;
-    font-weight: 600;
-    line-height: 1.35;
+    font-size: 1.15rem;
+    font-weight: 650;
+    line-height: 1.25;
     letter-spacing: -0.02em;
     color: var(--cal-text);
     word-break: break-word;
@@ -593,16 +794,16 @@ button.cal-event-pill-main {
     display: block;
     width: 100%;
     box-sizing: border-box;
-    padding: 0 12px;
-    min-height: 36px;
-    border-radius: 12px;
+    padding: 0 14px;
+    min-height: 40px;
+    border-radius: 14px;
     font-family: var(--cal-font);
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 800;
     letter-spacing: 0.02em;
     cursor: pointer;
-    border: 1.5px solid transparent;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    border: 1px solid transparent;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 
 .cal-event-detail-btn:active {
@@ -610,14 +811,14 @@ button.cal-event-pill-main {
 }
 
 .cal-event-detail-btn--primary {
-    background: var(--cal-accent);
+    background: linear-gradient(135deg, var(--cal-accent), color-mix(in srgb, var(--cal-accent) 70%, #ffffff));
     color: #fff;
-    border-color: var(--cal-accent);
-    box-shadow: 0 2px 10px rgba(0, 180, 216, 0.25);
+    border-color: color-mix(in srgb, var(--cal-accent) 80%, #ffffff);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--cal-accent) 22%, transparent);
 }
 
 .theme-night .cal-event-detail-btn--primary {
-    box-shadow: 0 2px 12px rgba(56, 189, 248, 0.2);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
 }
 
 .cal-event-detail-btn--primary:hover {
@@ -625,9 +826,9 @@ button.cal-event-pill-main {
 }
 
 .cal-event-detail-btn--danger {
-    background: rgba(239, 68, 68, 0.14);
-    color: #f87171;
-    border-color: rgba(239, 68, 68, 0.35);
+    background: rgba(239, 68, 68, 0.10);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.28);
 }
 
 .theme-night .cal-event-detail-btn--danger {
@@ -637,22 +838,21 @@ button.cal-event-pill-main {
 }
 
 .cal-event-detail-btn--danger:hover {
-    background: rgba(239, 68, 68, 0.22);
-    border-color: rgba(239, 68, 68, 0.5);
-    color: #fecaca;
+    background: rgba(239, 68, 68, 0.16);
+    border-color: rgba(239, 68, 68, 0.45);
 }
 
 .cal-event-detail-btn--muted {
-    background: var(--cal-nav-bg);
+    background: transparent;
     color: var(--cal-text);
     border-color: var(--cal-border);
-    font-weight: 650;
+    font-weight: 800;
 }
 
 .cal-event-detail-btn--muted:hover {
     border-color: var(--cal-accent);
     color: var(--cal-accent);
-    background: var(--cal-cell-hover);
+    background: color-mix(in srgb, var(--cal-accent) 8%, transparent);
 }
 
 /* Floating Popup */

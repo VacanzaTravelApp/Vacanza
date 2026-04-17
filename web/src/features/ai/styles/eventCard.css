@@ -9,7 +9,7 @@
   --event-card-muted: var(--vc-muted, #94a3b8);
   --event-card-surface: var(--vc-card-bg, #ffffff);
   --event-card-border: var(--vc-border, rgba(0, 0, 0, 0.08));
-  --event-card-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --event-card-shadow: 0 2px 10px rgba(15, 23, 42, 0.07);
 
   position: relative;
   display: flex;
@@ -30,8 +30,8 @@
 }
 
 .event-card:hover {
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
-  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.11);
+  transform: translateY(-1px);
 }
 
 .event-card:focus-visible {
@@ -42,11 +42,11 @@
 
 /* Dark mode via app theme class */
 .theme-night .event-card {
-  --event-card-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  --event-card-shadow: 0 2px 14px rgba(0, 0, 0, 0.32);
 }
 
 .theme-night .event-card:hover {
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
 }
 
 /* Thumbnail region — 120px, rounded top */
