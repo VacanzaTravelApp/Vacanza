@@ -150,7 +150,13 @@ public class ChatProxyController {
                                         AiRoute latest = existingRoutes.get(existingRoutes.size() - 1);
                                         String routeJson = latest.getRouteJson();
                                         if (routeJson != null && !routeJson.isBlank()) {
-                                                body.setContent(originalContent + "\n__EXISTING_ROUTE__\n" + routeJson);
+                                                // Strip Java-enriched timeline fields before injection.
+                                                // arrival_time_local / departure_time_local / travel_from_previous_min
+                                                // are computed by RouteTimelineService after the AI response and are
+                                                // not part of the AI schema — they bloat the prompt and output JSON,
+                                                // causing truncation at max_tokens when the route is large.
+                                                String cleanRouteJson = stripEnrichedTimelineFields(routeJson);
+                                                body.setContent(originalContent + "\n__EXISTING_ROUTE__\n" + cleanRouteJson);
                                                 parentRouteForTurn3 = latest;
                                         }
                                 }
@@ -510,6 +516,10 @@ public class ChatProxyController {
                                         response.getRouteData().setWeatherDayParts(routePlanningWeather.dayParts());
                                 }
                                 routeTimelineService.enrichTimeline(response.getRouteData(), profile);
+                                // After enrichTimeline computes real arrival times (including walking legs),
+                                // remove any museum/historic stops that ended up at or after 16:45 —
+                                // these venues close at 17:00 and the walking overhead pushed them past closing.
+                                stripLateClosingVenueStops(response.getRouteData());
                                 UUID savedRouteId = saveRoute(user, conversationId, response.getRouteData());
                                 if (savedRouteId != null) {
                                         response.setRouteId(savedRouteId);
@@ -541,6 +551,7 @@ public class ChatProxyController {
                         resolveNullCoordinates(response.getRouteData());
                         stripNullCoordinateWaypoints(response.getRouteData());
                         routeTimelineService.enrichTimeline(response.getRouteData(), profile);
+                        stripLateClosingVenueStops(response.getRouteData());
 
                         // Build a short human-readable reason from the user's edit request
                         String reason = "Chat edit";
@@ -998,6 +1009,86 @@ public class ChatProxyController {
                 log.info("[POI_DINING_BBOX] result: minLon={} minLat={} maxLon={} maxLat={}",
                         bbox[0], bbox[1], bbox[2], bbox[3]);
                 return bbox;
+        }
+
+        /**
+         * Remove Java-enriched timeline fields from a saved route JSON before injecting it
+         * into the Turn3 prompt.  These fields (arrival_time_local, departure_time_local,
+         * travel_from_previous_min, day_end_local) are added by {@link RouteTimelineService}
+         * after the AI response and are NOT part of the AI's output schema.  Including them
+         * in the prompt causes the AI to echo them back, roughly doubling waypoint JSON size
+         * and hitting the max_tokens limit for 3-day+ routes.
+         *
+         * Uses simple regex replacement so no full JSON round-trip is needed; the fields are
+         * always scalar (string or int/null) so there is no nesting risk.
+         */
+        private static String stripEnrichedTimelineFields(String routeJson) {
+                if (routeJson == null) return null;
+                // Remove: "field_name":"value" or "field_name":null or "field_name":123
+                // Fields to strip: arrival_time_local, departure_time_local, travel_from_previous_min, day_end_local
+                return routeJson
+                        .replaceAll(",?\\s*\"arrival_time_local\"\\s*:\\s*(\"[^\"]*\"|null)", "")
+                        .replaceAll(",?\\s*\"departure_time_local\"\\s*:\\s*(\"[^\"]*\"|null)", "")
+                        .replaceAll(",?\\s*\"travel_from_previous_min\"\\s*:\\s*(\\d+|null)", "")
+                        .replaceAll(",?\\s*\"day_end_local\"\\s*:\\s*(\"[^\"]*\"|null)", "");
+        }
+
+        /**
+         * Categories that have a hard closing time around 17:00.
+         * Outdoor landmarks (bridges, squares, viewpoints) are intentionally excluded —
+         * they can be visited at any hour.
+         */
+        private static final java.util.Set<String> EARLY_CLOSE_CATS = java.util.Set.of(
+                "museum", "art_gallery", "palace", "historic_site", "ruins",
+                "church", "mosque", "castle", "aquarium", "zoo"
+        );
+
+        /**
+         * Latest acceptable arrival at a venue that closes at 17:00.
+         * 16:45 gives the visitor 15 minutes inside — anything later is not worth visiting.
+         * Walking time is already baked into the computed arrival (enrichTimeline adds real Mapbox durations),
+         * so this check uses the final realistic time rather than the AI's naive estimate.
+         */
+        private static final java.time.LocalTime VENUE_LATEST_ARRIVAL =
+                java.time.LocalTime.of(16, 45);
+
+        private static final java.time.format.DateTimeFormatter HH_MM_FMT =
+                java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+
+        /**
+         * Remove museum/historic stops whose computed arrival time (set by {@link RouteTimelineService})
+         * is at or after {@link #VENUE_LATEST_ARRIVAL}.  Walking overhead between stops means the AI's
+         * naive schedule often pushes evening sightseeing past closing — this is the authoritative fix
+         * because it runs after real walking durations are known.
+         */
+        private void stripLateClosingVenueStops(AiChatDto.RouteData routeData) {
+                if (routeData == null || routeData.getDays() == null) return;
+                for (AiChatDto.DayPlan day : routeData.getDays()) {
+                        if (day.getWaypoints() == null) continue;
+                        int before = day.getWaypoints().size();
+                        day.getWaypoints().removeIf(wp -> {
+                                String cat = wp.getCategory() == null
+                                        ? "" : wp.getCategory().trim().toLowerCase(java.util.Locale.ROOT);
+                                if (!EARLY_CLOSE_CATS.contains(cat)) return false;
+                                String arrival = wp.getArrivalTimeLocal();
+                                if (arrival == null || arrival.isBlank()) return false;
+                                try {
+                                        java.time.LocalTime t = java.time.LocalTime.parse(arrival.trim(), HH_MM_FMT);
+                                        return !t.isBefore(VENUE_LATEST_ARRIVAL);
+                                } catch (Exception e) {
+                                        return false; // can't parse → keep safe
+                                }
+                        });
+                        int removed = before - day.getWaypoints().size();
+                        if (removed > 0) {
+                                log.warn("[TIMELINE] Day {}: removed {} venue stop(s) with arrival ≥ {} (closes 17:00); renumbering",
+                                        day.getDay(), removed, VENUE_LATEST_ARRIVAL);
+                                int order = 1;
+                                for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                        wp.setOrder(order++);
+                                }
+                        }
+                }
         }
 
         /** Haversine distance in metres between two lat/lon points. */

@@ -176,7 +176,7 @@ DINING stops (restaurant, fast_food, cafe, bar, pub, nightlife, market, bakery):
 - Do NOT invent or hallucinate restaurant/cafe/bar names — you do not have reliable knowledge of which specific dining venues exist.
 - If the POI list has metadata (rating, price), prefer higher-rated places that match user budget.
 - Respect opening hours; skip POIs closed on that day.
-- PROXIMITY RULE (CRITICAL): Each dining stop MUST be within 2.5 km of the sightseeing stops scheduled on the same day. Compare coordinates — do NOT pick a restaurant or cafe located in a different district or neighborhood from where the day's sightseeing takes place. Always choose the nearest suitable option.
+- PROXIMITY RULE (CRITICAL): Each dining stop MUST be within 2 km of the sightseeing stops scheduled on the same day. Compare coordinates before choosing — do NOT pick a restaurant or cafe from a different district or neighborhood. For lunch (slot 4), pick the nearest restaurant to the sightseeing stops in slots 2–3. For dinner (slot 8), pick the nearest restaurant to the sightseeing stops in slots 5–7. For a morning/afternoon cafe, it must be in the same neighborhood as the adjacent sightseeing stops. If no in-range option exists, pick the closest available one — never leave a meal slot empty.
 
 General:
 - Select the best combination for a {days}-day {travel_style} trip.
@@ -247,7 +247,9 @@ WATER CROSSING RULE (prevents unnecessary ferry/boat rides):
 
 OPENING HOURS (CRITICAL):
 - Museums, palaces, art galleries, historic sites, churches, mosques open at 09:00 at the earliest. NEVER schedule them before 09:00.
-- Museums, palaces, art galleries, historic sites close around 17:00. The visit (arrival + estimated_duration_min) MUST finish by 17:00. NEVER schedule a museum-type stop if it would end after 17:00.
+- Museums, palaces, art galleries, historic sites, ruins, monuments CLOSE around 17:00. The visit (arrival + estimated_duration_min) MUST finish BY 17:00. NEVER place these in the afternoon-late or evening slots. NEVER set time_slot: "evening" for museum/gallery/palace/historic_site/monument/ruins.
+- HARD RULE: A museum/gallery/palace/historic_site must ARRIVE before 16:30 so there is at least 30 min of visit time before closing. If the cumulative day schedule would push a museum past 16:30, place it EARLIER in the day (before lunch) instead.
+- After 17:00: only restaurants, cafes, bars, nightlife, and outdoor landmarks (bridges, squares, viewpoints) may be scheduled. No museums, no palaces, no galleries, no mosques, no churches.
 - day_start_local MUST be 08:30 or later (FAST pace), 09:00 or later (MODERATE/default), 09:30 or later (SLOW). NEVER set it before 08:30 for any reason.
 - If you have a morning cafe in SLOT 1 (~09:00), the first sightseeing stop (SLOT 2) starts at ~09:30–10:00 — still within opening hours.
 
@@ -388,7 +390,7 @@ RULES THAT ALWAYS APPLY (same as route generation)
 - Every day MUST have: 1× lunch restaurant (12:00–14:00) + 1× dinner restaurant (18:00–21:00).
 - NEVER two dining stops adjacent — at least one sightseeing stop between them.
 - CRITICAL — category field: NEVER use "lunch restaurant" or "dinner restaurant". Use only "restaurant". The time_slot field handles meal timing (morning/afternoon/evening/lunch/dinner).
-- Museums/galleries/palaces open at 09:00 at the earliest; visits must end by 17:00.
+- Museums/galleries/palaces/historic_sites/ruins open at 09:00 at the earliest; visits must END by 17:00 and ARRIVE before 16:30. NEVER set time_slot: "evening" for these. After 17:00 only restaurants, bars, cafes, outdoor landmarks are valid.
 - day_start_local NEVER before 08:30.
 - All stops in a single day must be within ~3 km of each other (same neighborhood cluster), UNLESS the user explicitly requests a water crossing (ferry/boat) as part of the day — in that case up to 2 crossings are allowed (e.g. morning one side → ferry → afternoon/evening other side, or morning one side → ferry → other side → ferry back for dinner). Never more than 2 crossings in a single day.
 - Waypoint "name" field: OFFICIAL ENGLISH/INTERNATIONAL name only (for geocoding).
@@ -397,6 +399,8 @@ RULES THAT ALWAYS APPLY (same as route generation)
   ✅ "Trattoria Luzzi" — NOT "restaurant" or "lunch restaurant" or "dinner restaurant"
   CRITICAL: NEVER use generic terms like "restaurant", "cafe", "lunch restaurant", "dinner restaurant", "Dinner at a restaurant", "Lunch restaurant" as the "name" value. The "name" MUST always be the real venue name (e.g. "Da Enzo al 29", "Caffè Sant'Eustachio"). If you do not know a specific venue, invent a plausible real-sounding name for that city — do NOT use category words.
 - CRITICAL — NO DUPLICATE NAMES: Before adding or suggesting any new waypoint (including new days), scan every waypoint in the ENTIRE EXISTING ROUTE. NEVER use a venue name that already appears on ANY day. This applies especially when adding new days — if "Husrev" is already a lunch stop on day 1, it cannot appear on day 3 or any new day either. Choose completely different venues for new days.
+- DINING PROXIMITY RULE: Any new dining stop (restaurant, cafe, bar) you add MUST be within ~2 km of the sightseeing stops on the same day. Do NOT place a restaurant from a different neighborhood or district. If you don't know a nearby option, set latitude: null, longitude: null and use the venue's real English name — the app will geocode it.
+- DINING NAMES: NEVER invent or hallucinate restaurant/cafe names. Use only real, well-known venues you are confident exist in that city. When in doubt, use a generic but recognizable local restaurant name or set null coordinates so the app can find a real nearby option. NEVER use generic placeholders like "Local Restaurant", "Lunch Place", "Dinner Spot".
 - Use the user's language for day titles and descriptions; keep "name" in English.
 - If adding a new sightseeing POI not in the original list: set latitude: null, longitude: null. GEOCODING CRITICAL: POIs that fail geocoding will be silently removed — use internationally-recognized English names with district context only.
 
@@ -1237,15 +1241,19 @@ def _fix_route_dining(route_data: RouteData) -> RouteData:
     return route_data
 
 
-_MAX_DINING_DISTANCE_M = 2500.0  # Dining stop must be within 2.5 km of the day's sightseeing cluster
+_MAX_DINING_DISTANCE_M = 2000.0  # Dining stop must be within 2 km of at least one sightseeing stop
 
 
 def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> RouteData:
-    """Post-process: swap dining stops that are too far from the day's sightseeing cluster.
+    """Post-process: swap dining stops that are too far from the day's sightseeing stops.
 
-    For each day, compute the geographic center of sightseeing stops with known coordinates.
-    Any dining stop further than _MAX_DINING_DISTANCE_M from that center gets replaced by
-    the nearest matching dining POI from tool_pois that IS within range.
+    Uses nearest-sightseeing-stop distance instead of centroid.  A dining stop is
+    valid if it lies within _MAX_DINING_DISTANCE_M of AT LEAST ONE sightseeing stop
+    in the same day.  Centroid-based checks fail when a day has two sub-clusters
+    (the centroid falls between them and a bad restaurant "near the middle" passes).
+
+    Replacements are also ranked by nearest-sightseeing-stop distance so that the
+    chosen restaurant stays as close as possible to the actual day's activity area.
     """
     dining_pool = [
         p for p in tool_pois
@@ -1261,18 +1269,20 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
         if not wps:
             continue
 
-        # Center of sightseeing stops that have coordinates
-        sight_wps = [
-            wp for wp in wps
+        # Collect sightseeing stops that have coordinates
+        sight_coords: list[tuple[float, float]] = [
+            (wp.latitude, wp.longitude)  # type: ignore[arg-type]
+            for wp in wps
             if (wp.category or "").lower() not in _DINING_CATS
             and wp.latitude is not None
             and wp.longitude is not None
         ]
-        if not sight_wps:
+        if not sight_coords:
             continue
 
-        center_lat = sum(w.latitude for w in sight_wps) / len(sight_wps)  # type: ignore[arg-type]
-        center_lon = sum(w.longitude for w in sight_wps) / len(sight_wps)  # type: ignore[arg-type]
+        def _min_sight_dist(lat: float, lon: float) -> float:
+            """Minimum haversine distance from (lat, lon) to any sightseeing stop."""
+            return min(_haversine_meters(s_lat, s_lon, lat, lon) for s_lat, s_lon in sight_coords)
 
         # Track names already in this day to prevent duplicates
         used_names = {(wp.name or "").lower() for wp in wps}
@@ -1284,11 +1294,11 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             if wp.latitude is None or wp.longitude is None:
                 continue
 
-            dist = _haversine_meters(center_lat, center_lon, wp.latitude, wp.longitude)
+            dist = _min_sight_dist(wp.latitude, wp.longitude)
             if dist <= _MAX_DINING_DISTANCE_M:
                 continue
 
-            # Find closest in-range replacement with matching meal type
+            # Find the in-range replacement closest to the day's sightseeing area
             best: dict | None = None
             best_dist = float("inf")
             for p in dining_pool:
@@ -1301,7 +1311,7 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
                     continue
                 if cat in ("cafe", "bakery") and p_cat not in ("cafe", "bakery"):
                     continue
-                d = _haversine_meters(center_lat, center_lon, p.get("lat") or 0, p.get("lon") or 0)
+                d = _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0)
                 if d < best_dist and d <= _MAX_DINING_DISTANCE_M:
                     best_dist = d
                     best = p
@@ -1313,7 +1323,7 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
                     p_name = (p.get("name") or "").lower()
                     if p_name in used_names:
                         continue
-                    d = _haversine_meters(center_lat, center_lon, p.get("lat") or 0, p.get("lon") or 0)
+                    d = _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0)
                     if d < best_dist and d <= _MAX_DINING_DISTANCE_M:
                         best_dist = d
                         best = p
@@ -1323,7 +1333,7 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             if best is not None:
                 log_suffix = " [type fallback]" if used_fallback else ""
                 logger.info(
-                    "[DINING_PROXIMITY] Day %s: '%s' is %.0fm away → replaced by '%s' (%.0fm)%s",
+                    "[DINING_PROXIMITY] Day %s: '%s' is %.0fm from nearest sight → replaced by '%s' (%.0fm)%s",
                     day_plan.day, wp.name, dist, best.get("name"), best_dist, log_suffix,
                 )
                 used_names.discard((wp.name or "").lower())
@@ -1339,6 +1349,11 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
                     time_slot=wp.time_slot,
                 )
                 used_names.add((best.get("name") or "").lower())
+            else:
+                logger.warning(
+                    "[DINING_PROXIMITY] Day %s: '%s' is %.0fm from nearest sight — no in-range replacement found in pool",
+                    day_plan.day, wp.name, dist,
+                )
 
     return route_data
 
@@ -1424,30 +1439,80 @@ def _fix_opening_hours(route_data: RouteData) -> RouteData:
                 day_plan.day, day_plan.day_start_local,
             )
 
-        # --- Pass 2: trim duration of museum-type stops that would end after 17:00 ---
+        # --- Pass 2: trim or REMOVE museum-type stops that end/arrive after 17:00 ---
+        # First pass: compute arrival times and flag stops that arrive at or after 17:00.
+        # Second sub-pass: remove flagged stops and renumber.
         cursor = datetime.datetime.combine(datetime.date.today(), parse_hhmm(day_plan.day_start_local) or min_start)
         max_close_dt = datetime.datetime.combine(datetime.date.today(), max_venue_close)
 
-        for wp in day_plan.waypoints:
+        remove_indices: list[int] = []
+        for idx_wp, wp in enumerate(day_plan.waypoints):
             cat = (wp.category or "").lower()
             dur = wp.estimated_duration_min or 45
             departure = cursor + datetime.timedelta(minutes=dur)
-            if cat in _EARLY_VENUE_CATS and departure > max_close_dt:
-                # How many minutes are available from arrival to closing time?
-                available = int((max_close_dt - cursor).total_seconds() // 60)
-                if available >= 15:
-                    logger.info(
-                        "[OPENING_HOURS] Day %s: '%s' would end at %s (after 17:00) → trimmed to %d min",
-                        day_plan.day, wp.name, departure.strftime("%H:%M"), available,
-                    )
-                    wp.estimated_duration_min = available
-                else:
-                    # No usable time left before closing — flag it (AI should have avoided this)
+
+            if cat in _EARLY_VENUE_CATS:
+                time_slot = (wp.time_slot or "").lower()
+                # Case A: explicitly tagged as evening → always remove
+                if time_slot == "evening":
                     logger.warning(
-                        "[OPENING_HOURS] Day %s: '%s' arrives at %s with <15 min before closing",
+                        "[OPENING_HOURS] Day %s: '%s' (%s) has time_slot='evening' — "
+                        "museums/historic sites close by 17:00, removing from route",
+                        day_plan.day, wp.name, cat,
+                    )
+                    remove_indices.append(idx_wp)
+                    cursor += datetime.timedelta(minutes=dur)
+                    continue
+                # Case B: arrival already at or after 17:00 → can't visit at all, remove
+                if cursor >= max_close_dt:
+                    logger.warning(
+                        "[OPENING_HOURS] Day %s: '%s' arrives at %s (≥17:00) — "
+                        "museum/historic site is closed, removing from route",
                         day_plan.day, wp.name, cursor.strftime("%H:%M"),
                     )
+                    remove_indices.append(idx_wp)
+                    cursor += datetime.timedelta(minutes=dur)
+                    continue
+                # Case C: visit would end after 17:00 → trim duration
+                if departure > max_close_dt:
+                    available = int((max_close_dt - cursor).total_seconds() // 60)
+                    if available >= 15:
+                        logger.info(
+                            "[OPENING_HOURS] Day %s: '%s' would end at %s → trimmed to %d min",
+                            day_plan.day, wp.name, departure.strftime("%H:%M"), available,
+                        )
+                        wp.estimated_duration_min = available
+                    else:
+                        # Arrival within minutes of closing — remove
+                        logger.warning(
+                            "[OPENING_HOURS] Day %s: '%s' arrives at %s with <15 min before closing — removing",
+                            day_plan.day, wp.name, cursor.strftime("%H:%M"),
+                        )
+                        remove_indices.append(idx_wp)
+                        cursor += datetime.timedelta(minutes=dur)
+                        continue
+
             cursor += datetime.timedelta(minutes=wp.estimated_duration_min or 45)
+
+        # Remove flagged stops (iterate in reverse to keep indices valid)
+        if remove_indices:
+            # Only remove if enough sightseeing stops remain after removal
+            sight_count_after = sum(
+                1 for i, wp in enumerate(day_plan.waypoints)
+                if i not in remove_indices
+                and (wp.category or "").lower() not in _DINING_CATS
+            )
+            if sight_count_after >= _MIN_SIGHTSEEING_PER_DAY:
+                for i in sorted(remove_indices, reverse=True):
+                    del day_plan.waypoints[i]
+                # Renumber order fields
+                for seq, wp in enumerate(day_plan.waypoints):
+                    wp.order = seq + 1
+            else:
+                logger.warning(
+                    "[OPENING_HOURS] Day %s: would remove %d late museum stop(s) but only %d sightseeing left — skipping removal",
+                    day_plan.day, len(remove_indices), sight_count_after,
+                )
 
     return route_data
 
