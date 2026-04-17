@@ -18,7 +18,7 @@ def create_chat_model(settings: Settings) -> ChatOpenAI:
         api_key=settings.openai_api_key,
         model=settings.openai_model,
         temperature=0,
-        max_tokens=2500,
+        max_tokens=6000,
     )
 
 

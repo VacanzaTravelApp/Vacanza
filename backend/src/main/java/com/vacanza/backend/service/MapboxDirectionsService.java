@@ -42,7 +42,11 @@ public class MapboxDirectionsService {
         String path = "/directions/v5/mapbox/walking/" + coords;
 
         // We request GeoJSON so frontend can easily consume coordinates.
-        String uri = path + "?geometries=geojson&overview=full";
+        // exclude=ferry: walking routes must never route via ferries/boats — same-day
+        // stops that require a water crossing should be on separate days (enforced by
+        // the geographic clustering rules). Without this, Mapbox suggests e.g. the
+        // Bosphorus coastal ferry between Sarıyer and Eminönü as a "walking" connection.
+        String uri = path + "?geometries=geojson&overview=full&exclude=ferry";
 
         MapboxDirectionsResponse response;
         try {
