@@ -90,7 +90,7 @@ Category selection (CRITICAL):
 - Also include 3–5 sightseeing categories so the route builder has real coordinates for well-known places.
 - Pick 6–10 categories total.
 
-Available categories: museum, monument, historic_site, church, landmark, attraction, park, art_gallery, restaurant, fast_food, cafe, bar, market, nightlife, neighborhood, ruins
+Available categories: museum, monument, historic_site, castle, church, landmark, attraction, park, garden, art_gallery, restaurant, fast_food, cafe, bakery, bar, pub, market, shopping, nightlife, neighborhood, ruins, beach, viewpoint, zoo, aquarium, winery
 
 Trip type guidelines (minimum):
 For history trips: attraction, monument, historic_site, museum, restaurant, cafe, bar, landmark
@@ -98,6 +98,7 @@ For art trips: attraction, museum, art_gallery, landmark, cafe, restaurant, bar
 For food-focused trips: restaurant, cafe, market, bar, fast_food, nightlife, neighborhood, attraction
 For nature trips: park, neighborhood, landmark, attraction, cafe, restaurant
 For general trips: attraction, museum, monument, park, restaurant, cafe, bar, landmark
+For shopping-focused trips or destinations with famous markets/bazaars: shopping, market, restaurant, cafe, bar, neighborhood, attraction
 """
 
 # Shown after TURN1_SYSTEM when user profile / AI prefs / RAG are present (tool-call turn).
@@ -158,7 +159,7 @@ Available POIs from search (real coordinates and metadata):
 SIGHTSEEING stops (museum, monument, landmark, historic_site, park, neighborhood, attraction, church, mosque, palace, bridge, square, ruins, art_gallery):
 - Use YOUR WORLD KNOWLEDGE to pick the best sights for this destination. You know which places are iconic and must-see.
 - If a sight exists in the POI list above, use its exact coordinates from the list.
-- If a must-see sight is NOT in the POI list, add it anyway with latitude: null, longitude: null — the app will geocode it.
+- If a must-see sight is NOT in the POI list, add it anyway with latitude: null, longitude: null — the app will geocode it. GEOCODING CRITICAL: Waypoints that cannot be geocoded will be silently removed from the route — prefer POIs from the list above whenever possible, and limit null-coordinate sightseeing stops to at most 3 per day.
 - CRITICAL NAME RULE for waypoints with null coordinates: The "name" field MUST use the OFFICIAL ENGLISH / INTERNATIONAL name that mapping services recognize. Include district for disambiguation. Examples:
   ✅ "Grand Bazaar, Fatih" (NOT "Kapalı Çarşı")
   ✅ "Blue Mosque, Sultanahmet" (NOT "Sultanahmet Camii")
@@ -319,6 +320,7 @@ FULL DAY REGENERATION ("redo day 1", "1. günü tekrar yap", "1. günü yeniden 
 - Mandatory dining rhythm still applies: 1× lunch restaurant (12:00–14:00) + 1× dinner restaurant (18:00–21:00).
 - Day ends no earlier than 18:00.
 - Set latitude: null, longitude: null for all new waypoints (app will geocode).
+- GEOCODING CRITICAL: Waypoints that cannot be geocoded will be silently removed from the route. To avoid losing stops: choose only world-famous or internationally-recognized landmarks; use the official English name with district (e.g. "Topkapi Palace, Fatih", "Blue Mosque, Sultanahmet"). Never use neighborhood-only names (e.g. "Hamamonu", "Balat") as standalone waypoints — they will fail to geocode. Prefer 6 highly-geocodable POIs over 8 risky ones.
 
 PARTIAL DAY REBUILD ("keep Hagia Sophia and Blue Mosque, change the rest", "Ayasofya kalsın diğerlerini değiştir"):
 - The user explicitly names which waypoints to KEEP. Preserve those exactly (same name, times, order position).
@@ -328,6 +330,7 @@ PARTIAL DAY REBUILD ("keep Hagia Sophia and Blue Mosque, change the rest", "Ayas
 - Recalculate all arrival/departure times so the full day flows logically.
 - Set latitude: null, longitude: null for any new waypoints (app will geocode).
 - 6–8 total waypoints, day ends no earlier than 18:00.
+- GEOCODING CRITICAL: Waypoints that cannot be geocoded will be silently removed. Use only internationally-recognized English names with district context. Avoid bare neighborhood names as waypoints.
 
 DAY-LEVEL REBUILD ("make day 3 more museum-focused", "3. günü daha aktif yap"):
 - Regenerate that day's waypoints from scratch using your world knowledge.
@@ -365,6 +368,7 @@ ADD A DAY ("işim uzadı 4 gün kalacağım", "add a day", "extend to 4 days", "
 - Apply the same dining rhythm: morning cafe → lunch restaurant → afternoon cafe → dinner restaurant.
 - Append new days at the end (day N+1, N+2 …).
 - Update total_days in the JSON to reflect the new total.
+- Set latitude: null, longitude: null for all new waypoints (app will geocode). GEOCODING CRITICAL: POIs that fail geocoding will be silently removed — use only internationally-recognized English names with district context.
 
 REMOVE A DAY ("3. günü çıkar", "remove day 2", "2. günü sil", "trip is shorter now"):
 - Delete the specified day entirely.
@@ -387,7 +391,7 @@ RULES THAT ALWAYS APPLY (same as route generation)
   CRITICAL: NEVER use generic terms like "restaurant", "cafe", "lunch restaurant", "dinner restaurant", "Dinner at a restaurant", "Lunch restaurant" as the "name" value. The "name" MUST always be the real venue name (e.g. "Da Enzo al 29", "Caffè Sant'Eustachio"). If you do not know a specific venue, invent a plausible real-sounding name for that city — do NOT use category words.
 - CRITICAL — NO DUPLICATE NAMES: Before adding or suggesting any new waypoint (including new days), scan every waypoint in the ENTIRE EXISTING ROUTE. NEVER use a venue name that already appears on ANY day. This applies especially when adding new days — if "Husrev" is already a lunch stop on day 1, it cannot appear on day 3 or any new day either. Choose completely different venues for new days.
 - Use the user's language for day titles and descriptions; keep "name" in English.
-- If adding a new sightseeing POI not in the original list: set latitude: null, longitude: null.
+- If adding a new sightseeing POI not in the original list: set latitude: null, longitude: null. GEOCODING CRITICAL: POIs that fail geocoding will be silently removed — use internationally-recognized English names with district context only.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT FORMAT (MANDATORY)
@@ -725,7 +729,7 @@ def _parse_tool_call(content: str) -> dict | None:
     return data
 
 
-_DINING_CATS = frozenset({"restaurant", "cafe", "bar", "fast_food", "pub", "nightlife", "bakery"})
+_DINING_CATS = frozenset({"restaurant", "cafe", "bar", "fast_food", "pub", "nightlife", "nightclub", "bakery", "food", "market"})
 _RESTAURANT_CATS = frozenset({"restaurant", "fast_food"})
 
 
@@ -1333,12 +1337,20 @@ def _fix_geographic_spread(route_data: RouteData) -> RouteData:
     return route_data
 
 
-def _poi_names_are_related(waypoint_name: str | None, poi_name: str | None) -> bool:
+def _poi_names_are_related(
+    waypoint_name: str | None,
+    poi_name: str | None,
+    common_words: set[str] | None = None,
+) -> bool:
     """Return True if a waypoint name and a POI list name refer to the same place.
 
     Used to decide whether matching coordinates are a legitimate reference or a theft.
-    Logic: at least one significant word (>3 chars) must be shared, OR one name contains
-    the other as a substring.
+    Logic: at least one *discriminating* word (>3 chars, not in common_words) must be
+    shared, OR one name contains the other as a substring.
+
+    common_words: words that appear in many POI names (e.g. city names, "museum",
+    "mosque") and therefore carry no discriminating power. Populated by the caller
+    from the full POI list so no language-specific hardcoding is needed.
     """
     if not waypoint_name or not poi_name:
         return False
@@ -1346,27 +1358,26 @@ def _poi_names_are_related(waypoint_name: str | None, poi_name: str | None) -> b
     pn = poi_name.lower()
     if wn in pn or pn in wn:
         return True
-    w_words = {w for w in wn.split() if len(w) > 3}
-    p_words = {w for w in pn.split() if len(w) > 3}
+    exclude = common_words or set()
+    w_words = {w for w in wn.split() if len(w) > 3 and w not in exclude}
+    p_words = {w for w in pn.split() if len(w) > 3 and w not in exclude}
     return bool(w_words & p_words)
 
 
 def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dict]) -> RouteData:
-    """Post-process: detect sightseeing waypoints that carry ANOTHER POI's coordinates.
+    """Post-process: detect waypoints that carry ANOTHER POI's coordinates (coordinate theft).
 
     The AI reads a long POI list and occasionally copies a different POI's lat/lon to a
-    sightseeing stop.  The original check covered only dining POIs (e.g. "Golden Gate Bridge"
-    getting "Amber India"'s coordinates).  This expanded version covers ALL POI types,
-    including sightseeing-to-sightseeing theft (e.g. "Golden Gate Bridge" getting
-    "Lombard Street"'s coordinates).
+    waypoint. This covers ALL categories (sightseeing and dining alike).
 
-    Detection: for each sightseeing waypoint with non-null coordinates, look up those
-    coordinates (≤ 4 decimal places ≈ 11 m) in the full POI index.  If a match is found
-    and the matched POI's name is UNRELATED to the waypoint name, the coordinates are
-    cleared so the Java backend can geocode the correct location via Mapbox.
+    Detection: for each waypoint with non-null coordinates, look up those coordinates
+    (≤ 4 decimal places ≈ 11 m) in the full POI index. If a match is found and the
+    matched POI's name is UNRELATED to the waypoint name, the coordinates are cleared so
+    the Java backend can geocode the correct location via Mapbox.
 
-    Correct usage (e.g. "Hagia Sophia" using "Hagia Sophia"'s coordinates from the list)
-    is not affected — name relatedness check passes and coordinates are kept.
+    common_words: words that appear in ≥ 3 POI names are excluded from name matching
+    (city names, generic category words like "museum"/"mosque" share across many POIs
+    and would produce false positives if used as the sole discriminating signal).
     """
     if not route_data.days or not tool_pois:
         return route_data
@@ -1384,6 +1395,20 @@ def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dic
     if not coord_to_poi:
         return route_data
 
+    # Build common_words: words (>3 chars) that appear in ≥ 3 POI names.
+    # These are non-discriminating (city names, generic terms) and must not
+    # be counted as a match signal — prevents false positives like
+    # "Istanbul Museum of Modern Art" matching "Istanbul Archaeology Museums"
+    # solely because both contain "istanbul".
+    from collections import Counter
+    word_counts: Counter = Counter()
+    for p in tool_pois:
+        name = (p.get("name") or "").lower()
+        for w in name.split():
+            if len(w) > 3:
+                word_counts[w] += 1
+    common_words = {w for w, cnt in word_counts.items() if cnt >= 3}
+
     for day_plan in route_data.days:
         for wp in (day_plan.waypoints or []):
             if wp.latitude is None or wp.longitude is None:
@@ -1394,7 +1419,7 @@ def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dic
             if poi_name is None:
                 continue  # Coordinates not from list — AI world knowledge, leave alone
 
-            if _poi_names_are_related(wp.name, poi_name):
+            if _poi_names_are_related(wp.name, poi_name, common_words):
                 continue  # Correct: waypoint correctly references this POI's coordinates
 
             # Coordinate theft detected — waypoint name and list POI name are unrelated
@@ -2042,11 +2067,13 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
         if route_data:
             _log_route("AI_RAW", route_data)           # what AI produced before any fix
             route_data = _fix_route_dining(route_data)
-            route_data = _validate_sightseeing_coordinates(route_data, tool_pois)
             route_data = _fix_dining_proximity(route_data, tool_pois)
             route_data = _fix_opening_hours(route_data)
             route_data = _fix_geographic_spread(route_data)
             route_data = _optimize_route_order(route_data)
+            # Validate AFTER all post-processing so any coordinate changes made by
+            # _fix_route_dining / _fix_dining_proximity are also checked.
+            route_data = _validate_sightseeing_coordinates(route_data, tool_pois)
             _log_route("FINAL", route_data)            # what is actually sent to the user
 
     # Turn3: user wants to edit an already-generated route via chat

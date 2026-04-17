@@ -1598,10 +1598,10 @@ export default function MapPage() {
     const dayPlan = activeRoute.days?.find(
       (d) => Number(d?.day) === Number(activeDay)
     );
-    const raw = (dayPlan?.waypoints || []).map((w) => {
+    const raw = (dayPlan?.waypoints || []).map((w, i) => {
       const lat = Number(w.latitude ?? w.lat ?? NaN);
       const lon = Number(w.longitude ?? w.lon ?? NaN);
-      return { ...w, latitude: lat, longitude: lon };
+      return { ...w, latitude: lat, longitude: lon, _originalIndex: i };
     });
     return raw.filter(
       (w) => Number.isFinite(w.latitude) && Number.isFinite(w.longitude)
@@ -2086,8 +2086,9 @@ export default function MapPage() {
             </Source>
           )}
 
-          {activeWaypoints.map((wp, idx) => {
+          {activeWaypoints.map((wp) => {
             const isUnavailable = wp.unavailable === true;
+            const displayNumber = wp._originalIndex + 1;
             return (
               <Marker key={`route-wp-${wp.day}-${wp.order}`} longitude={wp.longitude} latitude={wp.latitude} anchor="center">
                 <Tooltip
@@ -2114,7 +2115,7 @@ export default function MapPage() {
                     cursor: "pointer",
                     opacity: isUnavailable ? 0.6 : 1,
                   }}>
-                    {idx + 1}
+                    {displayNumber}
                   </div>
                 </Tooltip>
               </Marker>
