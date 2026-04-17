@@ -16,6 +16,7 @@ import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.security.CurrentUserProvider;
 import com.vacanza.backend.util.PolygonRouteGeometry;
 import com.vacanza.backend.service.AiRouteService;
+import com.vacanza.backend.service.RouteEditSignalService;
 import com.vacanza.backend.service.RouteSummaryMessageService;
 import com.vacanza.backend.dto.weather.WeatherPlanningForecast;
 import com.vacanza.backend.dto.internal.PersonalizedPoiParams;
@@ -96,6 +97,7 @@ public class ChatProxyController {
         private final WeatherService weatherService;
         private final PersonalizedPoiSelector personalizedPoiSelector;
         private final com.vacanza.backend.repo.UserInteractionRepository userInteractionRepository;
+        private final RouteEditSignalService routeEditSignalService;
 
         @PostMapping("/conversations")
         public ResponseEntity<AiChatDto.ConversationCreateResponse> createConversation() {
@@ -136,7 +138,7 @@ public class ChatProxyController {
                         log.warn("Could not fetch saved POI names for user {}: {}", user.getUserId(), e.getMessage());
                 }
 
-                var existingAiPrefs = userPreferenceAiService.getExistingPreferences(user);
+                List<AiChatDto.ExtractedPreference> existingAiPrefs = userPreferenceAiService.getExistingPreferences(user);
 
                 // Inject the latest saved route so the AI service can detect route-edit intent (Turn3).
                 // Uses the same __EXISTING_ROUTE__ marker as the polygon-replan flow.
@@ -158,6 +160,15 @@ public class ChatProxyController {
                                                 String cleanRouteJson = stripEnrichedTimelineFields(routeJson);
                                                 body.setContent(originalContent + "\n__EXISTING_ROUTE__\n" + cleanRouteJson);
                                                 parentRouteForTurn3 = latest;
+
+                                                // Override preferences with destination-specific ones
+                                                // so the AI gets city-tailored category preferences
+                                                String dest = latest.getDestination();
+                                                if (dest != null && !dest.isBlank()) {
+                                                        var destPrefs = userPreferenceAiService
+                                                                .getPreferencesForDestination(user, dest);
+                                                        existingAiPrefs = destPrefs;
+                                                }
                                         }
                                 }
                         } catch (Exception e) {
@@ -570,6 +581,9 @@ public class ChatProxyController {
                                         parentRoute,
                                         reason);
                         response.setRouteId(saved.getRouteId());
+
+                        // Extract preference signals from the diff between old and new route
+                        routeEditSignalService.processEditSignals(user, parentRoute, saved);
 
                         String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
                                         response.getRouteData(), profile);

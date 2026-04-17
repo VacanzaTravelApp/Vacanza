@@ -70,6 +70,40 @@ public interface UserInteractionRepository extends JpaRepository<UserInteraction
     List<Object[]> countInteractionTypesByUser(@Param("userId") UUID userId);
 
     /**
+     * Count categories from ROUTE_EDIT_ADD or ROUTE_EDIT_REMOVE interactions.
+     * Returns rows of [category (String), count (Long)].
+     */
+    @Query(value = """
+            SELECT metadata->>'category' as cat, COUNT(*) as cnt
+            FROM user_interactions
+            WHERE user_id = :userId
+              AND interaction_type = :interactionType
+              AND metadata->>'category' IS NOT NULL
+            GROUP BY cat
+            ORDER BY cnt DESC
+            """, nativeQuery = true)
+    List<Object[]> countEditSignalCategoriesByUser(@Param("userId") UUID userId,
+                                                   @Param("interactionType") String interactionType);
+
+    /**
+     * Count edit-signal categories for a specific destination.
+     * Returns rows of [category (String), count (Long)].
+     */
+    @Query(value = """
+            SELECT metadata->>'category' as cat, COUNT(*) as cnt
+            FROM user_interactions
+            WHERE user_id = :userId
+              AND interaction_type = :interactionType
+              AND metadata->>'category' IS NOT NULL
+              AND LOWER(metadata->>'destination') = LOWER(:destination)
+            GROUP BY cat
+            ORDER BY cnt DESC
+            """, nativeQuery = true)
+    List<Object[]> countEditSignalCategoriesByUserAndDestination(@Param("userId") UUID userId,
+                                                                 @Param("interactionType") String interactionType,
+                                                                 @Param("destination") String destination);
+
+    /**
      * Returns the names of the most recently favorited POIs for a user (max 10).
      * Used to inject into the AI profile so the route builder can prioritize them.
      */

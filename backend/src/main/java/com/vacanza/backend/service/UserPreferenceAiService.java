@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -81,5 +82,47 @@ public class UserPreferenceAiService {
                     return dto;
                 })
                 .toList();
+    }
+
+    /**
+     * Returns preferences resolved for a specific destination.
+     * If a "category_preference:{destination}" entry exists, it replaces the global
+     * "category_preference" in the returned list so the AI receives a single,
+     * city-specific value instead of the generic one.
+     * All other preference keys are returned unchanged.
+     */
+    @Transactional(readOnly = true)
+    public List<AiChatDto.ExtractedPreference> getPreferencesForDestination(User user, String destination) {
+        List<AiChatDto.ExtractedPreference> all = getExistingPreferences(user);
+        if (destination == null || destination.isBlank()) return all;
+
+        String destKey = "category_preference:" + destination.trim().toLowerCase(java.util.Locale.ROOT);
+
+        // Check if a destination-specific category preference exists
+        java.util.Optional<AiChatDto.ExtractedPreference> destPref = all.stream()
+                .filter(p -> destKey.equals(p.getPreferenceKey()))
+                .findFirst();
+
+        if (destPref.isEmpty()) return all; // no override — use global as-is
+
+        // Replace global "category_preference" with the destination-specific value,
+        // and strip the raw "category_preference:{destination}" entry (not needed by AI)
+        List<AiChatDto.ExtractedPreference> resolved = new ArrayList<>();
+        for (AiChatDto.ExtractedPreference p : all) {
+            if (p.getPreferenceKey().startsWith("category_preference:")) {
+                continue; // skip all destination-specific entries from the list
+            }
+            if ("category_preference".equals(p.getPreferenceKey())) {
+                // Override with destination-specific value
+                AiChatDto.ExtractedPreference override = new AiChatDto.ExtractedPreference();
+                override.setPreferenceKey("category_preference");
+                override.setPreferenceValue(destPref.get().getPreferenceValue());
+                override.setConfidence(destPref.get().getConfidence());
+                resolved.add(override);
+            } else {
+                resolved.add(p);
+            }
+        }
+        return resolved;
     }
 }

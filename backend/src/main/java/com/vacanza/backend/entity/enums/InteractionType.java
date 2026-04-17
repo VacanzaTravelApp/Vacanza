@@ -7,7 +7,11 @@ public enum InteractionType {
     POI_VIEW,
     POI_FAVORITE,
     CATEGORY_FILTER,
-    POI_TEXT_SEARCH;
+    POI_TEXT_SEARCH,
+    /** User explicitly added POIs of this category via Turn3 chat edit. */
+    ROUTE_EDIT_ADD,
+    /** User explicitly removed POIs of this category via Turn3 chat edit. */
+    ROUTE_EDIT_REMOVE;
 
     /** API'den gelen "area_select", "poi_view" vb. string'i enum'a çevirir. */
     public static InteractionType fromApi(String value) {
