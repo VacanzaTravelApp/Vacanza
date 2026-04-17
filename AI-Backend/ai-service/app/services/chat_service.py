@@ -236,6 +236,13 @@ Before assigning POIs to days, mentally cluster them by distance:
 - POIs more than 5 km apart → assign to DIFFERENT days.
 - NEVER put two POIs on the same day if reaching both requires going 5+ km out, then 5+ km back (a "detour"). Example: Sultanahmet cluster + Rumeli Fortress 12 km away = two separate days, NOT one day.
 - Order each day's waypoints as a continuous walking/transit path — each next stop must be the nearest unvisited stop. NO zigzagging.
+
+WATER CROSSING RULE (prevents unnecessary ferry/boat rides):
+- If two places require crossing a body of water (sea, strait, lake, river) to travel between them, treat the effective travel cost as 30+ minutes regardless of straight-line distance.
+- DEFAULT: dedicate an entire day (or half-day) to one side of the water. Group ALL same-side stops together. Do NOT zigzag: European stop → Asian stop → European stop → Asian stop.
+- ALLOWED — intentional crossing (up to 2 per day): if the user explicitly requests visiting both sides of the water in one day (e.g. "cross to the Asian side in the afternoon", "take the evening ferry back"), honour it. Structure as a clean one-way arc: [Side A stops] → ferry → [Side B stops], OR [Side A morning] → ferry → [Side B afternoon] → ferry → [Side A evening]. Never more than 2 crossings in one day.
+- FORBIDDEN regardless of user request: 3+ crossings in a single day (e.g. A→B→A→B). That is always exhausting and should be split across days.
+- When the AI generates a route WITHOUT explicit user crossing requests, default to same-side grouping.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 OPENING HOURS (CRITICAL):
@@ -383,7 +390,7 @@ RULES THAT ALWAYS APPLY (same as route generation)
 - CRITICAL — category field: NEVER use "lunch restaurant" or "dinner restaurant". Use only "restaurant". The time_slot field handles meal timing (morning/afternoon/evening/lunch/dinner).
 - Museums/galleries/palaces open at 09:00 at the earliest; visits must end by 17:00.
 - day_start_local NEVER before 08:30.
-- All stops in a single day must be within ~3 km of each other (same neighborhood cluster).
+- All stops in a single day must be within ~3 km of each other (same neighborhood cluster), UNLESS the user explicitly requests a water crossing (ferry/boat) as part of the day — in that case up to 2 crossings are allowed (e.g. morning one side → ferry → afternoon/evening other side, or morning one side → ferry → other side → ferry back for dinner). Never more than 2 crossings in a single day.
 - Waypoint "name" field: OFFICIAL ENGLISH/INTERNATIONAL name only (for geocoding).
   ✅ "Grand Bazaar, Fatih" — NOT "Kapalı Çarşı"
   ✅ "Blue Mosque, Sultanahmet" — NOT "Sultanahmet Camii"
@@ -533,43 +540,86 @@ def _is_itinerary_followup(history: list[HumanMessage | AIMessage]) -> bool:
 
 
 _ROUTE_EDIT_RE = re.compile(
-    # Türkçe düzenleme fiilleri
+    # ── Turkish edit verbs ──────────────────────────────────────────────────
     r"\b(güncelle|değiştir|düzenle|yenile|revize)\w*\b"
-    # Türkçe yeniden oluşturma / tasarlama fiilleri
     r"|\b(tekrardan|yeniden|tekrar)\b"
     r"|\b(oluştur|olustur|tasarla|yarat|planla)\w*\b"
-    # İngilizce düzenleme fiilleri
-    r"|update|change|modify|edit|replace|redo|redesign|recreate|regenerate|rebuild"
-    # Miktar değişikliği: "daha çok müze", "daha az yürüyüş"
-    r"|daha\s+(çok|fazla|az)\b"
-    # Ekleme / çıkarma
+    # Turkish add/remove
     r"|\b(ekle|çıkar|kaldır)\w*\b"
-    r"|\badd\b|\bremove\b"
-    # Yemek zamanı kaydırma: "öğleyi öne al", "akşam yemeğini geciktir"
-    r"|\b(öğle|akşam|sabah|lunch|dinner|breakfast)\w*.{0,25}(al|kaydır|değiştir|öne|sonra|move|shift|earlier|later)\b"
-    # Tempo değişikliği
-    r"|\b(tempo|pace|hız)\w*.{0,20}(yavaşlat|hızlandır|slow|fast)\b"
-    # Belirli gün referansı: "3. gün", "gün 2", "day 3", "1. günü", "1. gün"
-    r"|\bgün\s*\d+\b"
-    r"|\b\d+\.\s*gün[üu]?\b"
-    r"|\bday\s*\d+\b"
-    # Gün sayısı değişikliği: "4 gün kalacağım", "4 güne genişlet", "gün sayısını 5 yap", "4 days"
-    r"|\b\d+\s*gün\b"
-    r"|\b\d+\s*days?\b"
-    r"|\bgün\s*say[ıi]\w*\b"
-    # Ayarlama / düzenleme kelimeleri
+    # Turkish dissatisfaction — "didn't like / don't want / not happy"
+    r"|\bbeğenmedim\b|\bbeğenmiyorum\b|\bbeğenmedi\w*\b"
+    r"|\bhoşlanmadım\b|\bhoşlanmıyorum\b"
+    r"|\bistemiyorum\b"
+    # Turkish quantity change — "daha çok müze", "daha az yürüyüş"
+    r"|daha\s+(çok|fazla|az)\b"
+    # Turkish adjust/extend/shorten
     r"|\bayarla\w*\b"
     r"|\bgenişlet\w*\b|\bkısalt\w*\b|\buzat\w*\b"
-    r"|\badjust\b|\bextend\b|\bshorten\b|\bexpand\b"
-    # Gün silme / çıkarma
+    # Turkish day reference with any inflection suffix: "3. günü", "3. güne", "3. gündeki", etc.
+    r"|\b\d+\.\s*gün\w*\b"
+    r"|\bgün\s*\d+\b"
+    r"|\b\d+\s*gün\w*\b"
+    r"|\bgün\s*say[ıi]\w*\b"
+    # Turkish day delete
     r"|\bgünü?\s*(sil|çıkar|kaldır)\w*\b"
-    r"|\b(sil|remove)\s*day\b"
-    # Seçim/onay — AI öneri sunmuş ve kullanıcı birini seçiyor
-    # Örn: "Osteria da Fortunata seçiyorum", "I'll go with Da Enzo", "let's pick Luzzi"
+    # Turkish selection confirmation
     r"|\bseçiyorum\b|\bseçtim\b|\bseçeceğim\b|\bonu\s+seç\w*\b"
+
+    # ── English edit verbs ──────────────────────────────────────────────────
+    r"|update|change|modify|edit|replace|redo|redesign|recreate|regenerate|rebuild"
+    r"|\badd\b|\bremove\b"
+    # English dissatisfaction — "didn't like", "don't like", "not happy with", "dislike"
+    r"|\bdidn'?t\s+like\b|\bdon'?t\s+like\b|\bdislike\b"
+    r"|\bnot\s+happy\s+with\b|\bnot\s+satisfied\b|\bnot\s+a\s+fan\b"
+    r"|\bi\s+don'?t\s+want\b"
+    # English adjust/extend/shorten
+    r"|\badjust\b|\bextend\b|\bshorten\b|\bexpand\b"
+    # English day reference: "day 3", "on day 2"
+    r"|\bday\s*\d+\b"
+    r"|\b\d+\s*days?\b"
+    r"|\b(sil|remove)\s*day\b"
+    # English selection confirmation
     r"|\bchoose\b|\bselect\b|\bpick\b"
     r"|\bi'?ll\s+(go\s+with|take|use|choose|pick|select)\b"
-    r"|\blet'?s\s+(go\s+with|use|pick|choose)\b",
+    r"|\blet'?s\s+(go\s+with|use|pick|choose)\b"
+
+    # ── French edit verbs ───────────────────────────────────────────────────
+    r"|\bmodifi\w+\b|\bchang\w+\b|\bremplace\w*\b|\brefai\w*\b"
+    r"|\bajoute\w*\b|\bsupprime\w*\b|\benlève\w*\b|\bretire\w*\b"
+    r"|\bje\s+n'?aime\s+pas\b|\bpas\s+satisfait\b"
+    r"|\bjour\s*\d+\b|\b\d+\s*jours?\b"
+
+    # ── Spanish edit verbs ──────────────────────────────────────────────────
+    r"|\bcambi\w+\b|\bmodific\w+\b|\breemplaz\w+\b|\brehac\w+\b"
+    r"|\bagrega\w*\b|\bañad\w+\b|\belimin\w+\b|\bquita\w*\b"
+    r"|\bno\s+me\s+gusta\b|\bno\s+quiero\b"
+    r"|\bdía\s*\d+\b|\b\d+\s*días?\b"
+
+    # ── German edit verbs ───────────────────────────────────────────────────
+    r"|\bändere\w*\b|\bändern\b|\bbearbeit\w+\b|\bersetze\w*\b|\berneuer\w*\b"
+    r"|\bhinzufüg\w+\b|\bentfern\w+\b|\blösch\w+\b"
+    r"|\bgefällt\s+mir\s+nicht\b|\bmag\s+ich\s+nicht\b|\bnicht\s+gut\b"
+    r"|\bTag\s*\d+\b|\b\d+\s*Tage?\b"
+
+    # ── Italian edit verbs ──────────────────────────────────────────────────
+    r"|\bcambia\w*\b|\bmodifica\w*\b|\bsostituisc\w+\b|\bricrea\w*\b"
+    r"|\baggiung\w+\b|\brimuov\w+\b|\belimin\w+\b"
+    r"|\bnon\s+mi\s+piace\b|\bnon\s+voglio\b"
+    r"|\bgiorno\s*\d+\b|\b\d+\s*giorni?\b"
+
+    # ── Portuguese edit verbs ───────────────────────────────────────────────
+    r"|\bmude\w*\b|\bmodifiqu\w+\b|\bsubstitua\w*\b|\brefaça\w*\b"
+    r"|\badicione\w*\b|\bremova\w*\b|\bremover\b|\belimin\w+\b"
+    r"|\bnão\s+gostei\b|\bnão\s+gosto\b|\bnão\s+quero\b"
+    r"|\bdia\s*\d+\b|\b\d+\s*dias?\b"
+
+    # ── Time-slot shift (any language with EN keywords) ─────────────────────
+    r"|\b(öğle|akşam|sabah|lunch|dinner|breakfast|dîner|déjeuner|cena|pranzo|almuerzo|ceia)\w*"
+    r".{0,25}(al|kaydır|değiştir|öne|sonra|move|shift|earlier|later|avant|après|prima|dopo|antes|después)\b"
+
+    # ── Pace change ────────────────────────────────────────────────────────
+    r"|\b(tempo|pace|hız|rythme|ritmo|rhythmus)\w*.{0,20}"
+    r"(yavaşlat|hızlandır|slow|fast|lent|rapide|lento|rápido|langsam|schnell)\b",
     flags=re.I,
 )
 
@@ -717,6 +767,43 @@ def _parse_weather_context(user_content: str) -> list[dict] | dict | None:
         return None
 
 
+def _strip_heavy_content_for_turn3(
+    messages: list[HumanMessage | AIMessage],
+) -> list[HumanMessage | AIMessage]:
+    """Strip large JSON payloads from history before sending to the Turn3 LLM.
+
+    Turn3 already receives the current route via the system prompt.  Previous
+    route JSONs and POI tool-result payloads in history only waste tokens and
+    can push the LLM past its effective output window, causing it to emit the
+    confirmation sentence but truncate the JSON.
+
+    - AI messages  : keep only the text before ``---ROUTE_JSON---``
+    - User messages: strip ``__TOOL_RESULT__`` (POI list) and
+                     ``__EXISTING_ROUTE__`` (injected route JSON) blocks
+    """
+    result: list[HumanMessage | AIMessage] = []
+    for msg in messages:
+        content: str = getattr(msg, "content", "") or ""
+        if isinstance(msg, AIMessage):
+            idx = content.find(ROUTE_JSON_SEPARATOR)
+            if idx != -1:
+                content = content[:idx].strip()
+        else:  # HumanMessage
+            # Strip POI tool result (can be 50 KB+)
+            idx = content.find(TOOL_RESULT_PREFIX)
+            if idx != -1:
+                content = content[:idx].strip()
+            # Strip injected existing-route JSON
+            for marker in ("\n" + EXISTING_ROUTE_MARKER, EXISTING_ROUTE_MARKER):
+                idx = content.find(marker)
+                if idx != -1:
+                    content = content[:idx].strip()
+                    break
+        if content:
+            result.append(AIMessage(content=content) if isinstance(msg, AIMessage) else HumanMessage(content=content))
+    return result
+
+
 def _parse_tool_call(content: str) -> dict | None:
     # If content contains tool result, only parse the part BEFORE the marker.
     # Otherwise rfind("}") in _extract_json_object would pick the last } from
@@ -814,18 +901,56 @@ def _haversine_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> flo
     return R * c
 
 
-def _reorder_waypoints_by_proximity(waypoints: list[RouteWaypoint]) -> list[RouteWaypoint]:
-    """Reorder waypoints using nearest-neighbor to minimize total travel distance.
-    Skips optimization if any waypoint lacks coordinates.
+# Maximum intra-cluster distance: waypoints further apart than this are treated as
+# belonging to different geographic clusters (different sides of a water body, etc.).
+# 4 km catches most cross-water pairs (e.g. Sultanahmet ↔ Kadıköy ~4.4 km across
+# the Bosphorus) while keeping nearby same-side sights together.
+_CLUSTER_GAP_THRESHOLD_M = 4_000.0
+
+
+def _geo_clusters(waypoints: list[RouteWaypoint]) -> list[list[RouteWaypoint]]:
+    """Group waypoints into geographic clusters using connected-components.
+
+    Two waypoints are in the same cluster if their haversine distance is below
+    _CLUSTER_GAP_THRESHOLD_M. Returns a list of clusters (each a non-empty list),
+    ordered by the cluster whose first member appears earliest in the input.
     """
+    n = len(waypoints)
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        parent[find(a)] = find(b)
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            wi, wj = waypoints[i], waypoints[j]
+            if (wi.latitude is None or wi.longitude is None
+                    or wj.latitude is None or wj.longitude is None):
+                continue
+            dist = _haversine_meters(wi.latitude, wi.longitude, wj.latitude, wj.longitude)
+            if dist <= _CLUSTER_GAP_THRESHOLD_M:
+                union(i, j)
+
+    # Build cluster map preserving input order
+    cluster_map: dict[int, list[RouteWaypoint]] = {}
+    for i, wp in enumerate(waypoints):
+        root = find(i)
+        cluster_map.setdefault(root, []).append(wp)
+
+    return list(cluster_map.values())
+
+
+def _nn_order(waypoints: list[RouteWaypoint]) -> list[RouteWaypoint]:
+    """Nearest-neighbor ordering for a single cluster (no cross-cluster awareness needed)."""
     if len(waypoints) < 2:
         return waypoints
-    # Check all have coordinates
-    for w in waypoints:
-        if w.latitude is None or w.longitude is None:
-            return waypoints
-    # Nearest-neighbor: try each as start, pick order with minimum total distance
-    best_order: list[RouteWaypoint] = waypoints
+    best_order = waypoints
     best_total = float("inf")
     for start_idx in range(len(waypoints)):
         remaining = list(waypoints)
@@ -845,6 +970,65 @@ def _reorder_waypoints_by_proximity(waypoints: list[RouteWaypoint]) -> list[Rout
         if total < best_total:
             best_total = total
             best_order = ordered
+    return best_order
+
+
+def _reorder_waypoints_by_proximity(waypoints: list[RouteWaypoint]) -> list[RouteWaypoint]:
+    """Reorder waypoints using cluster-aware nearest-neighbor to minimize travel distance.
+
+    Detects geographic clusters (groups of waypoints within _CLUSTER_GAP_THRESHOLD_M of
+    each other). Waypoints in different clusters are likely separated by water or a large
+    geographic gap. The algorithm keeps all waypoints within a cluster together — preventing
+    the route from alternating between two sides of a strait or lake (which would force
+    multiple ferry/boat crossings in a single day).
+
+    Within each cluster, uses standard nearest-neighbor. Clusters are then ordered by
+    their centroid proximity to minimise the single inter-cluster transition distance.
+
+    Skips optimisation if any waypoint lacks coordinates.
+    """
+    if len(waypoints) < 2:
+        return waypoints
+    for w in waypoints:
+        if w.latitude is None or w.longitude is None:
+            return waypoints
+
+    clusters = _geo_clusters(waypoints)
+
+    if len(clusters) == 1:
+        # Single cluster — standard NN (no water crossing risk)
+        ordered = _nn_order(waypoints)
+    else:
+        # Multiple clusters detected — order within each cluster, then chain clusters
+        # by nearest centroid to minimise the single cross-cluster transition.
+        logger.info(
+            "[GEO_CLUSTER] %d geographic clusters detected for %d waypoints — "
+            "keeping clusters intact to avoid water-crossing back-and-forth",
+            len(clusters), len(waypoints),
+        )
+
+        def centroid(cluster: list[RouteWaypoint]) -> tuple[float, float]:
+            lats = [w.latitude for w in cluster if w.latitude is not None]
+            lons = [w.longitude for w in cluster if w.longitude is not None]
+            return (sum(lats) / len(lats), sum(lons) / len(lons)) if lats else (0.0, 0.0)
+
+        # Order waypoints within each cluster
+        ordered_clusters = [_nn_order(c) for c in clusters]
+
+        # Chain clusters: start with the largest cluster, then pick nearest remaining
+        ordered_clusters.sort(key=len, reverse=True)
+        chained: list[list[RouteWaypoint]] = [ordered_clusters.pop(0)]
+        while ordered_clusters:
+            last_wp = chained[-1][-1]
+            lat, lon = last_wp.latitude or 0.0, last_wp.longitude or 0.0
+            nearest_idx = min(
+                range(len(ordered_clusters)),
+                key=lambda i: _haversine_meters(lat, lon, *centroid(ordered_clusters[i])),
+            )
+            chained.append(ordered_clusters.pop(nearest_idx))
+
+        ordered = [wp for c in chained for wp in c]
+
     # Reassign order field
     return [
         RouteWaypoint(
@@ -858,7 +1042,7 @@ def _reorder_waypoints_by_proximity(waypoints: list[RouteWaypoint]) -> list[Rout
             estimated_duration_min=w.estimated_duration_min,
             time_slot=w.time_slot,
         )
-        for i, w in enumerate(best_order)
+        for i, w in enumerate(ordered)
     ]
 
 
@@ -1270,14 +1454,22 @@ def _fix_opening_hours(route_data: RouteData) -> RouteData:
 
 _MAX_SPREAD_FROM_CENTROID_M = 5000.0  # Sightseeing stops > 5 km from day centroid are outliers
 _MIN_SIGHTSEEING_PER_DAY = 2  # Never drop below this many sightseeing stops in a day
+# If two geographic clusters within a day are further apart than this, remove the smaller
+# cluster entirely. Catches bimodal days (e.g. Sarıyer + Eminönü same day) that the
+# centroid-based check misses because BOTH groups are far from the shared centroid.
+_INTER_CLUSTER_SPLIT_M = 8_000.0
 
 
 def _fix_geographic_spread(route_data: RouteData) -> RouteData:
     """Post-process: remove sightseeing outliers that are geographically far from the day's cluster.
 
-    For each day, computes the centroid of all sightseeing stops with known coordinates.
-    Any sightseeing stop more than 5 km from that centroid is considered an outlier and removed,
-    provided at least _MIN_SIGHTSEEING_PER_DAY sightseeing stops remain after removal.
+    Two-pass approach:
+    1. Cluster-split pass: if sightseeing waypoints form 2+ geographic clusters whose
+       centroids are more than _INTER_CLUSTER_SPLIT_M apart, remove the smaller cluster(s).
+       This fixes bimodal days (e.g. Sarıyer + Eminönü on the same day) that the centroid
+       check misses because both groups are far from the shared midpoint.
+    2. Centroid-outlier pass: any remaining sightseeing stop more than 5 km from the
+       (now single-cluster) centroid is removed, provided _MIN_SIGHTSEEING_PER_DAY remains.
 
     Dining stops are NEVER touched by this function (use _fix_dining_proximity for those).
     """
@@ -1296,28 +1488,83 @@ def _fix_geographic_spread(route_data: RouteData) -> RouteData:
             and wp.longitude is not None
         ]
 
+        if len(sight_wps) < 2:
+            continue
+
+        # ── Pass 1: cluster-split ──────────────────────────────────────────────
+        clusters = _geo_clusters(sight_wps)
+        if len(clusters) >= 2:
+            def cluster_centroid(c: list[RouteWaypoint]) -> tuple[float, float]:
+                lats = [w.latitude for w in c if w.latitude is not None]
+                lons = [w.longitude for w in c if w.longitude is not None]
+                return (sum(lats) / len(lats), sum(lons) / len(lons)) if lats else (0.0, 0.0)
+
+            # Find the largest cluster — that is the "main" day cluster
+            main_cluster = max(clusters, key=len)
+            main_lat, main_lon = cluster_centroid(main_cluster)
+
+            outlier_names: set[str] = set()
+            for cluster in clusters:
+                if cluster is main_cluster:
+                    continue
+                c_lat, c_lon = cluster_centroid(cluster)
+                dist = _haversine_meters(main_lat, main_lon, c_lat, c_lon)
+                if dist > _INTER_CLUSTER_SPLIT_M:
+                    for wp in cluster:
+                        outlier_names.add(wp.name or "")
+                    logger.warning(
+                        "[GEO_SPREAD] Day %s: cluster of %d stop(s) is %.1f km from main cluster "
+                        "— removing: %s",
+                        day_plan.day, len(cluster), dist / 1000,
+                        [wp.name for wp in cluster],
+                    )
+
+            if outlier_names:
+                remaining = sum(1 for w in sight_wps if (w.name or "") not in outlier_names)
+                if remaining >= _MIN_SIGHTSEEING_PER_DAY:
+                    wps = [
+                        wp for wp in wps
+                        if (wp.category or "").lower() in _DINING_CATS
+                        or (wp.name or "") not in outlier_names
+                    ]
+                    for i, wp in enumerate(wps):
+                        wp.order = i + 1
+                    day_plan.waypoints = wps
+                    # Refresh sight_wps for pass 2
+                    sight_wps = [
+                        wp for wp in wps
+                        if (wp.category or "").lower() not in _DINING_CATS
+                        and wp.latitude is not None
+                        and wp.longitude is not None
+                    ]
+                else:
+                    logger.warning(
+                        "[GEO_SPREAD] Day %s: cluster split skipped — would leave fewer than %d sightseeing stops",
+                        day_plan.day, _MIN_SIGHTSEEING_PER_DAY,
+                    )
+
+        # ── Pass 2: centroid-outlier (original logic) ──────────────────────────
         if len(sight_wps) <= _MIN_SIGHTSEEING_PER_DAY:
             continue
 
         center_lat = sum(w.latitude for w in sight_wps) / len(sight_wps)  # type: ignore[arg-type]
         center_lon = sum(w.longitude for w in sight_wps) / len(sight_wps)  # type: ignore[arg-type]
 
-        outlier_names: set[str] = set()
+        outlier_names2: set[str] = set()
         for wp in sight_wps:
             d = _haversine_meters(center_lat, center_lon, wp.latitude, wp.longitude)  # type: ignore[arg-type]
             if d > _MAX_SPREAD_FROM_CENTROID_M:
-                outlier_names.add(wp.name or "")
+                outlier_names2.add(wp.name or "")
                 logger.warning(
                     "[GEO_SPREAD] Day %s: '%s' is %.1f km from day centroid → removing as outlier",
                     day_plan.day, wp.name, d / 1000,
                 )
 
-        if not outlier_names:
+        if not outlier_names2:
             continue
 
-        # Safety: ensure enough sightseeing remains after removal
         remaining_sight_count = sum(
-            1 for wp in sight_wps if (wp.name or "") not in outlier_names
+            1 for wp in sight_wps if (wp.name or "") not in outlier_names2
         )
         if remaining_sight_count < _MIN_SIGHTSEEING_PER_DAY:
             logger.warning(
@@ -1327,8 +1574,8 @@ def _fix_geographic_spread(route_data: RouteData) -> RouteData:
             continue
 
         new_wps = [
-            wp for wp in wps
-            if (wp.category or "").lower() in _DINING_CATS or (wp.name or "") not in outlier_names
+            wp for wp in (day_plan.waypoints or [])
+            if (wp.category or "").lower() in _DINING_CATS or (wp.name or "") not in outlier_names2
         ]
         for i, wp in enumerate(new_wps):
             wp.order = i + 1
@@ -2090,9 +2337,14 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             # Strip the __EXISTING_ROUTE__ block from user_content before sending to the LLM
             # (it is already baked into the system prompt; sending it twice wastes tokens).
             clean_user_content = user_content.split("\n" + EXISTING_ROUTE_MARKER)[0].strip()
+            # Strip large JSON payloads (POI lists, previous route JSONs) from history.
+            # The current route is already in the system prompt — keeping old route JSONs
+            # in history only wastes tokens and can cause the model to truncate its output
+            # before writing the full updated route JSON.
+            turn3_history = _strip_heavy_content_for_turn3(history)
             turn3 = await llm.ainvoke(
                 [SystemMessage(content=turn3_system)]
-                + history
+                + turn3_history
                 + [HumanMessage(content=clean_user_content)]
             )
             raw_ai_content = str(turn3.content)
@@ -2107,7 +2359,7 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
                 # then demand the JSON explicitly.
                 retry_turn3 = await llm.ainvoke(
                     [SystemMessage(content=turn3_system)]
-                    + history
+                    + turn3_history
                     + [HumanMessage(content=clean_user_content)]
                     + [AIMessage(content=raw_ai_content)]
                     + [HumanMessage(content="Apply the change now and output ---ROUTE_JSON--- followed by the complete updated route JSON. Do not say 'please wait' again.")]
