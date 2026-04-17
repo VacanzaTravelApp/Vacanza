@@ -19,6 +19,17 @@ const { Header, Content, Footer, Sider } = Layout;
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
 
+const THEME = {
+    coral: '#FF6B6B',
+    navy: '#1A2332',
+    teal: '#00B4D8',
+    white: '#FFFFFF',
+    text: '#1A2332',
+    subtext: '#5A6B7A',
+    glass: 'rgba(255, 255, 255, 0.85)',
+    border: 'rgba(26, 35, 50, 0.08)'
+};
+
 const BRAND_COLOR = '#FF6B6B'; // Web App Coral
 const SIDEBAR_DARK = '#1A2332'; // Web App Navy
 
