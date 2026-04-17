@@ -658,6 +658,25 @@
   outline-offset: 2px;
 }
 
+.chat-send-icon--stop {
+  background: var(--vc-primary);
+  opacity: 1 !important;
+}
+
+.chat-send-icon--stop:hover {
+  background: var(--vc-primary-hover);
+  transform: scale(1.06);
+  box-shadow: 0 3px 10px var(--vc-primary-soft-strong);
+}
+
+.chat-stop-square {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: #ffffff;
+}
+
 /* ═══ Route Updated Badge (Turn3 chat-edit indicator) ═══ */
 .route-updated-badge {
   display: inline-flex;
