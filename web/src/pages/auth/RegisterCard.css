@@ -20,7 +20,9 @@
   margin-bottom: 18px;
 }
 
-.vacanza-logo { display: none; }
+.vacanza-logo {
+  display: none;
+}
 
 .card-header h3 {
   font-family: var(--font-display);
@@ -33,7 +35,9 @@
   transition: color 1.5s ease;
 }
 
-.card-header h3 span { color: var(--vivid-coral) !important; }
+.card-header h3 span {
+  color: var(--vivid-coral) !important;
+}
 
 .header-subtext {
   font-family: var(--font-serif);
@@ -73,20 +77,42 @@
 }
 
 .register-card .ant-input::placeholder,
-.register-card .ant-input-password input::placeholder { color: var(--input-placeholder) !important; }
-.register-card .ant-input-prefix, .register-card .ant-input-suffix { color: var(--card-subtext) !important; }
+.register-card .ant-input-password input::placeholder {
+  color: var(--input-placeholder) !important;
+}
 
-.register-card .ant-form-item { margin-bottom: 12px !important; }
-.register-card .ant-form-item-label { padding-bottom: 2px !important; }
-.register-card .ant-form-item-label > label {
+.register-card .ant-input-prefix,
+.register-card .ant-input-suffix {
+  color: var(--card-subtext) !important;
+}
+
+.register-card .ant-input-password-icon {
+  color: var(--card-subtext) !important;
+}
+
+.register-card .ant-form-item {
+  margin-bottom: 12px !important;
+}
+
+.register-card .ant-form-item-label {
+  padding-bottom: 2px !important;
+}
+
+.register-card .ant-form-item-label>label {
   font-family: var(--font-sans) !important;
   font-size: 11px !important;
   font-weight: 600 !important;
   color: var(--card-subtext) !important;
 }
 
-.register-card .ant-form-item-explain-error { font-size: 11px !important; color: var(--vivid-coral) !important; }
-.register-card .ant-form-item-has-error .ant-input-affix-wrapper { border-color: var(--vivid-coral) !important; }
+.register-card .ant-form-item-explain-error {
+  font-size: 11px !important;
+  color: var(--vivid-coral) !important;
+}
+
+.register-card .ant-form-item-has-error .ant-input-affix-wrapper {
+  border-color: var(--vivid-coral) !important;
+}
 
 .register-card .cta-button.ant-btn-primary {
   width: 100%;
@@ -109,20 +135,76 @@
   filter: brightness(1.05);
 }
 
-.login-redirect { text-align: center; margin-top: 14px; font-size: 13px; font-family: var(--font-sans); color: var(--card-subtext); }
-.login-link { color: var(--vivid-teal) !important; font-weight: 600; cursor: pointer; margin-left: 4px; }
-.login-options-row { display: flex; justify-content: flex-end; margin-top: -6px; margin-bottom: 6px; }
-.forgot-password-link { font-size: 11px; cursor: pointer; transition: color 0.2s; font-family: var(--font-sans); color: var(--card-subtext); font-weight: 500;}
-.forgot-password-link:hover { color: var(--vivid-coral); }
+.login-redirect {
+  text-align: center;
+  margin-top: 14px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  color: var(--card-subtext);
+}
 
-.password-checks-container { margin-bottom: 8px; }
-.password-check-item { font-size: 10px; color: var(--input-placeholder); font-family: var(--font-sans); display: flex; align-items: center;}
-.password-check-item.valid { color: var(--card-subtext); }
-.password-check-item.valid .check-indicator { color: var(--vivid-green) !important; }
+.login-link {
+  color: var(--vivid-teal) !important;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 4px;
+}
 
-.register-card .ant-checkbox-wrapper { font-size: 11px !important; color: var(--card-subtext) !important; font-family: var(--font-sans) !important;}
-.register-card .ant-checkbox-wrapper a { color: var(--vivid-teal) !important; font-weight: 500; }
-.register-card .ant-checkbox-checked .ant-checkbox-inner { background: var(--vivid-teal) !important; border-color: var(--vivid-teal) !important; }
+.login-options-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -6px;
+  margin-bottom: 6px;
+}
+
+.forgot-password-link {
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.2s;
+  font-family: var(--font-sans);
+  color: var(--card-subtext);
+  font-weight: 500;
+}
+
+.forgot-password-link:hover {
+  color: var(--vivid-coral);
+}
+
+.password-checks-container {
+  margin-bottom: 8px;
+}
+
+.password-check-item {
+  font-size: 10px;
+  color: var(--input-placeholder);
+  font-family: var(--font-sans);
+  display: flex;
+  align-items: center;
+}
+
+.password-check-item.valid {
+  color: var(--card-subtext);
+}
+
+.password-check-item.valid .check-indicator {
+  color: var(--vivid-green) !important;
+}
+
+.register-card .ant-checkbox-wrapper {
+  font-size: 11px !important;
+  color: var(--card-subtext) !important;
+  font-family: var(--font-sans) !important;
+}
+
+.register-card .ant-checkbox-wrapper a {
+  color: var(--vivid-teal) !important;
+  font-weight: 500;
+}
+
+.register-card .ant-checkbox-checked .ant-checkbox-inner {
+  background: var(--vivid-teal) !important;
+  border-color: var(--vivid-teal) !important;
+}
 
 .preferred-name-options {
   display: flex;
