@@ -22,6 +22,8 @@ public interface TripCalendarEventRepository extends JpaRepository<TripCalendarE
 
     boolean existsByUserAndAiRouteAndEventDate(User user, AiRoute aiRoute, LocalDate eventDate);
 
+    List<TripCalendarEvent> findByUserAndAiRouteOrderByEventDateAsc(User user, AiRoute aiRoute);
+
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM TripCalendarEvent e WHERE e.user = :user AND e.aiRoute.routeId = :routeId")
     int deleteByUserAndRouteId(@Param("user") User user, @Param("routeId") UUID routeId);
