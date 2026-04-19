@@ -92,7 +92,7 @@ const ChipSelector = ({ options, value, onChange, color = "var(--theme-primary)"
             {hasMore && (
                 <div
                     onClick={onToggleMore}
-                    style={{ padding: "8px 16px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "var(--vivid-subtle-bg, rgba(0,0,0,0.05))", color: "var(--theme-primary)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                    style={{ padding: "8px 16px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "var(--vivid-subtle-bg, rgba(0,0,0,0.05))", color: color, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
                 >
                     {isExpanded ? "Less" : "More..."}
                 </div>
@@ -164,11 +164,6 @@ const FieldLabel = ({ text, subtext, color = "var(--text-sub, rgba(255,255,255,0
 );
 
 const MultiSelectRow = ({ label, values, color, onClick }) => {
-    const summary = !values || values.length === 0
-        ? "None selected" : values.length <= 2
-            ? values.map(v => formatLabel(v)).join(", ")
-            : `${values.slice(0, 2).map(v => formatLabel(v)).join(", ")} +${values.length - 2}`;
-
     return (
         <div
             onClick={onClick}
@@ -180,14 +175,22 @@ const MultiSelectRow = ({ label, values, color, onClick }) => {
         >
             <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, color: "var(--text-sub, rgba(255,255,255,0.4))", fontWeight: 700 }}>{label}</div>
-                <div style={{
-                    fontSize: 15, fontWeight: 800, marginTop: 4,
-                    color: (!values || values.length === 0) ? "var(--text-sub, rgba(255,255,255,0.3))" : color
-                }}>
-                    {summary}
+                <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {values && values.length > 0 ? values.map(v => (
+                        <div key={v} style={{
+                            background: color, color: '#fff', fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 8,
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+                        }}>
+                            {formatLabel(v)}
+                        </div>
+                    )) : (
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-sub, rgba(255,255,255,0.3))" }}>
+                            None selected
+                        </div>
+                    )}
                 </div>
             </div>
-            <RightOutlined style={{ fontSize: 12, color: "var(--text-sub, rgba(255,255,255,0.3))" }} />
+            <RightOutlined style={{ fontSize: 12, color: "var(--text-sub, rgba(255,255,255,0.3))", marginLeft: 12 }} />
         </div>
     );
 };
@@ -199,10 +202,11 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
     const filteredOptions = options.filter(opt => opt.toLowerCase().includes(search.toLowerCase()));
 
     const toggleSelection = (opt) => {
-        const uOpt = String(opt).toUpperCase();
-        const currentUpper = selectedValues.map(v => String(v).toUpperCase());
+        const normalize = (s) => String(s).toUpperCase().replace(/_/g, ' ');
+        const uOpt = normalize(opt);
+        const currentUpper = selectedValues.map(normalize);
         const newValues = currentUpper.includes(uOpt)
-            ? selectedValues.filter(v => String(v).toUpperCase() !== uOpt)
+            ? selectedValues.filter(v => normalize(v) !== uOpt)
             : [...selectedValues, opt];
         setSelectedValues(newValues);
     };
@@ -231,7 +235,7 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
                     </div>
                 </div>
             </div>
-            
+
             <div style={{ padding: "16px 24px", background: "var(--bg-main, #091120)", borderBottom: "1px solid var(--card-border, rgba(255,255,255,0.05))" }}>
                 <Input
                     prefix={<SearchOutlined style={{ color: "var(--text-sub, rgba(255,255,255,0.3))" }} />}
@@ -246,7 +250,8 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
             <div style={{ padding: "0 24px", flex: 1, overflowY: "auto" }}>
                 <div style={{ padding: "12px 0 30px" }}>
                     {filteredOptions.length > 0 ? filteredOptions.map(opt => {
-                        const isSelected = selectedValues.map(v => String(v).toUpperCase()).includes(String(opt).toUpperCase());
+                        const normalize = (s) => String(s).toUpperCase().replace(/_/g, ' ');
+                        const isSelected = selectedValues.map(normalize).includes(normalize(opt));
                         return (
                             <div
                                 key={opt}
@@ -273,7 +278,7 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
                     )}
                 </div>
             </div>
-            
+
             <div style={{ padding: "20px 24px 30px", background: "var(--bg-main, #0D1526)", borderTop: "1px solid var(--card-border, rgba(255,255,255,0.1))" }}>
                 <Button type="primary" block size="large" onClick={handleDone} style={{ height: 56, borderRadius: 16, fontSize: 16, fontWeight: 900, background: "var(--theme-primary)", border: "none", color: "#fff" }}>
                     Done ({selectedValues.length})
@@ -283,19 +288,19 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
     );
 };
 
-const MainView = ({ 
-    preferencesForm, updatePrefsMutation, watchCategories, watchTravelStyle, watchActivityLevel, 
-    watchCuisines, watchDietary, watchAccessibility, watchTripPace, watchAccommodationType, 
+const MainView = ({
+    preferencesForm, updatePrefsMutation, watchCategories, watchTravelStyle, watchActivityLevel,
+    watchCuisines, watchDietary, watchAccessibility, watchTripPace, watchAccommodationType,
     watchTransportPreference, watchLanguage, watchSpokenLanguages,
     showMoreTravel, setShowMoreTravel, showMoreAccommodation, setShowMoreAccommodation,
     showMoreTransport, setShowMoreTransport, showAdvanced, setShowAdvanced,
     handleOpenPicker, onClose,
     accentBlue, accentOrange, accentRed, accentPurple, accentGreen,
     optionTravelStyle, optionTripPace, optionAccommodationType, optionTransportPreference, optionLanguages,
-    isDarkMode = true
+    isDarkMode = true, hidden
 }) => (
-    <div style={{ background: "var(--bg-main, #0D1526)", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ 
+    <div style={{ background: "var(--bg-main, #0D1526)", height: "100%", display: hidden ? "none" : "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{
             padding: "0 24px", background: "var(--bg-main, #0D1526)", zIndex: 10,
             paddingBottom: "12px", borderBottom: "1px solid var(--card-border, rgba(255,255,255,0.1))"
         }}>
@@ -315,7 +320,7 @@ const MainView = ({
             </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 40px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 100px" }}>
             <Form form={preferencesForm} layout="vertical" onFinish={(v) => updatePrefsMutation.mutate(v)}>
                 <Form.Item name="favoriteCategories" noStyle><input type="hidden" /></Form.Item>
                 <Form.Item name="cuisinePreferences" noStyle><input type="hidden" /></Form.Item>
@@ -333,7 +338,7 @@ const MainView = ({
                 <ChipSelector
                     options={optionTravelStyle}
                     value={watchTravelStyle}
-                    isMulti={true}
+                    isMulti={false}
                     onChange={v => preferencesForm.setFieldsValue({ travelStyle: v })}
                     color={accentBlue}
                     maxVisible={5}
@@ -342,8 +347,7 @@ const MainView = ({
                 />
 
                 <FieldLabel text="Favorite Categories" />
-                <ChipSelector options={watchCategories} value={watchCategories} isMulti={true} color={accentBlue} maxVisible={3} />
-                <MultiSelectRow label="Select categories" values={watchCategories} color={accentBlue} onClick={() => handleOpenPicker('categories')} />
+                <MultiSelectRow label="Select categories" values={watchCategories} color={accentBlue} onClick={() => handleOpenPicker('favoriteCategories')} />
 
                 <FieldLabel text="Daily Budget" />
                 <Row gutter={10}>
@@ -360,10 +364,11 @@ const MainView = ({
                                 }}
                             >
                                 <InputNumber
+                                    min={0}
                                     placeholder="150"
-                                    style={{ 
-                                        width: '100%', borderRadius: 12, height: 48, 
-                                        display: 'flex', alignItems: 'center', 
+                                    style={{
+                                        width: '100%', borderRadius: 12, height: 48,
+                                        display: 'flex', alignItems: 'center',
                                         background: "var(--vivid-subtle-bg, transparent)", fontSize: 16, fontWeight: 800
                                     }}
                                 />
@@ -381,15 +386,13 @@ const MainView = ({
                 <SegmentedControl isDarkMode={isDarkMode} options={["LOW", "MODERATE", "HIGH"]} value={watchActivityLevel} onChange={v => preferencesForm.setFieldsValue({ activityLevel: v })} />
 
                 <FieldLabel text="Cuisine Preferences" />
-                <ChipSelector options={watchCuisines} value={watchCuisines} isMulti={true} color={accentOrange} maxVisible={3} />
-                <MultiSelectRow label="Select cuisines" values={watchCuisines} color={accentOrange} onClick={() => handleOpenPicker('cuisines')} />
+                <MultiSelectRow label="Select cuisines" values={watchCuisines} color={accentOrange} onClick={() => handleOpenPicker('cuisinePreferences')} />
 
                 <FieldLabel text="Dietary Restrictions" subtext="Used by AI filter" />
-                <ChipSelector options={watchDietary} value={watchDietary} isMulti={true} color={accentRed} maxVisible={3} />
-                <MultiSelectRow label="Select dietary" values={watchDietary} color={accentRed} onClick={() => handleOpenPicker('dietary')} />
+                <MultiSelectRow label="Select dietary" values={watchDietary} color={accentRed} onClick={() => handleOpenPicker('dietaryRestrictions')} />
 
                 <FieldLabel text="Accessibility Needs" />
-                <MultiSelectRow label="Select accessibility" values={watchAccessibility} color={accentPurple} onClick={() => handleOpenPicker('accessibility')} />
+                <MultiSelectRow label="Select accessibility" values={watchAccessibility} color={accentPurple} onClick={() => handleOpenPicker('accessibilityNeeds')} />
 
                 <FieldLabel text="Trip Pace" />
                 <SegmentedControl isDarkMode={isDarkMode} options={optionTripPace} value={watchTripPace} onChange={v => preferencesForm.setFieldsValue({ tripPace: v })} />
@@ -424,8 +427,17 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
     const [showMoreAccommodation, setShowMoreAccommodation] = useState(false);
     const [showMoreTransport, setShowMoreTransport] = useState(false);
 
+    // Fix Ant Design Modal scroll re-mounting bug
+    const modalRender = React.useCallback((modal) => (
+        <div className="modal-shell">
+            <div className={themeClass} style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                {modal}
+            </div>
+        </div>
+    ), [themeClass]);
+
     useEffect(() => {
-        if (open && preferences && view === 'MAIN') {
+        if (open && preferences) {
             preferencesForm.setFieldsValue({
                 favoriteCategories: preferences.favoriteCategories || [],
                 cuisinePreferences: preferences.cuisinePreferences || [],
@@ -442,7 +454,8 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
                 budgetCurrency: preferences.budgetCurrency || 'EUR',
             });
         }
-    }, [open, preferences, preferencesForm, view]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, preferences]);
 
     const updatePrefsMutation = useMutation({
         mutationFn: (values) => userApi.updatePreferences(values),
@@ -459,10 +472,10 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
     };
 
     const pickerData = useMemo(() => {
-        if (pickerField === 'categories') return { title: "Categories", options: ["MUSEUMS", "NATURE", "NIGHTLIFE", "SHOPPING", "FOOD", "BEACH", "HISTORY", "ADVENTURE", "ART", "MUSIC", "SPORTS", "RELAXATION"], color: isDarkMode ? "#38BDF8" : "#FF6B6B" };
-        if (pickerField === 'cuisines') return { title: "Cuisines", options: ["ITALIAN", "FRENCH", "JAPANESE", "CHINESE", "MEXICAN", "INDIAN", "THAI", "SPANISH", "GREEK", "TURKISH", "LEBANESE", "VIETNAMESE", "KOREAN", "MEDITERRANEAN", "VEGETARIAN", "VEGAN", "LOCAL_SPECIALTY", "SEAFOOD", "BBQ"], color: "#F4A261" };
-        if (pickerField === 'dietary') return { title: "Dietary", options: ["NO_RESTRICTIONS", "VEGETARIAN", "VEGAN", "PESCATARIAN", "GLUTEN_FREE", "DAIRY_FREE", "NUT_ALLERGY", "SHELLFISH_ALLERGY", "KOSHER", "HALAL", "KETO", "PALEO"], color: "#FF6B6B" };
-        if (pickerField === 'accessibility') return { title: "Accessibility", options: ["WHEELCHAIR_ACCESSIBLE", "NO_STAIRS", "ELEVATOR", "VISUAL_IMPAIRMENT", "HEARING_IMPAIRMENT", "SERVICE_ANIMAL", "EASY_WALKING"], color: "#9C27B0" };
+        if (pickerField === 'favoriteCategories') return { title: "Categories", options: ["PARK", "MUSEUM", "RESTAURANT", "NATURE", "NIGHTLIFE", "SHOPPING", "FOOD", "BEACH", "HISTORY", "ADVENTURE", "ART", "MUSIC", "SPORTS", "RELAXATION", "CAFE", "BAR"], color: isDarkMode ? "#38BDF8" : "#FF6B6B" };
+        if (pickerField === 'cuisinePreferences') return { title: "Cuisines", options: ["ITALIAN", "FRENCH", "JAPANESE", "CHINESE", "MEXICAN", "INDIAN", "THAI", "SPANISH", "GREEK", "TURKISH", "LEBANESE", "VIETNAMESE", "KOREAN", "MEDITERRANEAN", "VEGETARIAN", "VEGAN", "LOCAL_SPECIALTY", "SEAFOOD", "BBQ"], color: "#F4A261" };
+        if (pickerField === 'dietaryRestrictions') return { title: "Dietary", options: ["NO_RESTRICTIONS", "NONE", "VEGETARIAN", "VEGAN", "PESCATARIAN", "GLUTEN_FREE", "DAIRY_FREE", "NUT_ALLERGY", "SHELLFISH_ALLERGY", "KOSHER", "HALAL", "KETO", "PALEO"], color: "#FF6B6B" };
+        if (pickerField === 'accessibilityNeeds') return { title: "Accessibility", options: ["WHEELCHAIR_ACCESSIBLE", "WHEELCHAIR", "NO_STAIRS", "ELEVATOR", "VISUAL_IMPAIRMENT", "HEARING_IMPAIRMENT", "SERVICE_ANIMAL", "EASY_WALKING"], color: "#9C27B0" };
         if (pickerField === 'spokenLanguages') return { title: "Languages", options: ["en", "tr", "de", "fr", "es", "it", "pt", "ar", "zh", "ja", "ko", "ru", "nl", "sv", "no", "da", "fi", "pl", "el", "hi", "bn", "ur"], color: isDarkMode ? "#38BDF8" : "#FF6B6B" };
         return { title: "", options: [], color: "#000" };
     }, [pickerField]);
@@ -518,12 +531,12 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
                 styles={{
                     body: {
                         height: 750,
-                        overflowY: 'auto',
+                        maxHeight: '85vh',
+                        overflow: 'hidden',
                         padding: 0,
                         display: 'flex',
                         flexDirection: 'column',
                         borderRadius: 40,
-                        overscrollBehavior: 'contain'
                     },
                     content: {
                         background: 'transparent',
@@ -534,31 +547,25 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
                         overflow: 'hidden'
                     }
                 }}
-                modalRender={(modal) => (
-                    <div className="modal-shell">
-                        <div className={themeClass} style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                            {modal}
-                        </div>
-                    </div>
-                )}
+                modalRender={modalRender}
             >
-                {view === 'MAIN' ? (
-                    <MainView 
+                <MainView
+                    hidden={view !== 'MAIN'}
+                    isDarkMode={isDarkMode}
+                    preferencesForm={preferencesForm} updatePrefsMutation={updatePrefsMutation}
+                    watchCategories={watchCategories} watchTravelStyle={watchTravelStyle} watchActivityLevel={watchActivityLevel}
+                    watchCuisines={watchCuisines} watchDietary={watchDietary} watchAccessibility={watchAccessibility} watchTripPace={watchTripPace} watchAccommodationType={watchAccommodationType}
+                    watchTransportPreference={watchTransportPreference} watchLanguage={watchLanguage} watchSpokenLanguages={watchSpokenLanguages}
+                    showMoreTravel={showMoreTravel} setShowMoreTravel={setShowMoreTravel} showMoreAccommodation={showMoreAccommodation} setShowMoreAccommodation={setShowMoreAccommodation}
+                    showMoreTransport={showMoreTransport} setShowMoreTransport={setShowMoreTransport} showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
+                    handleOpenPicker={handleOpenPicker} onClose={onClose}
+                    accentBlue={accentBlue} accentOrange={accentOrange} accentRed={accentRed} accentPurple={accentPurple} accentGreen={accentGreen}
+                    optionTravelStyle={optionTravelStyle} optionTripPace={optionTripPace} optionAccommodationType={optionAccommodationType} optionTransportPreference={optionTransportPreference} optionLanguages={optionLanguages}
+                />
+                {view === 'PICKER' && (
+                    <FullScreenPickerView
                         isDarkMode={isDarkMode}
-                        preferencesForm={preferencesForm} updatePrefsMutation={updatePrefsMutation} 
-                        watchCategories={watchCategories} watchTravelStyle={watchTravelStyle} watchActivityLevel={watchActivityLevel} 
-                        watchCuisines={watchCuisines} watchDietary={watchDietary} watchAccessibility={watchAccessibility} watchTripPace={watchTripPace} watchAccommodationType={watchAccommodationType} 
-                        watchTransportPreference={watchTransportPreference} watchLanguage={watchLanguage} watchSpokenLanguages={watchSpokenLanguages}
-                        showMoreTravel={showMoreTravel} setShowMoreTravel={setShowMoreTravel} showMoreAccommodation={showMoreAccommodation} setShowMoreAccommodation={setShowMoreAccommodation}
-                        showMoreTransport={showMoreTransport} setShowMoreTransport={setShowMoreTransport} showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
-                        handleOpenPicker={handleOpenPicker} onClose={onClose}
-                        accentBlue={accentBlue} accentOrange={accentOrange} accentRed={accentRed} accentPurple={accentPurple} accentGreen={accentGreen}
-                        optionTravelStyle={optionTravelStyle} optionTripPace={optionTripPace} optionAccommodationType={optionAccommodationType} optionTransportPreference={optionTransportPreference} optionLanguages={optionLanguages}
-                    />
-                ) : (
-                    <FullScreenPickerView 
-                        isDarkMode={isDarkMode}
-                        title={pickerData.title} options={pickerData.options} fieldName={pickerField} form={preferencesForm} onBack={() => setView('MAIN')} themeColor={pickerData.color} 
+                        title={pickerData.title} options={pickerData.options} fieldName={pickerField} form={preferencesForm} onBack={() => setView('MAIN')} themeColor={pickerData.color}
                     />
                 )}
             </Modal>
