@@ -33,6 +33,7 @@ import VacanzaChat, {
   linkPolygonRouteConversation,
 } from "../features/ai/components/VacanzaChat";
 import RoutePanel from "../features/ai/components/RoutePanel";
+import SavedPoisPanel from "../features/ai/components/SavedPoisPanel";
 import ProfileModal from "./ProfileModal";
 import PreferencesModal from "./PreferencesModal";
 import CalendarModal from "./CalendarModal";
@@ -769,6 +770,7 @@ export default function MapPage() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(false);
+  const [savedPoisOpen, setSavedPoisOpen] = useState(false);
 
   // 1. Initial State Calculation (Clock-driven unless manual)
   // (isDarkMode is now initialized above)
@@ -1842,6 +1844,13 @@ export default function MapPage() {
           >
             <span className="header-action-label" style={{ padding: "0 4px" }}>Book</span>
           </button>
+          <button
+            className={`header-action-btn vivid-interactive${savedPoisOpen ? " header-action-btn--active" : ""}`}
+            onClick={() => setSavedPoisOpen((v) => !v)}
+            title="Saved Places"
+          >
+            {savedPoisOpen ? <HeartFilled style={{ fontSize: 16 }} /> : <HeartOutlined style={{ fontSize: 16 }} />}
+          </button>
           <div
             className="vivid-theme-toggle"
             onClick={toggleTheme}
@@ -2180,6 +2189,19 @@ export default function MapPage() {
             </Tooltip>
           </div>
         </div>
+
+        {/* Saved Places Panel */}
+        {savedPoisOpen && (
+          <SavedPoisPanel
+            onClose={() => setSavedPoisOpen(false)}
+            onFlyTo={(lat, lng) => {
+              const map = mapRef.current?.getMap?.();
+              if (map) {
+                map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 });
+              }
+            }}
+          />
+        )}
 
         {/* 5. Filter Panel (Glass) */}
         {filterOpen && (

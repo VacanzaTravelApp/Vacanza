@@ -21,3 +21,9 @@ export async function fetchFeedbackAffinity() {
   const { data } = await http.get("/api/feedback/affinity");
   return data;
 }
+
+/** GET /api/feedback/saved-pois — liked POIs with display info, sorted by recency. */
+export async function fetchSavedPois() {
+  const { data } = await http.get("/api/feedback/saved-pois");
+  return data;
+}

@@ -12,4 +12,6 @@ public interface UserPoiFeedbackRepository extends JpaRepository<UserPoiFeedback
     Optional<UserPoiFeedback> findByUser_UserIdAndPoiKey(UUID userId, String poiKey);
 
     List<UserPoiFeedback> findByUser_UserId(UUID userId);
+
+    List<UserPoiFeedback> findByUser_UserIdAndScoreGreaterThan(UUID userId, double score);
 }

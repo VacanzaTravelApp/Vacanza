@@ -4,6 +4,7 @@ import com.vacanza.backend.config.PoiFeedbackProperties;
 import com.vacanza.backend.dto.enums.PoiFeedbackEventType;
 import com.vacanza.backend.dto.internal.PoiFeedbackContext;
 import com.vacanza.backend.dto.request.PoiFeedbackEventRequestDTO;
+import com.vacanza.backend.dto.response.SavedPoiDTO;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.UserCategoryAffinity;
 import com.vacanza.backend.entity.UserPoiFeedback;
@@ -14,9 +15,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -76,7 +80,7 @@ public class UserFeedbackService {
 
         String poiKey = resolvePoiStorageKey(req);
         if (poiKey != null) {
-            upsertPoi(user, poiKey, dPoi);
+            upsertPoi(user, poiKey, dPoi, req);
         }
         if (req.categoryKeys() != null) {
             for (String raw : req.categoryKeys()) {
@@ -100,7 +104,7 @@ public class UserFeedbackService {
         return PoiFeedbackKeyUtil.waypointIdentityKey(req.waypointName(), req.latitude(), req.longitude());
     }
 
-    private void upsertPoi(User user, String poiKey, double delta) {
+    private void upsertPoi(User user, String poiKey, double delta, PoiFeedbackEventRequestDTO req) {
         var existing = poiFeedbackRepository.findByUser_UserIdAndPoiKey(user.getUserId(), poiKey);
         double base = existing.map(UserPoiFeedback::getScore).orElse(0.0);
         double next = clamp(base + delta);
@@ -112,7 +116,35 @@ public class UserFeedbackService {
         row.setUser(user);
         row.setPoiKey(poiKey);
         row.setScore(next);
+        if (req != null) {
+            if (req.waypointName() != null && !req.waypointName().isBlank()) {
+                row.setPoiName(req.waypointName().trim());
+            }
+            if (req.categoryKeys() != null && !req.categoryKeys().isEmpty()) {
+                row.setPoiCategory(req.categoryKeys().get(0));
+            }
+            if (req.latitude() != null) row.setPoiLatitude(req.latitude());
+            if (req.longitude() != null) row.setPoiLongitude(req.longitude());
+        }
         poiFeedbackRepository.save(row);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SavedPoiDTO> getSavedPois(UUID userId) {
+        return poiFeedbackRepository.findByUser_UserIdAndScoreGreaterThan(userId, 0.0)
+                .stream()
+                .filter(r -> r.getPoiName() != null && !r.getPoiName().isBlank())
+                .sorted(Comparator.comparing(UserPoiFeedback::getUpdatedAt).reversed())
+                .map(r -> new SavedPoiDTO(
+                        r.getPoiKey(),
+                        r.getPoiName(),
+                        r.getPoiCategory(),
+                        r.getPoiLatitude(),
+                        r.getPoiLongitude(),
+                        r.getScore(),
+                        r.getUpdatedAt()
+                ))
+                .collect(Collectors.toList());
     }
 
     private void upsertCategory(User user, String categoryKey, double delta) {
