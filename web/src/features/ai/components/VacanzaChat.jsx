@@ -13,6 +13,7 @@ import {
 import { Rnd } from "react-rnd";
 import "../styles/vacanzaChat.css";
 import { normalizeRouteForMap } from "../utils/routeMap";
+import { getTipsForCity } from "../data/loadingTips";
 import RouteCardFeedback from "./RouteCardFeedback";
 import EventRecommendations from "./EventRecommendations";
 
@@ -390,6 +391,9 @@ export default function VacanzaChat({
   const dragNodeRef = useRef(null);
   const abortControllerRef = useRef(null);
   const lastSentTextRef = useRef(null);
+  const [currentTip, setCurrentTip] = useState(null);
+  const tipPoolRef = useRef([]);
+  const tipIndexRef = useRef(0);
 
   const ticketStateKey = (msgId, rIdx) => `${msgId}-r${rIdx}`;
 
@@ -697,6 +701,19 @@ export default function VacanzaChat({
     handleSendMessage(text);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!loading) { setCurrentTip(null); return; }
+    const cityHint = lastSentTextRef.current || "";
+    tipPoolRef.current = getTipsForCity(cityHint);
+    tipIndexRef.current = 0;
+    setCurrentTip(tipPoolRef.current[0] || null);
+    const interval = setInterval(() => {
+      tipIndexRef.current = (tipIndexRef.current + 1) % tipPoolRef.current.length;
+      setCurrentTip(tipPoolRef.current[tipIndexRef.current]);
+    }, 9000);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   if (!isOpen) return null;
 
@@ -1092,11 +1109,31 @@ export default function VacanzaChat({
               <div className="chat-row ai-row">
                 <div className="message-bubble ai-bubble chat-typing-bubble">
                   <span className="chat-typing-label">
-                    <span className="chat-typing-dots" aria-hidden>
-                      <span /><span /><span />
-                    </span>
+                    <span className="chat-typing-dots" aria-hidden><span /><span /><span /></span>
                     Thinking…
                   </span>
+                  {currentTip && (
+                    <div className="chat-tip-card" key={currentTip.tip}>
+                      <span className="chat-tip-label">Travel tip</span>
+                      <p className="chat-tip-text">{currentTip.tip}</p>
+                      <div className="chat-tip-footer">
+                        {currentTip.city
+                          ? <span className="chat-tip-city">{currentTip.city}</span>
+                          : <span />
+                        }
+                        <button
+                          type="button"
+                          className="chat-tip-next"
+                          onClick={() => {
+                            tipIndexRef.current = (tipIndexRef.current + 1) % tipPoolRef.current.length;
+                            setCurrentTip(tipPoolRef.current[tipIndexRef.current]);
+                          }}
+                        >
+                          next tip →
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
