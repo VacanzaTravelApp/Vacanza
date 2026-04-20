@@ -78,9 +78,13 @@ public final class AiChatDto {
         @JsonProperty("route_data")
         private RouteData routeData;
 
-        /** Short contextual message about the route (e.g. "Müzeleri sevdiğini biliyordum, o yüzden rotanda ağırlıklı olarak müzeler var."). */
+        /** Short contextual message about the route. */
         @JsonProperty("route_summary_message")
         private String routeSummaryMessage;
+
+        /** ID of the saved assistant message in the Python service DB. */
+        @JsonProperty("message_id")
+        private UUID messageId;
 
         /**
          * Persisted {@code ai_routes.route_id} after this turn saved route JSON (Java-only).

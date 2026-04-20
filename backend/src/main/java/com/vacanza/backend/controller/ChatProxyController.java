@@ -528,6 +528,9 @@ public class ChatProxyController {
                                                 response.getRouteData(), profile);
                                 if (summaryMessage != null) {
                                         response.setRouteSummaryMessage(summaryMessage);
+                                        if (response.getMessageId() != null) {
+                                                aiServiceClient.updateMessageContent(conversationId, response.getMessageId(), summaryMessage);
+                                        }
                                 }
                         }
                 } catch (Exception e) {
@@ -575,6 +578,9 @@ public class ChatProxyController {
                                         response.getRouteData(), profile);
                         if (summaryMessage != null) {
                                 response.setRouteSummaryMessage(summaryMessage);
+                                if (response.getMessageId() != null) {
+                                        aiServiceClient.updateMessageContent(conversationId, response.getMessageId(), summaryMessage);
+                                }
                         }
                 } catch (Exception e) {
                         log.warn("[TURN3] Failed to save versioned route (non-blocking): {}", e.getMessage());

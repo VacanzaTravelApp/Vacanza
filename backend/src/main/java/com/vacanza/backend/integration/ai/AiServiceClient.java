@@ -129,6 +129,20 @@ public class AiServiceClient {
      *
      * @return empty if the call fails or returns no body
      */
+    public void updateMessageContent(UUID conversationId, UUID messageId, String content) {
+        try {
+            webClient.patch()
+                    .uri("/chat/conversations/{convId}/messages/{msgId}", conversationId, messageId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(java.util.Map.of("content", content))
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block(Duration.ofSeconds(10));
+        } catch (Exception e) {
+            log.warn("Failed to update message content (non-blocking): {}", e.getMessage());
+        }
+    }
+
     public Optional<AiChatDto.EventRecommendAiResponse> recommendEventsForRoute(
             UUID userId,
             AiChatDto.EventRecommendAiRequest body) {
