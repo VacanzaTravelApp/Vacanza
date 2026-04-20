@@ -2535,4 +2535,4 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
         embedding_user_task, embedding_assistant_task, extraction_task
     )
 
-    return ai_content, extraction_result, route_data
+    return ai_content, extraction_result, route_data, assistant_msg.id

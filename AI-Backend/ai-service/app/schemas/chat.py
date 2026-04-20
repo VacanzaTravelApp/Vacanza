@@ -186,3 +186,4 @@ class MessageSendResponse(BaseModel):
     content: str
     extracted_preferences: list[ExtractedPreference] = Field(default_factory=list)
     route_data: RouteData | None = None
+    message_id: UUID | None = None
