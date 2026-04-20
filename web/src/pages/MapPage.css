@@ -293,6 +293,18 @@ a,
     border-color: var(--theme-primary);
 }
 
+.header-action-btn--active {
+    background: rgba(255, 107, 107, 0.10);
+    color: #FF6B6B;
+    border-color: rgba(255, 107, 107, 0.25);
+}
+
+.theme-night .header-action-btn--active {
+    background: rgba(56, 189, 248, 0.12);
+    color: #38BDF8;
+    border-color: rgba(56, 189, 248, 0.25);
+}
+
 .header-action-label {
     font-weight: 700;
     letter-spacing: -0.01em;
