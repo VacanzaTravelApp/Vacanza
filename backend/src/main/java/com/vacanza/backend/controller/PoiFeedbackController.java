@@ -4,6 +4,7 @@ import com.vacanza.backend.dto.enums.PoiFeedbackEventType;
 import com.vacanza.backend.dto.internal.PoiFeedbackContext;
 import com.vacanza.backend.dto.request.PoiFeedbackEventRequestDTO;
 import com.vacanza.backend.dto.request.RouteFeedbackRequestDTO;
+import com.vacanza.backend.dto.response.SavedPoiDTO;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.security.CurrentUserProvider;
 import com.vacanza.backend.service.UserFeedbackService;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -59,6 +61,12 @@ public class PoiFeedbackController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
         return ResponseEntity.accepted().build();
+    }
+
+    @GetMapping("/saved-pois")
+    public ResponseEntity<List<SavedPoiDTO>> getSavedPois() {
+        User user = currentUserProvider.getCurrentUserEntity();
+        return ResponseEntity.ok(userFeedbackService.getSavedPois(user.getUserId()));
     }
 
     @PostMapping("/poi-events")
