@@ -1649,6 +1649,58 @@ def _fix_geographic_spread(route_data: RouteData) -> RouteData:
     return route_data
 
 
+def _fix_duplicate_waypoints(route_data: RouteData) -> RouteData:
+    """Post-process: remove waypoints whose normalized name appears more than once across all days.
+
+    Keeps the first occurrence (earliest day, earliest order). Subsequent duplicates
+    are removed provided the day retains at least _MIN_SIGHTSEEING_PER_DAY sightseeing stops.
+    """
+    if not route_data.days:
+        return route_data
+
+    seen: set[str] = set()
+
+    for day_plan in route_data.days:
+        if not day_plan.waypoints:
+            continue
+
+        to_remove: set[int] = set()
+        for idx, wp in enumerate(day_plan.waypoints):
+            key = (wp.name or "").strip().lower()
+            if not key:
+                continue
+            if key in seen:
+                to_remove.add(idx)
+            else:
+                seen.add(key)
+
+        if not to_remove:
+            continue
+
+        sight_count_after = sum(
+            1 for i, wp in enumerate(day_plan.waypoints)
+            if i not in to_remove and (wp.category or "").lower() not in _DINING_CATS
+        )
+        if sight_count_after < _MIN_SIGHTSEEING_PER_DAY:
+            logger.warning(
+                "[DUPLICATE_WP] Day %s: skipping duplicate removal — would leave fewer than %d sightseeing stops",
+                day_plan.day, _MIN_SIGHTSEEING_PER_DAY,
+            )
+            continue
+
+        for i in sorted(to_remove, reverse=True):
+            logger.warning(
+                "[DUPLICATE_WP] Day %s: removing duplicate '%s'",
+                day_plan.day, day_plan.waypoints[i].name,
+            )
+            del day_plan.waypoints[i]
+
+        for i, wp in enumerate(day_plan.waypoints):
+            wp.order = i + 1
+
+    return route_data
+
+
 def _poi_names_are_related(
     waypoint_name: str | None,
     poi_name: str | None,
@@ -1864,6 +1916,27 @@ def _parse_route_from_response(raw_content: str) -> tuple[str, RouteData | None]
                 pass
         logger.warning("Failed to parse route JSON from AI response: %s", e)
         return text_content, None
+
+
+_TRIVIAL_MESSAGE_RE = re.compile(
+    r"^[\s\W]*("
+    r"teşekkür\w*|tamam|harika|süper|güzel|mükemmel|anladım|tamamdır|olur|evet|hayır|"
+    r"thanks?|thank\s+you|great|perfect|awesome|got\s+it|understood|sure|cool|nice|wow|okay|ok|"
+    r"merci|parfait|danke|grazie|gracias|genial|super|gut"
+    r")[\s\W]*$",
+    re.I | re.UNICODE,
+)
+_TRIVIAL_MAX_CHARS = 25
+
+
+def _is_trivial_message(text: str) -> bool:
+    """Return True if the message is a short acknowledgment with no extractable preference."""
+    stripped = text.strip()
+    return bool(stripped and len(stripped) <= _TRIVIAL_MAX_CHARS and _TRIVIAL_MESSAGE_RE.match(stripped))
+
+
+async def _empty_extraction() -> PreferenceExtractionResult:
+    return PreferenceExtractionResult(preferences=[])
 
 
 _EMBEDDING_MAX_CHARS = 6000  # ~1500 tokens; well under 8192-token model limit
@@ -2386,6 +2459,7 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             # Validate AFTER all post-processing so any coordinate changes made by
             # _fix_route_dining / _fix_dining_proximity are also checked.
             route_data = _validate_sightseeing_coordinates(route_data, tool_pois)
+            route_data = _fix_duplicate_waypoints(route_data)
             _log_route("FINAL", route_data)            # what is actually sent to the user
 
     # Turn3: user wants to edit an already-generated route via chat
@@ -2451,6 +2525,8 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
                 route_data = _fix_opening_hours(route_data)
                 route_data = _fix_geographic_spread(route_data)
                 route_data = _optimize_route_order(route_data)
+                route_data = _validate_sightseeing_coordinates(route_data, turn3_poi_pool)
+                route_data = _fix_duplicate_waypoints(route_data)
                 _log_route("TURN3_FINAL", route_data)
         else:
             # No existing route found — fall back to default chat
@@ -2482,6 +2558,7 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             route_data = _fix_opening_hours(route_data)
             route_data = _fix_geographic_spread(route_data)
             route_data = _optimize_route_order(route_data)
+            route_data = _fix_duplicate_waypoints(route_data)
 
     # Output moderation: block harmful AI response before returning to user
     ai_flagged, ai_flagged_cats = await is_content_flagged(settings, ai_content)
@@ -2536,8 +2613,10 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
     embedding_assistant_task = _save_embedding_for_message(
         settings, message_embedding_repo, assistant_msg, ai_content, user_id
     )
-    extraction_task = extract_preferences(
-        settings, user_content, ai_content, existing_preferences=existing_preferences
+    extraction_task = (
+        _empty_extraction()
+        if _is_trivial_message(user_content)
+        else extract_preferences(settings, user_content, ai_content, existing_preferences=existing_preferences)
     )
 
     _, _, extraction_result = await asyncio.gather(
