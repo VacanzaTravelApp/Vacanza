@@ -30,11 +30,13 @@ export const aiApi = {
         return asArray(response.data);
     },
 
-    // Send a message to a specific conversation
-    sendMessage: async (conversationId, content, { signal } = {}) => {
-        const response = await http.post(`/chat/conversations/${conversationId}/messages`, {
-            content
-        }, { signal });
+    // Send a message to a specific conversation.
+    // includeFavorites (default undefined = backend treats as true) toggles liked-POI
+    // injection into the AI profile for this request.
+    sendMessage: async (conversationId, content, { signal, includeFavorites } = {}) => {
+        const body = { content };
+        if (typeof includeFavorites === "boolean") body.includeFavorites = includeFavorites;
+        const response = await http.post(`/chat/conversations/${conversationId}/messages`, body, { signal });
         return response.data;
     },
 

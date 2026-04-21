@@ -26,8 +26,17 @@ public final class AiChatDto {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MessageSendRequest {
         private String content;
+
+        /**
+         * Java-internal toggle. When null/true the backend injects the user's liked POIs
+         * into the AI profile as a hint. Read from the frontend request but never forwarded
+         * to the Python AI service (WRITE_ONLY = deserialize-in, skip-on-serialize).
+         */
+        @JsonProperty(value = "includeFavorites", access = JsonProperty.Access.WRITE_ONLY)
+        private Boolean includeFavorites;
     }
 
     /** Response when creating a conversation. */

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, message, notification, Spin, Popover, ConfigProvider, theme } from "antd";
+import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, message, notification, Spin, Popover, ConfigProvider, theme } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LogoutOutlined,
@@ -1296,7 +1296,11 @@ export default function MapPage() {
 
   const openPolygonRouteParams = useCallback(() => {
     polygonRouteForm.resetFields();
-    polygonRouteForm.setFieldsValue({ totalDays: 3, travelStyle: "general" });
+    polygonRouteForm.setFieldsValue({
+      totalDays: 3,
+      travelStyle: "general",
+      includeFavorites: true,
+    });
     setPolygonRouteParamsOpen(true);
   }, [polygonRouteForm]);
 
@@ -1316,6 +1320,7 @@ export default function MapPage() {
           coordinates: ring,
           totalDays: values.totalDays,
           travelStyle: values.travelStyle,
+          includeFavorites: values.includeFavorites !== false,
         };
         if (categories.length) body.categories = categories;
         const res = await aiApi.createRouteFromPolygon(body);
@@ -2382,14 +2387,27 @@ export default function MapPage() {
               <Form form={polygonRouteForm} layout="vertical" onFinish={submitPolygonRoute}>
                 <Form.Item name="totalDays" label="Trip Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
                 <Form.Item name="travelStyle" label="Preferred Travel Style">
-                  <Select 
+                  <Select
                     className="route-plan-select"
                     popupClassName="vivid-premium-dropdown route-plan-select-dropdown"
                     getPopupContainer={(trigger) => trigger.parentNode}
-                    options={[{ value: "general", label: "Balanced" }, { value: "history", label: "Historical" }, { value: "food", label: "Gourmet" }, { value: "nature", label: "Outdoors" }]} 
+                    options={[{ value: "general", label: "Balanced" }, { value: "history", label: "Historical" }, { value: "food", label: "Gourmet" }, { value: "nature", label: "Outdoors" }]}
                   />
                 </Form.Item>
-                <Button 
+                <Form.Item
+                  name="includeFavorites"
+                  label={
+                    <span>
+                      <HeartFilled style={{ color: "#ef4444", marginRight: 8 }} />
+                      Include my liked places
+                    </span>
+                  }
+                  valuePropName="checked"
+                  tooltip="Liked POIs inside the drawn area are offered to the AI. It may skip some if they don't fit the plan — you can always refine later via chat."
+                >
+                  <Switch />
+                </Form.Item>
+                <Button
                   type="primary" 
                   block 
                   size="large" 

@@ -6,6 +6,8 @@ import {
   CompassOutlined,
   EditOutlined,
   EnvironmentOutlined,
+  HeartFilled,
+  HeartOutlined,
   HistoryOutlined,
   PlusOutlined,
   SendOutlined,
@@ -383,6 +385,9 @@ export default function VacanzaChat({
   const [initialLoading, setInitialLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [historyPanelOpen, setHistoryPanelOpen] = useState(false);
+  // When true the chat forwards `includeFavorites:true` so the backend injects the user's liked POIs
+  // into the AI profile. Default on; user can disable for this session if the hints feel off.
+  const [includeFavorites, setIncludeFavorites] = useState(true);
   /** `${messageId}-${routeIndex}` → bilet fiyatları yüklenirken / sonuç satırları */
   const [ticketLoadingByKey, setTicketLoadingByKey] = useState({});
   const [ticketRowsByKey, setTicketRowsByKey] = useState({});
@@ -600,7 +605,7 @@ export default function VacanzaChat({
     setInputText("");
 
     try {
-      const response = await aiApi.sendMessage(activeConvId, textToSend, { signal });
+      const response = await aiApi.sendMessage(activeConvId, textToSend, { signal, includeFavorites });
       if (response && response.content) {
         const routeData = response.route_data || response.routeData || null;
         const wasRouteRequest = /plan|rota|gün|tatil|itinerary|day/i.test(textToSend);
@@ -751,6 +756,28 @@ export default function VacanzaChat({
           </div>
         </div>
         <div className="chat-header-actions">
+          <Tooltip
+            title={
+              includeFavorites
+                ? "Using your liked places as hints for new routes. Click to disable."
+                : "Liked places are not being used. Click to enable."
+            }
+            placement="bottom"
+          >
+            <button
+              type="button"
+              className={`chat-header-icon-btn ${includeFavorites ? "chat-header-icon-btn-active" : ""}`}
+              aria-pressed={includeFavorites}
+              aria-label={includeFavorites ? "Disable liked-place hints" : "Enable liked-place hints"}
+              onClick={() => setIncludeFavorites((v) => !v)}
+            >
+              {includeFavorites ? (
+                <HeartFilled style={{ color: "#ef4444" }} />
+              ) : (
+                <HeartOutlined />
+              )}
+            </button>
+          </Tooltip>
           <button
             type="button"
             className={`chat-header-icon-btn ${historyPanelOpen ? "chat-header-icon-btn-active" : ""}`}

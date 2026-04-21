@@ -37,4 +37,11 @@ public class PolygonRouteRequest {
      * Mapbox category keys (museum, park, …). If null/empty, a default general set is used.
      */
     private List<String> categories;
+
+    /**
+     * When null/true, the backend pulls the user's liked POIs (UserPoiFeedback.score &gt; 0)
+     * and merges the ones inside the polygon into the POI pool given to the AI. When false,
+     * the route is built from Mapbox results only.
+     */
+    private Boolean includeFavorites;
 }

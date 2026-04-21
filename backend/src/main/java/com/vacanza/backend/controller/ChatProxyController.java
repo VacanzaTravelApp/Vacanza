@@ -14,6 +14,9 @@ import com.vacanza.backend.integration.MapboxPoiSearchClient;
 import com.vacanza.backend.integration.MapboxPoiSearchClient.DestinationGeocodeResult;
 import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.security.CurrentUserProvider;
+import com.vacanza.backend.entity.UserPoiFeedback;
+import com.vacanza.backend.repo.UserPoiFeedbackRepository;
+import com.vacanza.backend.util.PoiDedup;
 import com.vacanza.backend.util.PolygonRouteGeometry;
 import com.vacanza.backend.service.AiRouteService;
 import com.vacanza.backend.service.RouteSummaryMessageService;
@@ -96,6 +99,7 @@ public class ChatProxyController {
         private final WeatherService weatherService;
         private final PersonalizedPoiSelector personalizedPoiSelector;
         private final com.vacanza.backend.repo.UserInteractionRepository userInteractionRepository;
+        private final UserPoiFeedbackRepository userPoiFeedbackRepository;
 
         @PostMapping("/conversations")
         public ResponseEntity<AiChatDto.ConversationCreateResponse> createConversation() {
@@ -125,15 +129,20 @@ public class ChatProxyController {
                 var prefsDto = userPreferencesService.getPreferencesByUser(user).orElse(null);
                 UserProfileForAi profile = UserProfileForAi.from(infoDto, prefsDto);
 
-                // Inject favorited POI names so the AI can prioritize them in routes
-                try {
-                        List<String> savedPoiNames = userInteractionRepository
-                                        .findFavoritePoiNamesByUserId(user.getUserId());
-                        if (!savedPoiNames.isEmpty() && profile != null) {
-                                profile = profile.toBuilder().savedPoiNames(savedPoiNames).build();
+                // Inject favorited POI names so the AI can prioritize them in routes.
+                // Source 1: legacy user_interactions POI_FAVORITE rows.
+                // Source 2: thumbs-up rows from UserPoiFeedback (map heart button).
+                // Skip entirely when the client opts out via includeFavorites=false.
+                boolean includeFavoritesChat = body.getIncludeFavorites() == null || body.getIncludeFavorites();
+                if (includeFavoritesChat) {
+                        try {
+                                List<String> savedPoiNames = collectFavoritePoiNames(user.getUserId());
+                                if (!savedPoiNames.isEmpty() && profile != null) {
+                                        profile = profile.toBuilder().savedPoiNames(savedPoiNames).build();
+                                }
+                        } catch (Exception e) {
+                                log.warn("Could not fetch saved POI names for user {}: {}", user.getUserId(), e.getMessage());
                         }
-                } catch (Exception e) {
-                        log.warn("Could not fetch saved POI names for user {}: {}", user.getUserId(), e.getMessage());
                 }
 
                 var existingAiPrefs = userPreferenceAiService.getExistingPreferences(user);
@@ -273,9 +282,34 @@ public class ChatProxyController {
                 var prefsDtoPoly = userPreferencesService.getPreferencesByUser(user).orElse(null);
                 UserProfileForAi profilePoly = UserProfileForAi.from(infoDtoPoly, prefsDtoPoly);
 
+                boolean includeFavoritesPoly = body.getIncludeFavorites() == null || body.getIncludeFavorites();
+                if (includeFavoritesPoly) {
+                        try {
+                                List<String> savedPoiNames = collectFavoritePoiNames(user.getUserId());
+                                if (!savedPoiNames.isEmpty() && profilePoly != null) {
+                                        profilePoly = profilePoly.toBuilder().savedPoiNames(savedPoiNames).build();
+                                }
+                        } catch (Exception e) {
+                                log.warn("Could not fetch saved POI names for polygon route (user {}): {}",
+                                                user.getUserId(), e.getMessage());
+                        }
+                }
+
                 PoiToolExecutionResult exec = executePoiSearchForPolygon(
                                 ring, categories, totalDays, profilePoly, user.getUserId());
-                if (exec.pois().size() < MIN_POIS_IN_POLYGON) {
+
+                List<PoiResult> poolWithFavorites = exec.pois();
+                if (includeFavoritesPoly) {
+                        try {
+                                poolWithFavorites = mergeFavoritePoisInsidePolygon(
+                                                user.getUserId(), ring, exec.pois());
+                        } catch (Exception e) {
+                                log.warn("Failed to merge liked POIs into polygon route pool (user {}): {}",
+                                                user.getUserId(), e.getMessage());
+                        }
+                }
+
+                if (poolWithFavorites.size() < MIN_POIS_IN_POLYGON) {
                         return ResponseEntity.badRequest()
                                         .body(new PolygonRouteErrorResponse(
                                                         "INSUFFICIENT_POIS_IN_AREA",
@@ -315,7 +349,7 @@ public class ChatProxyController {
                 toolBody.append(toolJsonRaw).append("\n");
                 try {
                         toolBody.append("__TOOL_RESULT__search_pois__")
-                                        .append(objectMapper.writeValueAsString(exec.pois()));
+                                        .append(objectMapper.writeValueAsString(poolWithFavorites));
                         if (exec.planningWeather() != null
                                         && (!exec.planningWeather().daily().isEmpty()
                                                         || !exec.planningWeather().dayParts().isEmpty())) {
@@ -507,8 +541,10 @@ public class ChatProxyController {
                         UserProfileForAi profile) {
                 try {
                         if (response != null && response.getRouteData() != null) {
+                                logRouteShape("received_from_ai", response.getRouteData());
                                 resolveNullCoordinates(response.getRouteData());
                                 stripNullCoordinateWaypoints(response.getRouteData());
+                                logRouteShape("after_strip_null", response.getRouteData());
                                 if (routePlanningWeather != null && !routePlanningWeather.daily().isEmpty()) {
                                         response.getRouteData().setWeatherForecast(routePlanningWeather.daily());
                                 }
@@ -520,6 +556,7 @@ public class ChatProxyController {
                                 // remove any museum/historic stops that ended up at or after 16:45 —
                                 // these venues close at 17:00 and the walking overhead pushed them past closing.
                                 stripLateClosingVenueStops(response.getRouteData());
+                                logRouteShape("final", response.getRouteData());
                                 UUID savedRouteId = saveRoute(user, conversationId, response.getRouteData());
                                 if (savedRouteId != null) {
                                         response.setRouteId(savedRouteId);
@@ -551,10 +588,13 @@ public class ChatProxyController {
                         String userMessage) {
                 try {
                         if (response == null || response.getRouteData() == null) return;
+                        logRouteShape("turn3_received_from_ai", response.getRouteData());
                         resolveNullCoordinates(response.getRouteData());
                         stripNullCoordinateWaypoints(response.getRouteData());
+                        logRouteShape("turn3_after_strip_null", response.getRouteData());
                         routeTimelineService.enrichTimeline(response.getRouteData(), profile);
                         stripLateClosingVenueStops(response.getRouteData());
+                        logRouteShape("turn3_final", response.getRouteData());
 
                         // Build a short human-readable reason from the user's edit request
                         String reason = "Chat edit";
@@ -921,8 +961,16 @@ public class ChatProxyController {
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.put(k, p);  // force override
                 }
+                // Collapse Mapbox sub-features ("Anıtkabir" + "Anıtkabir güvenlik" etc.) before the AI sees them.
+                int beforeCollapse = dedup.size();
+                List<PoiResult> collapsed = PoiDedup.collapseNearDuplicates(
+                                new java.util.ArrayList<>(dedup.values()));
+                if (collapsed.size() < beforeCollapse) {
+                        log.info("[POI_DEDUP] chat: collapsed {} near-duplicate sub-feature(s)",
+                                        beforeCollapse - collapsed.size());
+                }
                 List<PoiResult> merged = personalizedPoiSelector.select(
-                                new java.util.ArrayList<>(dedup.values()),
+                                collapsed,
                                 profile,
                                 PersonalizedPoiParams.forUser(userId));
 
@@ -1097,6 +1145,27 @@ public class ChatProxyController {
                 }
         }
 
+        /**
+         * Emits a single-line summary of per-day waypoint counts. Called at each stage of the
+         * enrichment pipeline so we can tell whether short days (3 POIs/day) come from the AI
+         * itself or from a downstream strip step.
+         */
+        private static void logRouteShape(String tag, AiChatDto.RouteData routeData) {
+                if (routeData == null || routeData.getDays() == null || routeData.getDays().isEmpty()) {
+                        log.info("[ROUTE_SHAPE] {}: <no days>", tag);
+                        return;
+                }
+                StringBuilder sb = new StringBuilder();
+                int total = 0;
+                for (AiChatDto.DayPlan day : routeData.getDays()) {
+                        int n = day.getWaypoints() == null ? 0 : day.getWaypoints().size();
+                        total += n;
+                        if (sb.length() > 0) sb.append(", ");
+                        sb.append("day").append(day.getDay()).append('=').append(n);
+                }
+                log.info("[ROUTE_SHAPE] {}: {} (total={})", tag, sb, total);
+        }
+
         /** Haversine distance in metres between two lat/lon points. */
         private static double haversineMeters(double lat1, double lon1, double lat2, double lon2) {
                 final double R = 6_371_000.0;
@@ -1149,10 +1218,100 @@ public class ChatProxyController {
                         String k = p.getName().toLowerCase(java.util.Locale.ROOT);
                         dedup.putIfAbsent(k, p);
                 }
+                int beforeCollapse = dedup.size();
+                List<PoiResult> collapsed = PoiDedup.collapseNearDuplicates(
+                                new java.util.ArrayList<>(dedup.values()));
+                if (collapsed.size() < beforeCollapse) {
+                        log.info("[POI_DEDUP] polygon: collapsed {} near-duplicate sub-feature(s)",
+                                        beforeCollapse - collapsed.size());
+                }
                 List<PoiResult> merged = personalizedPoiSelector.select(
-                                new java.util.ArrayList<>(dedup.values()),
+                                collapsed,
                                 profile,
                                 PersonalizedPoiParams.forUser(userId));
+
+                long sightCount = merged.stream().filter(p -> !DINING_CATS.contains(
+                                (p.getCategory() == null ? "" : p.getCategory()).toLowerCase(java.util.Locale.ROOT))).count();
+                long diningCount = merged.size() - sightCount;
+                log.info("[POI_POOL] polygon total={} (sight={} dining={})",
+                                merged.size(), sightCount, diningCount);
+                for (PoiResult p : merged) {
+                        log.info("[POI_POOL]   [{}] {} → lat:{} lon:{}",
+                                        p.getCategory(), p.getName(), p.getLat(), p.getLon());
+                }
+
                 return new PoiToolExecutionResult(merged, planning);
+        }
+
+        /**
+         * Merges legacy {@code user_interactions POI_FAVORITE} names with thumbs-up POIs from
+         * {@link UserPoiFeedback} so the AI profile gets a single de-duplicated "liked places" list.
+         */
+        private List<String> collectFavoritePoiNames(UUID userId) {
+                java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+                try {
+                        List<String> legacy = userInteractionRepository.findFavoritePoiNamesByUserId(userId);
+                        if (legacy != null) {
+                                for (String n : legacy) {
+                                        if (n != null && !n.isBlank()) {
+                                                names.add(n.trim());
+                                        }
+                                }
+                        }
+                } catch (Exception e) {
+                        log.debug("legacy POI_FAVORITE fetch failed for user {}: {}", userId, e.getMessage());
+                }
+                try {
+                        List<UserPoiFeedback> thumbsUp = userPoiFeedbackRepository
+                                        .findByUser_UserIdAndScoreGreaterThan(userId, 0.0);
+                        if (thumbsUp != null) {
+                                for (UserPoiFeedback fb : thumbsUp) {
+                                        String n = fb.getPoiName();
+                                        if (n != null && !n.isBlank()) {
+                                                names.add(n.trim());
+                                        }
+                                }
+                        }
+                } catch (Exception e) {
+                        log.debug("thumbs-up POI fetch failed for user {}: {}", userId, e.getMessage());
+                }
+                return new java.util.ArrayList<>(names);
+        }
+
+        /**
+         * Adds the user's liked POIs (thumbs-up with known coordinates) that fall inside {@code ring}
+         * to {@code existing}. Uses {@link PoiDedup#isNearDuplicateOfAny} so a thumbs-up on
+         * "Anıtkabir" doesn't append next to a Mapbox "Anıtkabir güvenlik" entry already in the pool.
+         */
+        private List<PoiResult> mergeFavoritePoisInsidePolygon(
+                        UUID userId, List<double[]> ring, List<PoiResult> existing) {
+                List<PoiResult> out = new java.util.ArrayList<>(existing);
+                List<UserPoiFeedback> thumbsUp = userPoiFeedbackRepository
+                                .findByUser_UserIdAndScoreGreaterThan(userId, 0.0);
+                if (thumbsUp == null || thumbsUp.isEmpty()) {
+                        return out;
+                }
+                int added = 0;
+                for (UserPoiFeedback fb : thumbsUp) {
+                        Double lat = fb.getPoiLatitude();
+                        Double lon = fb.getPoiLongitude();
+                        String name = fb.getPoiName();
+                        if (lat == null || lon == null || name == null || name.isBlank()) {
+                                continue;
+                        }
+                        if (!PolygonRouteGeometry.pointInPolygon(lon, lat, ring)) {
+                                continue;
+                        }
+                        PoiResult pr = new PoiResult(name.trim(), fb.getPoiCategory(), lat, lon);
+                        if (PoiDedup.isNearDuplicateOfAny(pr, out)) {
+                                continue;
+                        }
+                        out.add(pr);
+                        added++;
+                }
+                if (added > 0) {
+                        log.info("Polygon route: merged {} liked POI(s) for user {}", added, userId);
+                }
+                return out;
         }
 }
