@@ -7,7 +7,7 @@ import re
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import ValidationError
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.schemas.event_recommendation import (
     AvailableEvent,
     EventRecommendRequest,
@@ -87,11 +87,15 @@ def _fallback_all_events(
     )
 
 
-async def recommend_events_for_route(request: EventRecommendRequest) -> EventRecommendResponse:
+async def recommend_events_for_route(
+    request: EventRecommendRequest,
+    settings: Settings | None = None,
+) -> EventRecommendResponse:
     if not request.available_events:
         return EventRecommendResponse(message=EMPTY_MESSAGE, recommended_events=[])
 
-    settings = get_settings()
+    if settings is None:
+        settings = get_settings()
     route = request.route_summary
     prefs = request.user_preferences
     lang = (prefs.preferred_language or "tr").strip() or "tr"
