@@ -1026,6 +1026,7 @@ export default function MapPage() {
       try {
         await postPoiFeedbackEvent({ eventType, ...base });
         await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
+        await queryClient.invalidateQueries({ queryKey: ["feedback", "saved-pois"] });
         message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
       } catch (e) {
         message.error(e?.friendlyMessage || "Could not update favorites.");
