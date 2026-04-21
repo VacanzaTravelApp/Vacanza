@@ -507,10 +507,10 @@ def _is_itinerary_request(user_content: str) -> bool:
         # Match common stems + optional suffixes to reliably route into the tool-call flow.
         # "gezi" (TR trip/tour), "seyahat" (TR travel), "route"/"vacation"/"holiday" (EN) added
         # to minimize fallback through base_prompt.
-        and __import__("re").search(
+        and re.search(
             r"\b(plan|rota|itinerary|trip|vacation|holiday|route|day|gün|günlük|gezi|seyahat|tatil)\w*\b",
             user_content,
-            flags=__import__("re").I,
+            flags=re.I,
         )
     )
 
@@ -2154,7 +2154,7 @@ async def get_ai_response(
     user_content: str,
     user_profile: UserProfileForAi | None = None,
     existing_preferences: list[dict] | None = None,
-) -> tuple[str, PreferenceExtractionResult, RouteData | None]:
+) -> tuple[str, PreferenceExtractionResult, RouteData | None, uuid.UUID | None]:
     """Send user message, get AI response with context, save both to DB.
 
     Returns:
@@ -2437,8 +2437,17 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
                         raw_ai_content[:600],
                     )
             if route_data:
+                # Build a proxy POI pool from the existing route's waypoints so
+                # _fix_dining_proximity can validate against known coordinates.
+                turn3_poi_pool = [
+                    {"name": wp.name, "category": wp.category, "lat": wp.latitude, "lon": wp.longitude}
+                    for day in (existing_route.days or [])
+                    for wp in (day.waypoints or [])
+                    if wp.latitude is not None and wp.longitude is not None
+                ]
                 _log_route("TURN3_RAW", route_data)
                 route_data = _fix_route_dining(route_data)
+                route_data = _fix_dining_proximity(route_data, turn3_poi_pool)
                 route_data = _fix_opening_hours(route_data)
                 route_data = _fix_geographic_spread(route_data)
                 route_data = _optimize_route_order(route_data)
