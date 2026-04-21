@@ -9,9 +9,11 @@ import pytest
 from app.schemas.chat import DayPlan, RouteData, RouteWaypoint
 from app.services.chat_service import (
     _fix_dining_proximity,
+    _fix_duplicate_waypoints,
     _fix_opening_hours,
     _fix_route_dining,
     _fix_geographic_spread,
+    _is_trivial_message,
     _optimize_route_order,
 )
 
@@ -321,3 +323,125 @@ class TestOptimizeRouteOrder:
         result = _optimize_route_order(route)
         orders = [w.order for w in result.days[0].waypoints]
         assert orders == list(range(1, len(orders) + 1))
+
+
+# ── _fix_duplicate_waypoints ──────────────────────────────────────────────────
+
+class TestFixDuplicateWaypoints:
+    def test_duplicate_across_days_removed(self):
+        day1 = _day(
+            _wp("Hagia Sophia", "museum", 1),
+            _wp("Lunch", "restaurant", 2, time_slot="lunch"),
+            _wp("Blue Mosque", "museum", 3),
+            _wp("Dinner", "restaurant", 4, time_slot="dinner"),
+            day_num=1,
+        )
+        # day2 has 3 sightseeing stops so removing the duplicate still leaves 2 (_MIN_SIGHTSEEING_PER_DAY)
+        day2 = _day(
+            _wp("Hagia Sophia", "museum", 1),   # duplicate
+            _wp("Lunch2", "restaurant", 2, time_slot="lunch"),
+            _wp("Topkapi Palace", "museum", 3),
+            _wp("Galata Tower", "museum", 4),
+            _wp("Dinner2", "restaurant", 5, time_slot="dinner"),
+            day_num=2,
+        )
+        route = _route(day1, day2, total_days=2)
+        result = _fix_duplicate_waypoints(route)
+        day2_names = [w.name for w in result.days[1].waypoints]
+        assert "Hagia Sophia" not in day2_names
+
+    def test_first_occurrence_always_kept(self):
+        day1 = _day(
+            _wp("Topkapi Palace", "museum", 1),
+            _wp("Lunch", "restaurant", 2, time_slot="lunch"),
+            _wp("Grand Bazaar", "museum", 3),
+            _wp("Dinner", "restaurant", 4, time_slot="dinner"),
+            day_num=1,
+        )
+        day2 = _day(
+            _wp("Topkapi Palace", "museum", 1),  # duplicate
+            _wp("Lunch2", "restaurant", 2, time_slot="lunch"),
+            _wp("Galata Tower", "museum", 3),
+            _wp("Dinner2", "restaurant", 4, time_slot="dinner"),
+            day_num=2,
+        )
+        route = _route(day1, day2, total_days=2)
+        result = _fix_duplicate_waypoints(route)
+        day1_names = [w.name for w in result.days[0].waypoints]
+        assert "Topkapi Palace" in day1_names
+
+    def test_removal_skipped_when_too_few_sights_remain(self):
+        day1 = _day(
+            _wp("Museum A", "museum", 1),
+            _wp("Dinner", "restaurant", 2, time_slot="dinner"),
+            day_num=1,
+        )
+        day2 = _day(
+            _wp("Museum A", "museum", 1),  # duplicate — but removing leaves only 0 sights
+            _wp("Dinner2", "restaurant", 2, time_slot="dinner"),
+            day_num=2,
+        )
+        route = _route(day1, day2, total_days=2)
+        result = _fix_duplicate_waypoints(route)
+        # Removal skipped — day2 still has Museum A
+        day2_names = [w.name for w in result.days[1].waypoints]
+        assert "Museum A" in day2_names
+
+    def test_order_renumbered_after_removal(self):
+        day1 = _day(
+            _wp("Museum A", "museum", 1),
+            _wp("Lunch", "restaurant", 2, time_slot="lunch"),
+            _wp("Museum B", "museum", 3),
+            _wp("Dinner", "restaurant", 4, time_slot="dinner"),
+            day_num=1,
+        )
+        day2 = _day(
+            _wp("Museum A", "museum", 1),   # duplicate → removed
+            _wp("Lunch2", "restaurant", 2, time_slot="lunch"),
+            _wp("Museum C", "museum", 3),
+            _wp("Museum D", "museum", 4),
+            _wp("Dinner2", "restaurant", 5, time_slot="dinner"),
+            day_num=2,
+        )
+        route = _route(day1, day2, total_days=2)
+        result = _fix_duplicate_waypoints(route)
+        orders = [w.order for w in result.days[1].waypoints]
+        assert orders == list(range(1, len(orders) + 1))
+
+
+# ── _is_trivial_message ───────────────────────────────────────────────────────
+
+class TestIsTrivialMessage:
+    @pytest.mark.parametrize("msg", [
+        "Teşekkürler",
+        "tamam",
+        "Harika!",
+        "thanks",
+        "ok",
+        "Perfect!",
+        "got it",
+        "süper",
+        "merci",
+        "grazie",
+    ])
+    def test_trivial_messages_detected(self, msg: str):
+        assert _is_trivial_message(msg) is True
+
+    @pytest.mark.parametrize("msg", [
+        "3 günlük İstanbul turu istiyorum",
+        "Deniz ürünlerine alerjim var",
+        "Vejetaryenim, bunu göz önünde bulundur",
+        "Harika! Peki müzeleri seviyor musun?",   # > 25 chars
+        "Teşekkürler, ama bir sorum var",           # > 25 chars
+    ])
+    def test_non_trivial_messages_not_flagged(self, msg: str):
+        assert _is_trivial_message(msg) is False
+
+    def test_empty_string_is_not_trivial(self):
+        # Empty string returns False — it's blocked upstream by moderation/validation,
+        # not by the trivial-message check.
+        assert _is_trivial_message("") is False
+
+    def test_long_trivial_phrase_not_flagged(self):
+        # Matches the pattern but exceeds _TRIVIAL_MAX_CHARS
+        assert _is_trivial_message("teşekkürler çok güzel oldu harika") is False
