@@ -6,6 +6,11 @@ import '../../../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../../../checkin/presentation/bloc/location_state.dart';
 import '../../../../../poi_search/data/models/poi.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import '../../../../../poi_search/data/models/area_source.dart';
+import '../../../../../poi_search/presentation/bloc/area_query_bloc.dart';
+import '../../../../../poi_search/presentation/bloc/area_query_event.dart' as aq;
+import '../../../../../poi_search/presentation/bloc/poi_search_bloc.dart';
+import '../../../../../poi_search/presentation/bloc/poi_search_event.dart' as ps;
 
 import '../../../../../poi_search/data/models/poi_category_catalog.dart';
 import '../../../../../behavior/domain/feedback_poi_ref.dart';
@@ -17,6 +22,8 @@ import '../../../bloc/map_event.dart';
 void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
   // Resolve blocs from the caller context — modal route context does not see them.
   final mapBloc = context.read<MapBloc>();
+  final areaBloc = context.read<AreaQueryBloc>();
+  final poiBloc = context.read<PoiSearchBloc>();
   final loc = context.read<LocationBloc>().state;
   final categoryLabel =
       PoiCategoryCatalog.labelForRawCategory(poi.category) ?? poi.category;
@@ -117,6 +124,14 @@ void showPoiMarkerDetailSheet(BuildContext context, Poi poi) {
                 onPressed:
                     _canFlyTo(poi)
                         ? () {
+                          // When user chooses "Show on map", close any drawn selection
+                          // + results panel so the map becomes the focus.
+                          final areaCtx = areaBloc.state.context;
+                          if (areaCtx.areaSource == AreaSource.userSelection) {
+                            areaBloc.add(const aq.ClearUserSelection());
+                            poiBloc.add(const ps.AreaCleared());
+                            mapBloc.add(SetDrawingEnabled(false));
+                          }
                           Navigator.of(ctx).pop();
                           mapBloc.add(
                             FlyToPoiRequested(
