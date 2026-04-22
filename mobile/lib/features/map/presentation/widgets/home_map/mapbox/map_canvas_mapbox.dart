@@ -347,6 +347,15 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
               },
             ),
 
+            // ── Route kapandıktan sonra viewport'u yenile ─────────────
+            BlocListener<MapBloc, MapState>(
+              listenWhen: (prev, next) =>
+                  prev.refreshViewportTick != next.refreshViewportTick,
+              listener: (context, state) {
+                unawaited(_emitCurrentViewportBbox());
+              },
+            ),
+
             // ── Recenter → fly to latest GPS position (MOB-6) ────────
             BlocListener<MapBloc, MapState>(
               listenWhen:

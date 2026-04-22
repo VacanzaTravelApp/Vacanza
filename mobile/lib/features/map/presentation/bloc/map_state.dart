@@ -20,6 +20,7 @@ class MapState {
   final double? fitRouteBearing;
   final String? lastErrorMessage;
   final bool isDrawing;
+  final int refreshViewportTick;
 
   const MapState({
     required this.basemap,
@@ -38,6 +39,7 @@ class MapState {
     this.fitRouteBearing,
     required this.isDrawing,
     this.lastErrorMessage,
+    this.refreshViewportTick = 0,
   });
 
   factory MapState.initial() => const MapState(
@@ -57,6 +59,7 @@ class MapState {
     fitRouteBearing: null,
     lastErrorMessage: null,
     isDrawing: false,
+    refreshViewportTick: 0,
   );
 
   MapState copyWith({
@@ -76,6 +79,7 @@ class MapState {
     double? fitRouteBearing,
     String? lastErrorMessage,
     bool? isDrawing,
+    int? refreshViewportTick,
   }) {
     return MapState(
       basemap: basemap ?? this.basemap,
@@ -94,6 +98,7 @@ class MapState {
       fitRouteBearing: fitRouteBearing ?? this.fitRouteBearing,
       lastErrorMessage: lastErrorMessage ?? this.lastErrorMessage,
       isDrawing: isDrawing ?? this.isDrawing,
+      refreshViewportTick: refreshViewportTick ?? this.refreshViewportTick,
     );
   }
 }

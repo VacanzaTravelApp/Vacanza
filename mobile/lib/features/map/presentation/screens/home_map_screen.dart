@@ -712,6 +712,9 @@ class _HomeMapViewState extends State<_HomeMapView>
               } else {
                 return;
               }
+              context
+                  .read<PoiSearchBloc>()
+                  .add(const poi.HidePoiMarkers());
               setState(() {
                 _routeShowEventsInitially = nav.openEventsInitially;
                 _routeOpen = true;
@@ -782,6 +785,12 @@ class _HomeMapViewState extends State<_HomeMapView>
                       initialEvents: _routeShowEventsInitially,
                       onClose: () {
                         context.read<ActiveRouteCubit>().hideRouteFromMap();
+                        context
+                            .read<PoiSearchBloc>()
+                            .add(const poi.ShowPoiMarkers());
+                        context
+                            .read<MapBloc>()
+                            .add(const RefreshViewportRequested());
                         if (mounted) setState(() => _routeOpen = false);
                       },
                     )
@@ -803,11 +812,20 @@ class _HomeMapViewState extends State<_HomeMapView>
                       day: activeRouteState.activeDay,
                           onOpen: () {
                             if (!mounted) return;
+                            context
+                                .read<PoiSearchBloc>()
+                                .add(const poi.HidePoiMarkers());
                             context.read<ActiveRouteCubit>().showRouteOnMapAgain();
                             setState(() => _routeOpen = true);
                           },
                       onClear: () {
                         context.read<ActiveRouteCubit>().reset();
+                        context
+                            .read<PoiSearchBloc>()
+                            .add(const poi.ShowPoiMarkers());
+                        context
+                            .read<MapBloc>()
+                            .add(const RefreshViewportRequested());
                         if (mounted) setState(() => _routeOpen = false);
                       },
                     )

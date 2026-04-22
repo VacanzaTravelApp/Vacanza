@@ -25,6 +25,9 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
 
     on<SearchRequested>(_onSearchRequested);
     on<LoadNextPage>(_onLoadNextPage); // opsiyonel
+
+    on<HidePoiMarkers>(_onHidePoiMarkers);
+    on<ShowPoiMarkers>(_onShowPoiMarkers);
   }
 
   /// Son gelen viewport bbox’u burada cache’liyoruz.
@@ -101,6 +104,18 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
     if (fallback.isUsable) {
       add(const SearchRequested());
     }
+  }
+
+  void _onHidePoiMarkers(HidePoiMarkers event, Emitter<PoiSearchState> emit) {
+    emit(state.copyWith(hidePoiMarkers: true));
+  }
+
+  void _onShowPoiMarkers(ShowPoiMarkers event, Emitter<PoiSearchState> emit) {
+    emit(state.copyWith(
+      hidePoiMarkers: false,
+      pois: const [],
+      count: 0,
+    ));
   }
 
   bool _bboxTooLargeForSearch(BboxArea b) {

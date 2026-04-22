@@ -44,7 +44,8 @@ class _PoiMarkersListenerState extends State<PoiMarkersListener> {
             prev.count != next.count ||
             prev.selectedArea != next.selectedArea ||
             prev.areaSource != next.areaSource ||
-            prev.selectedCategories != next.selectedCategories;
+            prev.selectedCategories != next.selectedCategories ||
+            prev.hidePoiMarkers != next.hidePoiMarkers;
       },
       listener: (context, state) {
         _processPoisState(state);
@@ -67,6 +68,12 @@ class _PoiMarkersListenerState extends State<PoiMarkersListener> {
     }
 
     _lastProcessedState = state;
+
+    if (state.hidePoiMarkers) {
+      log('[PoiMarkersListener] route visible -> hiding POI markers');
+      await markers.clear();
+      return;
+    }
 
     if (state.status == PoiSearchStatus.loading) {
       log('[PoiMarkersListener] loading -> keeping old markers until new data');
@@ -97,6 +104,7 @@ class _PoiMarkersListenerState extends State<PoiMarkersListener> {
         a.count == b.count &&
         a.selectedArea == b.selectedArea &&
         a.areaSource == b.areaSource &&
-        a.selectedCategories == b.selectedCategories;
+        a.selectedCategories == b.selectedCategories &&
+        a.hidePoiMarkers == b.hidePoiMarkers;
   }
 }

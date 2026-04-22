@@ -55,6 +55,11 @@ class FlyToPoiRequested extends MapEvent {
   final double zoom;
 }
 
+/// Haritanın o anki viewport bbox'unu yeniden AreaQueryBloc'a dispatch et.
+class RefreshViewportRequested extends MapEvent {
+  const RefreshViewportRequested();
+}
+
 /// Fit camera to a geographic bounding box (e.g. full AI route), optional bearing in degrees.
 class FitRouteBoundsRequested extends MapEvent {
   const FitRouteBoundsRequested({
