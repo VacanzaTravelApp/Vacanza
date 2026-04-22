@@ -17,6 +17,7 @@ class ChatApiClient {
     int? totalDays,
     String? travelStyle,
     List<String>? categories,
+    bool? includeFavorites,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/chat/routes/from-polygon',
@@ -25,6 +26,7 @@ class ChatApiClient {
         if (totalDays != null) 'totalDays': totalDays,
         if (travelStyle != null) 'travelStyle': travelStyle,
         if (categories != null) 'categories': categories,
+        if (includeFavorites != null) 'includeFavorites': includeFavorites,
       },
       options: Options(receiveTimeout: const Duration(seconds: 90)),
     );

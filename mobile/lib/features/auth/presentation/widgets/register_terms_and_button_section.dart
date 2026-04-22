@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/gradient_button.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 
 class RegisterTermsAndButtonSection extends StatelessWidget {
   final bool terms;
@@ -68,12 +68,13 @@ class RegisterTermsAndButtonSection extends StatelessWidget {
 
         const SizedBox(height: 14),
 
-        GradientButton(
-          text: "Sign Up",
+        VacanzaGradientButton(
+          label: 'Sign Up',
           loading: loading,
-          active: canSubmit,
           enabled: canSubmit,
           onPressed: canSubmit ? onSubmit : null,
+          minHeight: 52,
+          borderRadius: 26,
         ),
       ],
     );

@@ -38,6 +38,9 @@ class HomeMapScaffold extends StatelessWidget {
   /// Chatbot entry point
   final VoidCallback onOpenChat;
 
+  /// Saved places panel entry point
+  final VoidCallback onOpenSavedPlaces;
+
   /// UC1.11 — Explore in AR entry point
   final VoidCallback onOpenArMode;
 
@@ -53,6 +56,11 @@ class HomeMapScaffold extends StatelessWidget {
   final bool isFiltersOpen;
   final Widget? filtersPanel;
   final VoidCallback? onCloseFilters;
+
+  /// Saved places overlay (HomeMapScreen yönetir)
+  final bool isSavedPlacesOpen;
+  final Widget? savedPlacesPanel;
+  final VoidCallback? onCloseSavedPlaces;
 
   /// ✅ Results bottom sheet kontrolü (HomeMapScreen yönetir)
   final bool isResultsOpen;
@@ -82,6 +90,7 @@ class HomeMapScaffold extends StatelessWidget {
     required this.onOpenBooking,
     required this.onOpenTripAgenda,
     required this.onOpenChat,
+    required this.onOpenSavedPlaces,
     required this.onOpenArMode,
     required this.onOpenFilters,
     required this.isControlsMenuOpen,
@@ -90,6 +99,9 @@ class HomeMapScaffold extends StatelessWidget {
     this.isFiltersOpen = false,
     this.filtersPanel,
     this.onCloseFilters,
+    this.isSavedPlacesOpen = false,
+    this.savedPlacesPanel,
+    this.onCloseSavedPlaces,
     this.isResultsOpen = false,
     this.resultsSheet,
     this.isRouteOpen = false,
@@ -103,16 +115,23 @@ class HomeMapScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final padding = MediaQuery.of(context).padding;
     final showFilters = isFiltersOpen && filtersPanel != null;
+    final showSavedPlaces = isSavedPlacesOpen && savedPlacesPanel != null;
     final showMenu = isControlsMenuOpen;
 
     // normal sheet: filter kapalıyken
-    final showResults = isResultsOpen && resultsSheet != null && !showFilters;
+    final showResults =
+        isResultsOpen && resultsSheet != null && !showFilters && !showSavedPlaces;
     final showRoute =
-        isRouteOpen && routeSheet != null && !showFilters && !showResults;
+        isRouteOpen &&
+        routeSheet != null &&
+        !showFilters &&
+        !showSavedPlaces &&
+        !showResults;
     final baseMiniPill =
         showRouteMiniPill &&
         routeMiniPill != null &&
         !showFilters &&
+        !showSavedPlaces &&
         !showResults;
 
     // blur preview: filter açıkken, sadece belirli senaryoda
@@ -121,12 +140,13 @@ class HomeMapScaffold extends StatelessWidget {
 
     // Route mini pill: sol altta, recenter ile aynı bottom; Ask Vacanza ortada.
     final showChatPill =
-        !showResults && !showRoute && !showFilters && !isDrawing;
+        !showResults && !showRoute && !showFilters && !showSavedPlaces && !isDrawing;
 
     return Scaffold(
       extendBody: true,
       extendBodyBehindAppBar: true,
       body: Stack(
+        fit: StackFit.expand,
         children: [
           // ================= MAP (tam ekran, safe area'yı aşar) =================
           const Positioned.fill(child: MapCanvasMapbox()),
@@ -182,6 +202,7 @@ class HomeMapScaffold extends StatelessWidget {
               perspective: perspective,
               isDrawing: isDrawing,
               onToggleDrawing: onToggleDrawing,
+              onOpenSavedPlaces: onOpenSavedPlaces,
               onOpenFilters: onOpenFilters,
               onOpenArMode: onOpenArMode,
               onOpenBooking: onOpenBooking,
@@ -241,27 +262,22 @@ class HomeMapScaffold extends StatelessWidget {
             ),
 
           // ================= FILTER OVERLAY (SAĞDAN PANEL) =================
-          if (showFilters) ...[
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: onCloseFilters,
-                child: Container(
-                  color:
-                      Theme.of(
-                        context,
-                      ).extension<VacanzaTokens>()?.overlayScrim ??
-                      Colors.black.withValues(alpha: 0.10),
-                ),
-              ),
-            ),
+          _RightOverlayPanel(
+            show: showFilters,
+            top: padding.top + 86,
+            right: 16,
+            onClose: onCloseFilters,
+            child: Material(color: Colors.transparent, child: filtersPanel),
+          ),
 
-            Positioned(
-              top: padding.top + 86,
-              right: 16,
-              child: Material(color: Colors.transparent, child: filtersPanel!),
-            ),
-          ],
+          // ================= SAVED PLACES OVERLAY (SAĞDAN PANEL) =================
+          _RightOverlayPanel(
+            show: showSavedPlaces,
+            top: padding.top + 86,
+            right: 16,
+            onClose: onCloseSavedPlaces,
+            child: savedPlacesPanel,
+          ),
 
           // ================= RESULTS SHEET (BOTTOM) =================
           if (showResults)
@@ -281,6 +297,114 @@ class HomeMapScaffold extends StatelessWidget {
               top: padding.top + 56,
               child: AnimatedRouteSheetEntrance(child: routeSheet!),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RightOverlayPanel extends StatefulWidget {
+  const _RightOverlayPanel({
+    required this.show,
+    required this.top,
+    required this.right,
+    required this.onClose,
+    required this.child,
+  });
+
+  final bool show;
+  final double top;
+  final double right;
+  final VoidCallback? onClose;
+  final Widget? child;
+
+  @override
+  State<_RightOverlayPanel> createState() => _RightOverlayPanelState();
+}
+
+class _RightOverlayPanelState extends State<_RightOverlayPanel>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scrimFade;
+  late final Animation<Offset> _panelSlide;
+
+  bool _mountedOverlay = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+      reverseDuration: const Duration(milliseconds: 240),
+    );
+    _scrimFade = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
+      reverseCurve: Curves.easeInOutCubic,
+    );
+    _panelSlide = Tween<Offset>(
+      begin: const Offset(0.075, 0),
+      end: Offset.zero,
+    ).animate(_scrimFade);
+
+    _mountedOverlay = widget.show;
+    if (widget.show) _controller.value = 1;
+  }
+
+  @override
+  void didUpdateWidget(covariant _RightOverlayPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.show == widget.show) return;
+
+    if (widget.show) {
+      setState(() => _mountedOverlay = true);
+      _controller.forward();
+    } else {
+      _controller.reverse().whenComplete(() {
+        if (!mounted) return;
+        if (widget.show) return; // reopened mid-flight
+        setState(() => _mountedOverlay = false);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scrim =
+        Theme.of(context).extension<VacanzaTokens>()?.overlayScrim ??
+        Colors.black.withValues(alpha: 0.10);
+
+    if (!_mountedOverlay) return const SizedBox.shrink();
+
+    return IgnorePointer(
+      ignoring: !widget.show && _controller.isDismissed,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: FadeTransition(
+              opacity: _scrimFade,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: widget.onClose,
+                child: Container(color: scrim),
+              ),
+            ),
+          ),
+          Positioned(
+            top: widget.top,
+            right: widget.right,
+            child: SlideTransition(
+              position: _panelSlide,
+              child: widget.child ?? const SizedBox.shrink(),
+            ),
+          ),
         ],
       ),
     );

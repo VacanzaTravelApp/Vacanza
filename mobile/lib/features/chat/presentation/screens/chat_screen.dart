@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 import '../../data/api/chat_api_client.dart';
 import '../../data/models/chat_models.dart';
 import '../cubit/chat_cubit.dart';
@@ -13,6 +16,7 @@ import '../widgets/chat_message_bubble.dart';
 import '../widgets/chat_route_card.dart';
 import '../widgets/chat_typing_indicator.dart';
 import '../widgets/past_conversations_sheet.dart';
+import '../../data/loading_tips.dart';
 
 /// Result when closing the chat after a route action (maps to web navigation).
 class ChatScreenNavResult {
@@ -25,6 +29,14 @@ class ChatScreenNavResult {
     this.openEventsInitially = false,
     this.startDrawAreaOnMap = false,
   });
+}
+
+/// Returns the last element matching [test], or null.
+T? _lastWhere<T>(List<T> list, bool Function(T) test) {
+  for (var i = list.length - 1; i >= 0; i--) {
+    if (test(list[i])) return list[i];
+  }
+  return null;
 }
 
 /// Chatbot screen — AI travel assistant.
@@ -50,6 +62,13 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
   bool _hasDraft = false;
   bool _showJumpToLatest = false;
 
+  // ── Loading tip state (mirrors web 9-second rotation) ──
+  TravelTip? _currentTip;
+  List<TravelTip> _tipPool = [];
+  int _tipIndex = 0;
+  Timer? _tipTimer;
+  String? _lastSentText;
+
   String _formatTime(DateTime d) {
     final h = d.hour.toString().padLeft(2, '0');
     final m = d.minute.toString().padLeft(2, '0');
@@ -60,6 +79,16 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
   void initState() {
     super.initState();
     _scrollController.addListener(_handleScroll);
+    // If user navigates away and comes back while a request is still in-flight,
+    // ChatCubit may already be in `isSending=true` without triggering listenWhen.
+    // Ensure tips appear immediately in that case.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final s = context.read<ChatCubit>().state;
+      if (s is ChatLoaded && s.isSending) {
+        _startTipRotation(_lastSentText ?? '');
+      }
+    });
   }
 
   void _handleScroll() {
@@ -74,10 +103,37 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
 
   @override
   void dispose() {
+    _tipTimer?.cancel();
     _scrollController.removeListener(_handleScroll);
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _startTipRotation(String cityHint) {
+    _tipTimer?.cancel();
+    _tipPool = getTipsForCity(cityHint);
+    _tipIndex = 0;
+    if (_tipPool.isNotEmpty) {
+      setState(() => _currentTip = _tipPool[0]);
+    }
+    _tipTimer = Timer.periodic(const Duration(seconds: 9), (_) {
+      if (_tipPool.isEmpty || !mounted) return;
+      _tipIndex = (_tipIndex + 1) % _tipPool.length;
+      setState(() => _currentTip = _tipPool[_tipIndex]);
+    });
+  }
+
+  void _stopTipRotation() {
+    _tipTimer?.cancel();
+    _tipTimer = null;
+    if (mounted) setState(() => _currentTip = null);
+  }
+
+  void _advanceTip() {
+    if (_tipPool.isEmpty) return;
+    _tipIndex = (_tipIndex + 1) % _tipPool.length;
+    setState(() => _currentTip = _tipPool[_tipIndex]);
   }
 
   void _scrollToBottom() {
@@ -214,13 +270,18 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                       onPressed: () => Navigator.of(ctx).pop(false),
                       child: Text('Keep', style: TextStyle(color: t.vividBlue)),
                     ),
-                    FilledButton(
+                    VacanzaGradientButton(
+                      label: 'Discard',
                       onPressed: () => Navigator.of(ctx).pop(true),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: t.vividCoral,
-                        foregroundColor: Colors.white,
+                      enabled: true,
+                      minHeight: 44,
+                      borderRadius: 14,
+                      horizontalPadding: 16,
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
                       ),
-                      child: const Text('Discard'),
                     ),
                   ],
                 );
@@ -264,6 +325,7 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                   if (next.error != null && next.error != prev.error) {
                     return true;
                   }
+                  if (next.isSending != prev.isSending) return true;
                 }
                 return false;
               },
@@ -283,6 +345,12 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                         ),
                       ),
                     );
+                  }
+                  // Start / stop tip rotation based on sending state
+                  if (state.isSending) {
+                    _startTipRotation(_lastSentText ?? '');
+                  } else {
+                    _stopTipRotation();
                   }
                   _scrollToBottom();
                 }
@@ -372,12 +440,20 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                                   state.messages.length + (showTyping ? 1 : 0),
                               itemBuilder: (context, i) {
                                 if (showTyping && i == state.messages.length) {
-                                  return const ChatTypingIndicator();
+                                  return ChatTypingIndicator(
+                                    currentTip: _currentTip,
+                                    onNextTip: _advanceTip,
+                                  );
                                 }
                                 final message = state.messages[i];
                                 final isAssistant = !message.isUser;
                                 final canShowRouteCard =
                                     isAssistant && message.routeData != null;
+                                // Has a previous route card? → This one is an edit.
+                                final isRouteEdit = canShowRouteCard &&
+                                    state.messages
+                                        .take(i)
+                                        .any((m) => m.routeData != null);
 
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -393,6 +469,7 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                                         route: message.routeData!,
                                         summary: message.routeSummaryMessage,
                                         routeId: message.routeId,
+                                        isRouteEdit: isRouteEdit,
                                         onDrawAreaOnMap: () {
                                           Navigator.of(context).pop(
                                             const ChatScreenNavResult(
@@ -473,41 +550,94 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
           BlocBuilder<ChatCubit, ChatState>(
             builder: (context, state) {
               final canSend = state is ChatLoaded && !state.isSending;
-              return ChatInputBar(
-                controller: _controller,
-                enabled: canSend,
-                quickActions: [
+              // Check whether any route exists to switch between plan / edit chips
+              final hasExistingRoute = state is ChatLoaded &&
+                  state.messages.any((m) => m.routeData != null);
+              final lastRouteMsg = state is ChatLoaded
+                  ? _lastWhere(state.messages, (m) => m.routeData != null)
+                  : null;
+              final totalDays =
+                  lastRouteMsg?.routeData?.totalDays ??
+                  lastRouteMsg?.routeData?.days.length ??
+                  0;
+
+              final List<ChatQuickAction> quickActions;
+              if (hasExistingRoute) {
+                quickActions = [
+                  if (totalDays >= 1)
+                    ChatQuickAction(
+                      label: 'Day 1: more museums',
+                      onTap: () {
+                        if (!canSend) return;
+                        _lastSentText = 'Make day 1 more museum-focused';
+                        context.read<ChatCubit>().sendMessage(_lastSentText!);
+                      },
+                    ),
+                  if (totalDays >= 2)
+                    ChatQuickAction(
+                      label: 'Slow down day 2',
+                      onTap: () {
+                        if (!canSend) return;
+                        _lastSentText = 'Slow down day 2';
+                        context.read<ChatCubit>().sendMessage(_lastSentText!);
+                      },
+                    ),
+                  if (totalDays >= 3)
+                    ChatQuickAction(
+                      label: 'Day 3: more dining',
+                      onTap: () {
+                        if (!canSend) return;
+                        _lastSentText = 'Add more dining options to day 3';
+                        context.read<ChatCubit>().sendMessage(_lastSentText!);
+                      },
+                    ),
+                  ChatQuickAction(
+                    label: 'Slower pace',
+                    onTap: () {
+                      if (!canSend) return;
+                      _lastSentText = 'Change the pace to slow for the whole trip';
+                      context.read<ChatCubit>().sendMessage(_lastSentText!);
+                    },
+                  ),
+                ];
+              } else {
+                quickActions = [
                   ChatQuickAction(
                     label: '3-day Istanbul',
                     onTap: () {
                       if (!canSend) return;
-                      context.read<ChatCubit>().sendMessage(
-                        'Plan a 3-day trip to Istanbul.',
-                      );
+                      _lastSentText = 'Plan a 3-day trip to Istanbul.';
+                      context.read<ChatCubit>().sendMessage(_lastSentText!);
                     },
                   ),
                   ChatQuickAction(
                     label: '2-day Rome',
                     onTap: () {
                       if (!canSend) return;
-                      context.read<ChatCubit>().sendMessage(
-                        'Plan a 2-day trip to Rome.',
-                      );
+                      _lastSentText = 'Plan a 2-day trip to Rome.';
+                      context.read<ChatCubit>().sendMessage(_lastSentText!);
                     },
                   ),
                   ChatQuickAction(
                     label: '4-day Antalya',
                     onTap: () {
                       if (!canSend) return;
-                      context.read<ChatCubit>().sendMessage(
-                        'Create a 4-day Antalya vacation plan for me.',
-                      );
+                      _lastSentText = 'Create a 4-day Antalya vacation plan for me.';
+                      context.read<ChatCubit>().sendMessage(_lastSentText!);
                     },
                   ),
-                ],
+                ];
+              }
+
+              return ChatInputBar(
+                controller: _controller,
+                enabled: canSend,
+                quickActions: quickActions,
+                quickActionsLabel: hasExistingRoute ? 'Edit route:' : 'Plan a route:',
                 onSend: () {
                   final text = _controller.text.trim();
                   if (text.isEmpty) return;
+                  _lastSentText = text;
                   context.read<ChatCubit>().sendMessage(text);
                   _controller.clear();
                   setState(() => _hasDraft = false);

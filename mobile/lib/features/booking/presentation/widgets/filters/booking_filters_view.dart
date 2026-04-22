@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 
 import '../../../data/models/sort_criteria.dart';
 import '../../cubit/booking_cubit.dart';
@@ -66,7 +67,6 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final accent = context.mapControlAccent;
-    final gradientColors = context.mapControlActiveGradientColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final neutralFieldFill = isLight
         ? context.lightGlassFieldFill
@@ -209,37 +209,13 @@ class _BookingFiltersViewState extends State<BookingFiltersView> {
         const SizedBox(height: 32),
 
         // Apply button
-        GestureDetector(
-          onTap: _apply,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: gradientColors),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withValues(alpha: 0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_rounded, size: 18, color: Colors.white),
-                SizedBox(width: 8),
-                Text(
-                  'Apply Filters',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        VacanzaGradientButton(
+          label: 'Apply Filters',
+          icon: Icons.check_rounded,
+          onPressed: _apply,
+          enabled: true,
+          minHeight: 52,
+          borderRadius: 20,
         ),
 
         const SizedBox(height: 12),

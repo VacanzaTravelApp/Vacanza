@@ -8,6 +8,7 @@ import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/theme/theme_cubit.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
 import 'package:mobile/features/booking/presentation/widgets/search/booking_search_field_styles.dart';
+import 'package:mobile/features/trip_agenda/trip_agenda_calendar_sheet.dart';
 
 import '../../../gamification/presentation/cubit/gamification_cubit.dart';
 import '../../../gamification/presentation/cubit/gamification_state.dart';
@@ -22,8 +23,6 @@ import '../widgets/edit_preferences_sheet.dart';
 import '../widgets/edit_profile_sheet.dart';
 import '../widgets/profile_character_card.dart';
 import '../widgets/profile_photo_viewer.dart';
-import 'check_in_history_screen.dart';
-import 'travel_statistics_screen.dart';
 import '../../data/models/check_in.dart';
 import '../../data/models/user_preferences.dart';
 import '../../data/models/user_profile.dart';
@@ -170,11 +169,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 subtitle: "Places you've visited",
                 icon: Icons.schedule_rounded,
                 iconGradient: ProfileIconGradient.checkIn(context),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const CheckInHistoryScreen()),
-                  );
-                },
+                onTap: null,
                 child: const _CheckInHistoryPreview(),
               ),
               const SizedBox(height: 16),
@@ -184,11 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 subtitle: 'Your journey so far',
                 icon: Icons.bar_chart_rounded,
                 iconGradient: ProfileIconGradient.stats,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const TravelStatisticsScreen()),
-                  );
-                },
+                onTap: null,
                 child: const _TravelStatisticsPreview(),
               ),
               const SizedBox(height: 16),
@@ -327,7 +318,7 @@ class _ProfileMenuCard extends StatelessWidget {
   final String? subtitle;
   final IconData icon;
   final LinearGradient iconGradient;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Widget? child;
   /// When null, shows a chevron (push navigation). Pass a custom widget for sheets / other affordances.
   final Widget? trailing;
@@ -337,7 +328,7 @@ class _ProfileMenuCard extends StatelessWidget {
     this.subtitle,
     required this.icon,
     required this.iconGradient,
-    required this.onTap,
+    this.onTap,
     this.child,
     this.trailing,
   });
@@ -394,8 +385,16 @@ class _ProfileMenuCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      trailing ??
-                          Icon(Icons.chevron_right, size: 22, color: cs.onSurfaceVariant),
+                      if (trailing != null)
+                        trailing!
+                      else if (onTap != null)
+                        Icon(
+                          Icons.chevron_right,
+                          size: 22,
+                          color: cs.onSurfaceVariant,
+                        )
+                      else
+                        const SizedBox.shrink(),
                     ],
                   ),
                   if (child != null) ...[
@@ -477,6 +476,29 @@ class _ActionsCard extends StatelessWidget {
                 onPressed: () => context.read<ThemeCubit>().toggle(),
               ),
               onTap: () => context.read<ThemeCubit>().toggle(),
+            ),
+            Divider(
+              height: 1,
+              color: BookingSearchFieldStyles.fieldBorderInactive(context),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                Icons.calendar_month_rounded,
+                color: cs.onSurfaceVariant,
+              ),
+              title: Text(
+                'Trip Agenda',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+              ),
+              subtitle: Text(
+                'Your trip calendar',
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+              onTap: () => showTripAgendaCalendar(context),
             ),
             Divider(
               height: 1,

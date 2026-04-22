@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../domain/saved_poi.dart';
+
 /// `/api/feedback` — same contract as web [feedbackApi.js].
 class FeedbackApiClient {
   final Dio _dio;
@@ -17,6 +19,16 @@ class FeedbackApiClient {
 
   Future<void> postPoiFeedbackEvent(Map<String, dynamic> body) async {
     await _dio.post<void>('/api/feedback/poi-events', data: body);
+  }
+
+  /// GET `/api/feedback/saved-pois` — liked POIs with display info.
+  Future<List<SavedPoi>> fetchSavedPois() async {
+    final res = await _dio.get<dynamic>('/api/feedback/saved-pois');
+    final data = res.data;
+    if (data is! List) {
+      throw const FormatException('Invalid saved-pois response');
+    }
+    return data.map((e) => SavedPoi.fromJson(e)).toList(growable: false);
   }
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:mobile/features/booking/presentation/widgets/search/booking_search_field_styles.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 
 import '../../data/profile_preference_options.dart';
 import '../styles/profile_sheet_styles.dart';
@@ -270,16 +271,12 @@ class _SearchableMultiSelectPickerSheetState
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             child: SizedBox(
               width: double.infinity,
-              child: FilledButton(
+              child: VacanzaGradientButton(
+                label: 'Done (${_selected.length} selected)',
                 onPressed: _done,
-                style: FilledButton.styleFrom(
-                  backgroundColor: accent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: Text('Done (${_selected.length} selected)'),
+                enabled: true,
+                minHeight: 50,
+                borderRadius: 14,
               ),
             ),
           ),

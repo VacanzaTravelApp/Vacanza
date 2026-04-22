@@ -17,6 +17,7 @@ class MapControlsMenu extends StatefulWidget {
     required this.perspective,
     required this.isDrawing,
     required this.onToggleDrawing,
+    required this.onOpenSavedPlaces,
     required this.onOpenFilters,
     required this.onOpenArMode,
     required this.onOpenBooking,
@@ -33,6 +34,7 @@ class MapControlsMenu extends StatefulWidget {
   final bool isDrawing;
 
   final VoidCallback onToggleDrawing;
+  final VoidCallback onOpenSavedPlaces;
   final VoidCallback onOpenFilters;
   final VoidCallback onOpenArMode;
   final VoidCallback onOpenBooking;
@@ -55,13 +57,13 @@ class _MapControlsMenuState extends State<MapControlsMenu>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 260),
-      reverseDuration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 240),
+      reverseDuration: const Duration(milliseconds: 240),
     );
     _fade = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
+      curve: Curves.easeInOutCubic,
+      reverseCurve: Curves.easeInOutCubic,
     );
     _slide = Tween<Offset>(
       begin: const Offset(0, -0.06),
@@ -106,68 +108,62 @@ class _MapControlsMenuState extends State<MapControlsMenu>
         const SizedBox(height: 12),
         IgnorePointer(
           ignoring: !widget.open,
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 260),
-            reverseDuration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: widget.open ? null : 0,
-              child: FadeTransition(
-                opacity: _fade,
-                child: SlideTransition(
-                  position: _slide,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ActionIconButton(
-                        tooltip:
-                            widget.isDrawing ? 'Drawing: ON' : 'Drawing: OFF',
-                        icon: Icons.edit_rounded,
-                        isActive: widget.isDrawing,
-                        onPressed: widget.onToggleDrawing,
-                      ),
-                      const SizedBox(height: 16),
-                      ActionIconButton(
-                        tooltip: 'Filter POIs',
-                        icon: Icons.layers_sharp,
-                        onPressed: widget.onOpenFilters,
-                      ),
-                      const SizedBox(height: 16),
-                      ActionIconButton(
-                        tooltip: 'Explore in AR',
-                        icon: Icons.view_in_ar_rounded,
-                        onPressed: widget.onOpenArMode,
-                      ),
-                      const SizedBox(height: 16),
-                      ActionIconButton(
-                        tooltip: 'Booking',
-                        icon: Icons.luggage_rounded,
-                        onPressed: widget.onOpenBooking,
-                      ),
-                      const SizedBox(height: 16),
-                      ActionIconButton(
-                        tooltip: 'Trip Agenda',
-                        icon: Icons.calendar_month_rounded,
-                        onPressed: widget.onOpenTripAgenda,
-                      ),
-                      const SizedBox(height: 16),
-                      _actionWithBadge(
-                        tooltip: _basemapTooltip(widget.basemap),
-                        icon: Icons.layers_outlined,
-                        badge: widget.basemap.label,
-                        onPressed: widget.onCycleBasemap,
-                      ),
-                      const SizedBox(height: 16),
-                      _actionWithBadge(
-                        tooltip: is3D ? 'Switch to 2D' : 'Switch to 3D',
-                        icon: Icons.map_outlined,
-                        badge: widget.perspective.label,
-                        isActive: is3D,
-                        onPressed: widget.onTogglePerspective,
-                      ),
-                    ],
-                  ),
+          child: SizeTransition(
+            sizeFactor: _fade,
+            axisAlignment: -1,
+            child: FadeTransition(
+              opacity: _fade,
+              child: SlideTransition(
+                position: _slide,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ActionIconButton(
+                      tooltip: widget.isDrawing ? 'Drawing: ON' : 'Drawing: OFF',
+                      icon: Icons.edit_rounded,
+                      isActive: widget.isDrawing,
+                      onPressed: widget.onToggleDrawing,
+                    ),
+                    const SizedBox(height: 16),
+                    ActionIconButton(
+                      tooltip: 'Saved Places',
+                      icon: Icons.favorite_rounded,
+                      onPressed: widget.onOpenSavedPlaces,
+                    ),
+                    const SizedBox(height: 16),
+                    ActionIconButton(
+                      tooltip: 'Filter POIs',
+                      icon: Icons.filter_alt_rounded,
+                      onPressed: widget.onOpenFilters,
+                    ),
+                    const SizedBox(height: 16),
+                    ActionIconButton(
+                      tooltip: 'Explore in AR',
+                      icon: Icons.view_in_ar_rounded,
+                      onPressed: widget.onOpenArMode,
+                    ),
+                    const SizedBox(height: 16),
+                    ActionIconButton(
+                      tooltip: 'Booking',
+                      icon: Icons.luggage_rounded,
+                      onPressed: widget.onOpenBooking,
+                    ),
+                    const SizedBox(height: 16),
+                    _actionWithBadge(
+                      tooltip: _basemapTooltip(widget.basemap),
+                      icon: Icons.layers_outlined,
+                      badge: widget.basemap.label,
+                      onPressed: widget.onCycleBasemap,
+                    ),
+                    const SizedBox(height: 16),
+                    _actionWithBadge(
+                      tooltip: is3D ? 'Switch to 2D' : 'Switch to 3D',
+                      icon: Icons.map_outlined,
+                      badge: widget.perspective.label,
+                      isActive: is3D,
+                      onPressed: widget.onTogglePerspective,
+                    ),
+                  ],
                 ),
               ),
             ),

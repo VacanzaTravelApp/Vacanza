@@ -19,14 +19,25 @@ class BookingTypeToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final accent = context.mapControlAccent;
+    final gradientColors = context.mapControlActiveGradientColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final track = isLight
         ? context.lightGlassFieldFill
-        : cs.surfaceContainerHighest.withValues(alpha: 0.9);
+        : cs.surfaceContainerHighest.withValues(alpha: 0.55);
+    final indicatorGradientColors = isLight
+        ? gradientColors
+        : gradientColors
+            .map((c) => c.withValues(alpha: 0.88))
+            .toList(growable: false);
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: track,
+        border: Border.all(
+          color: isLight
+              ? cs.secondary.withValues(alpha: 0.22)
+              : cs.outline.withValues(alpha: 0.55),
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Stack(
@@ -43,14 +54,24 @@ class BookingTypeToggle extends StatelessWidget {
               child: Container(
                 height: 44,
                 decoration: BoxDecoration(
-                  color: cs.surface,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: indicatorGradientColors,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: cs.shadow.withValues(alpha: 0.08),
+                      color: cs.shadow.withValues(alpha: isLight ? 0.08 : 0.18),
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
+                    if (!isLight)
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.20),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
                   ],
                 ),
               ),
@@ -79,7 +100,11 @@ class BookingTypeToggle extends StatelessWidget {
     ColorScheme cs,
   ) {
     final isActive = selected == type;
-    final inactiveMuted = cs.onSurfaceVariant;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final inactiveMuted = isLight
+        ? cs.onSurfaceVariant
+        : cs.onSurface.withValues(alpha: 0.72);
+    final activeFg = Colors.white;
     return Expanded(
       child: GestureDetector(
         onTap: () => onChanged(type),
@@ -92,7 +117,7 @@ class BookingTypeToggle extends StatelessWidget {
               Icon(
                 icon,
                 size: 16,
-                color: isActive ? accent : inactiveMuted,
+                color: isActive ? activeFg : inactiveMuted,
               ),
               const SizedBox(width: 6),
               Text(
@@ -100,7 +125,7 @@ class BookingTypeToggle extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: isActive ? accent : inactiveMuted,
+                  color: isActive ? activeFg : inactiveMuted,
                 ),
               ),
             ],
