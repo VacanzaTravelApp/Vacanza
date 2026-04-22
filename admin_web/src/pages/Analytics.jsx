@@ -96,7 +96,7 @@ const Analytics = () => {
                 </Col>
 
                 <Col xs={24} lg={16}>
-                    <Card className="glass-card" variant="borderless" title={<span style={{ fontSize: 20 }}>User Growth Trend</span>}>
+                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>User Growth Trend</span>}>
                         <div style={{ height: 400, width: '100%', marginTop: 24 }}>
                             <ResponsiveContainer>
                                 <AreaChart data={data?.growthTrajectory || []}>
@@ -138,14 +138,18 @@ const Analytics = () => {
                         <Col span={24}>
                             <Card className="glass-card" variant="borderless">
                                 <Statistic
-                                    title={<Text style={{ color: THEME.subtext, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Global Service Nodes</Text>}
+                                    title={<Text style={{ color: THEME.subtext, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Global Traffic Volume</Text>}
                                     value={data?.activeNodes || 0}
                                     prefix={<GlobalOutlined style={{ color: THEME.teal }} />}
                                     valueStyle={{ color: THEME.navy, fontWeight: 800, fontSize: 48 }}
                                 />
-                                <div style={{ marginTop: 24 }}>
-                                    <Text style={{ fontSize: 12, color: THEME.subtext, fontWeight: 700, display: 'block', marginBottom: 8 }}>SESSION AVG DURATION</Text>
-                                    <Title level={3} style={{ margin: 0 }}>{data?.avgDuration || 0}h</Title>
+                                <div style={{ marginTop: 24, padding: '16px', background: 'rgba(26, 35, 50, 0.03)', borderRadius: '12px' }}>
+                                    <Text style={{ fontSize: 11, color: THEME.subtext, fontWeight: 700, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Avg. Planning Session</Text>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                                        <Title level={3} style={{ margin: 0, fontWeight: 900, color: THEME.navy }}>{data?.avgDuration || 0}h</Title>
+                                        <Text style={{ fontSize: 12, color: THEME.subtext, fontWeight: 500 }}>per researcher</Text>
+                                    </div>
+                                    <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: 8 }}>Time spent by users building travel itineraries.</Text>
                                 </div>
                             </Card>
                         </Col>
