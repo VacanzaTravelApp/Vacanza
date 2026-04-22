@@ -8,6 +8,7 @@ class ChatInputBar extends StatelessWidget {
   final VoidCallback onSend;
   final ValueChanged<bool> onDraftChanged;
   final List<ChatQuickAction> quickActions;
+  final String? quickActionsLabel;
 
   const ChatInputBar({
     super.key,
@@ -16,6 +17,7 @@ class ChatInputBar extends StatelessWidget {
     required this.onSend,
     required this.onDraftChanged,
     this.quickActions = const [],
+    this.quickActionsLabel,
   });
 
   @override
@@ -54,7 +56,10 @@ class ChatInputBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (showQuickActions) ...[
-                  _ChatQuickActionsRow(actions: quickActions),
+                  _ChatQuickActionsRow(
+                    actions: quickActions,
+                    label: quickActionsLabel,
+                  ),
                   const SizedBox(height: 12),
                 ],
                 Row(
@@ -209,22 +214,42 @@ class _SendButton extends StatelessWidget {
 
 class _ChatQuickActionsRow extends StatelessWidget {
   final List<ChatQuickAction> actions;
+  final String? label;
 
-  const _ChatQuickActionsRow({required this.actions});
+  const _ChatQuickActionsRow({required this.actions, this.label});
 
   @override
   Widget build(BuildContext context) {
     final t = context.vacanzaTokens;
     final cs = Theme.of(context).colorScheme;
     final accent = context.mapControlAccent;
+    final totalItems = actions.length + (label != null ? 1 : 0);
     return SizedBox(
       height: 34,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: actions.length,
+        itemCount: totalItems,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          final a = actions[i];
+          // First item is the label when provided
+          if (label != null && i == 0) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 2),
+                child: Text(
+                  label!.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.7,
+                    color: t.textSub.withValues(alpha: 0.65),
+                  ),
+                ),
+              ),
+            );
+          }
+          final actionIndex = label != null ? i - 1 : i;
+          final a = actions[actionIndex];
           final bg =
               Theme.of(context).brightness == Brightness.light
                   ? context.lightGlassFieldFill
