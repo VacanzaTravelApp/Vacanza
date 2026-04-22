@@ -49,12 +49,17 @@ abstract final class BookingSearchFieldStyles {
     final cs = Theme.of(context).colorScheme;
     final isLight = Theme.of(context).brightness == Brightness.light;
     if (isLight) return cs.secondary.withValues(alpha: 0.22);
-    return cs.outline.withValues(alpha: 0.35);
+    // Dark mode: slightly stronger border so fields and buttons don't disappear.
+    return cs.outline.withValues(alpha: 0.55);
   }
 
   /// Text field / dropdown fill — light: airy white; dark: muted surface.
-  static Color fieldFill(BuildContext context) =>
-      context.lightGlassFieldFill;
+  static Color fieldFill(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    if (isLight) return context.lightGlassFieldFill;
+    return cs.surfaceContainerHighest.withValues(alpha: 0.55);
+  }
 }
 
 /// Odak / vurgu rengi — harita ile aynı [mapControlAccent].
