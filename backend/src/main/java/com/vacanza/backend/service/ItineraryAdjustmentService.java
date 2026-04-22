@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vacanza.backend.dto.adjustment.AdjustmentResult;
 import com.vacanza.backend.dto.adjustment.AdjustmentTriggerRequest;
 import com.vacanza.backend.entity.AiRoute;
+import com.vacanza.backend.entity.RouteHotel;
 import com.vacanza.backend.entity.RouteAdjustmentLog;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.enums.AdjustmentSeverity;
@@ -164,6 +165,21 @@ public class ItineraryAdjustmentService {
         int newVersion = route.getVersion() + 1;
 
         // Persist new version
+        RouteHotel parentHotel = route.getSelectedHotel();
+        RouteHotel copiedHotel = parentHotel == null ? null : RouteHotel.builder()
+                .hotelName(parentHotel.getHotelName())
+                .hotelExternalId(parentHotel.getHotelExternalId())
+                .address(parentHotel.getAddress())
+                .latitude(parentHotel.getLatitude())
+                .longitude(parentHotel.getLongitude())
+                .imageUrl(parentHotel.getImageUrl())
+                .externalBookingUrl(parentHotel.getExternalBookingUrl())
+                .pricePerNight(parentHotel.getPricePerNight())
+                .currency(parentHotel.getCurrency())
+                .rating(parentHotel.getRating())
+                .providerName(parentHotel.getProviderName())
+                .build();
+
         AiRoute newRoute = AiRoute.builder()
                 .user(route.getUser())
                 .conversationId(route.getConversationId())
@@ -175,6 +191,7 @@ public class ItineraryAdjustmentService {
                 .parentRouteId(route.getRouteId())
                 .adjustedAt(LocalDateTime.now())
                 .adjustmentReason(adjustmentReason)
+                .selectedHotel(copiedHotel)
                 .build();
         AiRoute saved = routeRepository.save(newRoute);
 

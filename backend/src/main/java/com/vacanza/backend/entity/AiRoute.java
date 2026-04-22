@@ -3,6 +3,7 @@ package com.vacanza.backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.UuidGenerator;
+import com.vacanza.backend.entity.RouteHotel;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -78,6 +79,9 @@ public class AiRoute {
      */
     @Column(name = "adjustment_reason", length = 1024)
     private String adjustmentReason;
+
+    @Embedded
+    private RouteHotel selectedHotel;
 
     @PrePersist
     protected void onCreate() {

@@ -2,7 +2,9 @@ package com.vacanza.backend.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vacanza.backend.dto.request.RouteHotelRequestDTO;
 import com.vacanza.backend.entity.AiRoute;
+import com.vacanza.backend.entity.RouteHotel;
 import com.vacanza.backend.entity.User;
 import com.vacanza.backend.entity.enums.RouteFeedbackVote;
 import com.vacanza.backend.security.CurrentUserProvider;
@@ -12,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -39,6 +43,20 @@ public class RouteController {
             String userFeedback
     ) {}
 
+    record RouteHotelView(
+            String hotelName,
+            String hotelExternalId,
+            String address,
+            Double latitude,
+            Double longitude,
+            String imageUrl,
+            String externalBookingUrl,
+            BigDecimal pricePerNight,
+            String currency,
+            Double rating,
+            String providerName
+    ) {}
+
     record RouteDetail(
             UUID routeId,
             String title,
@@ -47,7 +65,8 @@ public class RouteController {
             JsonNode routeData,
             LocalDateTime generatedAt,
             /** "UP", "DOWN", or null */
-            String userFeedback
+            String userFeedback,
+            RouteHotelView selectedHotel
     ) {}
 
     @GetMapping
@@ -101,6 +120,24 @@ public class RouteController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/{routeId}/hotel")
+    public ResponseEntity<RouteDetail> setHotel(
+            @PathVariable UUID routeId,
+            @RequestBody RouteHotelRequestDTO dto) {
+        User user = currentUserProvider.getCurrentUserEntity();
+        return aiRouteService.setRouteHotel(routeId, user, dto)
+                .map(r -> ResponseEntity.ok(toDetail(r, user)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{routeId}/hotel")
+    public ResponseEntity<RouteDetail> removeHotel(@PathVariable UUID routeId) {
+        User user = currentUserProvider.getCurrentUserEntity();
+        return aiRouteService.removeRouteHotel(routeId, user)
+                .map(r -> ResponseEntity.ok(toDetail(r, user)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     private RouteDetail toDetail(AiRoute route, User user) {
         Map<UUID, RouteFeedbackVote> votes = userRouteFeedbackService.findVotesForUserAndRoutes(
                 user.getUserId(), List.of(route.getRouteId()));
@@ -118,7 +155,17 @@ public class RouteController {
         return new RouteDetail(
                 route.getRouteId(), route.getTitle(), route.getDestination(),
                 route.getTotalDays(), parsed, route.getGeneratedAt(),
-                feedbackString(votes, route.getRouteId()));
+                feedbackString(votes, route.getRouteId()),
+                toHotelView(route.getSelectedHotel()));
+    }
+
+    private RouteHotelView toHotelView(RouteHotel hotel) {
+        if (hotel == null || hotel.getHotelName() == null) return null;
+        return new RouteHotelView(
+                hotel.getHotelName(), hotel.getHotelExternalId(), hotel.getAddress(),
+                hotel.getLatitude(), hotel.getLongitude(), hotel.getImageUrl(),
+                hotel.getExternalBookingUrl(), hotel.getPricePerNight(), hotel.getCurrency(),
+                hotel.getRating(), hotel.getProviderName());
     }
 
     private static String feedbackString(Map<UUID, RouteFeedbackVote> votes, UUID routeId) {
