@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 
 /// Result for [ActiveRouteCubit.createFromPolygon]. Backend expects a single
 /// `travelStyle` string; multiple chip selections are joined with ", ".
@@ -250,29 +251,20 @@ class _CreateRouteFromAreaState extends State<_CreateRouteFromAreaDialog> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      CupertinoTheme(
-                        data: CupertinoThemeData(primaryColor: accent),
-                        child: CupertinoButton.filled(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          borderRadius: BorderRadius.circular(14),
-                          onPressed: () {
-                            Navigator.of(context).pop(
-                              CreateRouteFromAreaOptions(
-                                totalDays: _days,
-                                travelStyle: _travelStyle,
-                                includeFavorites: _includeFavorites,
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            'Done',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.2,
+                      VacanzaGradientButton(
+                        label: 'Done',
+                        onPressed: () {
+                          Navigator.of(context).pop(
+                            CreateRouteFromAreaOptions(
+                              totalDays: _days,
+                              travelStyle: _travelStyle,
+                              includeFavorites: _includeFavorites,
                             ),
-                          ),
-                        ),
+                          );
+                        },
+                        enabled: true,
+                        minHeight: 50,
+                        borderRadius: 14,
                       ),
                       const SizedBox(height: 8),
                       CupertinoButton(
