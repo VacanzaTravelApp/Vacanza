@@ -732,7 +732,7 @@ export default function MapPage() {
       if (result.newRouteId && result.newRouteId !== routeId) {
         const detail = await aiApi.getRoute(result.newRouteId);
         const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
-        setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? result.newRouteId }));
+        setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? result.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
       }
       message.success(result.userMessage || "Rotanız güncellendi.");
     } catch {
@@ -746,7 +746,7 @@ export default function MapPage() {
     try {
       const detail = await aiApi.getRoute(data.newRouteId);
       const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
-      setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? data.newRouteId }));
+      setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? data.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
       notification.info({
         message: "Rotanız güncellendi",
         description: data.userMessage || "Bir veya daha fazla durak otomatik olarak güncellendi.",
@@ -1617,6 +1617,18 @@ export default function MapPage() {
     );
   }, [activeRoute, activeDay]);
 
+  // Hotel-aware waypoints for directions: prepend + append hotel coords if set
+  const directionsWaypoints = useMemo(() => {
+    const hotel = activeRoute?.selectedHotel;
+    const hlat = Number(hotel?.latitude);
+    const hlon = Number(hotel?.longitude);
+    if (!hotel || !Number.isFinite(hlat) || !Number.isFinite(hlon) || activeWaypoints.length === 0) {
+      return activeWaypoints;
+    }
+    const hotelPoint = { latitude: hlat, longitude: hlon, _isHotel: true };
+    return [hotelPoint, ...activeWaypoints, hotelPoint];
+  }, [activeWaypoints, activeRoute?.selectedHotel]);
+
   const routeLineGeoJSON = useMemo(() => {
     const coords =
       Array.isArray(routeGeometry) && routeGeometry.length >= 2
@@ -1681,7 +1693,7 @@ export default function MapPage() {
     let cancelled = false;
 
     const fetchRouteGeometry = async () => {
-      if (activeWaypoints.length < 2) {
+      if (directionsWaypoints.length < 2) {
         // No route for single-point days
         setRouteGeometry(null);
         return;
@@ -1693,7 +1705,7 @@ export default function MapPage() {
 
       try {
         const body = {
-          waypoints: activeWaypoints.map((w) => ({
+          waypoints: directionsWaypoints.map((w) => ({
             latitude: w.latitude,
             longitude: w.longitude,
           })),
@@ -1737,7 +1749,7 @@ export default function MapPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeWaypoints]);
+  }, [directionsWaypoints]);
 
   // fitBounds when route day changes
   useEffect(() => {
@@ -2102,6 +2114,21 @@ export default function MapPage() {
             </Source>
           )}
 
+          {/* Hotel marker */}
+          {(() => {
+            const hotel = activeRoute?.selectedHotel;
+            const hlat = Number(hotel?.latitude);
+            const hlon = Number(hotel?.longitude);
+            if (!hotel || !Number.isFinite(hlat) || !Number.isFinite(hlon)) return null;
+            return (
+              <Marker key="hotel-marker" latitude={hlat} longitude={hlon} anchor="bottom">
+                <div className="vc-map-hotel-marker" title={hotel?.hotelName ?? "Hotel"} role="img" aria-label="Hotel">
+                  <span className="vc-map-hotel-marker__glyph" aria-hidden>🏨</span>
+                </div>
+              </Marker>
+            );
+          })()}
+
           {activeWaypoints.map((wp) => {
             const isUnavailable = wp.unavailable === true;
             const displayNumber = wp._originalIndex + 1;
@@ -2436,6 +2463,7 @@ export default function MapPage() {
             onClose={() => { setActiveRoute(null); setRouteViewActive(false); }}
             onWaypointClick={handleWaypointClick}
             onMarkUnavailable={handleMarkUnavailable}
+            onRouteUpdate={setActiveRoute}
           />
         )}
 
@@ -2447,7 +2475,10 @@ export default function MapPage() {
           onRequestDrawToEdit={handleRequestDrawToEditFromChat}
           onRouteGenerated={(routeData, meta) => {
             const routeId = meta?.routeId ?? routeData?.routeId ?? routeData?.route_id ?? null;
-            setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
+            const currentId = activeRoute?.routeId ?? activeRoute?.route_id;
+            const preservedHotel = (routeId && routeId === currentId) ? (activeRoute?.selectedHotel ?? null) : null;
+            const fromChatHotel = routeData?.selectedHotel ?? null;
+            setActiveRoute(normalizeRouteForMap({ ...routeData, routeId, selectedHotel: fromChatHotel ?? preservedHotel }));
             setActiveDay(1);
             setRouteViewActive(true);
             setIsChatOpen(false);
@@ -2491,6 +2522,7 @@ export default function MapPage() {
                   destination: d.destination ?? raw.destination,
                   total_days: d.totalDays ?? raw.total_days,
                   totalDays: d.totalDays ?? raw.totalDays,
+                  selectedHotel: d.selectedHotel ?? null,
                 })
               );
               setActiveDay(1);

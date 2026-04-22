@@ -4,6 +4,9 @@ import { CloseOutlined } from "@ant-design/icons";
 import { getCategoryColor } from "../../../constants/categoryColors";
 import WaypointFeedback from "./WaypointFeedback";
 import EventRecommendations from "./EventRecommendations";
+import HotelPickerSheet from "./HotelPickerSheet";
+import HotelIcon from "./icons/HotelIcon";
+import { aiApi } from "../../../api/aiApi";
 import { Rnd } from "react-rnd";
 import "../styles/routePanel.css";
 
@@ -90,10 +93,77 @@ export default function RoutePanel({
   onClose,
   onWaypointClick,
   onMarkUnavailable,
+  onRouteUpdate,
 }) {
   const [adjustingPoi, setAdjustingPoi] = useState(null);
+  const [hotelPickerOpen, setHotelPickerOpen] = useState(false);
+  const [savingHotel, setSavingHotel] = useState(false);
+  const [hotelError, setHotelError] = useState(null);
 
   if (!route) return null;
+
+  const routeId = route.routeId ?? route.route_id;
+  const selectedHotel = route.selectedHotel ?? null;
+
+  async function handleHotelSelect(hotel) {
+    if (!routeId) return;
+    setSavingHotel(true);
+    setHotelPickerOpen(false);
+    setHotelError(null);
+    try {
+      await aiApi.setRouteHotel(routeId, {
+        hotelName: hotel.hotelName,
+        hotelExternalId: hotel.hotelId,
+        address: hotel.address,
+        latitude: hotel.latitude,
+        longitude: hotel.longitude,
+        imageUrl: hotel.imageUrl,
+        externalBookingUrl: hotel.externalBookingUrl,
+        pricePerNight: hotel.pricePerNight,
+        currency: hotel.currency,
+        rating: hotel.rating,
+        providerName: hotel.providerName,
+      });
+      onRouteUpdate?.({
+        ...route,
+        selectedHotel: {
+          hotelName: hotel.hotelName,
+          hotelExternalId: hotel.hotelId,
+          address: hotel.address,
+          latitude: hotel.latitude,
+          longitude: hotel.longitude,
+          imageUrl: hotel.imageUrl,
+          externalBookingUrl: hotel.externalBookingUrl,
+          pricePerNight: hotel.pricePerNight,
+          currency: hotel.currency,
+          rating: hotel.rating,
+          providerName: hotel.providerName,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to save hotel", err);
+      const msg = err?.friendlyMessage || err?.response?.data?.message || err?.message || "Failed to save hotel.";
+      setHotelError(msg);
+    } finally {
+      setSavingHotel(false);
+    }
+  }
+
+  async function handleRemoveHotel() {
+    if (!routeId) return;
+    setSavingHotel(true);
+    setHotelError(null);
+    try {
+      await aiApi.removeRouteHotel(routeId);
+      onRouteUpdate?.({ ...route, selectedHotel: null });
+    } catch (err) {
+      console.error("Failed to remove hotel", err);
+      const msg = err?.friendlyMessage || err?.response?.data?.message || err?.message || "Failed to remove hotel.";
+      setHotelError(msg);
+    } finally {
+      setSavingHotel(false);
+    }
+  }
 
   const days = route.days || [];
   const dayPlan = days.find((d) => Number(d?.day) === Number(activeDay));
@@ -195,6 +265,86 @@ export default function RoutePanel({
         </div>
       )}
 
+      {/* ── Hotel Section ── */}
+      <div className="route-panel-hotel-section">
+        <div className="route-panel-hotel-section-label">
+          <HotelIcon size={14} className="route-panel-hotel-icon" />
+          Accommodation
+        </div>
+        {hotelError && (
+          <div className="route-panel-hotel-error">{hotelError}</div>
+        )}
+        {selectedHotel ? (
+          <div className="route-panel-hotel-card">
+            <div className="route-panel-hotel-card-inner">
+              <div className="route-panel-hotel-thumb">
+                {selectedHotel.imageUrl ? (
+                  <img
+                    className="route-panel-hotel-thumb-img"
+                    src={selectedHotel.imageUrl}
+                    alt={selectedHotel.hotelName}
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="route-panel-hotel-thumb-placeholder" aria-hidden>
+                    <HotelIcon size={22} className="route-panel-hotel-thumb-icon" title="Hotel" />
+                  </div>
+                )}
+              </div>
+              <div className="route-panel-hotel-info">
+                <div className="route-panel-hotel-name">{selectedHotel.hotelName}</div>
+                {selectedHotel.address && (
+                  <div className="route-panel-hotel-address">📍 {selectedHotel.address}</div>
+                )}
+                {selectedHotel.rating != null && (
+                  <div className="route-panel-hotel-stars">★ {selectedHotel.rating}</div>
+                )}
+              </div>
+            </div>
+            <div className="route-panel-hotel-actions">
+              <div className="route-panel-hotel-actions-left">
+                {selectedHotel.externalBookingUrl && (
+                  <a
+                    className="route-panel-hotel-book-btn"
+                    href={selectedHotel.externalBookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Book ↗
+                  </a>
+                )}
+                <button
+                  className="route-panel-hotel-change-btn"
+                  onClick={() => setHotelPickerOpen(true)}
+                  disabled={savingHotel}
+                >
+                  Change
+                </button>
+              </div>
+              <button
+                className="route-panel-hotel-remove-btn"
+                onClick={handleRemoveHotel}
+                disabled={savingHotel}
+              >
+                {savingHotel ? '...' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="route-panel-hotel-empty">
+            <span className="route-panel-hotel-empty-text">No hotel added yet</span>
+            <button
+              className="route-panel-hotel-add-btn"
+              onClick={() => setHotelPickerOpen(true)}
+              disabled={savingHotel || !routeId}
+            >
+              {savingHotel ? "Saving..." : "+ Add Hotel"}
+            </button>
+          </div>
+        )}
+      </div>
+
       {(dayStartLocal || dayEndLocal) && (
         <div className="route-panel-day-window" aria-label="Day summary">
           {dayStartLocal && dayEndLocal
@@ -229,6 +379,29 @@ export default function RoutePanel({
           <div className="route-panel-empty">No waypoints found for this day.</div>
         ) : (
           <ul className="route-panel-timeline">
+
+            {/* ── Hotel start ── */}
+            {selectedHotel && (
+              <>
+                <li className="route-panel-waypoint-row">
+                  <div className="route-panel-hotel-dot" aria-hidden>
+                    <HotelIcon size={18} className="route-panel-hotel-dot-icon" title="Hotel" />
+                  </div>
+                  <div className="route-panel-waypoint-line" />
+                  <div className="route-panel-waypoint-content" style={{ paddingTop: 4 }}>
+                    <div className="route-panel-waypoint-name">{selectedHotel.hotelName}</div>
+                    {selectedHotel.address && (
+                      <div className="route-panel-waypoint-desc">{selectedHotel.address}</div>
+                    )}
+                  </div>
+                </li>
+                <li className="route-panel-travel-leg">
+                  <div className="route-panel-travel-line" />
+                  <span className="route-panel-travel-label">Depart from hotel</span>
+                </li>
+              </>
+            )}
+
             {waypoints.map((wp, idx) => {
               const color = getCategoryColor(wp.category);
               const isLast = idx === waypoints.length - 1;
@@ -276,7 +449,7 @@ export default function RoutePanel({
                     >
                       {idx + 1}
                     </div>
-                    {!isLast && <div className="route-panel-waypoint-line" />}
+                    {(!isLast || selectedHotel) && <div className="route-panel-waypoint-line" />}
                     <div className="route-panel-waypoint-content">
                       {(arrival || departure) && (
                         <div className="route-panel-waypoint-clock">
@@ -347,6 +520,25 @@ export default function RoutePanel({
                 </React.Fragment>
               );
             })}
+
+            {/* ── Hotel end (return) ── */}
+            {selectedHotel && (
+              <>
+                <li className="route-panel-travel-leg">
+                  <div className="route-panel-travel-line" />
+                  <span className="route-panel-travel-label">Return to hotel</span>
+                </li>
+                <li className="route-panel-waypoint-row route-panel-waypoint-last">
+                  <div className="route-panel-hotel-dot" aria-hidden>
+                    <HotelIcon size={18} className="route-panel-hotel-dot-icon" title="Hotel" />
+                  </div>
+                  <div className="route-panel-waypoint-content" style={{ paddingTop: 4 }}>
+                    <div className="route-panel-waypoint-name">{selectedHotel.hotelName}</div>
+                  </div>
+                </li>
+              </>
+            )}
+
           </ul>
         )}
       </div>
@@ -370,35 +562,47 @@ export default function RoutePanel({
     </div>
   );
 
+  const hotelPicker = (
+    <HotelPickerSheet
+      open={hotelPickerOpen}
+      onClose={() => setHotelPickerOpen(false)}
+      defaultDestination={route.destination}
+      onSelect={handleHotelSelect}
+    />
+  );
+
   if (isMobile) {
-    return content;
+    return <>{content}{hotelPicker}</>;
   }
 
   return (
-    <Rnd
-      default={{
-        x: window.innerWidth - 640,
-        y: 84,
-        width: 480,
-        height: 600,
-      }}
-      minWidth={320}
-      minHeight={400}
-      dragHandleClassName="route-panel-header"
-      cancel=".route-panel-close, .route-panel-tab"
-      bounds="parent"
-      enableResizing={{
-        top: true,
-        right: true,
-        bottom: true,
-        left: true,
-        topRight: true,
-        bottomRight: true,
-        bottomLeft: true,
-        topLeft: true,
-      }}
-    >
-      {content}
-    </Rnd>
+    <>
+      <Rnd
+        default={{
+          x: window.innerWidth - 640,
+          y: 84,
+          width: 480,
+          height: 600,
+        }}
+        minWidth={320}
+        minHeight={400}
+        dragHandleClassName="route-panel-header"
+        cancel=".route-panel-close, .route-panel-tab"
+        bounds="parent"
+        enableResizing={{
+          top: true,
+          right: true,
+          bottom: true,
+          left: true,
+          topRight: true,
+          bottomRight: true,
+          bottomLeft: true,
+          topLeft: true,
+        }}
+      >
+        {content}
+      </Rnd>
+      {hotelPicker}
+    </>
   );
 }
