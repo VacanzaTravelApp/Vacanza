@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 import '../../../ai/data/api/ai_route_api_client.dart';
 import '../../data/models/chat_models.dart';
 import 'chat_events_preview.dart';
@@ -444,17 +445,18 @@ class _ChatRouteCardState extends State<ChatRouteCard> {
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
-              child: FilledButton.icon(
+              child: VacanzaGradientButton(
+                label: 'Show on map',
+                icon: Icons.map_rounded,
                 onPressed: widget.onShowOnMap,
-                icon: const Icon(Icons.map_rounded, size: 18),
-                label: const Text('Show on map'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                enabled: true,
+                minHeight: 46,
+                borderRadius: 12,
+                horizontalPadding: 18,
+                textStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
                 ),
               ),
             ),
