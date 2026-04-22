@@ -2,9 +2,9 @@
 // lib/features/poi_search/presentation/widgets/area_results/area_results_bottom_sheet.dart
 import 'dart:ui';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 import 'package:mobile/core/theme/vacanza_tokens.dart';
 
 import '../../../data/models/poi.dart';
@@ -266,29 +266,14 @@ class AreaResultsSheet extends StatelessWidget {
                   Divider(height: 1, color: t.cardBorder),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-                    child: CupertinoTheme(
-                      data: CupertinoThemeData(
-                        primaryColor: context.mapControlAccent,
-                      ),
-                      child: CupertinoButton.filled(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        borderRadius: BorderRadius.circular(14),
-                        onPressed:
-                            isCreatingRoute ? null : onCreateRouteFromArea,
-                        child:
-                            isCreatingRoute
-                                ? const CupertinoActivityIndicator(
-                                  color: CupertinoColors.white,
-                                )
-                                : const Text(
-                                  'Create a route',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                      ),
+                    child: VacanzaGradientButton(
+                      label: 'Create a route',
+                      onPressed:
+                          (isCreatingRoute ? null : onCreateRouteFromArea),
+                      enabled: !isCreatingRoute,
+                      loading: isCreatingRoute,
+                      minHeight: 50,
+                      borderRadius: 14,
                     ),
                   ),
                 ],
