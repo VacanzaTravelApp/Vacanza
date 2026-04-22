@@ -26,6 +26,7 @@ class PoiSearchState extends Equatable {
   final int count;
   final List<Poi> pois;
   final Map<String, int> countsByCategory;
+  final bool hidePoiMarkers;
 
   const PoiSearchState({
     required this.areaSource,
@@ -40,6 +41,7 @@ class PoiSearchState extends Equatable {
     required this.count,
     required this.pois,
     required this.countsByCategory,
+    this.hidePoiMarkers = false,
   });
 
   factory PoiSearchState.initial() => PoiSearchState(
@@ -55,6 +57,7 @@ class PoiSearchState extends Equatable {
     count: 0,
     pois: const [],
     countsByCategory: const {},
+    hidePoiMarkers: false,
   );
 
   bool get isLoading => status == PoiSearchStatus.loading;
@@ -75,6 +78,7 @@ class PoiSearchState extends Equatable {
     int? count,
     List<Poi>? pois,
     Map<String, int>? countsByCategory,
+    bool? hidePoiMarkers,
   }) {
     return PoiSearchState(
       areaSource: areaSource ?? this.areaSource,
@@ -89,6 +93,7 @@ class PoiSearchState extends Equatable {
       count: count ?? this.count,
       pois: pois ?? this.pois,
       countsByCategory: countsByCategory ?? this.countsByCategory,
+      hidePoiMarkers: hidePoiMarkers ?? this.hidePoiMarkers,
     );
   }
 
@@ -106,5 +111,6 @@ class PoiSearchState extends Equatable {
     count,
     pois,
     countsByCategory,
+    hidePoiMarkers,
   ];
 }

@@ -22,6 +22,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<SetDrawingEnabled>(_onSetDrawingEnabled);
     on<SyncBasemapToAppTheme>(_onSyncBasemapToAppTheme);
     on<FitRouteBoundsRequested>(_onFitRouteBounds);
+    on<RefreshViewportRequested>(_onRefreshViewport);
   }
 
   void _onInitialized(MapInitialized event, Emitter<MapState> emit) {
@@ -114,6 +115,11 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     if (state.basemap == target) return;
     emit(state.copyWith(basemap: target));
     log('[MapBloc] SyncBasemapToAppTheme -> basemap=${target.label}');
+  }
+
+  void _onRefreshViewport(RefreshViewportRequested event, Emitter<MapState> emit) {
+    emit(state.copyWith(refreshViewportTick: state.refreshViewportTick + 1));
+    log('[MapBloc] RefreshViewportRequested -> tick=${state.refreshViewportTick + 1}');
   }
 
   bool get hasController => _controller != null;

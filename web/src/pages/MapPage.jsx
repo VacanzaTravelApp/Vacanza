@@ -702,6 +702,7 @@ export default function MapPage() {
   const [activeRoute, setActiveRoute] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
   const [routeGeometry, setRouteGeometry] = useState(null);
+  const [routeViewActive, setRouteViewActive] = useState(false);
 
   // Fly to a waypoint when user clicks it in the RoutePanel
   const handleWaypointClick = useCallback((wp) => {
@@ -1966,7 +1967,7 @@ export default function MapPage() {
             <Layer {...previewGlowLayer} />
             <Layer {...previewMainLayer} />
           </Source>
-          {pois.map((p) => {
+          {!routeViewActive && pois.map((p) => {
             const icon = poiIconByCategory(p);
             const catKey = icon?.uiKey || "others";
             if (!selectedCats[catKey]) return null;
@@ -2432,7 +2433,7 @@ export default function MapPage() {
             route={activeRoute}
             activeDay={activeDay}
             onDayChange={setActiveDay}
-            onClose={() => setActiveRoute(null)}
+            onClose={() => { setActiveRoute(null); setRouteViewActive(false); }}
             onWaypointClick={handleWaypointClick}
             onMarkUnavailable={handleMarkUnavailable}
           />
@@ -2448,6 +2449,7 @@ export default function MapPage() {
             const routeId = meta?.routeId ?? routeData?.routeId ?? routeData?.route_id ?? null;
             setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
             setActiveDay(1);
+            setRouteViewActive(true);
             setIsChatOpen(false);
           }}
         />
