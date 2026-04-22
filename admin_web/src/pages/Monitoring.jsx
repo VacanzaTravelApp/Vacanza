@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Row, Col, Card, Typography, Tag, Space, Spin, Badge, Progress, Table, message } from "antd";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from "recharts";
-import { LoadingOutlined, DatabaseOutlined, CloudServerOutlined, BugFilled, CheckCircleFilled, WarningFilled, CopyOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import { Row, Col, Card, Typography, Tag, Space, Spin, Badge, Progress, Table, message, Button, Empty, Tooltip as AntTooltip } from "antd";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { LoadingOutlined, DatabaseOutlined, CloudServerOutlined, BugFilled, CheckCircleFilled, WarningFilled, CopyOutlined, CheckCircleOutlined, SyncOutlined, CloseCircleFilled } from "@ant-design/icons";
 import http from "../api/http";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
@@ -104,9 +104,95 @@ const Monitoring = () => {
 
     useEffect(() => {
         fetchMonitoringData(true);
-        const interval = setInterval(() => fetchMonitoringData(), 60000);
+        // Refresh every 10 seconds for real-time accuracy
+        const interval = setInterval(() => fetchMonitoringData(), 10000);
         return () => clearInterval(interval);
     }, [fetchMonitoringData]);
+
+    const HealthCheckButton = ({ serviceName }) => {
+        const [state, setState] = useState("idle");
+        const [result, setResult] = useState(null);
+
+        const handleTest = async () => {
+            setState("loading");
+            try {
+                const response = await http.post(`/admin/health-check/${serviceName}`);
+                const dataResponse = response.data;
+                setResult(dataResponse);
+                const newStatus = dataResponse.status === "UP" ? "up" : "down";
+                setState(newStatus);
+
+                // Real-time synchronization with the main table
+                if (setData) {
+                    setData(prev => ({
+                        ...prev,
+                        services: prev.services.map(s => {
+                            const SERVICE_KEY_MAP = {
+                                "Currency Exchange (Frankfurter)": "frankfurter",
+                                "Weather Service (OpenMeteo)": "openmeteo",
+                                "Local Places (Foursquare)": "foursquare",
+                                "Maps & Geocoding (Mapbox)": "mapbox",
+                                "Hotel Search (SerpApi)": "serpapi",
+                                "Hotel & Flight Search (SerpApi)": "serpapi",
+                                "Events (Ticketmaster)": "ticketmaster",
+                                "Tours/Activities (Viator)": "viator",
+                                "AI Recommendation Engine": "ai",
+                            };
+                            return SERVICE_KEY_MAP[s.name] === serviceName
+                                ? { ...s, status: dataResponse.status }
+                                : s;
+                        })
+                    }));
+                }
+
+                setTimeout(() => setState("idle"), 5000);
+            } catch (e) {
+                setState("down");
+                setResult({ message: e.response?.data?.message || "Connection Error" });
+                setTimeout(() => setState("idle"), 5000);
+            }
+        };
+
+        const getLatencyStatus = (ms) => {
+            if (ms < 500) return "Excellent (Perfectly fluid response)";
+            if (ms < 2000) return "Normal (Stable connection)";
+            return "Slow (High latency detected)";
+        };
+
+        const getLatencyColor = (ms) => {
+            if (ms < 500) return THEME.green;
+            if (ms < 2000) return "#FFB347"; // Warning color
+            return THEME.error;
+        };
+
+        if (state === "loading") return <Button size="small" type="link" icon={<SyncOutlined spin />} disabled style={{ fontSize: 12 }}>Testing...</Button>;
+
+        if (state === "up") return (
+            <AntTooltip title={getLatencyStatus(result?.responseMs)}>
+                <Tag color="success" icon={<CheckCircleFilled />} style={{ fontWeight: 700, borderRadius: '20px', cursor: 'help' }}>
+                    UP (<span style={{ color: getLatencyColor(result?.responseMs) }}>{result?.responseMs}ms</span>)
+                </Tag>
+            </AntTooltip>
+        );
+
+        if (state === "down") return (
+            <AntTooltip title={result?.message}>
+                <Tag color="error" icon={<CloseCircleFilled />} style={{ cursor: 'help', borderRadius: '20px' }}>DOWN</Tag>
+            </AntTooltip>
+        );
+
+        return (
+            <Button
+                size="small"
+                type="primary"
+                ghost
+                onClick={handleTest}
+                style={{ borderRadius: '20px', fontSize: 11, height: 24, padding: '0 12px' }}
+            >
+                Test
+            </Button>
+        );
+    };
 
     const serviceColumns = [
         {
@@ -129,7 +215,7 @@ const Monitoring = () => {
                 const isUp = status === "UP" || status === "Active";
                 return (
                     <Tag
-                        bordered={false}
+                        variant="filled"
                         style={{
                             borderRadius: '20px',
                             padding: '4px 12px',
@@ -143,6 +229,29 @@ const Monitoring = () => {
                     </Tag>
                 );
             },
+        },
+        {
+            title: "Action",
+            key: "action",
+            align: 'right',
+            render: (_, record) => {
+                const SERVICE_KEY_MAP = {
+                    "Currency Exchange (Frankfurter)": "frankfurter",
+                    "Weather Service (OpenMeteo)": "openmeteo",
+                    "Local Places (Foursquare)": "foursquare",
+                    "Maps & Geocoding (Mapbox)": "mapbox",
+                    "Hotel Search (SerpApi)": "serpapi",
+                    "Hotel & Flight Search (SerpApi)": "serpapi",
+                    "Events (Ticketmaster)": "ticketmaster",
+                    "Tours/Activities (Viator)": "viator",
+                    "AI Recommendation Engine": "ai",
+                };
+
+                const serviceKey = SERVICE_KEY_MAP[record.name];
+                if (!serviceKey) return <Text style={{ color: 'rgba(26, 35, 50, 0.2)', fontSize: 11, fontStyle: 'italic' }}>Internal Node</Text>;
+
+                return <HealthCheckButton serviceName={serviceKey} />;
+            }
         }
     ];
 
@@ -181,12 +290,17 @@ const Monitoring = () => {
     ];
 
     if (loading) return (
-        <div style={{ minHeight: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f8fafc' }}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                <Spin indicator={<LoadingOutlined style={{ fontSize: 60, color: THEME.primary }} spin />} />
-                <div style={{ marginTop: 24, textAlign: 'center' }}>
-                    <Title level={4} className="gradient-text">Syncing System Matrix</Title>
-                    <Text type="secondary">Establishing secure administrative tunnel...</Text>
+        <div style={{ height: '70vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{ textAlign: 'center' }}
+            >
+                <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: THEME.primary, marginBottom: 24 }} spin />} description="SYSTEM MATRIX" />
+                <div style={{ marginTop: 16 }}>
+                    <Text type="secondary" style={{ fontSize: 16, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, opacity: 0.7 }}>
+                        Authenticating & Syncing Node Telemetry
+                    </Text>
                 </div>
             </motion.div>
         </div>
@@ -205,81 +319,150 @@ const Monitoring = () => {
             <Row gutter={[48, 48]}>
                 <Col span={24}>
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                        <Title level={4} style={{ color: THEME.coral, marginBottom: 8, letterSpacing: 2, textTransform: 'uppercase', fontSize: 13, fontWeight: 700 }}>
-                            INFRASTRUCTURE OVERWATCH
-                        </Title>
-                        <Title className="gradient-text" style={{ fontSize: '42px', margin: '0 0 16px 0', lineHeight: 1.1, letterSpacing: '-1.5px' }}>
+                        <Title
+                            className="gradient-text"
+                            style={{
+                                fontSize: '32px',
+                                margin: '0 0 10px 0',
+                                letterSpacing: '-1.2px',
+                                fontFamily: "'Fraunces', serif",
+                                fontWeight: 700
+                            }}
+                        >
                             System Matrix
                         </Title>
-                        <Text style={{ fontSize: '18px', color: THEME.subtext, fontWeight: 500 }}>Global telemetry, service node health, and live execution tracing.</Text>
+                        <Text
+                            style={{
+                                fontSize: '16px',
+                                color: THEME.subtext,
+                                fontWeight: 500,
+                                fontFamily: "'DM Sans', sans-serif",
+                                display: 'block',
+                                maxWidth: '750px',
+                                lineHeight: '1.5'
+                            }}
+                        >
+                            Global telemetry, service node health, and live execution tracing across the Vacanza infrastructure.
+                        </Text>
                     </motion.div>
                 </Col>
 
                 <Col xs={24} lg={16}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>API Performance Index</span>}>
-                        <div style={{ height: 350, width: '100%', marginTop: 24 }}>
-                            <ResponsiveContainer>
-                                <LineChart data={data?.apiMetrics || []}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(26, 35, 50, 0.05)" />
-                                    <XAxis dataKey="apiName" hide />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: THEME.subtext, fontSize: 12, fontWeight: 600 }} />
-                                    <Tooltip
-                                        labelStyle={{ color: THEME.navy, fontWeight: 700 }}
-                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '16px' }}
-                                    />
-                                    <Line name="Avg Response (ms)" type="monotone" dataKey="avgResponseMs" stroke={THEME.coral} strokeWidth={4} dot={false} activeDot={{ r: 8, fill: THEME.coral, stroke: 'white', strokeWidth: 3 }} />
-                                    <Line name="Total Calls" type="monotone" dataKey="totalCalls" stroke={THEME.teal} strokeWidth={2} dot={false} strokeDasharray="5 5" />
-                                </LineChart>
-                            </ResponsiveContainer>
+                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Service Usage Distribution</span>}>
+                        <div style={{ padding: '0 20px' }}>
+                            {Object.values((data?.apiMetrics || []).reduce((acc, curr) => {
+                                const name = curr.apiName.includes('admin') ? 'Platform Controls' :
+                                    curr.apiName.includes('auth') ? 'Access & Security' :
+                                        curr.apiName.includes('user') ? 'User Operations' :
+                                            curr.apiName.includes('analytics') ? 'Data Intelligence' : 'General Assets';
+                                if (!acc[name]) acc[name] = { name: name, value: 0 };
+                                acc[name].value += (curr.totalCalls || 0);
+                                return acc;
+                            }, {})).sort((a, b) => b.value - a.value).map((item, index) => {
+                                const COLORS = [THEME.coral, THEME.navy, '#2DD4A8', '#FFB347', '#00B4D8'];
+                                const total = data?.apiMetrics?.reduce((acc, curr) => acc + (curr.totalCalls || 0), 0) || 1;
+                                const percentage = Math.round((item.value / total) * 100);
+
+                                return (
+                                    <div key={index} style={{ marginBottom: 24 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                            <Space>
+                                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[index % COLORS.length] }} />
+                                                <Text strong style={{ color: THEME.navy, fontSize: 13 }}>{item.name}</Text>
+                                            </Space>
+                                            <Text style={{ fontSize: 13, fontWeight: 700, color: THEME.subtext }}>
+                                                {item.value.toLocaleString()} <span style={{ color: 'rgba(0,0,0,0.2)', fontWeight: 400 }}>({percentage}%)</span>
+                                            </Text>
+                                        </div>
+                                        <div style={{ height: 12, background: 'rgba(26, 35, 50, 0.04)', borderRadius: '6px', overflow: 'hidden' }}>
+                                            <motion.div
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${percentage}%` }}
+                                                transition={{ duration: 1, delay: index * 0.1 }}
+                                                style={{
+                                                    height: '100%',
+                                                    background: COLORS[index % COLORS.length],
+                                                    borderRadius: '6px',
+                                                    boxShadow: `0 0 10px ${COLORS[index % COLORS.length]}44`
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div style={{
+                                marginTop: 40,
+                                padding: '20px',
+                                background: 'rgba(26, 35, 50, 0.02)',
+                                borderRadius: '16px',
+                                border: '1px solid rgba(26, 35, 50, 0.05)',
+                                textAlign: 'center'
+                            }}>
+                                <Text style={{ display: 'block', fontSize: 11, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>Global Data Throughput</Text>
+                                <Title level={2} style={{ margin: '4px 0', fontWeight: 900, color: THEME.navy }}>
+                                    {(data?.apiMetrics?.reduce((acc, curr) => acc + (curr.totalCalls || 0), 0) || 0).toLocaleString()}
+                                </Title>
+                                <Text style={{ display: 'block', fontSize: 12, color: 'rgba(26, 35, 50, 0.4)', fontWeight: 600 }}>Total processed operations across all Vacanza nodes today.</Text>
+                            </div>
                         </div>
                     </Card>
 
                     <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Service Node Topography</span>} style={{ marginTop: 48 }}>
                         <Table
-                            columns={[
-                                { title: "Provider Node", dataIndex: "name", key: "name", width: '25%', render: (text) => <Space><DatabaseOutlined style={{ color: THEME.navy }} /><Text strong style={{ fontSize: 16, whiteSpace: 'nowrap' }}>{text}</Text></Space> },
-                                { title: "Operational Status", dataIndex: "status", key: "status", width: '15%', render: (status) => <Tag color={status === 'UP' ? 'success' : 'error'} bordered={false} style={{ borderRadius: 8, fontWeight: 800, padding: '4px 12px' }}>{status}</Tag> },
-                                {
-                                    title: "Test Command", key: "testCommand", width: '60%', render: (_, record) => {
-                                        const getCommand = (name) => {
-                                            if (name.includes('Auth')) return 'vacanza-cli auth:health-check';
-                                            if (name.includes('User')) return 'vacanza-cli user:sync-status';
-                                            if (name.includes('Gamification')) return 'vacanza-cli game:ping-engine';
-                                            if (name.includes('Mapbox')) return 'curl -I https://api.mapbox.com/health';
-                                            if (name.includes('Foursquare')) return 'curl -I https://api.foursquare.com/v3';
-                                            if (name.includes('SerpApi')) return 'curl -I https://serpapi.com/status';
-                                            if (name.includes('Ticketmaster')) return 'curl -I https://app.ticketmaster.com/discovery';
-                                            if (name.includes('Viator')) return 'curl -I https://api.viator.com/';
-                                            if (name.includes('Internal')) return `vacanza-cli core:diagnostics ${name.split(' ')[1]}`;
-                                            return `vacanza-cli service:ping --target="${name}"`;
-                                        };
-                                        const cmdString = record.testCommand || getCommand(record.name);
-                                        return <TerminalCommandBlock cmdString={cmdString} />;
-                                    }
-                                }
-                            ]}
+                            columns={serviceColumns}
                             dataSource={data?.services || []}
                             pagination={false}
                             rowKey="name"
                             style={{ marginTop: 24 }}
                         />
+                        <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(26, 35, 50, 0.02)', borderRadius: '12px', border: '1px dashed rgba(26, 35, 50, 0.1)' }}>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                                <span style={{ marginRight: 8 }}>💡</span>
+                                <b>System Insight:</b> The millisecond (ms) values in parentheses represent the round-trip response time between Vacanza and the provider.
+                                <span style={{ color: THEME.green, fontWeight: 700 }}> Under 500ms</span> is Excellent,
+                                <span style={{ color: THEME.warning, fontWeight: 700 }}> under 2000ms</span> is Normal,
+                                <span style={{ color: THEME.error, fontWeight: 700 }}> above</span> indicates a slow connection.
+                            </Text>
+                        </div>
                     </Card>
                 </Col>
 
                 <Col xs={24} lg={8}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Core Infrastructure Pulse</span>}>
+                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>System Vitality Monitor</span>}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
                             <div style={{ padding: '32px', background: 'rgba(26, 35, 50, 0.04)', borderRadius: '24px' }}>
-                                <Text style={{ fontSize: 12, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 12 }}>Infrastructure Health</Text>
+                                <Text style={{ fontSize: 12, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 12 }}>Overall System Integrity</Text>
                                 <Title level={1} style={{ margin: '0 0 12px 0', color: THEME.navy, fontWeight: 800, fontSize: 48 }}>{Math.round((data?.systemHealth || 0) * 100)}%</Title>
                                 <Progress percent={Math.round((data?.systemHealth || 0) * 100)} strokeColor={THEME.green} status="active" strokeWidth={12} />
                             </div>
 
                             <div style={{ padding: '32px', background: `${THEME.navy}`, borderRadius: '24px', color: 'white' }}>
-                                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 12 }}>Metric Density</Text>
-                                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-                                    <Title level={1} style={{ margin: 0, color: 'white', fontWeight: 800, fontSize: 48 }}>{data?.apiMetrics?.length || 0}</Title>
-                                    <Text style={{ color: THEME.green, fontWeight: 800, paddingBottom: 10 }}>ACTIVE STREAMS</Text>
+                                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 16 }}>Network Continuity</Text>
+
+                                <div style={{ marginBottom: 20 }}>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                                        <Title level={1} style={{ margin: 0, color: 'white', fontWeight: 900, fontSize: 42 }}>
+                                            {Math.floor((data?.uptimeSeconds || 0) / 86400)}
+                                        </Title>
+                                        <Text style={{ color: THEME.green, fontWeight: 800, fontSize: 16 }}>DAYS ONLINE</Text>
+                                    </div>
+                                    <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 600 }}>
+                                        {Math.floor(((data?.uptimeSeconds || 0) % 86400) / 3600)} Hours {Math.floor(((data?.uptimeSeconds || 0) % 3600) / 60)} Mins Without Interruption
+                                    </Text>
+                                </div>
+
+                                <div style={{
+                                    borderTop: '1px solid rgba(255,255,255,0.1)',
+                                    paddingTop: 16,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Badge status="processing" color={THEME.green} />
+                                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600 }}>Status: <span style={{ color: THEME.green }}>Excellent</span></Text>
+                                    </div>
+                                    <Tag color="rgba(45, 212, 168, 0.1)" style={{ margin: 0, color: THEME.green, border: 'none', fontSize: 10 }}>ACTIVE</Tag>
                                 </div>
                             </div>
                         </div>
@@ -288,38 +471,57 @@ const Monitoring = () => {
                             marginTop: 48,
                             background: '#06080b',
                             borderRadius: '32px',
-                            padding: '32px',
-                            minHeight: 450,
+                            padding: '24px',
+                            height: 520,
+                            display: 'flex',
+                            flexDirection: 'column',
                             boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
-                            border: '1px solid rgba(255,255,255,0.05)'
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            overflow: 'hidden'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: 20,
+                                paddingBottom: 16,
+                                borderBottom: '1px solid rgba(255,255,255,0.03)'
+                            }}>
                                 <div style={{ display: 'flex', gap: 8 }}>
-                                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f56' }} />
-                                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e' }} />
-                                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f' }} />
+                                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f56' }} />
+                                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
+                                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#27c93f' }} />
                                 </div>
-                                <Tag bordered={false} style={{ margin: 0, background: 'rgba(45, 212, 168, 0.1)', color: THEME.green, fontWeight: 800, fontSize: 10 }}>LIVE_TRACE</Tag>
+                                <Tag variant="filled" style={{ margin: 0, background: 'rgba(45, 212, 168, 0.1)', color: THEME.green, fontWeight: 800, fontSize: 10, letterSpacing: 1 }}>LIVE_TRACE</Tag>
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                                {(data?.logs || []).map((log, idx) => (
-                                    <div key={idx} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', lineHeight: 1.6, display: 'flex' }}>
-                                        <span style={{ color: THEME.green, opacity: 0.8, whiteSpace: 'nowrap' }}>[{dayjs(log.timestamp).format('HH:mm:ss')}]</span>
-                                        <span style={{
-                                            color: log.level === 'ERROR' ? THEME.coral : log.level === 'WARN' ? THEME.amber : '#5A6B7A',
-                                            marginLeft: 12,
-                                            fontWeight: 800,
-                                            minWidth: 50
-                                        }}>{log.level}</span>
-                                        <span style={{ color: '#e2e8f0', marginLeft: 12 }}>{log.message}</span>
-                                    </div>
-                                ))}
+
+                            <div style={{
+                                flex: 1,
+                                overflowY: 'auto',
+                                paddingRight: 8,
+                                scrollbarWidth: 'thin',
+                                scrollbarColor: 'rgba(45, 212, 168, 0.2) transparent'
+                            }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                                    {(data?.logs || []).map((log, idx) => (
+                                        <div key={idx} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', lineHeight: 1.6, display: 'flex' }}>
+                                            <span style={{ color: THEME.green, opacity: 0.8, whiteSpace: 'nowrap' }}>[{dayjs(log.timestamp).format('HH:mm:ss')}]</span>
+                                            <span style={{
+                                                color: log.level === 'ERROR' ? THEME.coral : log.level === 'WARN' ? THEME.amber : '#5A6B7A',
+                                                marginLeft: 12,
+                                                fontWeight: 800,
+                                                minWidth: 50
+                                            }}>{log.level}</span>
+                                            <span style={{ color: '#e2e8f0', marginLeft: 12 }}>{log.message}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </Card>
                 </Col>
             </Row>
-        </div>
+        </div >
     );
 };
 

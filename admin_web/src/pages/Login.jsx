@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 import { Form, Input, Button, Card, Typography, message, Layout, Space } from "antd";
 import { LockOutlined, UserOutlined, ArrowRightOutlined } from "@ant-design/icons";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { authApi } from "../api/userApi";
 import { useNavigate } from "react-router-dom";
-import VacanzaLogo from "../components/VacanzaLogo";
 import { motion } from "framer-motion";
 
 const { Title, Text } = Typography;
@@ -26,20 +25,41 @@ export default function Login() {
     const onFinish = async ({ email, password }) => {
         setLoading(true);
         try {
+            // 1. Firebase authentication
             await signInWithEmailAndPassword(auth, email, password);
-            try {
-                // Sync with backend to ensure admin role is verified
-                await authApi.login();
-            } catch (e) {
-                console.error("Backend validation failed", e);
-                // If backend says 500 but Firebase is OK, we might still proceed in dev
-                // but usually we want to stop here if it's a security requirement.
+
+            // 2. Sync with backend and get user data (includes role from DB)
+            const res = await authApi.login();
+            const userData = res.data;
+
+            // 3. Check if user has ADMIN role in DB
+            if (!userData?.role || userData.role !== 'ADMIN') {
+                message.error("Access denied. You do not have administrator privileges.");
+                await signOut(auth);
+                return;
             }
-            message.success("Administrative clearance granted.");
-            navigate("/");
+
+            message.success("Authentication verified. Establishing secure administrative session...");
+            // We don't navigate manually anymore. 
+            // AuthProvider will detect the login and App.jsx will redirect once authenticated.
         } catch (error) {
             console.error("Login error", error);
-            message.error("Access Denied: Invalid identification.");
+            // Firebase sign out on any failure
+            try { await signOut(auth); } catch (_) { }
+
+            if (error.code === 'auth/user-not-found') {
+                message.error("No account found with this email address.");
+            } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                message.error("Incorrect email or password. Please try again.");
+            } else if (error.code === 'auth/too-many-requests') {
+                message.error("Too many failed attempts. Please wait a few minutes.");
+            } else if (error?.response?.status === 401) {
+                message.error("Authentication failed. Please check your credentials.");
+            } else if (error?.response?.status === 403) {
+                message.error("Access denied. Your account is not verified or authorized.");
+            } else {
+                message.error("Login failed. Please check your credentials.");
+            }
         } finally {
             setLoading(false);
         }
@@ -71,28 +91,38 @@ export default function Login() {
                             padding: '24px'
                         }}
                     >
-                        <div style={{ textAlign: "center", marginBottom: 48 }}>
-                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-                                <VacanzaLogo size={64} showText={false} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
+                            <img src="/logo.svg" alt="Logo" style={{ width: 100, height: 100, objectFit: 'contain', marginBottom: 16 }} />
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{
+                                    color: THEME.navy,
+                                    fontSize: '28px',
+                                    fontWeight: 800,
+                                    letterSpacing: '4px',
+                                    fontFamily: "'DM Sans', sans-serif"
+                                }}>
+                                    VACANZA
+                                </div>
+                                <div style={{
+                                    color: THEME.primary,
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    letterSpacing: '3px',
+                                    opacity: 0.8,
+                                    marginTop: '-4px'
+                                }}>
+                                    ADMINISTRATIVE CONSOLE
+                                </div>
                             </div>
-                            <Title style={{
-                                margin: 0,
-                                fontFamily: 'var(--font-display)',
-                                fontSize: '38px',
-                                letterSpacing: '-1.5px',
-                                color: THEME.navy
-                            }}>
-                                Authorized Access
-                            </Title>
-                            <Text style={{ color: THEME.subtext, fontSize: '15px', fontWeight: 500 }}>
-                                ENTER SECURE SYSTEM CONSOLE
-                            </Text>
                         </div>
 
                         <Form name="admin_login" onFinish={onFinish} layout="vertical" size="large">
                             <Form.Item
                                 name="email"
-                                rules={[{ required: true, message: "ID required" }, { type: "email" }]}
+                                rules={[
+                                    { required: true, message: "Please enter your administrative email address" },
+                                    { type: "email", message: "Please provide a valid email format" }
+                                ]}
                             >
                                 <Input
                                     prefix={<UserOutlined style={{ color: THEME.coral }} />}
@@ -103,11 +133,11 @@ export default function Login() {
 
                             <Form.Item
                                 name="password"
-                                rules={[{ required: true, message: "Security key required" }]}
+                                rules={[{ required: true, message: "Please enter your password" }]}
                             >
                                 <Input.Password
                                     prefix={<LockOutlined style={{ color: THEME.coral }} />}
-                                    placeholder="Security Key"
+                                    placeholder="Password"
                                     style={{ borderRadius: 14, height: 56, background: '#f8faff' }}
                                 />
                             </Form.Item>
@@ -118,7 +148,6 @@ export default function Login() {
                                     htmlType="submit"
                                     block
                                     loading={loading}
-                                    icon={<ArrowRightOutlined />}
                                     style={{
                                         height: 60,
                                         borderRadius: 18,
@@ -129,7 +158,7 @@ export default function Login() {
                                         boxShadow: '0 10px 30px rgba(26, 35, 50, 0.3)'
                                     }}
                                 >
-                                    ESTABLISH SESSION
+                                    Secure Login
                                 </Button>
                             </Form.Item>
                         </Form>

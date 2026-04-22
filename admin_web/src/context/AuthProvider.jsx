@@ -10,6 +10,7 @@ export default function AuthProvider({ children }) {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            setLoading(true); // Start loading immediately when auth state changes
             try {
                 if (!firebaseUser) {
                     setAuthDto(null);

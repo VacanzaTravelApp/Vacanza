@@ -3,7 +3,10 @@ import { auth } from "../firebase";
 
 const http = axios.create({
     baseURL: "/",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+        "Content-Type": "application/json",
+        "Accept-Language": "en"
+    },
 });
 
 http.interceptors.request.use(
@@ -29,7 +32,7 @@ http.interceptors.response.use(
                 response.data.toLowerCase().includes("<!doctype html"));
 
         if (isHtml) {
-            console.warn("⚠️ HTML döndü (JSON bekleniyordu). Proxy path veya auth kontrol et.");
+            console.warn("HTML returned (JSON expected). Check Proxy path or auth.");
             return Promise.reject(
                 new Error("HTML response received (check Vite proxy paths and authentication).")
             );
@@ -48,20 +51,13 @@ http.interceptors.response.use(
                 message.toLowerCase().includes("email");
 
             if (isEmailNotVerified) {
-                console.warn("⚠️ 403: Email not verified. Backend requires email verification.");
                 error.isEmailNotVerified = true;
-                error.friendlyMessage = "Please verify your email address first. Check your inbox for the verification link.";
+                error.friendlyMessage = "Please verify your email address first.";
             } else {
-                console.warn("⚠️ 403 Forbidden. Access denied.");
-                error.friendlyMessage = "Access denied. You don't have permission for this action.";
+                error.friendlyMessage = "Access denied. You don't have permission.";
             }
         } else if (status === 401) {
-            console.warn("⚠️ 401 Unauthorized. Token invalid or expired.");
             error.friendlyMessage = "Session expired. Please log in again.";
-        } else if (status === 400) {
-            error.friendlyMessage = message || "Invalid request. Please check your input.";
-        } else if (status === 409) {
-            error.friendlyMessage = message || "This email is already registered.";
         }
 
         return Promise.reject(error);

@@ -13,7 +13,6 @@ import {
 import { useNavigate, useLocation, Outlet, Link } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { motion, AnimatePresence } from "framer-motion";
-import VacanzaLogo from "./VacanzaLogo";
 
 const { Header, Content, Footer, Sider } = Layout;
 const { Title, Text } = Typography;
@@ -45,6 +44,7 @@ export default function AdminLayout() {
         { key: "/", icon: <DashboardOutlined style={{ fontSize: 18 }} />, label: "Home Console" },
         { key: "/monitoring", icon: <ThunderboltOutlined style={{ fontSize: 18 }} />, label: "System Matrix" },
         { key: "/analytics", icon: <GlobalOutlined style={{ fontSize: 18 }} />, label: "Analytics Core" },
+        { key: "/users", icon: <UserOutlined style={{ fontSize: 18 }} />, label: "User Access" },
     ];
 
     const handleLogout = async () => {
@@ -90,16 +90,48 @@ export default function AdminLayout() {
                 <div
                     onClick={() => window.location.reload()}
                     style={{
-                        height: "64px",
-                        margin: "24px 16px 32px",
+                        minHeight: "90px",
+                        margin: "32px 16px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         background: 'transparent',
-                        overflow: 'hidden',
                         cursor: 'pointer'
                     }}>
-                    <VacanzaLogo size={44} color="white" showText={!collapsed} />
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        <img
+                            src="/logo.svg"
+                            alt="Vacanza"
+                            style={{
+                                height: collapsed ? "40px" : "80px",
+                                width: "auto",
+                                objectFit: "contain",
+                                transition: 'all 0.3s'
+                            }}
+                        />
+                        {!collapsed && (
+                            <div style={{ textAlign: 'center', animation: 'fadeIn 0.5s' }}>
+                                <div style={{
+                                    color: '#fff',
+                                    fontSize: '18px',
+                                    fontWeight: 900,
+                                    letterSpacing: '4px',
+                                    fontFamily: "'Fraunces', serif"
+                                }}>
+                                    VACANZA
+                                </div>
+                                <div style={{
+                                    color: 'rgba(255, 255, 255, 0.45)',
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    letterSpacing: '2px',
+                                    marginTop: '-2px'
+                                }}>
+                                    ADMIN CONSOLE
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <Menu
