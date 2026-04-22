@@ -15,6 +15,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vector_math/vector_math_64.dart' as vmath;
@@ -791,7 +792,7 @@ class _ArExplorePageState extends State<ArExplorePage>
                   ],
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
+                    child: VacanzaGradientButton(
                       onPressed:
                           _checkinLoading
                               ? null
@@ -821,14 +822,17 @@ class _ArExplorePageState extends State<ArExplorePage>
                                   ),
                                 );
                               },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black87,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                      label: 'Check-in yap',
+                      enabled: !_checkinLoading,
+                      loading: _checkinLoading,
+                      minHeight: 46,
+                      borderRadius: 12,
+                      horizontalPadding: 18,
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
                       ),
-                      child: const Text('Check-in yap'),
                     ),
                   ),
                 ],
@@ -1286,7 +1290,7 @@ class _ArExplorePageState extends State<ArExplorePage>
             constraints: const BoxConstraints(maxWidth: 260),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.68),
+              color: Colors.black.withValues(alpha: 0.68),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white24),
             ),
@@ -1331,7 +1335,7 @@ class _ArExplorePageState extends State<ArExplorePage>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.55),
+              color: Colors.black.withValues(alpha: 0.55),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -1371,7 +1375,7 @@ class _ArExplorePageState extends State<ArExplorePage>
             constraints: const BoxConstraints(maxWidth: 250),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.68),
+              color: Colors.black.withValues(alpha: 0.68),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white24),
             ),
@@ -1576,9 +1580,18 @@ class _CameraDeniedMessage extends StatelessWidget {
                   },
                   child: const Text('Open app settings'),
                 ),
-                ElevatedButton(
+                VacanzaGradientButton(
+                  label: 'Back to map',
                   onPressed: onBackToMap,
-                  child: const Text('Back to map'),
+                  enabled: true,
+                  minHeight: 44,
+                  borderRadius: 14,
+                  horizontalPadding: 16,
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
                 ),
               ],
             ),
