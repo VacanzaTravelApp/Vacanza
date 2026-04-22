@@ -15,4 +15,5 @@ export const userApi = {
     getCheckins: () => http.get("/users/me/checkins"),
     getStats: () => http.get("/users/me/stats"),
     autoCheckIn: (coords) => http.post("/users/me/checkins/auto", coords),
+    promoteUserToAdmin: (email) => http.post(`/user/promote?email=${email}`),
 };

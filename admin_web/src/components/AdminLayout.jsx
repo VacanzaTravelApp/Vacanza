@@ -45,6 +45,7 @@ export default function AdminLayout() {
         { key: "/", icon: <DashboardOutlined style={{ fontSize: 18 }} />, label: "Home Console" },
         { key: "/monitoring", icon: <ThunderboltOutlined style={{ fontSize: 18 }} />, label: "System Matrix" },
         { key: "/analytics", icon: <GlobalOutlined style={{ fontSize: 18 }} />, label: "Analytics Core" },
+        { key: "/users", icon: <UserOutlined style={{ fontSize: 18 }} />, label: "User Access" },
     ];
 
     const handleLogout = async () => {

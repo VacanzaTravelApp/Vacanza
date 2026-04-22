@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Form, Input, Button, Card, Typography, message, Layout, Space } from "antd";
 import { LockOutlined, UserOutlined, ArrowRightOutlined } from "@ant-design/icons";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { authApi } from "../api/userApi";
 import { useNavigate } from "react-router-dom";
@@ -26,20 +26,41 @@ export default function Login() {
     const onFinish = async ({ email, password }) => {
         setLoading(true);
         try {
+            // 1. Firebase authentication
             await signInWithEmailAndPassword(auth, email, password);
-            try {
-                // Sync with backend to ensure admin role is verified
-                await authApi.login();
-            } catch (e) {
-                console.error("Backend validation failed", e);
-                // If backend says 500 but Firebase is OK, we might still proceed in dev
-                // but usually we want to stop here if it's a security requirement.
+
+            // 2. Sync with backend and get user data (includes role from DB)
+            const res = await authApi.login();
+            const userData = res.data;
+
+            // 3. Check if user has ADMIN role in DB
+            if (!userData?.role || userData.role !== 'ADMIN') {
+                message.error("Access denied. You do not have administrator privileges.");
+                await signOut(auth);
+                return;
             }
-            message.success("Administrative clearance granted.");
-            navigate("/");
+
+            message.success("Login successful! Clearing credentials...");
+            // We don't navigate manually anymore. 
+            // AuthProvider will detect the login and App.jsx will redirect once authenticated.
         } catch (error) {
             console.error("Login error", error);
-            message.error("Access Denied: Invalid identification.");
+            // Firebase sign out on any failure
+            try { await signOut(auth); } catch (_) { }
+
+            if (error.code === 'auth/user-not-found') {
+                message.error("No account found with this email address.");
+            } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                message.error("Incorrect email or password. Please try again.");
+            } else if (error.code === 'auth/too-many-requests') {
+                message.error("Too many failed attempts. Please wait a few minutes.");
+            } else if (error?.response?.status === 401) {
+                message.error("Authentication failed. Please check your credentials.");
+            } else if (error?.response?.status === 403) {
+                message.error("Access denied. Your account is not verified or authorized.");
+            } else {
+                message.error("Login failed. Please check your credentials.");
+            }
         } finally {
             setLoading(false);
         }
