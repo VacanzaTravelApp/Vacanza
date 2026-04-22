@@ -69,14 +69,18 @@ class VacanzaGradientButton extends StatelessWidget {
             );
 
     final fg = canTap ? Colors.white : cs.onSurfaceVariant;
-    final labelStyle =
-        textStyle ??
-        TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.1,
-          color: fg.withValues(alpha: canTap ? 0.98 : 0.92),
-        );
+    final baseLabelStyle = TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.1,
+      color: fg.withValues(alpha: canTap ? 0.98 : 0.92),
+    );
+    final labelStyle = (textStyle == null)
+        ? baseLabelStyle
+        : baseLabelStyle.merge(textStyle).copyWith(
+              // If caller passed a style without color, keep our readable default.
+              color: textStyle!.color ?? baseLabelStyle.color,
+            );
 
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 160),
