@@ -9,6 +9,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'package:mobile/features/chat/presentation/cubit/chat_cubit.dart';
+import 'package:mobile/features/behavior/presentation/cubit/favorite_poi_cubit.dart';
+import 'package:mobile/features/behavior/presentation/cubit/saved_pois_cubit.dart';
+import 'package:mobile/features/behavior/presentation/widgets/saved_pois_panel.dart';
 
 import '../../../checkin/data/api/checkin_api_client.dart';
 import '../../../checkin/data/repositories/checkin_repository.dart';
@@ -118,6 +121,13 @@ class HomeMapScreen extends StatelessWidget {
             create:
                 (ctx) => ProfileBloc(repository: ctx.read<ProfileRepository>()),
           ),
+          BlocProvider<SavedPoisCubit>(
+            create:
+                (ctx) => SavedPoisCubit(
+                  api: ctx.read(),
+                  favoritePoiCubit: ctx.read<FavoritePoiCubit>(),
+                ),
+          ),
         ],
         child: const _HomeMapView(),
       ),
@@ -139,6 +149,7 @@ class _HomeMapViewState extends State<_HomeMapView>
   bool _controlsMenuOpen = false;
   bool _routeOpen = false;
   bool _routeShowEventsInitially = false;
+  bool _savedPlacesOpen = false;
 
   /// Cached reference to avoid context.read in dispose/lifecycle callbacks.
   late final LocationBloc _locationBloc;
@@ -207,6 +218,28 @@ class _HomeMapViewState extends State<_HomeMapView>
     context.read<MapBloc>().add(SetDrawingEnabled(false));
   }
 
+  /// If user has drawn a polygon, clear it when opening any other screen.
+  void _dismissUserSelectionIfAny() {
+    final ctx = context.read<AreaQueryBloc>().state.context;
+    if (ctx.areaSource != AreaSource.userSelection) return;
+
+    // Close panels first so UI doesn't flash.
+    if (mounted) {
+      setState(() {
+        _resultsOpen = false;
+        _activeChipKey = null;
+        if (_filtersOpen) {
+          _filtersOpen = false;
+          _filtersFromUserSelection = false;
+        }
+      });
+    }
+
+    context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
+    context.read<PoiSearchBloc>().add(const poi.AreaCleared());
+    context.read<MapBloc>().add(SetDrawingEnabled(false));
+  }
+
   void _toggleControlsMenu() {
     if (!mounted) return;
     setState(() => _controlsMenuOpen = !_controlsMenuOpen);
@@ -216,6 +249,26 @@ class _HomeMapViewState extends State<_HomeMapView>
     if (!_controlsMenuOpen) return;
     if (!mounted) return;
     setState(() => _controlsMenuOpen = false);
+  }
+
+  void _openSavedPlaces() {
+    if (!mounted) return;
+    _dismissUserSelectionIfAny();
+    setState(() {
+      _filtersOpen = false;
+      _filtersFromUserSelection = false;
+      _resultsOpen = false;
+      _activeChipKey = null;
+      _routeOpen = false;
+      _savedPlacesOpen = true;
+    });
+    context.read<SavedPoisCubit>().refresh();
+  }
+
+  void _closeSavedPlaces() {
+    if (!_savedPlacesOpen) return;
+    if (!mounted) return;
+    setState(() => _savedPlacesOpen = false);
   }
 
   /// Closes results (and filters), then shows the two-step wizard + loading.
@@ -252,7 +305,14 @@ class _HomeMapViewState extends State<_HomeMapView>
         .toList(growable: false);
 
     final options = await showCreateRouteFromAreaOptionsSheet(context);
-    if (!mounted || options == null) return;
+    if (!mounted) return;
+    if (options == null) {
+      // User dismissed the Plan a Route popup → clear the drawn area too.
+      context.read<MapBloc>().add(SetDrawingEnabled(false));
+      context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
+      context.read<PoiSearchBloc>().add(const poi.AreaCleared());
+      return;
+    }
 
     // Rota isteği başlarken çizimi ve poligon overlay’ini kaldır (koordinatlar zaten [coords]’ta).
     context.read<MapBloc>().add(SetDrawingEnabled(false));
@@ -297,6 +357,7 @@ class _HomeMapViewState extends State<_HomeMapView>
         totalDays: options.totalDays,
         travelStyle: options.travelStyle,
         categories: null,
+        includeFavorites: options.includeFavorites,
       );
     } finally {
       if (mounted) {
@@ -646,11 +707,13 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ✅ manual filter tuşu -> blur preview OFF
             onOpenFilters: () {
+              _dismissUserSelectionIfAny();
               _openFilters(fromUserSelection: false);
             },
 
             // UC1.11 — Explore in AR entry point
             onOpenArMode: () {
+              _dismissUserSelectionIfAny();
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder:
@@ -664,6 +727,7 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ✅ UC1.8-MOB1: booking entry point
             onOpenBooking: () {
+              _dismissUserSelectionIfAny();
               showModalBottomSheet<void>(
                 context: context,
                 isScrollControlled: true,
@@ -676,12 +740,14 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             onOpenTripAgenda: () {
               _closeControlsMenu();
+              _dismissUserSelectionIfAny();
               showTripAgendaCalendar(context);
             },
 
             // ✅ Chatbot
             onOpenChat: () async {
               _closeControlsMenu();
+              _dismissUserSelectionIfAny();
               final nav = await Navigator.push<ChatScreenNavResult?>(
                 context,
                 MaterialPageRoute(
@@ -748,6 +814,8 @@ class _HomeMapViewState extends State<_HomeMapView>
               });
             },
 
+            onOpenSavedPlaces: _openSavedPlaces,
+
             // ===== Filters overlay =====
             isFiltersOpen: _filtersOpen,
             onCloseFilters: _closeFilters,
@@ -755,6 +823,19 @@ class _HomeMapViewState extends State<_HomeMapView>
               onClose: _closeFilters,
               hideZeroCountCategories:
                   poiState.areaSource == AreaSource.userSelection,
+            ),
+
+            // ===== Saved places overlay =====
+            isSavedPlacesOpen: _savedPlacesOpen,
+            onCloseSavedPlaces: _closeSavedPlaces,
+            savedPlacesPanel: SavedPoisPanel(
+              onClose: _closeSavedPlaces,
+              onFlyTo: (lat, lon) {
+                _closeSavedPlaces();
+                context.read<MapBloc>().add(
+                  FlyToPoiRequested(latitude: lat, longitude: lon),
+                );
+              },
             ),
 
             // ===== Controls menu =====
