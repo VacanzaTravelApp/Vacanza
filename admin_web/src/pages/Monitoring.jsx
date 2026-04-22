@@ -296,11 +296,12 @@ const Monitoring = () => {
                 animate={{ opacity: 1, y: 0 }}
                 style={{ textAlign: 'center' }}
             >
-                <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: THEME.primary, marginBottom: 24 }} spin />} />
-                <Title level={3} className="gradient-text" style={{ margin: '16px 0 8px 0' }}>SYSTEM MATRIX</Title>
-                <Text type="secondary" style={{ fontSize: 16, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, opacity: 0.7 }}>
-                    Authenticating & Syncing Node Telemetry
-                </Text>
+                <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: THEME.primary, marginBottom: 24 }} spin />} description="SYSTEM MATRIX" />
+                <div style={{ marginTop: 16 }}>
+                    <Text type="secondary" style={{ fontSize: 16, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, opacity: 0.7 }}>
+                        Authenticating & Syncing Node Telemetry
+                    </Text>
+                </div>
             </motion.div>
         </div>
     );
@@ -406,7 +407,7 @@ const Monitoring = () => {
                         </div>
                     </Card>
 
-                    <Card className="glass-card" variant="borderless" title={<span style={{ fontSize: 20 }}>Service Node Topography</span>} style={{ marginTop: 48 }}>
+                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Service Node Topography</span>} style={{ marginTop: 48 }}>
                         <Table
                             columns={serviceColumns}
                             dataSource={data?.services || []}
@@ -427,7 +428,7 @@ const Monitoring = () => {
                 </Col>
 
                 <Col xs={24} lg={8}>
-                    <Card className="glass-card" variant="borderless" title={<span style={{ fontSize: 20 }}>System Vitality Monitor</span>}>
+                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>System Vitality Monitor</span>}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
                             <div style={{ padding: '32px', background: 'rgba(26, 35, 50, 0.04)', borderRadius: '24px' }}>
                                 <Text style={{ fontSize: 12, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 12 }}>Overall System Integrity</Text>
@@ -476,9 +477,8 @@ const Monitoring = () => {
                             flexDirection: 'column',
                             boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
                             border: '1px solid rgba(255,255,255,0.05)',
-                            overflow: 'hidden' // Dış kutu taşmasın
+                            overflow: 'hidden'
                         }}>
-                            {/* Sabit Terminal Başlığı */}
                             <div style={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
@@ -492,10 +492,9 @@ const Monitoring = () => {
                                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
                                     <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#27c93f' }} />
                                 </div>
-                                <Tag bordered={false} style={{ margin: 0, background: 'rgba(45, 212, 168, 0.1)', color: THEME.green, fontWeight: 800, fontSize: 10, letterSpacing: 1 }}>LIVE_TRACE</Tag>
+                                <Tag variant="filled" style={{ margin: 0, background: 'rgba(45, 212, 168, 0.1)', color: THEME.green, fontWeight: 800, fontSize: 10, letterSpacing: 1 }}>LIVE_TRACE</Tag>
                             </div>
 
-                            {/* Kaydırılabilir Log Alanı */}
                             <div style={{
                                 flex: 1,
                                 overflowY: 'auto',

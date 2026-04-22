@@ -7,7 +7,6 @@ const http = axios.create({
         "Content-Type": "application/json",
         "Accept-Language": "en"
     },
-    withCredentials: true,
 });
 
 http.interceptors.request.use(

@@ -1,6 +1,6 @@
 import React from "react";
 import { Table, Tag, Card, Button, Input, Space, message, Typography, Avatar, Tooltip, Row, Col } from "antd";
-import { SearchOutlined, UserOutlined, EditOutlined, DeleteOutlined, RocketFilled, VerifiedOutlined, SafetyCertificateFilled } from "@ant-design/icons";
+import { SearchOutlined, UserOutlined, RocketFilled, VerifiedOutlined, SafetyCertificateFilled } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { userApi } from "../api/userApi";
 import { motion } from "framer-motion";
@@ -55,25 +55,25 @@ export default function UserManagement() {
         {
             title: "Identity",
             key: "identity",
-            width: '35%',
+            width: 250,
+            fixed: 'left',
             render: (_, record) => (
                 <Space size="middle">
                     <div style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: '10px',
+                        width: 36,
+                        height: 36,
+                        borderRadius: '8px',
                         background: 'rgba(26, 35, 50, 0.03)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         border: '1px dashed rgba(26, 35, 50, 0.1)'
                     }}>
-                        <UserOutlined style={{ color: THEME.subtext, opacity: 0.5 }} />
+                        <UserOutlined style={{ color: THEME.subtext, opacity: 0.5, fontSize: 14 }} />
                     </div>
-                    <div>
-                        <Text strong style={{ color: THEME.navy, fontSize: 14 }}>{record.user?.displayName || "Anonymous"}</Text>
-                        <br />
-                        <Text type="secondary" style={{ fontSize: 12 }}>{record.user?.email}</Text>
+                    <div style={{ maxWidth: 180 }}>
+                        <Text strong style={{ color: THEME.navy, fontSize: 13, display: 'block' }} ellipsis>{record.user?.displayName || "Anonymous"}</Text>
+                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }} ellipsis>{record.user?.email}</Text>
                     </div>
                 </Space>
             ),
@@ -82,18 +82,19 @@ export default function UserManagement() {
             title: "Access Privileges",
             dataIndex: ["user", "role"],
             key: "role",
-            width: '150px',
+            width: 150,
             render: (role) => {
                 const isAdmin = role === "ADMIN";
                 return (
                     <Tag
+                        variant="filled"
                         color={isAdmin ? "purple" : "blue"}
                         icon={isAdmin ? <SafetyCertificateFilled /> : <UserOutlined />}
                         style={{
                             borderRadius: '12px',
-                            padding: '4px 12px',
+                            padding: '2px 10px',
                             fontWeight: 700,
-                            letterSpacing: 0.5,
+                            fontSize: 10,
                             border: 'none',
                             textTransform: 'uppercase'
                         }}
@@ -107,15 +108,15 @@ export default function UserManagement() {
             title: "Connectivity",
             dataIndex: "authenticated",
             key: "authenticated",
-            width: '150px',
+            width: 140,
             render: (auth) => (
                 <Space>
                     {auth ? (
-                        <Tag color="success" icon={<VerifiedOutlined />} style={{ borderRadius: 6, border: 'none', background: 'rgba(82, 196, 26, 0.1)' }}>
+                        <Tag variant="filled" color="success" icon={<VerifiedOutlined />} style={{ borderRadius: 6, border: 'none', background: 'rgba(82, 196, 26, 0.1)', fontSize: 10 }}>
                             Active Node
                         </Tag>
                     ) : (
-                        <Tag color="default">Legacy</Tag>
+                        <Tag variant="filled" color="default" style={{ fontSize: 10 }}>Legacy</Tag>
                     )}
                 </Space>
             )
@@ -124,6 +125,7 @@ export default function UserManagement() {
             title: "System Actions",
             key: "actions",
             align: 'right',
+            width: 180,
             render: (_, record) => (
                 <Space size="middle">
                     {record.user?.role !== "ADMIN" ? (
@@ -133,19 +135,20 @@ export default function UserManagement() {
                                 icon={<RocketFilled />}
                                 onClick={() => handlePromote(record.user?.email)}
                                 style={{
-                                    borderRadius: '10px',
+                                    borderRadius: '8px',
                                     background: THEME.admin,
                                     borderColor: THEME.admin,
                                     fontWeight: 600,
-                                    fontSize: 12
+                                    fontSize: 11,
+                                    height: 32
                                 }}
                             >
-                                Promote to Admin
+                                Promote
                             </Button>
                         </Tooltip>
                     ) : (
-                        <Text style={{ color: THEME.admin, fontWeight: 700, fontSize: 11, fontStyle: 'italic', opacity: 0.5 }}>
-                            High-Level Authority
+                        <Text style={{ color: THEME.admin, fontWeight: 700, fontSize: 10, fontStyle: 'italic', opacity: 0.5 }}>
+                            High Authority
                         </Text>
                     )}
                 </Space>
@@ -154,54 +157,61 @@ export default function UserManagement() {
     ];
 
     return (
-        <div style={{ padding: "16px" }}>
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: 48 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: 12 }}>
-                    <Title
-                        className="gradient-text"
-                        style={{
-                            fontSize: '36px',
-                            margin: 0,
-                            fontFamily: "'Fraunces', serif",
-                            fontWeight: 900,
-                            letterSpacing: '-1.5px'
-                        }}
-                    >
-                        Directory Node Explorer
-                    </Title>
-                    <div style={{ padding: '4px 16px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '24px', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
-                        <Text strong style={{ color: THEME.primary }}>{users?.length || 0} Registered Profiles</Text>
-                    </div>
-                </div>
-                <Text
-                    style={{
-                        color: THEME.subtext,
-                        fontSize: '16px',
-                        fontWeight: 500,
-                        fontFamily: "'DM Sans', sans-serif",
-                        maxWidth: '750px',
-                        display: 'block',
-                        lineHeight: 1.6
-                    }}
-                >
-                    Manage unified user identities across the Vacanza infrastructure. Review authentication status and privilege elevation for node administrators.
-                </Text>
+        <div style={{ padding: "clamp(12px, 3vw, 24px)" }}>
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: "clamp(24px, 5vw, 48px)" }}>
+                <Row gutter={[16, 16]} align="middle">
+                    <Col xs={24} md={16}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px', marginBottom: 8 }}>
+                            <Title
+                                className="gradient-text"
+                                style={{
+                                    fontSize: 'clamp(28px, 4vw, 36px)',
+                                    margin: 0,
+                                    fontFamily: "'Fraunces', serif",
+                                    fontWeight: 900,
+                                    letterSpacing: '-1px'
+                                }}
+                            >
+                                Directory Node Explorer
+                            </Title>
+                            <div style={{ padding: '4px 12px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '24px', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
+                                <Text strong style={{ color: THEME.primary, fontSize: 12 }}>{users?.length || 0} Nodes</Text>
+                            </div>
+                        </div>
+                        <Text
+                            style={{
+                                color: THEME.subtext,
+                                fontSize: 'clamp(14px, 2vw, 16px)',
+                                fontWeight: 500,
+                                fontFamily: "'DM Sans', sans-serif",
+                                maxWidth: '750px',
+                                display: 'block',
+                                lineHeight: 1.5
+                            }}
+                        >
+                            Manage unified user identities across the Vacanza infrastructure. Review authentication status and privilege elevation for node administrators.
+                        </Text>
+                    </Col>
+                </Row>
             </motion.div>
 
             <Row gutter={[24, 24]}>
-                <Col xs={24} lg={16}>
+                <Col xs={24} xl={16}>
                     <Card
                         bordered={false}
                         className="glass-card"
-                        title={<span style={{ fontSize: 18, color: THEME.navy }}>Unified Identity Table</span>}
-                        extra={
-                            <Input
-                                placeholder="Search by name or email..."
-                                prefix={<SearchOutlined style={{ color: THEME.subtext }} />}
-                                value={searchText}
-                                onChange={e => setSearchText(e.target.value)}
-                                style={{ width: 300, borderRadius: '12px' }}
-                            />
+                        styles={{ body: { padding: "clamp(12px, 2vw, 24px)" } }}
+                        title={
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                                <span style={{ fontSize: 18, color: THEME.navy }}>Unified Identity Table</span>
+                                <Input
+                                    placeholder="Search nodes..."
+                                    prefix={<SearchOutlined style={{ color: THEME.subtext }} />}
+                                    value={searchText}
+                                    onChange={e => setSearchText(e.target.value)}
+                                    style={{ width: 'clamp(200px, 100%, 300px)', borderRadius: '10px' }}
+                                />
+                            </div>
                         }
                     >
                         <Table
@@ -209,18 +219,19 @@ export default function UserManagement() {
                             dataSource={filteredUsers}
                             loading={isLoading}
                             rowKey={(record) => record.user?.userId || record.user?.email}
-                            pagination={{ pageSize: 8, showSizeChanger: false }}
+                            pagination={{ pageSize: 8, showSizeChanger: false, size: 'small' }}
                             style={{ overflow: 'hidden' }}
+                            scroll={{ x: 700 }}
                         />
                     </Card>
                 </Col>
 
-                <Col xs={24} lg={8}>
+                <Col xs={24} xl={8}>
                     <Card
                         className="glass-card"
-                        variant="borderless"
+                        bordered={false}
                         title={<span style={{ fontSize: 18, color: THEME.navy }}>Quick Privilege Elevation</span>}
-                        style={{ height: '100%' }}
+                        styles={{ body: { padding: "clamp(16px, 3vw, 24px)" } }}
                     >
                         <div style={{ marginBottom: 24 }}>
                             <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 20 }}>
@@ -257,14 +268,14 @@ export default function UserManagement() {
                         </div>
 
                         <div style={{
-                            padding: '20px',
+                            padding: '16px',
                             background: 'rgba(114, 46, 209, 0.03)',
                             borderRadius: '16px',
                             border: '1px dashed rgba(114, 46, 209, 0.2)'
                         }}>
-                            <Title level={5} style={{ fontSize: 12, color: THEME.admin, textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px 0' }}>Authority Warning</Title>
+                            <Title level={5} style={{ fontSize: 11, color: THEME.admin, textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px 0' }}>Authority Warning</Title>
                             <Text style={{ fontSize: 12, color: THEME.subtext, lineHeight: 1.5 }}>
-                                Promoting a user to <b>ADMIN</b> grants full access to system monitoring, user directory, and global telemetry controls. This action is recorded in the system log.
+                                Promoting a user to <b>ADMIN</b> grants full access to system monitoring, user directory, and global telemetry controls.
                             </Text>
                         </div>
                     </Card>

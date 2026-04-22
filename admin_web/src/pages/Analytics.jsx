@@ -123,12 +123,12 @@ const Analytics = () => {
                 <Col xs={24} lg={8}>
                     <Row gutter={[0, 48]}>
                         <Col span={24}>
-                            <Card className="glass-card" variant="borderless" style={{ background: THEME.navy }}>
+                            <Card className="glass-card" bordered={false} styles={{ body: { background: THEME.navy, borderRadius: '24px' } }}>
                                 <Statistic
                                     title={<Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Total Registered Users</Text>}
                                     value={data?.matrixUsers || 0}
                                     prefix={<UserOutlined style={{ color: THEME.coral }} />}
-                                    valueStyle={{ color: 'white', fontWeight: 800, fontSize: 48 }}
+                                    styles={{ content: { color: 'white', fontWeight: 800, fontSize: 48 } }}
                                 />
                                 <div style={{ marginTop: 16 }}>
                                     <Tag color={THEME.coral} variant="filled" style={{ borderRadius: 8, fontWeight: 800 }}>PLATFORM TOTAL</Tag>
@@ -136,12 +136,12 @@ const Analytics = () => {
                             </Card>
                         </Col>
                         <Col span={24}>
-                            <Card className="glass-card" variant="borderless">
+                            <Card className="glass-card" bordered={false}>
                                 <Statistic
                                     title={<Text style={{ color: THEME.subtext, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Global Traffic Volume</Text>}
                                     value={data?.activeNodes || 0}
                                     prefix={<GlobalOutlined style={{ color: THEME.teal }} />}
-                                    valueStyle={{ color: THEME.navy, fontWeight: 800, fontSize: 48 }}
+                                    styles={{ content: { color: THEME.navy, fontWeight: 800, fontSize: 48 } }}
                                 />
                                 <div style={{ marginTop: 24, padding: '16px', background: 'rgba(26, 35, 50, 0.03)', borderRadius: '12px' }}>
                                     <Text style={{ fontSize: 11, color: THEME.subtext, fontWeight: 700, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Avg. Planning Session</Text>
