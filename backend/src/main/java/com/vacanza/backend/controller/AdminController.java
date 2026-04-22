@@ -77,5 +77,45 @@ public class AdminController {
             ));
         }
     }
+
+    // ── User Management ─────────────────────────────────────────
+
+    /**
+     * Get all registered users with their profile info and roles.
+     * Used by the admin User Management table.
+     */
+    @GetMapping("/users")
+    public ResponseEntity<?> getAllUsers() {
+        log.info("Admin get all users request");
+        return ResponseEntity.ok(adminService.getAllUsers());
+    }
+
+    /**
+     * Promote a user to ADMIN role by their email address.
+     * Used by the "Make Admin" button in the frontend.
+     *
+     * @param email the email of the user to promote
+     */
+    @PatchMapping("/users/promote")
+    public ResponseEntity<?> promoteUserToAdmin(@RequestParam String email) {
+        log.info("Admin promote request: email={}", email);
+        try {
+            adminService.promoteUserToAdmin(email);
+            return ResponseEntity.ok(Map.of(
+                    "message", "User promoted to ADMIN successfully",
+                    "email", email
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Not Found",
+                    "message", e.getMessage()
+            ));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Already Admin",
+                    "message", e.getMessage()
+            ));
+        }
+    }
 }
 

@@ -4,10 +4,15 @@ import com.vacanza.backend.component.ApiMetricsCollector;
 import com.vacanza.backend.component.SystemLogCollector;
 import com.vacanza.backend.dto.response.AdminAnalyticsDTO;
 import com.vacanza.backend.dto.response.AdminAnalyticsDTO.*;
+import com.vacanza.backend.dto.response.AdminUserDTO;
 import com.vacanza.backend.dto.response.SystemMonitoringDTO;
 import com.vacanza.backend.dto.response.SystemMonitoringDTO.*;
+import com.vacanza.backend.entity.User;
+import com.vacanza.backend.entity.UserInfo;
+import com.vacanza.backend.entity.enums.Role;
 import com.vacanza.backend.repo.CheckInRepository;
 import com.vacanza.backend.repo.PointOfInterestRepository;
+import com.vacanza.backend.repo.UserInfoRepository;
 import com.vacanza.backend.repo.UserLoginHistoryRepository;
 import com.vacanza.backend.repo.UserRepository;
 import com.vacanza.backend.service.AdminService;
@@ -38,6 +43,7 @@ import java.util.stream.Collectors;
 public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;
+    private final UserInfoRepository userInfoRepository;
     private final CheckInRepository checkInRepository;
     private final UserLoginHistoryRepository loginHistoryRepository;
     private final PointOfInterestRepository poiRepository;
@@ -265,5 +271,45 @@ public class AdminServiceImpl implements AdminService {
                     .build());
         }
         return trends;
+    }
+
+    // ── User Management ─────────────────────────────────────────
+
+    @Override
+    public List<AdminUserDTO> getAllUsers() {
+        log.info("Fetching all users for admin panel");
+        List<User> allUsers = userRepository.findAll();
+
+        return allUsers.stream().map(user -> {
+            // Try to find UserInfo for display name
+            String displayName = userInfoRepository.findByUser(user)
+                    .map(UserInfo::getDisplayName)
+                    .orElse(user.getEmail().split("@")[0]); // fallback to email prefix
+
+            return AdminUserDTO.builder()
+                    .user(AdminUserDTO.UserSummary.builder()
+                            .userId(user.getUserId())
+                            .email(user.getEmail())
+                            .displayName(displayName)
+                            .role(user.getRole().name())
+                            .build())
+                    .authenticated(true) // all DB users have completed auth
+                    .build();
+        }).toList();
+    }
+
+    @Override
+    public void promoteUserToAdmin(String email) {
+        log.info("Promoting user to ADMIN: {}", email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + email));
+
+        if (user.getRole() == Role.ADMIN) {
+            throw new IllegalStateException("User is already an ADMIN: " + email);
+        }
+
+        user.setRole(Role.ADMIN);
+        userRepository.save(user);
+        log.info("User promoted to ADMIN successfully: {}", email);
     }
 }
