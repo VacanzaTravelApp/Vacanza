@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 
 import '../../../data/models/accommodation_search_request.dart';
 import '../../../data/models/airport_suggestion.dart';
@@ -554,54 +555,13 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
 
   Widget _searchButton(BuildContext context, BookingSearch? search) {
     final enabled = _isValid(search);
-    final cs = Theme.of(context).colorScheme;
-    final accent = context.mapControlAccent;
-    final gradientColors = context.mapControlActiveGradientColors;
-    return GestureDetector(
-      onTap: enabled ? _onSearch : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          gradient: enabled
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: gradientColors,
-                )
-              : null,
-          color: enabled ? null : cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: enabled
-              ? [
-                  BoxShadow(
-                    color: accent.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_rounded,
-              size: 20,
-              color: enabled ? Colors.white : cs.onSurfaceVariant,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Search ${_type == BookingType.hotels ? 'Hotels' : 'Flights'}',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: enabled ? Colors.white : cs.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return VacanzaGradientButton(
+      label: 'Search ${_type == BookingType.hotels ? 'Hotels' : 'Flights'}',
+      icon: Icons.search_rounded,
+      enabled: enabled,
+      onPressed: enabled ? _onSearch : null,
+      minHeight: 54,
+      borderRadius: 20,
     );
   }
 }
