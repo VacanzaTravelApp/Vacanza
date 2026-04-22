@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:mobile/core/widgets/gradient_button.dart';
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 
 import 'package:mobile/features/auth/presentation/widgets/login_email_section.dart';
 import 'package:mobile/features/auth/presentation/widgets/login_password_section.dart';
@@ -161,12 +161,13 @@ class _LoginFormState extends State<LoginForm> {
               ],
 
               // LOGIN BUTTON
-              GradientButton(
-                text: "Log In",
+              VacanzaGradientButton(
+                label: 'Log In',
                 loading: isSubmitting,
-                active: canSubmit,
                 enabled: canSubmit,
                 onPressed: canSubmit ? () => _submit(context) : null,
+                minHeight: 52,
+                borderRadius: 26,
               ),
             ],
           ),
