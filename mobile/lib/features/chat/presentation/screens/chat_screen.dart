@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 import '../../data/api/chat_api_client.dart';
 import '../../data/models/chat_models.dart';
 import '../cubit/chat_cubit.dart';
@@ -269,13 +270,18 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                       onPressed: () => Navigator.of(ctx).pop(false),
                       child: Text('Keep', style: TextStyle(color: t.vividBlue)),
                     ),
-                    FilledButton(
+                    VacanzaGradientButton(
+                      label: 'Discard',
                       onPressed: () => Navigator.of(ctx).pop(true),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: t.vividCoral,
-                        foregroundColor: Colors.white,
+                      enabled: true,
+                      minHeight: 44,
+                      borderRadius: 14,
+                      horizontalPadding: 16,
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
                       ),
-                      child: const Text('Discard'),
                     ),
                   ],
                 );
