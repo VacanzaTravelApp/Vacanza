@@ -2,7 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 
 import '../../data/models/gamification_profile_dto.dart';
 import '../cubit/gamification_cubit.dart';
@@ -66,17 +66,16 @@ class GamificationProfileScreen extends StatelessWidget {
               style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
-            FilledButton.icon(
+            VacanzaGradientButton(
+              label: 'Retry',
+              icon: Icons.refresh,
               onPressed: () {
                 log('[GAM_UI] GamificationProfileScreen retry tapped');
                 context.read<GamificationCubit>().fetchProfile();
               },
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Retry'),
-              style: FilledButton.styleFrom(
-                backgroundColor: context.mapControlAccent,
-                foregroundColor: Colors.white,
-              ),
+              enabled: true,
+              minHeight: 48,
+              borderRadius: 16,
             ),
           ],
         ),
