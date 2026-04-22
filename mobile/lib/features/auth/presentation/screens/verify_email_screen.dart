@@ -2,6 +2,7 @@ import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 
 import 'package:mobile/core/theme/app_text_styles.dart';
@@ -80,6 +81,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     if (!mounted) return;
     setState(() => _checking = true);
     try {
+      final authRepo = context.read<AuthRepository>();
       final user = fb.FirebaseAuth.instance.currentUser;
       if (user == null) {
         _showSnackBar('No active session. Please log in again.');
@@ -98,7 +100,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
       // Force-refresh Firebase ID token and sync backend session (GET /auth/login).
       try {
-        await context.read<AuthRepository>().restoreSession();
+        await authRepo.restoreSession();
       } catch (e) {
         // If backend session cannot be synced, keep user informed and let AuthGate
         // handle clean session resolution on next app start.
@@ -181,31 +183,19 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       const SizedBox(height: 32),
                       SizedBox(
                         height: 48,
-                        child: ElevatedButton(
+                        child: VacanzaGradientButton(
+                          label: 'Resend verification email',
                           onPressed: isBusy ? null : _resendVerification,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: accent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
+                          enabled: !isBusy,
+                          loading: _sending,
+                          minHeight: 48,
+                          borderRadius: 14,
+                          horizontalPadding: 16,
+                          textStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
                           ),
-                          child: _sending
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Resend verification email',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
                         ),
                       ),
                       const SizedBox(height: 12),
