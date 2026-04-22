@@ -90,6 +90,23 @@ jobs:
             docker ps | grep vacanza-web-prod
 
             echo "✔ Web Production Deploy Finished!"
+
+            ##############################################################
+            # AADMIN WEB DEPLOY (Production)
+            ##############################################################
+            echo "🌍 Updating Admin Panel Web (Production)..."
+
+            cd /root/vacanza-web-admin/prod/Vacanza
+            git fetch origin
+            git reset --hard origin/Production
+
+            cd /root/vacanza-web-admin/prod
+            docker compose -p vacanza-web-admin-prod down --remove-orphans
+            docker compose -p vacanza-web-admin-prod up --build -d
+
+            docker ps | grep vacanza-web-admin-prod
+
+            echo "✔ Admin Panel Web Production Deploy Finished!"
             echo "===== 🎉 ALL PRODUCTION SERVICES UPDATED SUCCESSFULLY ====="
 
       ##############################################################
