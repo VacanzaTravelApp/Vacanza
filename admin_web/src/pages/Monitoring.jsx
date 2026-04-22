@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Row, Col, Card, Typography, Tag, Space, Spin, Badge, Progress, Table, message } from "antd";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { LoadingOutlined, DatabaseOutlined, CloudServerOutlined, BugFilled, CheckCircleFilled, WarningFilled, CopyOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import http from "../api/http";
 import { motion } from "framer-motion";
@@ -129,7 +129,7 @@ const Monitoring = () => {
                 const isUp = status === "UP" || status === "Active";
                 return (
                     <Tag
-                        bordered={false}
+                        variant="filled"
                         style={{
                             borderRadius: '20px',
                             padding: '4px 12px',
@@ -181,13 +181,17 @@ const Monitoring = () => {
     ];
 
     if (loading) return (
-        <div style={{ minHeight: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f8fafc' }}>
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                <Spin indicator={<LoadingOutlined style={{ fontSize: 60, color: THEME.primary }} spin />} />
-                <div style={{ marginTop: 24, textAlign: 'center' }}>
-                    <Title level={4} className="gradient-text">Syncing System Matrix</Title>
-                    <Text type="secondary">Establishing secure administrative tunnel...</Text>
-                </div>
+        <div style={{ height: '70vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{ textAlign: 'center' }}
+            >
+                <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: THEME.primary, marginBottom: 24 }} spin />} />
+                <Title level={3} className="gradient-text" style={{ margin: '16px 0 8px 0' }}>SYSTEM MATRIX</Title>
+                <Text type="secondary" style={{ fontSize: 16, letterSpacing: 1.5, textTransform: 'uppercase', fontWeight: 600, opacity: 0.7 }}>
+                    Authenticating & Syncing Node Telemetry
+                </Text>
             </motion.div>
         </div>
     );
@@ -205,40 +209,90 @@ const Monitoring = () => {
             <Row gutter={[48, 48]}>
                 <Col span={24}>
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                        <Title level={4} style={{ color: THEME.coral, marginBottom: 8, letterSpacing: 2, textTransform: 'uppercase', fontSize: 13, fontWeight: 700 }}>
-                            INFRASTRUCTURE OVERWATCH
-                        </Title>
-                        <Title className="gradient-text" style={{ fontSize: '42px', margin: '0 0 16px 0', lineHeight: 1.1, letterSpacing: '-1.5px' }}>
+                        <Title
+                            className="gradient-text"
+                            style={{
+                                fontSize: '32px',
+                                margin: '0 0 10px 0',
+                                letterSpacing: '-1.2px',
+                                fontFamily: "'Fraunces', serif",
+                                fontWeight: 700
+                            }}
+                        >
                             System Matrix
                         </Title>
-                        <Text style={{ fontSize: '18px', color: THEME.subtext, fontWeight: 500 }}>Global telemetry, service node health, and live execution tracing.</Text>
+                        <Text
+                            style={{
+                                fontSize: '16px',
+                                color: THEME.subtext,
+                                fontWeight: 500,
+                                fontFamily: "'DM Sans', sans-serif",
+                                display: 'block',
+                                maxWidth: '750px',
+                                lineHeight: '1.5'
+                            }}
+                        >
+                            Global telemetry, service node health, and live execution tracing across the Vacanza infrastructure.
+                        </Text>
                     </motion.div>
                 </Col>
 
                 <Col xs={24} lg={16}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>API Performance Index</span>}>
-                        <div style={{ height: 350, width: '100%', marginTop: 24 }}>
-                            <ResponsiveContainer>
-                                <LineChart data={data?.apiMetrics || []}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(26, 35, 50, 0.05)" />
-                                    <XAxis dataKey="apiName" hide />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: THEME.subtext, fontSize: 12, fontWeight: 600 }} />
+                    <Card className="glass-card" variant="borderless" title={<span style={{ fontSize: 20 }}>Service Usage Distribution</span>}>
+                        <div style={{ height: 400, width: '100%', position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            <div style={{ position: 'absolute', textAlign: 'center', zIndex: 1, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '100%' }}>
+                                <Text style={{ fontSize: 11, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block' }}>Service Operations</Text>
+                                <Title level={1} style={{ margin: '4px 0', fontWeight: 900, fontSize: 48, color: THEME.navy, lineHeight: 1 }}>
+                                    {(data?.apiMetrics?.reduce((acc, curr) => acc + (curr.totalCalls || 0), 0) || 0).toLocaleString()}
+                                </Title>
+                                <Text style={{ fontSize: 11, color: 'rgba(26, 35, 50, 0.4)', fontWeight: 600, display: 'block', marginTop: 4 }}>TOTAL REQUESTS TODAY</Text>
+                            </div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={Object.values((data?.apiMetrics || []).reduce((acc, curr) => {
+                                            const name = curr.apiName.includes('admin') ? 'Platform Controls' :
+                                                curr.apiName.includes('auth') ? 'Access & Security' :
+                                                    curr.apiName.includes('user') ? 'User Operations' :
+                                                        curr.apiName.includes('analytics') ? 'Data Intelligence' : 'General Assets';
+                                            if (!acc[name]) acc[name] = { displayName: name, totalCalls: 0 };
+                                            acc[name].totalCalls += (curr.totalCalls || 0);
+                                            return acc;
+                                        }, {}))}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={90}
+                                        outerRadius={135}
+                                        paddingAngle={8}
+                                        dataKey="totalCalls"
+                                        nameKey="displayName"
+                                        stroke="none"
+                                    >
+                                        {['Platform Controls', 'Access & Security', 'User Operations', 'Data Intelligence', 'General Assets'].map((entry, index) => {
+                                            const COLORS = [THEME.coral, THEME.navy, '#2DD4A8', '#FFB347', '#00B4D8'];
+                                            return <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />;
+                                        })}
+                                    </Pie>
                                     <Tooltip
-                                        labelStyle={{ color: THEME.navy, fontWeight: 700 }}
                                         contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '16px' }}
+                                        formatter={(value, name) => [`${value} Operations`, name]}
                                     />
-                                    <Line name="Avg Response (ms)" type="monotone" dataKey="avgResponseMs" stroke={THEME.coral} strokeWidth={4} dot={false} activeDot={{ r: 8, fill: THEME.coral, stroke: 'white', strokeWidth: 3 }} />
-                                    <Line name="Total Calls" type="monotone" dataKey="totalCalls" stroke={THEME.teal} strokeWidth={2} dot={false} strokeDasharray="5 5" />
-                                </LineChart>
+                                    <Legend
+                                        verticalAlign="bottom"
+                                        height={40}
+                                        iconType="circle"
+                                        formatter={(value) => <span style={{ color: THEME.navy, fontWeight: 700, fontSize: 13 }}>{value}</span>}
+                                    />
+                                </PieChart>
                             </ResponsiveContainer>
                         </div>
                     </Card>
 
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Service Node Topography</span>} style={{ marginTop: 48 }}>
+                    <Card className="glass-card" variant="borderless" title={<span style={{ fontSize: 20 }}>Service Node Topography</span>} style={{ marginTop: 48 }}>
                         <Table
                             columns={[
                                 { title: "Provider Node", dataIndex: "name", key: "name", width: '25%', render: (text) => <Space><DatabaseOutlined style={{ color: THEME.navy }} /><Text strong style={{ fontSize: 16, whiteSpace: 'nowrap' }}>{text}</Text></Space> },
-                                { title: "Operational Status", dataIndex: "status", key: "status", width: '15%', render: (status) => <Tag color={status === 'UP' ? 'success' : 'error'} bordered={false} style={{ borderRadius: 8, fontWeight: 800, padding: '4px 12px' }}>{status}</Tag> },
+                                { title: "Operational Status", dataIndex: "status", key: "status", width: '15%', render: (status) => <Tag color={status === 'UP' ? 'success' : 'error'} variant="filled" style={{ borderRadius: 8, fontWeight: 800, padding: '4px 12px' }}>{status}</Tag> },
                                 {
                                     title: "Test Command", key: "testCommand", width: '60%', render: (_, record) => {
                                         const getCommand = (name) => {
@@ -267,19 +321,41 @@ const Monitoring = () => {
                 </Col>
 
                 <Col xs={24} lg={8}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Core Infrastructure Pulse</span>}>
+                    <Card className="glass-card" variant="borderless" title={<span style={{ fontSize: 20 }}>System Vitality Monitor</span>}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
                             <div style={{ padding: '32px', background: 'rgba(26, 35, 50, 0.04)', borderRadius: '24px' }}>
-                                <Text style={{ fontSize: 12, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 12 }}>Infrastructure Health</Text>
+                                <Text style={{ fontSize: 12, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 12 }}>Overall System Integrity</Text>
                                 <Title level={1} style={{ margin: '0 0 12px 0', color: THEME.navy, fontWeight: 800, fontSize: 48 }}>{Math.round((data?.systemHealth || 0) * 100)}%</Title>
                                 <Progress percent={Math.round((data?.systemHealth || 0) * 100)} strokeColor={THEME.green} status="active" strokeWidth={12} />
                             </div>
 
                             <div style={{ padding: '32px', background: `${THEME.navy}`, borderRadius: '24px', color: 'white' }}>
-                                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 12 }}>Metric Density</Text>
-                                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-                                    <Title level={1} style={{ margin: 0, color: 'white', fontWeight: 800, fontSize: 48 }}>{data?.apiMetrics?.length || 0}</Title>
-                                    <Text style={{ color: THEME.green, fontWeight: 800, paddingBottom: 10 }}>ACTIVE STREAMS</Text>
+                                <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 16 }}>Network Continuity</Text>
+
+                                <div style={{ marginBottom: 20 }}>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                                        <Title level={1} style={{ margin: 0, color: 'white', fontWeight: 900, fontSize: 42 }}>
+                                            {Math.floor((data?.uptimeSeconds || 0) / 86400)}
+                                        </Title>
+                                        <Text style={{ color: THEME.green, fontWeight: 800, fontSize: 16 }}>DAYS ONLINE</Text>
+                                    </div>
+                                    <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 600 }}>
+                                        {Math.floor(((data?.uptimeSeconds || 0) % 86400) / 3600)} Hours {Math.floor(((data?.uptimeSeconds || 0) % 3600) / 60)} Mins Without Interruption
+                                    </Text>
+                                </div>
+
+                                <div style={{
+                                    borderTop: '1px solid rgba(255,255,255,0.1)',
+                                    paddingTop: 16,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Badge status="processing" color={THEME.green} />
+                                        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600 }}>Status: <span style={{ color: THEME.green }}>Excellent</span></Text>
+                                    </div>
+                                    <Tag color="rgba(45, 212, 168, 0.1)" style={{ margin: 0, color: THEME.green, border: 'none', fontSize: 10 }}>ACTIVE</Tag>
                                 </div>
                             </div>
                         </div>

@@ -5,7 +5,6 @@ import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { authApi } from "../api/userApi";
 import { useNavigate } from "react-router-dom";
-import VacanzaLogo from "../components/VacanzaLogo";
 import { motion } from "framer-motion";
 
 const { Title, Text } = Typography;
@@ -40,7 +39,7 @@ export default function Login() {
                 return;
             }
 
-            message.success("Login successful! Clearing credentials...");
+            message.success("Authentication verified. Establishing secure administrative session...");
             // We don't navigate manually anymore. 
             // AuthProvider will detect the login and App.jsx will redirect once authenticated.
         } catch (error) {
@@ -92,28 +91,38 @@ export default function Login() {
                             padding: '24px'
                         }}
                     >
-                        <div style={{ textAlign: "center", marginBottom: 48 }}>
-                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
-                                <VacanzaLogo size={64} showText={false} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
+                            <img src="/logo.svg" alt="Logo" style={{ width: 100, height: 100, objectFit: 'contain', marginBottom: 16 }} />
+                            <div style={{ textAlign: 'center' }}>
+                                <div style={{
+                                    color: THEME.navy,
+                                    fontSize: '28px',
+                                    fontWeight: 800,
+                                    letterSpacing: '4px',
+                                    fontFamily: "'DM Sans', sans-serif"
+                                }}>
+                                    VACANZA
+                                </div>
+                                <div style={{
+                                    color: THEME.primary,
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    letterSpacing: '3px',
+                                    opacity: 0.8,
+                                    marginTop: '-4px'
+                                }}>
+                                    ADMINISTRATIVE CONSOLE
+                                </div>
                             </div>
-                            <Title style={{
-                                margin: 0,
-                                fontFamily: 'var(--font-display)',
-                                fontSize: '38px',
-                                letterSpacing: '-1.5px',
-                                color: THEME.navy
-                            }}>
-                                Authorized Access
-                            </Title>
-                            <Text style={{ color: THEME.subtext, fontSize: '15px', fontWeight: 500 }}>
-                                ENTER SECURE SYSTEM CONSOLE
-                            </Text>
                         </div>
 
                         <Form name="admin_login" onFinish={onFinish} layout="vertical" size="large">
                             <Form.Item
                                 name="email"
-                                rules={[{ required: true, message: "ID required" }, { type: "email" }]}
+                                rules={[
+                                    { required: true, message: "Please enter your administrative email address" },
+                                    { type: "email", message: "Please provide a valid email format" }
+                                ]}
                             >
                                 <Input
                                     prefix={<UserOutlined style={{ color: THEME.coral }} />}
@@ -124,11 +133,11 @@ export default function Login() {
 
                             <Form.Item
                                 name="password"
-                                rules={[{ required: true, message: "Security key required" }]}
+                                rules={[{ required: true, message: "Please enter your password" }]}
                             >
                                 <Input.Password
                                     prefix={<LockOutlined style={{ color: THEME.coral }} />}
-                                    placeholder="Security Key"
+                                    placeholder="Password"
                                     style={{ borderRadius: 14, height: 56, background: '#f8faff' }}
                                 />
                             </Form.Item>
@@ -139,7 +148,6 @@ export default function Login() {
                                     htmlType="submit"
                                     block
                                     loading={loading}
-                                    icon={<ArrowRightOutlined />}
                                     style={{
                                         height: 60,
                                         borderRadius: 18,
@@ -150,7 +158,7 @@ export default function Login() {
                                         boxShadow: '0 10px 30px rgba(26, 35, 50, 0.3)'
                                     }}
                                 >
-                                    ESTABLISH SESSION
+                                    Secure Login
                                 </Button>
                             </Form.Item>
                         </Form>

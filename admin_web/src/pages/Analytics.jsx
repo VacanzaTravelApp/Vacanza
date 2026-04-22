@@ -25,7 +25,7 @@ const Analytics = () => {
 
     if (loading && !data) return (
         <div style={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: THEME.coral }} spin />} />
+            <Spin indicator={<LoadingOutlined style={{ fontSize: 48, color: THEME.coral }} spin />} description="Collecting Market Intelligence" />
         </div>
     );
 
@@ -46,7 +46,7 @@ const Analytics = () => {
             title: 'CATEGORY',
             dataIndex: 'category',
             key: 'category',
-            render: (c) => <Tag color={THEME.navy} bordered={false} style={{ textTransform: 'uppercase', fontWeight: 800, fontSize: 10, borderRadius: 6 }}>{c}</Tag>
+            render: (c) => <Tag color={THEME.navy} variant="filled" style={{ textTransform: 'uppercase', fontWeight: 800, fontSize: 10, borderRadius: 6 }}>{c}</Tag>
         },
         {
             title: 'PERFORMANCE SCORE',
@@ -66,13 +66,37 @@ const Analytics = () => {
             <Row gutter={[48, 48]}>
                 <Col span={24}>
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                        <Title className="gradient-text" style={{ fontSize: '42px', marginBottom: 8, marginTop: 0, letterSpacing: '-1.5px' }}>Analytics Core</Title>
-                        <Text style={{ fontSize: '18px', color: THEME.subtext, fontWeight: 500 }}>Structural intelligence and revenue trajectory monitoring across the Vacanza ecosystem.</Text>
+                        <Title
+                            className="gradient-text"
+                            style={{
+                                fontSize: '32px',
+                                marginBottom: 8,
+                                marginTop: 0,
+                                letterSpacing: '-1.2px',
+                                fontFamily: "'Fraunces', serif",
+                                fontWeight: 900
+                            }}
+                        >
+                            Analytics Core
+                        </Title>
+                        <Text
+                            style={{
+                                fontSize: '16px',
+                                color: THEME.subtext,
+                                fontWeight: 500,
+                                fontFamily: "'DM Sans', sans-serif",
+                                display: 'block',
+                                maxWidth: '700px',
+                                lineHeight: '1.5'
+                            }}
+                        >
+                            Real-time data synchronization and growth trajectory monitoring across the global Vacanza infrastructure.
+                        </Text>
                     </motion.div>
                 </Col>
 
                 <Col xs={24} lg={16}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Growth Trajectory</span>}>
+                    <Card className="glass-card" variant="borderless" title={<span style={{ fontSize: 20 }}>User Growth Trend</span>}>
                         <div style={{ height: 400, width: '100%', marginTop: 24 }}>
                             <ResponsiveContainer>
                                 <AreaChart data={data?.growthTrajectory || []}>
@@ -99,22 +123,22 @@ const Analytics = () => {
                 <Col xs={24} lg={8}>
                     <Row gutter={[0, 48]}>
                         <Col span={24}>
-                            <Card className="glass-card" bordered={false} style={{ background: THEME.navy }}>
+                            <Card className="glass-card" variant="borderless" style={{ background: THEME.navy }}>
                                 <Statistic
-                                    title={<Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>System Users</Text>}
+                                    title={<Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Total Registered Users</Text>}
                                     value={data?.matrixUsers || 0}
                                     prefix={<UserOutlined style={{ color: THEME.coral }} />}
                                     valueStyle={{ color: 'white', fontWeight: 800, fontSize: 48 }}
                                 />
                                 <div style={{ marginTop: 16 }}>
-                                    <Tag color={THEME.coral} bordered={false} style={{ borderRadius: 8, fontWeight: 800 }}>LIVE CLUSTER</Tag>
+                                    <Tag color={THEME.coral} variant="filled" style={{ borderRadius: 8, fontWeight: 800 }}>PLATFORM TOTAL</Tag>
                                 </div>
                             </Card>
                         </Col>
                         <Col span={24}>
-                            <Card className="glass-card" bordered={false}>
+                            <Card className="glass-card" variant="borderless">
                                 <Statistic
-                                    title={<Text style={{ color: THEME.subtext, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Active Service Nodes</Text>}
+                                    title={<Text style={{ color: THEME.subtext, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Global Service Nodes</Text>}
                                     value={data?.activeNodes || 0}
                                     prefix={<GlobalOutlined style={{ color: THEME.teal }} />}
                                     valueStyle={{ color: THEME.navy, fontWeight: 800, fontSize: 48 }}

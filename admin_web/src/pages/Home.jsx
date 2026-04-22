@@ -7,7 +7,6 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import VacanzaLogo from "../components/VacanzaLogo";
 import http from "../api/http";
 import dayjs from "dayjs";
 
@@ -108,23 +107,43 @@ export default function Home() {
             </motion.div>
 
             {/* Welcome Header */}
-            <motion.div variants={item} style={{ marginBottom: 40 }}>
+            <motion.div variants={item} style={{ marginBottom: 40, marginTop: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
                     <div
                         onClick={() => window.location.reload()}
                         style={{
-                            width: 56,
-                            height: 56,
+                            width: 120,
+                            height: 120,
                             display: 'flex',
                             justifyContent: 'center',
                             alignItems: 'center',
                             cursor: 'pointer'
                         }}>
-                        <VacanzaLogo size={56} showText={false} />
+                        <img src="/logo.svg" alt="Logo" style={{ width: 120, height: 120, objectFit: 'contain' }} />
                     </div>
                     <div>
-                        <Title level={1} style={{ margin: 0, letterSpacing: -1.2, fontWeight: 800 }}>Command Center</Title>
-                        <Text type="secondary" style={{ fontSize: 16 }}>Real-time orchestration of user growth, system telemetry, and strategic assets.</Text>
+                        <Title
+                            className="gradient-text"
+                            style={{
+                                margin: 0,
+                                letterSpacing: -1.5,
+                                fontWeight: 900,
+                                fontSize: '36px',
+                                fontFamily: "'Fraunces', serif"
+                            }}
+                        >
+                            Command Center
+                        </Title>
+                        <Text
+                            style={{
+                                fontSize: '18px',
+                                color: '#5A6B7A',
+                                fontWeight: 500,
+                                fontFamily: "'DM Sans', sans-serif"
+                            }}
+                        >
+                            Real-time orchestration of user growth, system telemetry, and strategic assets.
+                        </Text>
                     </div>
                 </div>
             </motion.div>
@@ -138,29 +157,46 @@ export default function Home() {
                                     hoverable
                                     className="glass-card"
                                     onClick={() => navigate('/monitoring')}
-                                    style={{ borderRadius: 20, height: '100%' }}
-                                    bodyStyle={{ padding: '32px' }}
+                                    style={{ borderRadius: 24, height: '100%', border: '1px solid rgba(26, 35, 50, 0.08)' }}
+                                    styles={{ body: { padding: '36px' } }}
                                 >
                                     <div style={{
-                                        width: 48,
-                                        height: 48,
-                                        borderRadius: 12,
+                                        width: 52,
+                                        height: 52,
+                                        borderRadius: 14,
                                         background: `${THEME.warning}15`,
                                         color: THEME.warning,
                                         display: 'flex',
                                         justifyContent: 'center',
                                         alignItems: 'center',
-                                        marginBottom: 24,
-                                        fontSize: 24
+                                        marginBottom: 28,
+                                        fontSize: 26
                                     }}>
                                         <ThunderboltOutlined />
                                     </div>
-                                    <Title level={3} style={{ margin: '0 0 12px' }}>System Matrix</Title>
-                                    <Paragraph type="secondary" style={{ height: 48, fontSize: 14 }}>
+                                    <Title
+                                        level={3}
+                                        style={{
+                                            margin: '0 0 14px',
+                                            fontFamily: "'Fraunces', serif",
+                                            fontWeight: 800,
+                                            fontSize: '24px'
+                                        }}
+                                    >
+                                        System Matrix
+                                    </Title>
+                                    <Paragraph
+                                        style={{
+                                            height: 52,
+                                            fontSize: '15px',
+                                            color: '#5A6B7A',
+                                            fontFamily: "'DM Sans', sans-serif"
+                                        }}
+                                    >
                                         Real-time telemetry, provider node health, and granular performance metrics.
                                     </Paragraph>
-                                    <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Button type="primary" style={{ background: THEME.warning, border: 'none', borderRadius: 8 }}>
+                                    <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Button type="primary" style={{ background: THEME.warning, border: 'none', borderRadius: 10, fontWeight: 700, height: '40px' }}>
                                             Launch Console
                                         </Button>
                                         <ArrowRightOutlined style={{ color: THEME.warning }} />
@@ -175,29 +211,46 @@ export default function Home() {
                                     hoverable
                                     className="glass-card"
                                     onClick={() => navigate('/analytics')}
-                                    style={{ borderRadius: 20, height: '100%' }}
-                                    bodyStyle={{ padding: '32px' }}
+                                    style={{ borderRadius: 24, height: '100%', border: '1px solid rgba(26, 35, 50, 0.08)' }}
+                                    bodyStyle={{ padding: '36px' }}
                                 >
                                     <div style={{
-                                        width: 48,
-                                        height: 48,
-                                        borderRadius: 12,
+                                        width: 52,
+                                        height: 52,
+                                        borderRadius: 14,
                                         background: `${THEME.primary}15`,
                                         color: THEME.primary,
                                         display: 'flex',
                                         justifyContent: 'center',
                                         alignItems: 'center',
-                                        marginBottom: 24,
-                                        fontSize: 24
+                                        marginBottom: 28,
+                                        fontSize: 26
                                     }}>
                                         <GlobalOutlined />
                                     </div>
-                                    <Title level={3} style={{ margin: '0 0 12px' }}>Analytics Core</Title>
-                                    <Paragraph type="secondary" style={{ height: 48, fontSize: 14 }}>
+                                    <Title
+                                        level={3}
+                                        style={{
+                                            margin: '0 0 14px',
+                                            fontFamily: "'Fraunces', serif",
+                                            fontWeight: 800,
+                                            fontSize: '24px'
+                                        }}
+                                    >
+                                        Analytics Core
+                                    </Title>
+                                    <Paragraph
+                                        style={{
+                                            height: 52,
+                                            fontSize: '15px',
+                                            color: '#5A6B7A',
+                                            fontFamily: "'DM Sans', sans-serif"
+                                        }}
+                                    >
                                         Deep-dive behavioral patterns, revenue trajectory, and asset engagement ranking.
                                     </Paragraph>
-                                    <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Button type="primary" style={{ background: THEME.primary, border: 'none', borderRadius: 8 }}>
+                                    <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Button type="primary" style={{ background: THEME.primary, border: 'none', borderRadius: 10, fontWeight: 700, height: '40px' }}>
                                             Open Insights
                                         </Button>
                                         <ArrowRightOutlined style={{ color: THEME.primary }} />
@@ -209,10 +262,15 @@ export default function Home() {
 
                     <motion.div variants={item} style={{ marginTop: 24 }}>
                         <Card
-                            title={<Space><RocketOutlined style={{ color: THEME.primary }} /> Operational Overview</Space>}
+                            title={
+                                <Space>
+                                    <RocketOutlined style={{ color: THEME.primary }} />
+                                    <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 800 }}>Operational Overview</span>
+                                </Space>
+                            }
                             className="glass-card"
-                            bordered={false}
-                            bodyStyle={{ padding: '32px' }}
+                            variant="borderless"
+                            styles={{ body: { padding: '36px' } }}
                         >
                             <Row gutter={[32, 24]}>
                                 <Col xs={24} sm={12}>

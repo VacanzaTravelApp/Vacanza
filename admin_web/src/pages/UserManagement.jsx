@@ -84,16 +84,50 @@ export default function UserManagement() {
 
     return (
         <div style={{ padding: "12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px", alignItems: "center" }}>
-                <h2 style={{ fontSize: '28px', fontWeight: 600 }}>User Management</h2>
-                <Input
-                    prefix={<SearchOutlined />}
-                    placeholder="Search users in table..."
-                    style={{ width: "300px", borderRadius: '8px' }}
-                />
+            <div style={{ marginBottom: "32px", marginTop: "12px" }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: 10 }}>
+                    <h2
+                        className="gradient-text"
+                        style={{
+                            fontSize: '32px',
+                            margin: 0,
+                            fontFamily: "'Fraunces', serif",
+                            fontWeight: 700,
+                            letterSpacing: '-1px'
+                        }}
+                    >
+                        Registered Users
+                    </h2>
+                    <Tag
+                        color="blue"
+                        variant="filled"
+                        style={{
+                            borderRadius: '20px',
+                            fontWeight: 600,
+                            border: 'none',
+                            background: 'rgba(26, 35, 50, 0.05)',
+                            color: '#5A6B7A',
+                            padding: '2px 12px'
+                        }}
+                    >
+                        {users?.length || 0} Total Profiles
+                    </Tag>
+                </div>
+                <p
+                    style={{
+                        color: '#5A6B7A',
+                        fontSize: '16px',
+                        fontWeight: 500,
+                        fontFamily: "'DM Sans', sans-serif",
+                        maxWidth: '800px',
+                        lineHeight: 1.5
+                    }}
+                >
+                    View all accounts registered on the Vacanza platform and manage their administrative roles.
+                </p>
             </div>
 
-            {/* Manual Promotion Panel */}
+            {/* Manual Promotion Panel (Burası geri geldi) */}
             <Card
                 title={<span style={{ color: '#1a1a1a' }}>Manual Admin Promotion</span>}
                 style={{ marginBottom: '24px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
