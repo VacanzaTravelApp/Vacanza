@@ -766,15 +766,18 @@ class _HomeMapViewState extends State<_HomeMapView>
               }
               final res = nav.response;
               final routeCubit = context.read<ActiveRouteCubit>();
-              if (res.routeData != null) {
-                routeCubit.setFromChatResponse(res);
-              } else if (res.routeId != null &&
-                  res.routeId!.trim().isNotEmpty) {
-                await routeCubit.loadSavedRoute(res.routeId!.trim());
+              final rid = res.routeId?.trim();
+              // Prefer hydrating from saved route when we have a routeId, because
+              // chat payloads do not include hotel/accommodation.
+              if (rid != null && rid.isNotEmpty) {
+                await routeCubit.loadSavedRoute(rid);
                 if (!context.mounted) return;
                 if (routeCubit.state.status != ActiveRouteStatus.ready) {
                   return;
                 }
+              } else if (res.routeData != null) {
+                // Unsaved/ephemeral route (no routeId) — fall back to chat payload.
+                routeCubit.setFromChatResponse(res);
               } else {
                 return;
               }
