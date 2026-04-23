@@ -661,6 +661,8 @@ public class ChatProxyController {
                 double minLat = -90;
                 double maxLon = 180;
                 double maxLat = 90;
+                Double destCenterLat = null;
+                Double destCenterLon = null;
                 if (destination != null && !destination.isBlank()) {
                         var bboxOpt = mapboxPoiSearchClient.geocodeDestination(destination.trim()).blockOptional();
                         if (bboxOpt.isPresent()) {
@@ -669,6 +671,8 @@ public class ChatProxyController {
                                 minLat = g.getMinLat();
                                 maxLon = g.getMaxLon();
                                 maxLat = g.getMaxLat();
+                                destCenterLat = g.getCenterLat();
+                                destCenterLon = g.getCenterLon();
                                 log.info("[RESOLVE NULL] bbox from destination '{}' -> {},{},{},{}",
                                                 destination, minLon, minLat, maxLon, maxLat);
                         } else {
@@ -676,11 +680,17 @@ public class ChatProxyController {
                                                 destination);
                         }
                 }
+                // Max allowed distance from destination centre. Generous enough to keep
+                // restaurants at city edges; tight enough to reject results in other cities.
+                final double MAX_DIST_FROM_CENTER_M = 75_000;
                 for (AiChatDto.DayPlan dayPlan : routeData.getDays()) {
                         if (dayPlan.getWaypoints() == null) continue;
                         for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
                                 if (wp.getLatitude() != null && wp.getLongitude() != null) continue;
                                 if (wp.getName() == null || wp.getName().isBlank()) continue;
+                                // Internal placeholders (e.g. __LUNCH_PLACEHOLDER__) must not be geocoded.
+                                // stripNullCoordinateWaypoints will handle them via category-based search.
+                                if (wp.getName().startsWith("__") && wp.getName().endsWith("__")) continue;
                                 try {
                                         var result = mapboxPoiSearchClient.resolvePlace(
                                                         wp.getName(),
@@ -689,15 +699,23 @@ public class ChatProxyController {
                                                 .blockOptional();
                                         if (result.isPresent()) {
                                                 String resultName = result.get().getName();
-                                                if (isGeocodingNameCompatible(wp.getName(), resultName)) {
-                                                        wp.setLatitude(result.get().getLat());
-                                                        wp.setLongitude(result.get().getLon());
+                                                double rLat = result.get().getLat();
+                                                double rLon = result.get().getLon();
+                                                boolean nameOk = isGeocodingNameCompatible(wp.getName(), resultName);
+                                                boolean nearEnough = destCenterLat == null
+                                                        || haversineMeters(destCenterLat, destCenterLon, rLat, rLon) <= MAX_DIST_FROM_CENTER_M;
+                                                if (nameOk && nearEnough) {
+                                                        wp.setLatitude(rLat);
+                                                        wp.setLongitude(rLon);
                                                         log.info("[RESOLVE NULL] '{}' -> ({}, {}) ✓ (matched '{}')",
-                                                                        wp.getName(), result.get().getLat(),
-                                                                        result.get().getLon(), resultName);
-                                                } else {
-                                                        log.warn("[RESOLVE NULL] '{}' geocoded to unrelated '{}' — rejecting to avoid wrong pin",
+                                                                        wp.getName(), rLat, rLon, resultName);
+                                                } else if (!nameOk) {
+                                                        log.warn("[RESOLVE NULL] '{}' geocoded to unrelated '{}' — rejecting",
                                                                         wp.getName(), resultName);
+                                                } else {
+                                                        long distKm = Math.round(haversineMeters(destCenterLat, destCenterLon, rLat, rLon) / 1000.0);
+                                                        log.warn("[RESOLVE NULL] '{}' geocoded to ({}, {}) — {} km from destination centre, rejecting",
+                                                                        wp.getName(), rLat, rLon, distKm);
                                                 }
                                         } else {
                                                 log.warn("[RESOLVE NULL] All strategies exhausted for '{}' — waypoint has no coordinates",
@@ -850,16 +868,16 @@ public class ChatProxyController {
                 String cat = missing.getCategory();
                 String category = (cat != null && !cat.isBlank()) ? cat.trim() : "tourist_attraction";
 
-                // Try similar category first, then broaden.
-                List<String> cats = List.of(
-                        category,
-                        "tourist_attraction",
-                        "landmark",
-                        "monument",
-                        "park",
-                        "viewpoint",
-                        "neighborhood"
-                );
+                java.util.Set<String> diningCats = java.util.Set.of(
+                        "restaurant", "cafe", "bar", "fast_food", "bakery", "pub", "food", "market");
+                boolean isDining = diningCats.contains(category.toLowerCase(java.util.Locale.ROOT));
+
+                // For dining stops only try dining categories — never fall through to tourist attractions.
+                // For sightseeing stops try similar category first, then broaden to outdoor fallbacks.
+                List<String> cats = isDining
+                        ? List.of("restaurant", "cafe", "bar", "fast_food")
+                        : List.of(category, "tourist_attraction", "landmark", "monument",
+                                  "park", "viewpoint", "neighborhood");
 
                 for (String c : cats) {
                         if (c == null || c.isBlank()) continue;
@@ -986,16 +1004,14 @@ public class ChatProxyController {
                         ? duplicate.getCategory().trim()
                         : "tourist_attraction";
 
-                // Similar category first, then flexible outdoor categories.
-                java.util.List<String> cats = java.util.List.of(
-                        category,
-                        "tourist_attraction",
-                        "landmark",
-                        "monument",
-                        "park",
-                        "viewpoint",
-                        "neighborhood"
-                );
+                java.util.Set<String> diningCats2 = java.util.Set.of(
+                        "restaurant", "cafe", "bar", "fast_food", "bakery", "pub", "food", "market");
+                boolean isDining2 = diningCats2.contains(category.toLowerCase(java.util.Locale.ROOT));
+
+                java.util.List<String> cats = isDining2
+                        ? java.util.List.of("restaurant", "cafe", "bar", "fast_food")
+                        : java.util.List.of(category, "tourist_attraction", "landmark",
+                                            "monument", "park", "viewpoint", "neighborhood");
 
                 for (String c : cats) {
                         if (c == null || c.isBlank()) continue;
@@ -1405,14 +1421,10 @@ public class ChatProxyController {
                 "church", "mosque", "castle", "aquarium", "zoo"
         );
 
-        /**
-         * Latest acceptable arrival at a venue that closes at 17:00.
-         * 16:45 gives the visitor 15 minutes inside — anything later is not worth visiting.
-         * Walking time is already baked into the computed arrival (enrichTimeline adds real Mapbox durations),
-         * so this check uses the final realistic time rather than the AI's naive estimate.
-         */
-        private static final java.time.LocalTime VENUE_LATEST_ARRIVAL =
-                java.time.LocalTime.of(16, 45);
+        /** Closing time for early-close venue categories (museums, palaces, etc.). */
+        private static final java.time.LocalTime VENUE_CLOSE_TIME = java.time.LocalTime.of(17, 0);
+        /** Minimum visit time kept as buffer even if estimatedDurationMin is missing. */
+        private static final int DEFAULT_VENUE_DURATION_MIN = 90;
 
         private static final java.time.format.DateTimeFormatter HH_MM_FMT =
                 java.time.format.DateTimeFormatter.ofPattern("HH:mm");
@@ -1447,7 +1459,12 @@ public class ChatProxyController {
                                 } catch (Exception e) {
                                         continue; // can't parse → keep safe
                                 }
-                                if (t.isBefore(VENUE_LATEST_ARRIVAL)) continue;
+                                // Latest arrival = closing time minus the stop's own visit duration.
+                                // A 90-min museum closing at 17:00 must be arrived at by 15:30 at the latest.
+                                int durationMin = (wp.getEstimatedDurationMin() != null && wp.getEstimatedDurationMin() > 0)
+                                        ? wp.getEstimatedDurationMin() : DEFAULT_VENUE_DURATION_MIN;
+                                java.time.LocalTime latestArrival = VENUE_CLOSE_TIME.minusMinutes(durationMin);
+                                if (t.isBefore(latestArrival)) continue;
 
                                 lateCount++;
 

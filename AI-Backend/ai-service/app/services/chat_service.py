@@ -228,6 +228,15 @@ SELF-CHECK (do this mentally before outputting each day):
   ✓ Does the day end after 18:00? If NO → extend with dinner or evening stop.
   ✓ Are ALL sightseeing stops within 3 km of each other? If NO → split distant ones to a different day.
   ✓ Does day_start_local leave enough time to reach the first sight before it opens (09:00)? If NO → adjust.
+  ✓ Does this day have at least 2 iconic/landmark-level sights? If NO → add one from world knowledge (null coordinates).
+
+QUALITY BALANCE ACROSS DAYS (CRITICAL — prevents day-1 bias):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- Do NOT front-load all iconic/famous attractions into day 1. Every day must feel equally exciting to the traveller.
+- Each day MUST contain at least 2 landmark-level or iconic sights (famous museums, palaces, historic squares, well-known viewpoints, etc.). If a geographic cluster is weak, supplement it with a must-see from your world knowledge (null coordinates — the app will geocode).
+- After you assign POIs to clusters, ask yourself: "Would a traveller be just as happy on day 2 as on day 1?" If not, rebalance — move a strong attraction to the weaker day or add one from world knowledge.
+- The POI list is a resource pool, NOT a ranking. Ignore the list order when deciding day quality — a POI at position 50 in the list may be more iconic than position 5.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 GEOGRAPHIC CLUSTERING (CRITICAL — prevents costly back-and-forth travel):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -248,7 +257,7 @@ WATER CROSSING RULE (prevents unnecessary ferry/boat rides):
 OPENING HOURS (CRITICAL):
 - Museums, palaces, art galleries, historic sites, churches, mosques open at 09:00 at the earliest. NEVER schedule them before 09:00.
 - Museums, palaces, art galleries, historic sites, ruins, monuments CLOSE around 17:00. The visit (arrival + estimated_duration_min) MUST finish BY 17:00. NEVER place these in the afternoon-late or evening slots. NEVER set time_slot: "evening" for museum/gallery/palace/historic_site/monument/ruins.
-- HARD RULE: A museum/gallery/palace/historic_site must ARRIVE before 16:30 so there is at least 30 min of visit time before closing. If the cumulative day schedule would push a museum past 16:30, place it EARLIER in the day (before lunch) instead.
+- HARD RULE: Museums, palaces, and galleries need 90–120 min to visit properly. If they close at 17:00, the LATEST acceptable arrival is 15:00 (= 17:00 − 120 min). Arriving at 16:30 gives only 30 minutes — that is NOT acceptable. If the cumulative day schedule would push a museum past 15:00, move it to BEFORE lunch or replace it with an outdoor landmark (bridge, square, viewpoint, park) that has no closing time.
 - After 17:00: only restaurants, cafes, bars, nightlife, and outdoor landmarks (bridges, squares, viewpoints) may be scheduled. No museums, no palaces, no galleries, no mosques, no churches.
 - day_start_local MUST be 08:30 or later (FAST pace), 09:00 or later (MODERATE/default), 09:30 or later (SLOW). NEVER set it before 08:30 for any reason.
 - If you have a morning cafe in SLOT 1 (~09:00), the first sightseeing stop (SLOT 2) starts at ~09:30–10:00 — still within opening hours.
@@ -849,6 +858,56 @@ def _build_must_visit_section(must_visit: list[str] | None) -> str:
     )
 
 
+async def _extract_turn3_must_visit_llm(
+    llm,
+    user_request: str,
+    destination_hint: str | None = None,
+) -> list[str]:
+    """LLM-only extractor for "add this place" Turn3 edits.
+
+    This avoids brittle string matching in downstream services. Output is a best-effort
+    list of place names the user explicitly requested to add/visit.
+    """
+    if not user_request or not user_request.strip():
+        return []
+    dest = (destination_hint or "").strip()
+    sys = (
+        "You extract MUST-VISIT places from a user's route-edit request.\n"
+        "Return ONLY valid JSON with this exact shape:\n"
+        '{ "must_visit": ["Place 1", "Place 2"] }\n'
+        "Rules:\n"
+        "- Include ONLY places the user explicitly asked to add/visit/see.\n"
+        "- If none, return {\"must_visit\": []}.\n"
+        "- Use the official English/international name if known; otherwise return the user's wording.\n"
+        "- Do not include generic terms like 'restaurant' or 'museum' without a specific name.\n"
+        + (f"- Destination context: {dest}\n" if dest else "")
+    )
+    try:
+        resp = await llm.ainvoke(
+            [SystemMessage(content=sys), HumanMessage(content=user_request.strip())]
+        )
+        data = _extract_json_object(str(resp.content))
+        mv = data.get("must_visit") if isinstance(data, dict) else None
+        if not isinstance(mv, list):
+            return []
+        out: list[str] = []
+        for x in mv:
+            if isinstance(x, str) and x.strip():
+                out.append(x.strip())
+        # De-dup while preserving order
+        seen: set[str] = set()
+        uniq: list[str] = []
+        for name in out:
+            k = name.lower()
+            if k in seen:
+                continue
+            seen.add(k)
+            uniq.append(name)
+        return uniq[:8]
+    except Exception:
+        return []
+
+
 def _format_poi_list(pois: list[dict]) -> str:
     lines: list[str] = []
     for i, p in enumerate(pois, start=1):
@@ -1233,6 +1292,39 @@ def _fix_route_dining(route_data: RouteData) -> RouteData:
                 for wp in sight_wps:
                     wp.estimated_duration_min = (wp.estimated_duration_min or 45) + bump
 
+        # --- Pass 4: flag missing lunch so _fix_dining_proximity can insert one ---
+        has_lunch = any(
+            (wp.category or "").lower() in _RESTAURANT_CATS
+            and (wp.time_slot or "").lower() in ("lunch", "")
+            and wp.order <= max(3, len(wps) // 2)
+            for wp in wps
+        )
+        # Simpler check: any restaurant in the first half of the day
+        restaurant_positions = [
+            i for i, wp in enumerate(wps)
+            if (wp.category or "").lower() in _RESTAURANT_CATS
+        ]
+        has_lunch = any(pos < len(wps) * 0.6 for pos in restaurant_positions)
+        if not has_lunch:
+            logger.warning(
+                "[FIX_DINING] Day %s has no lunch restaurant — will be enforced by _fix_dining_proximity",
+                day_plan.day,
+            )
+            # Insert a sentinel placeholder so _fix_dining_proximity replaces it with a real nearby one.
+            # Position: after slot 3 (index 2), or mid-day.
+            insert_at = min(3, len(wps))
+            sentinel = RouteWaypoint(
+                name="__LUNCH_PLACEHOLDER__",
+                category="restaurant",
+                day=day_plan.day,
+                order=insert_at + 1,
+                estimated_duration_min=60,
+                time_slot="lunch",
+                latitude=None,
+                longitude=None,
+            )
+            wps.insert(insert_at, sentinel)
+
         # --- Renumber order ---
         for idx, wp in enumerate(wps):
             wp.order = idx + 1
@@ -1284,6 +1376,30 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             """Minimum haversine distance from (lat, lon) to any sightseeing stop."""
             return min(_haversine_meters(s_lat, s_lon, lat, lon) for s_lat, s_lon in sight_coords)
 
+        def _adjacent_score(idx: int, lat: float, lon: float) -> float:
+            """Max distance to the nearest sightseeing stop before AND after a dining stop.
+
+            After _optimize_route_order the sightseeing chunks are already sorted, so
+            the stop immediately before/after the dining index is the true neighbour.
+            Minimising this score picks a restaurant that is 'on the way' between the
+            surrounding sights rather than just near any sight in the day.
+            """
+            prev_dist: float | None = None
+            for j in range(idx - 1, -1, -1):
+                w = wps[j]
+                if (w.category or "").lower() not in _DINING_CATS and w.latitude is not None:
+                    prev_dist = _haversine_meters(w.latitude, w.longitude, lat, lon)
+                    break
+            next_dist: float | None = None
+            for j in range(idx + 1, len(wps)):
+                w = wps[j]
+                if (w.category or "").lower() not in _DINING_CATS and w.latitude is not None:
+                    next_dist = _haversine_meters(w.latitude, w.longitude, lat, lon)
+                    break
+            if prev_dist is not None and next_dist is not None:
+                return max(prev_dist, next_dist)
+            return prev_dist or next_dist or _min_sight_dist(lat, lon)
+
         # Track names already in this day to prevent duplicates
         used_names = {(wp.name or "").lower() for wp in wps}
 
@@ -1291,29 +1407,45 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             cat = (wp.category or "").lower()
             if cat not in _DINING_CATS:
                 continue
+
+            is_placeholder = (wp.name or "").startswith("__") and (wp.name or "").endswith("__")
+
             if wp.latitude is None or wp.longitude is None:
-                continue
+                # Null-coord dining (including placeholders): always try to replace with a nearby real venue.
+                if not is_placeholder:
+                    # Skip non-placeholder nulls here; Java resolveNullCoordinates handles them.
+                    continue
+                # Placeholder: fall through to replacement logic below.
+                dist = float("inf")
+                adj_score = float("inf")
+            else:
+                # Trigger replacement if the dining stop is far from any sightseeing stop
+                # OR if it's far from its immediate neighbours (the stops it sits between).
+                dist = _min_sight_dist(wp.latitude, wp.longitude)
+                adj_score = _adjacent_score(i, wp.latitude, wp.longitude)
+                if dist <= _MAX_DINING_DISTANCE_M and adj_score <= _MAX_DINING_DISTANCE_M:
+                    continue
 
-            dist = _min_sight_dist(wp.latitude, wp.longitude)
-            if dist <= _MAX_DINING_DISTANCE_M:
-                continue
+            def _score_candidate(p_lat: float, p_lon: float) -> float:
+                return _adjacent_score(i, p_lat, p_lon)
 
-            # Find the in-range replacement closest to the day's sightseeing area
+            # Find the in-range replacement with the best adjacent score
             best: dict | None = None
-            best_dist = float("inf")
+            best_score = float("inf")
             for p in dining_pool:
                 p_name = (p.get("name") or "").lower()
                 if p_name in used_names:
                     continue
                 p_cat = (p.get("category") or "").lower()
-                # Preserve meal type: restaurant stays restaurant, cafe stays cafe
                 if cat in _RESTAURANT_CATS and p_cat not in _RESTAURANT_CATS:
                     continue
                 if cat in ("cafe", "bakery") and p_cat not in ("cafe", "bakery"):
                     continue
-                d = _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0)
-                if d < best_dist and d <= _MAX_DINING_DISTANCE_M:
-                    best_dist = d
+                if _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0) > _MAX_DINING_DISTANCE_M:
+                    continue
+                score = _score_candidate(p.get("lat") or 0.0, p.get("lon") or 0.0)
+                if score < best_score:
+                    best_score = score
                     best = p
 
             # Fallback: if no same-type replacement found, accept any in-range dining type
@@ -1323,9 +1455,11 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
                     p_name = (p.get("name") or "").lower()
                     if p_name in used_names:
                         continue
-                    d = _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0)
-                    if d < best_dist and d <= _MAX_DINING_DISTANCE_M:
-                        best_dist = d
+                    if _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0) > _MAX_DINING_DISTANCE_M:
+                        continue
+                    score = _score_candidate(p.get("lat") or 0.0, p.get("lon") or 0.0)
+                    if score < best_score:
+                        best_score = score
                         best = p
                 if best is not None:
                     used_fallback = True
@@ -1333,8 +1467,8 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             if best is not None:
                 log_suffix = " [type fallback]" if used_fallback else ""
                 logger.info(
-                    "[DINING_PROXIMITY] Day %s: '%s' is %.0fm from nearest sight → replaced by '%s' (%.0fm)%s",
-                    day_plan.day, wp.name, dist, best.get("name"), best_dist, log_suffix,
+                    "[DINING_PROXIMITY] Day %s: '%s' (any_sight=%.0fm adj=%.0fm) → replaced by '%s' (adj=%.0fm)%s",
+                    day_plan.day, wp.name, dist, adj_score, best.get("name"), best_score, log_suffix,
                 )
                 used_names.discard((wp.name or "").lower())
                 wps[i] = RouteWaypoint(
@@ -1350,10 +1484,25 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
                 )
                 used_names.add((best.get("name") or "").lower())
             else:
-                logger.warning(
-                    "[DINING_PROXIMITY] Day %s: '%s' is %.0fm from nearest sight — no in-range replacement found in pool",
-                    day_plan.day, wp.name, dist,
-                )
+                if is_placeholder:
+                    # No nearby restaurant found — remove the placeholder rather than leaving garbage in the route.
+                    wps[i] = None  # type: ignore[assignment]
+                    logger.warning(
+                        "[DINING_PROXIMITY] Day %s: lunch placeholder removed — no in-range restaurant in pool",
+                        day_plan.day,
+                    )
+                else:
+                    logger.warning(
+                        "[DINING_PROXIMITY] Day %s: '%s' is %.0fm from nearest sight — no in-range replacement found in pool",
+                        day_plan.day, wp.name, dist,
+                    )
+
+    # Remove None slots left by failed placeholder replacements and renumber.
+    for day_plan in route_data.days:
+        if day_plan.waypoints:
+            day_plan.waypoints = [wp for wp in day_plan.waypoints if wp is not None]
+            for idx, wp in enumerate(day_plan.waypoints):
+                wp.order = idx + 1
 
     return route_data
 
@@ -2452,10 +2601,10 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
         if route_data:
             _log_route("AI_RAW", route_data)           # what AI produced before any fix
             route_data = _fix_route_dining(route_data)
-            route_data = _fix_dining_proximity(route_data, tool_pois)
             route_data = _fix_opening_hours(route_data)
             route_data = _fix_geographic_spread(route_data)
             route_data = _optimize_route_order(route_data)
+            route_data = _fix_dining_proximity(route_data, tool_pois)
             # Validate AFTER all post-processing so any coordinate changes made by
             # _fix_route_dining / _fix_dining_proximity are also checked.
             route_data = _validate_sightseeing_coordinates(route_data, tool_pois)
@@ -2476,6 +2625,25 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             # Strip the __EXISTING_ROUTE__ block from user_content before sending to the LLM
             # (it is already baked into the system prompt; sending it twice wastes tokens).
             clean_user_content = user_content.split("\n" + EXISTING_ROUTE_MARKER)[0].strip()
+            # Optional: extract "must-visit" places from the edit request and enforce them
+            # via the same MUST-VISIT section used in tool-based flows.
+            must_visit_turn3 = await _extract_turn3_must_visit_llm(
+                llm,
+                clean_user_content,
+                destination_hint=getattr(existing_route, "destination", None),
+            )
+            if must_visit_turn3:
+                logger.info("[TURN3] extracted must_visit=%s", must_visit_turn3)
+                places_str = ", ".join(must_visit_turn3)
+                turn3_add_note = (
+                    f"PLACES TO ADD (user explicitly requested these — MANDATORY):\n"
+                    f"  {places_str}\n"
+                    f"- INSERT each place into the day the user specified (or the most geographically sensible day).\n"
+                    f"- Set latitude: null, longitude: null — the app will geocode.\n"
+                    f"- Do NOT remove or replace existing waypoints to make room. Simply insert the new stop.\n"
+                    f"- Adjust surrounding arrival/departure times to accommodate the new stop."
+                )
+                turn3_system = f"{turn3_system}\n\n{turn3_add_note}"
             # Strip large JSON payloads (POI lists, previous route JSONs) from history.
             # The current route is already in the system prompt — keeping old route JSONs
             # in history only wastes tokens and can cause the model to truncate its output
@@ -2521,10 +2689,10 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
                 ]
                 _log_route("TURN3_RAW", route_data)
                 route_data = _fix_route_dining(route_data)
-                route_data = _fix_dining_proximity(route_data, turn3_poi_pool)
                 route_data = _fix_opening_hours(route_data)
                 route_data = _fix_geographic_spread(route_data)
                 route_data = _optimize_route_order(route_data)
+                route_data = _fix_dining_proximity(route_data, turn3_poi_pool)
                 route_data = _validate_sightseeing_coordinates(route_data, turn3_poi_pool)
                 route_data = _fix_duplicate_waypoints(route_data)
                 _log_route("TURN3_FINAL", route_data)
