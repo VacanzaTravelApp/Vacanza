@@ -17,7 +17,7 @@ class ArPoiSourceFromPoiSearch implements ArPoiSource {
   Future<List<ArPoi>> getNearbyArPois({
     required double lat,
     required double lng,
-    List<String>? categories,
+    List<String>? categories, // ignored — backend’e filtre gönderilmez (harita ile aynı)
     double? radiusMeters,
   }) async {
     final effectiveRadius = (radiusMeters ?? 500).clamp(50, 2000).toDouble();
@@ -31,7 +31,7 @@ class ArPoiSourceFromPoiSearch implements ArPoiSource {
 
     final PoiSearchInAreaResponseDto res = await _poiRepo.searchInArea(
       area: bbox,
-      categories: categories,
+      categories: null,
       page: 0,
       limit: 50,
       sort: null,
@@ -59,6 +59,9 @@ class ArPoiSourceFromPoiSearch implements ArPoiSource {
           id: poi.poiId,
           name: poi.name,
           categoryKey: poi.category,
+          latitude: poi.latitude,
+          longitude: poi.longitude,
+          externalId: poi.externalId,
           distanceMeters: d,
           bearingDegrees: b,
         ),

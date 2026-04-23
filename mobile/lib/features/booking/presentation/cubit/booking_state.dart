@@ -1,5 +1,8 @@
 import '../../data/models/accommodation_option.dart';
 import '../../data/models/accommodation_search_request.dart';
+import '../../data/models/airport_autocomplete_slot.dart';
+import '../../data/models/booking_currency.dart';
+import '../../data/models/destination_autocomplete_slot.dart';
 import '../../data/models/sort_criteria.dart';
 import '../../data/models/transport_option.dart';
 import '../../data/models/transport_search_request.dart';
@@ -21,7 +24,24 @@ sealed class BookingState {
 /// Default state — search form is shown.
 class BookingSearch extends BookingState {
   final BookingType type;
-  const BookingSearch({this.type = BookingType.hotels});
+
+  /// Shared for hotel + flight requests (TASK-9).
+  final String currency;
+
+  /// Origin / destination autocomplete — independent of flight search results.
+  final AirportAutocompleteSlot originAirport;
+  final AirportAutocompleteSlot destinationAirport;
+
+  /// Hotel destination autocomplete — independent of accommodation search results.
+  final DestinationAutocompleteSlot hotelDestination;
+
+  const BookingSearch({
+    this.type = BookingType.hotels,
+    this.currency = BookingCurrencies.defaultCode,
+    this.originAirport = const AirportAutocompleteSlot(),
+    this.destinationAirport = const AirportAutocompleteSlot(),
+    this.hotelDestination = const DestinationAutocompleteSlot(),
+  });
 }
 
 /// Search in progress.

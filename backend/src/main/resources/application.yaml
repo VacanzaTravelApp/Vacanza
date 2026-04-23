@@ -5,6 +5,11 @@ spring:
   application:
     name: vacanza-backend
 
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+
   profiles:
     active: dev # security kapatmak için dev ortamına ayarladım
 
@@ -24,9 +29,9 @@ spring:
     init:
       mode: always
 
-geoapify:
-  base-url: https://api.geoapify.com/v2
-  api-key: ${GEOAPIFY_API_KEY}
+foursquare:
+  base-url: https://api.foursquare.com/v3
+  api-key: ${FOURSQUARE_API_KEY}
 
 mapbox:
   access-token: ${MAPBOX_ACCESS_TOKEN}
@@ -53,6 +58,59 @@ open-meteo:
   base-url: https://api.open-meteo.com/v1
   connect-timeout: 10s
   read-timeout: 30s
+
+# Frankfurter: free open-source exchange rate API, no API key (https://api.frankfurter.dev)
+frankfurter:
+  base-url: https://api.frankfurter.dev
+  connect-timeout: 10s
+  read-timeout: 30s
+
+
+viator:
+  base-url: ${VIATOR_BASE_URL:https://api.sandbox.viator.com/partner}
+  api-key: ${VIATOR_API_KEY:}
+  connect-timeout: 8s
+  read-timeout: 15s
+
+# POI retrieval scoring (PoiScoreCalculator). avoid-mode: DROP | PENALTY
+vacanza:
+  poi-scoring:
+    weight-rating: 2.0
+    weight-popularity: 1.0
+    favorite-bonus: 3.0
+    avoid-penalty: 50.0
+    neutral-rating-prior: 0.5
+    avoid-mode: DROP
+  poi-diversity:
+    enabled: true
+    target-count: 60
+    pool-size: 120
+    mode: MMR
+    mmr-lambda: 0.72
+    max-per-family: 4
+  poi-constraints:
+    budget-enabled: true
+    budget-currency-strict: true
+    expected-budget-currency: USD
+    budget-mode: DROP
+    budget-penalty: 25
+    tier-1-max-budget: 45
+    tier-2-max-budget: 95
+    tier-3-max-budget: 190
+    closed-day-enabled: true
+  poi-feedback:
+    enabled: true
+    poi-score-multiplier: 0.35
+    category-score-multiplier: 0.25
+    category-drop-threshold: -12
+    category-drop-enabled: true
+    max-stored-affinity: 24
+    delta-thumbs-up-poi: 2
+    delta-thumbs-down-poi: -2
+    delta-remove-poi: -5
+    delta-thumbs-up-category: 1
+    delta-thumbs-down-category: -1
+    delta-remove-category: -2
 
 management:
   endpoints:

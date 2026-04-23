@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.preference_extraction import ExtractedPreference
 
@@ -59,6 +59,9 @@ class UserProfileForAi(BaseModel):
     preferredLanguage: str | None = None
     spokenLanguages: list[str] | None = None
 
+    # Favorited / saved POIs (injected by Java backend from user_interactions table)
+    savedPoiNames: list[str] | None = None
+
 
 class ConversationCreateResponse(BaseModel):
     """Response when creating a new conversation."""
@@ -95,6 +98,23 @@ class MessageItem(BaseModel):
     created_at: datetime
 
 
+_COMPOUND_CATEGORY_MAP = {
+    "lunch restaurant": "restaurant",
+    "dinner restaurant": "restaurant",
+    "lunch cafe": "cafe",
+    "dinner cafe": "cafe",
+    "morning cafe": "cafe",
+    "afternoon cafe": "cafe",
+}
+
+_COMPOUND_TIME_SLOT_MAP = {
+    "lunch restaurant": "lunch",
+    "dinner restaurant": "dinner",
+    "morning cafe": "morning",
+    "afternoon cafe": "afternoon",
+}
+
+
 class RouteWaypoint(BaseModel):
     """A single stop/place in a day's route plan."""
 
@@ -107,10 +127,29 @@ class RouteWaypoint(BaseModel):
     longitude: float | None = None
     estimated_duration_min: int | None = None
     time_slot: str | None = None
+
     # Filled by Java backend after generation (Mapbox walking + dwell times)
     travel_from_previous_min: int | None = None
     arrival_time_local: str | None = None
     departure_time_local: str | None = None
+    # Set by adaptive adjustment when stop is known closed/unavailable
+    unavailable: bool | None = None
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def normalize_category(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
+        normalized = v.strip().lower()
+        return _COMPOUND_CATEGORY_MAP.get(normalized, v)
+
+    @field_validator("time_slot", mode="before")
+    @classmethod
+    def normalize_time_slot(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
+        normalized = v.strip().lower()
+        return _COMPOUND_TIME_SLOT_MAP.get(normalized, v)
 
 
 class DayPlan(BaseModel):
@@ -131,6 +170,10 @@ class RouteData(BaseModel):
     total_days: int
     days: list[DayPlan] = Field(default_factory=list)
     notes: str | None = None
+    # True = narrow event search to trip dates; false/omit = ~30-day broad search (Java backend)
+    trip_dates_user_specified: bool | None = None
+    # First day of trip when user stated dates (YYYY-MM-DD); Java prefers this over weather for events
+    trip_start_date: str | None = None
     # Filled by Java backend (Open-Meteo); optional in model output
     weather_forecast: list | None = None
     # Morning/afternoon/evening planning hints; optional, set by Java backend
@@ -143,3 +186,4 @@ class MessageSendResponse(BaseModel):
     content: str
     extracted_preferences: list[ExtractedPreference] = Field(default_factory=list)
     route_data: RouteData | None = None
+    message_id: UUID | None = None

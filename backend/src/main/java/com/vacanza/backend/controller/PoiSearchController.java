@@ -3,6 +3,7 @@ package com.vacanza.backend.controller;
 import com.vacanza.backend.dto.internal.PoiResult;
 import com.vacanza.backend.dto.internal.PoiSearchRequest;
 import com.vacanza.backend.integration.MapboxPoiSearchClient;
+import com.vacanza.backend.service.PoiResultEnrichmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 public class PoiSearchController {
 
     private final MapboxPoiSearchClient mapboxPoiSearchClient;
+    private final PoiResultEnrichmentService poiResultEnrichmentService;
 
     @PostMapping
     public ResponseEntity<List<PoiResult>> searchPois(
@@ -54,7 +56,7 @@ public class PoiSearchController {
                         (a, b) -> a
                 ));
 
-        return ResponseEntity.ok(new ArrayList<>(dedup.values()));
+        return ResponseEntity.ok(poiResultEnrichmentService.enrichAll(new ArrayList<>(dedup.values())));
     }
 }
 

@@ -36,12 +36,15 @@ class AreaQueryBloc extends Bloc<AreaQueryEvent, AreaQueryState> {
       return;
     }
 
-    // ✅ Aynı bbox geldiyse spam emit etme.
-    if (current.area is BboxArea && current.area == event.bbox) {
-      if (kDebugMode) {
-        log('[AreaQueryBloc] IGNORE same bbox');
+    // ✅ Aynı bbox (veya stil/kamera sonrası kayan float ile neredeyse aynı) → emit yok.
+    if (current.area is BboxArea) {
+      final cur = current.area as BboxArea;
+      if (cur == event.bbox || cur.isNearlyEqual(event.bbox)) {
+        if (kDebugMode) {
+          log('[AreaQueryBloc] IGNORE same/near-identical bbox');
+        }
+        return;
       }
-      return;
     }
 
     if (kDebugMode) {

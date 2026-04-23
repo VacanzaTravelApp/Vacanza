@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:equatable/equatable.dart';
 
 import '../../data/models/check_in.dart';
@@ -23,6 +25,12 @@ class ProfileState extends Equatable {
   /// One-off error after failed profile update; clear via [ProfileUpdateErrorDismissed].
   final String? profileUpdateError;
 
+  /// Cached binary avatar from [GET /users/me/profile/photo] when [UserProfile.hasProfilePhoto].
+  final Uint8List? profilePhotoBytes;
+
+  /// True while upload/delete profile photo is in progress.
+  final bool isProfilePhotoBusy;
+
   const ProfileState({
     this.profileStatus = LoadStatus.initial,
     this.preferencesStatus = LoadStatus.initial,
@@ -35,6 +43,8 @@ class ProfileState extends Equatable {
     this.sectionErrors = const {},
     this.preferencesUpdateError,
     this.profileUpdateError,
+    this.profilePhotoBytes,
+    this.isProfilePhotoBusy = false,
   });
 
   ProfileState copyWith({
@@ -49,9 +59,12 @@ class ProfileState extends Equatable {
     Map<ProfileSection, String>? sectionErrors,
     String? preferencesUpdateError,
     String? profileUpdateError,
+    Uint8List? profilePhotoBytes,
+    bool? isProfilePhotoBusy,
     bool clearPreferencesUpdateError = false,
     bool clearProfileUpdateError = false,
     bool clearPreferences = false,
+    bool clearProfilePhotoBytes = false,
   }) {
     return ProfileState(
       profileStatus: profileStatus ?? this.profileStatus,
@@ -69,6 +82,10 @@ class ProfileState extends Equatable {
       profileUpdateError: clearProfileUpdateError
           ? null
           : (profileUpdateError ?? this.profileUpdateError),
+      profilePhotoBytes: clearProfilePhotoBytes
+          ? null
+          : (profilePhotoBytes ?? this.profilePhotoBytes),
+      isProfilePhotoBusy: isProfilePhotoBusy ?? this.isProfilePhotoBusy,
     );
   }
 
@@ -87,5 +104,7 @@ class ProfileState extends Equatable {
         sectionErrors,
         preferencesUpdateError,
         profileUpdateError,
+        profilePhotoBytes,
+        isProfilePhotoBusy,
       ];
 }

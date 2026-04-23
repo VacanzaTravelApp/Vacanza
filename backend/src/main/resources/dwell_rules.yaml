@@ -1,0 +1,242 @@
+# Dwell time matrix for RouteTimelineService (see DwellRulesService).
+# Categories align with Mapbox search tokens (snake_case).
+
+dwell_rules:
+  version: 6
+  description: "Production-ready, parser-safe, snake_case aligned matrix."
+
+  enums:
+    itinerary_pace: [FAST_DAY, BALANCED_DAY, RELAXED_DAY]
+    visit_style: [DEPTH_SEEKER, PHOTO_PASS, FAMILY_WITH_KIDS]
+
+  priority_order:
+    - waypoint_estimated_duration_min_if_positive
+    - poi_custom_duration_if_present
+    - category_default_matrix_with_dynamic_modifiers
+    - category_default_matrix
+
+  global_clamps:
+    min_minutes: 10
+    max_minutes: 480
+
+  dynamic_modifiers:
+    bbox_area_sqm:
+      - condition: "< 2000"
+        multiplier: 0.7
+      - condition: "2000..10000"
+        multiplier: 1.0
+      - condition: "> 10000"
+        multiplier: 1.5
+      - condition: "fallback"
+        multiplier: 1.0
+    poi_density_radius_500m:
+      - condition: "> 15"
+        multiplier: 0.85
+      - condition: "< 3"
+        multiplier: 1.15
+      - condition: "fallback"
+        multiplier: 1.0
+
+  logistics_buffers:
+    apply_to_all_pois: true
+    default_parking_to_door_min: 5
+    entrance_friction_min:
+      ticket_typical_true: 15
+      ticket_typical_false: 0
+
+  categories:
+    - id: museum
+      match: [museum]
+      attributes: { indoor: true, ticket_typical: true }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 75, PHOTO_PASS: 45, FAMILY_WITH_KIDS: 65 }
+        BALANCED_DAY: { DEPTH_SEEKER: 110, PHOTO_PASS: 70, FAMILY_WITH_KIDS: 95 }
+        RELAXED_DAY: { DEPTH_SEEKER: 140, PHOTO_PASS: 90, FAMILY_WITH_KIDS: 120 }
+
+    - id: art_gallery
+      match: [art_gallery, gallery]
+      attributes: { indoor: true, ticket_typical: true }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 60, PHOTO_PASS: 35, FAMILY_WITH_KIDS: 50 }
+        BALANCED_DAY: { DEPTH_SEEKER: 90, PHOTO_PASS: 55, FAMILY_WITH_KIDS: 75 }
+        RELAXED_DAY: { DEPTH_SEEKER: 120, PHOTO_PASS: 70, FAMILY_WITH_KIDS: 95 }
+
+    - id: historic_site
+      match: [historic_site, heritage]
+      attributes: { indoor: false, ticket_typical: true }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 60, PHOTO_PASS: 30, FAMILY_WITH_KIDS: 50 }
+        BALANCED_DAY: { DEPTH_SEEKER: 90, PHOTO_PASS: 50, FAMILY_WITH_KIDS: 75 }
+        RELAXED_DAY: { DEPTH_SEEKER: 120, PHOTO_PASS: 65, FAMILY_WITH_KIDS: 95 }
+
+    - id: ruins
+      match: [ruins, archaeological_site]
+      attributes: { indoor: false, ticket_typical: true }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 60, PHOTO_PASS: 35, FAMILY_WITH_KIDS: 50 }
+        BALANCED_DAY: { DEPTH_SEEKER: 90, PHOTO_PASS: 55, FAMILY_WITH_KIDS: 70 }
+        RELAXED_DAY: { DEPTH_SEEKER: 120, PHOTO_PASS: 70, FAMILY_WITH_KIDS: 90 }
+
+    - id: monument
+      match: [monument]
+      attributes: { indoor: false, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 30, PHOTO_PASS: 15, FAMILY_WITH_KIDS: 25 }
+        BALANCED_DAY: { DEPTH_SEEKER: 45, PHOTO_PASS: 25, FAMILY_WITH_KIDS: 35 }
+        RELAXED_DAY: { DEPTH_SEEKER: 60, PHOTO_PASS: 35, FAMILY_WITH_KIDS: 50 }
+
+    - id: landmark
+      match: [landmark, attraction]
+      attributes: { indoor: false, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 40, PHOTO_PASS: 20, FAMILY_WITH_KIDS: 35 }
+        BALANCED_DAY: { DEPTH_SEEKER: 60, PHOTO_PASS: 35, FAMILY_WITH_KIDS: 50 }
+        RELAXED_DAY: { DEPTH_SEEKER: 80, PHOTO_PASS: 50, FAMILY_WITH_KIDS: 65 }
+
+    - id: palace
+      match: [palace, castle]
+      attributes: { indoor: true, ticket_typical: true }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 75, PHOTO_PASS: 45, FAMILY_WITH_KIDS: 65 }
+        BALANCED_DAY: { DEPTH_SEEKER: 110, PHOTO_PASS: 70, FAMILY_WITH_KIDS: 90 }
+        RELAXED_DAY: { DEPTH_SEEKER: 150, PHOTO_PASS: 90, FAMILY_WITH_KIDS: 120 }
+
+    - id: park
+      match: [park, national_park, nature_reserve]
+      attributes: { indoor: false, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 45, PHOTO_PASS: 25, FAMILY_WITH_KIDS: 55 }
+        BALANCED_DAY: { DEPTH_SEEKER: 75, PHOTO_PASS: 40, FAMILY_WITH_KIDS: 85 }
+        RELAXED_DAY: { DEPTH_SEEKER: 110, PHOTO_PASS: 60, FAMILY_WITH_KIDS: 120 }
+
+    - id: amusement_park
+      match: [amusement_park, theme_park, water_park]
+      attributes: { indoor: false, ticket_typical: true }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 180, PHOTO_PASS: 60, FAMILY_WITH_KIDS: 240 }
+        BALANCED_DAY: { DEPTH_SEEKER: 240, PHOTO_PASS: 90, FAMILY_WITH_KIDS: 300 }
+        RELAXED_DAY: { DEPTH_SEEKER: 360, PHOTO_PASS: 120, FAMILY_WITH_KIDS: 420 }
+
+    - id: zoo_aquarium
+      match: [zoo, aquarium, wildlife_park]
+      attributes: { indoor: false, ticket_typical: true }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 90, PHOTO_PASS: 45, FAMILY_WITH_KIDS: 120 }
+        BALANCED_DAY: { DEPTH_SEEKER: 150, PHOTO_PASS: 60, FAMILY_WITH_KIDS: 180 }
+        RELAXED_DAY: { DEPTH_SEEKER: 210, PHOTO_PASS: 90, FAMILY_WITH_KIDS: 240 }
+
+    - id: beach
+      match: [beach, public_bath]
+      attributes: { indoor: false, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 60, PHOTO_PASS: 20, FAMILY_WITH_KIDS: 90 }
+        BALANCED_DAY: { DEPTH_SEEKER: 120, PHOTO_PASS: 40, FAMILY_WITH_KIDS: 150 }
+        RELAXED_DAY: { DEPTH_SEEKER: 240, PHOTO_PASS: 60, FAMILY_WITH_KIDS: 240 }
+
+    - id: bridge
+      match: [bridge, pier]
+      attributes: { indoor: false, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 20, PHOTO_PASS: 10, FAMILY_WITH_KIDS: 20 }
+        BALANCED_DAY: { DEPTH_SEEKER: 35, PHOTO_PASS: 15, FAMILY_WITH_KIDS: 30 }
+        RELAXED_DAY: { DEPTH_SEEKER: 50, PHOTO_PASS: 25, FAMILY_WITH_KIDS: 40 }
+
+    - id: neighborhood
+      match: [neighborhood, district, quarter]
+      attributes: { indoor: false, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 45, PHOTO_PASS: 25, FAMILY_WITH_KIDS: 40 }
+        BALANCED_DAY: { DEPTH_SEEKER: 75, PHOTO_PASS: 40, FAMILY_WITH_KIDS: 65 }
+        RELAXED_DAY: { DEPTH_SEEKER: 110, PHOTO_PASS: 60, FAMILY_WITH_KIDS: 90 }
+
+    - id: restaurant
+      match: [restaurant, fine_dining, bistro, fast_food]
+      attributes: { indoor: true, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 50, PHOTO_PASS: 35, FAMILY_WITH_KIDS: 55 }
+        BALANCED_DAY: { DEPTH_SEEKER: 75, PHOTO_PASS: 50, FAMILY_WITH_KIDS: 80 }
+        RELAXED_DAY: { DEPTH_SEEKER: 100, PHOTO_PASS: 65, FAMILY_WITH_KIDS: 110 }
+
+    - id: cafe
+      match: [cafe, coffee_shop, tea_house, bakery]
+      attributes: { indoor: true, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 30, PHOTO_PASS: 15, FAMILY_WITH_KIDS: 30 }
+        BALANCED_DAY: { DEPTH_SEEKER: 50, PHOTO_PASS: 25, FAMILY_WITH_KIDS: 45 }
+        RELAXED_DAY: { DEPTH_SEEKER: 70, PHOTO_PASS: 35, FAMILY_WITH_KIDS: 60 }
+
+    - id: market
+      match: [market, bazaar, food_market, flea_market]
+      attributes: { indoor: false, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 45, PHOTO_PASS: 25, FAMILY_WITH_KIDS: 50 }
+        BALANCED_DAY: { DEPTH_SEEKER: 75, PHOTO_PASS: 40, FAMILY_WITH_KIDS: 80 }
+        RELAXED_DAY: { DEPTH_SEEKER: 105, PHOTO_PASS: 60, FAMILY_WITH_KIDS: 110 }
+
+    - id: church
+      match: [church, cathedral, chapel, basilica]
+      attributes: { indoor: true, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 30, PHOTO_PASS: 15, FAMILY_WITH_KIDS: 25 }
+        BALANCED_DAY: { DEPTH_SEEKER: 40, PHOTO_PASS: 20, FAMILY_WITH_KIDS: 35 }
+        RELAXED_DAY: { DEPTH_SEEKER: 55, PHOTO_PASS: 30, FAMILY_WITH_KIDS: 45 }
+
+    - id: mosque
+      match: [mosque]
+      attributes: { indoor: true, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 25, PHOTO_PASS: 15, FAMILY_WITH_KIDS: 20 }
+        BALANCED_DAY: { DEPTH_SEEKER: 35, PHOTO_PASS: 20, FAMILY_WITH_KIDS: 30 }
+        RELAXED_DAY: { DEPTH_SEEKER: 50, PHOTO_PASS: 30, FAMILY_WITH_KIDS: 40 }
+
+    - id: place_of_worship
+      match: [place_of_worship, religious_organization, synagogue, temple, shrine]
+      attributes: { indoor: true, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 25, PHOTO_PASS: 15, FAMILY_WITH_KIDS: 20 }
+        BALANCED_DAY: { DEPTH_SEEKER: 35, PHOTO_PASS: 20, FAMILY_WITH_KIDS: 30 }
+        RELAXED_DAY: { DEPTH_SEEKER: 50, PHOTO_PASS: 30, FAMILY_WITH_KIDS: 40 }
+
+    - id: shopping_optional
+      match: [shopping_mall, department_store, shopping_center]
+      attributes: { indoor: true, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 40, PHOTO_PASS: 20, FAMILY_WITH_KIDS: 50 }
+        BALANCED_DAY: { DEPTH_SEEKER: 65, PHOTO_PASS: 35, FAMILY_WITH_KIDS: 75 }
+        RELAXED_DAY: { DEPTH_SEEKER: 90, PHOTO_PASS: 50, FAMILY_WITH_KIDS: 105 }
+
+    - id: viewpoint_optional
+      match: [viewpoint, overlook, belvedere]
+      attributes: { indoor: false, ticket_typical: false }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 25, PHOTO_PASS: 10, FAMILY_WITH_KIDS: 25 }
+        BALANCED_DAY: { DEPTH_SEEKER: 40, PHOTO_PASS: 15, FAMILY_WITH_KIDS: 35 }
+        RELAXED_DAY: { DEPTH_SEEKER: 55, PHOTO_PASS: 25, FAMILY_WITH_KIDS: 50 }
+
+    - id: observation_deck
+      match: [observation_deck]
+      attributes: { indoor: true, ticket_typical: true }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 45, PHOTO_PASS: 25, FAMILY_WITH_KIDS: 45 }
+        BALANCED_DAY: { DEPTH_SEEKER: 60, PHOTO_PASS: 35, FAMILY_WITH_KIDS: 55 }
+        RELAXED_DAY: { DEPTH_SEEKER: 75, PHOTO_PASS: 45, FAMILY_WITH_KIDS: 70 }
+
+    - id: default_unknown
+      match: []
+      attributes: { indoor: null, ticket_typical: null }
+      minutes_by_pace_and_style:
+        FAST_DAY: { DEPTH_SEEKER: 50, PHOTO_PASS: 35, FAMILY_WITH_KIDS: 45 }
+        BALANCED_DAY: { DEPTH_SEEKER: 65, PHOTO_PASS: 45, FAMILY_WITH_KIDS: 55 }
+        RELAXED_DAY: { DEPTH_SEEKER: 85, PHOTO_PASS: 60, FAMILY_WITH_KIDS: 70 }
+
+  validation_schema_rules:
+    strict_ordering_applies_to_all: "FAST_DAY <= BALANCED_DAY <= RELAXED_DAY"
+    photo_pass_always_minimum: "PHOTO_PASS <= DEPTH_SEEKER and PHOTO_PASS <= FAMILY_WITH_KIDS"
+    family_exceeds_depth_allowed_categories:
+      - park
+      - amusement_park
+      - zoo_aquarium
+      - beach
+      - restaurant
+      - market
+      - shopping_optional

@@ -4,6 +4,7 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel
 
 from app.api.deps import (
     get_conversation_repo,
@@ -123,7 +124,7 @@ async def send_message(
             detail="OpenAI API key not configured",
         )
 
-    content, extraction_result, route_data = await get_ai_response(
+    content, extraction_result, route_data, assistant_message_id = await get_ai_response(
         settings=settings,
         message_repo=message_repo,
         message_embedding_repo=message_embedding_repo,
@@ -140,7 +141,26 @@ async def send_message(
         content=content,
         extracted_preferences=extraction_result.preferences,
         route_data=route_data,
+        message_id=assistant_message_id,
     )
+
+
+class MessageContentUpdate(BaseModel):
+    content: str
+
+
+@router.patch("/conversations/{conversation_id}/messages/{message_id}")
+def update_message_content(
+    conversation_id: uuid.UUID,
+    message_id: uuid.UUID,
+    body: MessageContentUpdate,
+    message_repo: MessageRepository = Depends(get_message_repo),
+) -> dict:
+    """Update the content of a stored message (used by Java to persist enriched summary)."""
+    updated = message_repo.update(message_id, body.content)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"ok": True}
 
 
 @router.get("/conversations/{conversation_id}/messages", response_model=list[MessageItem])

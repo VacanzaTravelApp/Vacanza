@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
 class AppTextField extends StatefulWidget {
   final TextEditingController controller;
@@ -61,28 +61,33 @@ class _AppTextFieldState extends State<AppTextField> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tokens = context.vacanzaTokens;
+    final isLight = theme.brightness == Brightness.light;
+    final accent = context.authAccent;
+
     final isFocused = _focusNode.hasFocus;
     final isError = widget.errorGlow;
 
     // **Mini glow – blur=3, spread=0, offset=(0,1)**
     List<BoxShadow> shadows = [];
-    Color borderColor = AppColors.inputBorder;
+    Color borderColor = tokens.cardBorder;
 
     if (isError) {
       borderColor = Colors.red;
       shadows = [
         BoxShadow(
-          color: Colors.red.withOpacity(0.22),
+          color: Colors.red.withValues(alpha: 0.22),
           blurRadius: 3,
           spreadRadius: 0,
           offset: const Offset(0, 1),
         ),
       ];
     } else if (isFocused) {
-      borderColor = AppColors.primary;
+      borderColor = accent;
       shadows = [
         BoxShadow(
-          color: AppColors.primary.withOpacity(0.20),
+          color: accent.withValues(alpha: isLight ? 0.18 : 0.26),
           blurRadius: 3,
           spreadRadius: 0,
           offset: const Offset(0, 1),
@@ -103,10 +108,10 @@ class _AppTextFieldState extends State<AppTextField> {
       children: [
         Text(
           widget.label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppColors.textHeading,
+            color: tokens.textMain,
           ),
         ),
         const SizedBox(height: 6),
@@ -123,17 +128,30 @@ class _AppTextFieldState extends State<AppTextField> {
             keyboardType: widget.keyboardType,
             validator: widget.validator,
             onChanged: widget.onChanged,
+            style: TextStyle(
+              color: tokens.textMain,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            cursorColor: accent,
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 20,
                 vertical: 14,
               ),
               hintText: widget.hintText,
-              hintStyle: const TextStyle(color: AppColors.inputPlaceholder),
+              hintStyle: TextStyle(
+                color: tokens.textSub.withValues(alpha: isLight ? 0.70 : 0.62),
+              ),
               filled: true,
-              fillColor: AppColors.inputFill,
+              fillColor: isLight
+                  ? Color.alphaBlend(
+                      Colors.white.withValues(alpha: 0.58),
+                      theme.colorScheme.surface.withValues(alpha: 0.94),
+                    )
+                  : tokens.pillSurface,
               suffixIcon: widget.suffixIcon,
-              enabledBorder: br(AppColors.inputBorder),
+              enabledBorder: br(tokens.cardBorder),
               focusedBorder: br(borderColor),
               errorBorder: br(borderColor),
               focusedErrorBorder: br(borderColor),

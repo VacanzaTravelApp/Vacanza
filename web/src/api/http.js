@@ -2,10 +2,14 @@ import axios from "axios";
 import { auth } from "../firebase";
 
 const http = axios.create({
-  // Vite Proxy'sini kullanmak için tam URL yerine sadece / kullanıyoruz.
-  // Bu CORS hatalarını önler.
+  // Using / instead of full URL to use Vite Proxy.
+  // This prevents CORS errors.
   baseURL: "/",
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Content-Type": "application/json",
+    "Accept-Language": "en"
+  },
+  withCredentials: true,
 });
 
 http.interceptors.request.use(
@@ -13,7 +17,7 @@ http.interceptors.request.use(
     const user = auth.currentUser;
 
     if (user) {
-      // Debug/stabilite için token'ı zorla yenile
+      // Force token refresh for stability/debug
       const token = await user.getIdToken(true);
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -33,7 +37,7 @@ http.interceptors.response.use(
         response.data.toLowerCase().includes("<!doctype html"));
 
     if (isHtml) {
-      console.warn("⚠️ HTML döndü (JSON bekleniyordu). Proxy path veya auth kontrol et.");
+      console.warn("HTML returned (JSON expected). Check Proxy path or auth.");
       return Promise.reject(
         new Error("HTML response received (check Vite proxy paths and authentication).")
       );
@@ -53,21 +57,21 @@ http.interceptors.response.use(
         message.toLowerCase().includes("email");
 
       if (isEmailNotVerified) {
-        console.warn("⚠️ 403: Email not verified. Backend requires email verification.");
+        console.warn("403: Email not verified. Backend requires email verification.");
         // Attach a custom flag so components can detect this specific error
         error.isEmailNotVerified = true;
         error.friendlyMessage = "Please verify your email address first. Check your inbox for the verification link.";
       } else {
-        console.warn("⚠️ 403 Forbidden. Access denied.");
+        console.warn("403 Forbidden. Access denied.");
         error.friendlyMessage = "Access denied. You don't have permission for this action.";
       }
     } else if (status === 401) {
-      console.warn("⚠️ 401 Unauthorized. Token invalid or expired.");
+      console.warn("401 Unauthorized. Token invalid or expired.");
       error.friendlyMessage = "Session expired. Please log in again.";
     } else if (status === 400) {
       error.friendlyMessage = message || "Invalid request. Please check your input.";
     } else if (status === 409) {
-      error.friendlyMessage = message || "This email is already registered.";
+      error.friendlyMessage = message || "This action conflicts with existing data.";
     }
 
     return Promise.reject(error);

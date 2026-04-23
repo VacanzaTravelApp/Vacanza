@@ -5,6 +5,7 @@ import '../../../data/models/accommodation_option.dart';
 import '../../../data/models/transport_option.dart';
 import '../../cubit/booking_cubit.dart';
 import '../../cubit/booking_state.dart';
+import '../search/booking_search_field_styles.dart';
 import 'flight_card.dart';
 import 'hotel_card.dart';
 
@@ -23,6 +24,7 @@ class BookingResultsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -35,10 +37,10 @@ class BookingResultsView extends StatelessWidget {
                 children: [
                   Text(
                     '${results.length} ${type == BookingType.hotels ? 'Hotels' : 'Flights'} Found',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                      color: cs.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -46,7 +48,7 @@ class BookingResultsView extends StatelessWidget {
                     summary,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade500,
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -59,12 +61,14 @@ class BookingResultsView extends StatelessWidget {
                 height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE5E5E5)),
+                  border: Border.all(
+                    color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                  ),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.tune_rounded,
                   size: 18,
-                  color: Color(0xFF666666),
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ),

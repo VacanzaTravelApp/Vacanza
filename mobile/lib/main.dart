@@ -5,14 +5,20 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import 'core/config/mapbox_config.dart';
-import 'core/theme/app_colors.dart';
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_cubit.dart';
+import 'core/theme/theme_lifecycle.dart';
 import 'firebase_options.dart';
 
 import 'core/navigation/navigation_service.dart';
 import 'core/network/app_dio.dart';
+import 'core/deeplinks/deep_link_listener.dart';
 
 import 'features/auth/data/repositories/auth_repository.dart';
 import 'features/auth/data/storage/secure_storage_service.dart';
+
+import 'features/behavior/data/api/feedback_api_client.dart';
+import 'features/behavior/presentation/cubit/favorite_poi_cubit.dart';
 
 import 'features/poi_search/data/api/poi_search_api_client.dart';
 
@@ -24,6 +30,7 @@ import 'features/booking/data/api/booking_api_client.dart';
 import 'features/booking/data/repositories/booking_repository.dart';
 
 import 'features/chat/data/api/chat_api_client.dart';
+import 'features/ai/data/api/ai_route_api_client.dart';
 
 import 'features/profile/data/datasources/profile_remote_data_source.dart';
 import 'features/profile/data/repositories/profile_repository.dart';
@@ -35,8 +42,14 @@ import 'features/auth/presentation/screens/auth_gate.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Mapbox token
-  MapboxOptions.setAccessToken(MapboxConfig.accessToken);
+  final mapboxToken = MapboxConfig.accessToken.trim();
+  MapboxOptions.setAccessToken(mapboxToken);
+  if (mapboxToken.isEmpty || !mapboxToken.startsWith('pk.')) {
+    debugPrint(
+      '[Mapbox] Public access token missing or not pk.* — vector tiles will 401 until '
+      'mobile/lib/core/config/mapbox_access_token.dart is set.',
+    );
+  }
 
   // Firebase init
   await Firebase.initializeApp(
@@ -78,6 +91,10 @@ class VacanzaApp extends StatelessWidget {
           create: (ctx) => PoiSearchApiClient(ctx.read<Dio>()),
         ),
 
+        RepositoryProvider<FeedbackApiClient>(
+          create: (ctx) => FeedbackApiClient(ctx.read<Dio>()),
+        ),
+
         /// Gamification API client (MOB-8)
         RepositoryProvider<GamificationApiClient>(
           create: (ctx) => GamificationApiClient(ctx.read<Dio>()),
@@ -105,6 +122,11 @@ class VacanzaApp extends StatelessWidget {
         /// Chat API client (AI chatbot)
         RepositoryProvider<ChatApiClient>(
           create: (ctx) => ChatApiClient(ctx.read<Dio>()),
+        ),
+
+        /// Saved AI routes + directions (shared by map AI route UI)
+        RepositoryProvider<AiRouteApiClient>(
+          create: (ctx) => AiRouteApiClient(ctx.read<Dio>()),
         ),
 
         /// Profile (MOB-9 / profile feature)
@@ -136,20 +158,36 @@ class VacanzaApp extends StatelessWidget {
               repository: context.read<GamificationRepository>(),
             ),
           ),
-        ],
-        child: MaterialApp(
-          navigatorKey: NavigationService.navigatorKey,
-          debugShowCheckedModeBanner: false,
-          title: 'Vacanza',
-          theme: ThemeData(
-            useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: AppColors.primary,
-              brightness: Brightness.light,
+
+          BlocProvider<FavoritePoiCubit>(
+            create: (context) => FavoritePoiCubit(
+              context.read<FeedbackApiClient>(),
             ),
-            fontFamily: 'SF Pro',
           ),
-          home: const AuthGate(),
+        ],
+        child: BlocProvider<ThemeCubit>(
+          create: (_) => ThemeCubit(),
+          child: BlocBuilder<ThemeCubit, ThemeCubitState>(
+            buildWhen: (a, b) => a.resolvedThemeMode != b.resolvedThemeMode,
+            builder: (context, themeState) {
+              return ThemeLifecycle(
+                child: MaterialApp(
+                  navigatorKey: NavigationService.navigatorKey,
+                  debugShowCheckedModeBanner: false,
+                  title: 'Vacanza',
+                  theme: AppTheme.light(),
+                  darkTheme: AppTheme.dark(),
+                  themeMode: themeState.resolvedThemeMode,
+                  builder: (context, child) {
+                    return DeepLinkListener(
+                      child: child ?? const SizedBox.shrink(),
+                    );
+                  },
+                  home: const AuthGate(),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

@@ -34,7 +34,7 @@ class JwtInterceptor extends Interceptor {
           accessToken.trim().toLowerCase() != 'null';
 
       if (tokenOk) {
-        options.headers['Authorization'] = 'Bearer ${accessToken!.trim()}';
+        options.headers['Authorization'] = 'Bearer ${accessToken.trim()}';
       }
     } catch (_) {}
 
@@ -192,7 +192,6 @@ class JwtInterceptor extends Interceptor {
 
       final response = await _dio.fetch(retriedOptions);
       handler.resolve(response);
-      return;
       return;
     } catch (e) {
       // Refresh/Retry patladı -> logout

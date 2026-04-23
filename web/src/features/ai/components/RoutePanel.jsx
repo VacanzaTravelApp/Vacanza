@@ -1,13 +1,25 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import { Button } from "antd";
 import { CloseOutlined } from "@ant-design/icons";
 import { getCategoryColor } from "../../../constants/categoryColors";
+import WaypointFeedback from "./WaypointFeedback";
+import EventRecommendations from "./EventRecommendations";
+import HotelPickerSheet from "./HotelPickerSheet";
+import HotelIcon from "./icons/HotelIcon";
+import { aiApi } from "../../../api/aiApi";
+import { Rnd } from "react-rnd";
 import "../styles/routePanel.css";
 
+/** Set to true to show per-stop thumbs on the map route card (POI feedback). */
+const ENABLE_ROUTE_PANEL_WAYPOINT_FEEDBACK = false;
+
 const TIME_SLOT_LABELS = {
-  morning: "Sabah",
-  afternoon: "Öğle",
-  evening: "Akşam",
+  morning: "Morning",
+  lunch: "Lunch",
+  afternoon: "Afternoon",
+  evening: "Evening",
+  dinner: "Dinner",
+  night: "Night",
 };
 
 function formatTimeSlot(slot) {
@@ -21,7 +33,14 @@ function formatForecastDate(iso) {
   const d = new Date(String(iso).slice(0, 10));
   return Number.isNaN(d.getTime())
     ? String(iso)
-    : d.toLocaleDateString("tr-TR", { weekday: "short", day: "numeric", month: "short" });
+    : d.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" }).replace(',', '');
+}
+
+function stripEmojis(text) {
+  if (!text) return text;
+  return String(text)
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}]/gu, '')
+    .trim();
 }
 
 /** Match day_parts row to active day (by date from daily row, else index). */
@@ -46,9 +65,9 @@ function pickDayPartForActiveDay(dayParts, weatherForecast, activeDay) {
 function formatDayPartHintLines(dayRow) {
   if (!dayRow) return [];
   const slots = [
-    { prop: "morning", label: "Sabah" },
-    { prop: "afternoon", label: "Öğleden sonra" },
-    { prop: "evening", label: "Akşam" },
+    { prop: "morning", label: "Morning" },
+    { prop: "afternoon", label: "Afternoon" },
+    { prop: "evening", label: "Evening" },
   ];
   const lines = [];
   for (const { prop, label } of slots) {
@@ -56,13 +75,12 @@ function formatDayPartHintLines(dayRow) {
     if (!s) continue;
     const avoid = s.avoid_outdoor ?? s.avoidOutdoor;
     if (!avoid) continue;
-    const precip =
-      s.precipitation_probability_max_percent ?? s.precipitationProbabilityMaxPercent;
+    const precip = s.precipitation_probability_max_percent ?? s.precipitationProbabilityMaxPercent;
     const pct =
       precip != null && Number.isFinite(Number(precip))
-        ? ` (~%${Math.round(Number(precip))} yağış olasılığı)`
+        ? ` (~${Math.round(Number(precip))}% chance of rain)`
         : "";
-    lines.push(`${label}${pct}: dış mekânda uzun süre önerilmez.`);
+    lines.push(`${label}${pct}: not recommended for long outdoor activities.`);
     if (lines.length >= 2) break;
   }
   return lines;
@@ -74,8 +92,78 @@ export default function RoutePanel({
   onDayChange,
   onClose,
   onWaypointClick,
+  onMarkUnavailable,
+  onRouteUpdate,
 }) {
+  const [adjustingPoi, setAdjustingPoi] = useState(null);
+  const [hotelPickerOpen, setHotelPickerOpen] = useState(false);
+  const [savingHotel, setSavingHotel] = useState(false);
+  const [hotelError, setHotelError] = useState(null);
+
   if (!route) return null;
+
+  const routeId = route.routeId ?? route.route_id;
+  const selectedHotel = route.selectedHotel ?? null;
+
+  async function handleHotelSelect(hotel) {
+    if (!routeId) return;
+    setSavingHotel(true);
+    setHotelPickerOpen(false);
+    setHotelError(null);
+    try {
+      await aiApi.setRouteHotel(routeId, {
+        hotelName: hotel.hotelName,
+        hotelExternalId: hotel.hotelId,
+        address: hotel.address,
+        latitude: hotel.latitude,
+        longitude: hotel.longitude,
+        imageUrl: hotel.imageUrl,
+        externalBookingUrl: hotel.externalBookingUrl,
+        pricePerNight: hotel.pricePerNight,
+        currency: hotel.currency,
+        rating: hotel.rating,
+        providerName: hotel.providerName,
+      });
+      onRouteUpdate?.({
+        ...route,
+        selectedHotel: {
+          hotelName: hotel.hotelName,
+          hotelExternalId: hotel.hotelId,
+          address: hotel.address,
+          latitude: hotel.latitude,
+          longitude: hotel.longitude,
+          imageUrl: hotel.imageUrl,
+          externalBookingUrl: hotel.externalBookingUrl,
+          pricePerNight: hotel.pricePerNight,
+          currency: hotel.currency,
+          rating: hotel.rating,
+          providerName: hotel.providerName,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to save hotel", err);
+      const msg = err?.friendlyMessage || err?.response?.data?.message || err?.message || "Failed to save hotel.";
+      setHotelError(msg);
+    } finally {
+      setSavingHotel(false);
+    }
+  }
+
+  async function handleRemoveHotel() {
+    if (!routeId) return;
+    setSavingHotel(true);
+    setHotelError(null);
+    try {
+      await aiApi.removeRouteHotel(routeId);
+      onRouteUpdate?.({ ...route, selectedHotel: null });
+    } catch (err) {
+      console.error("Failed to remove hotel", err);
+      const msg = err?.friendlyMessage || err?.response?.data?.message || err?.message || "Failed to remove hotel.";
+      setHotelError(msg);
+    } finally {
+      setSavingHotel(false);
+    }
+  }
 
   const days = route.days || [];
   const dayPlan = days.find((d) => Number(d?.day) === Number(activeDay));
@@ -97,16 +185,19 @@ export default function RoutePanel({
     (Array.isArray(weatherForecast) && weatherForecast.length > 0) ||
     (Array.isArray(weatherDayParts) && weatherDayParts.length > 0);
 
-  return (
+  const isMobile = window.innerWidth <= 768;
+
+  const content = (
     <div className="route-panel">
       <div className="route-panel-header">
+
         <div className="route-panel-title-row">
           <div>
             <div className="route-panel-title">{route.title}</div>
             <div className="route-panel-destination">{route.destination}</div>
           </div>
           <div className="route-panel-badges">
-            <span className="route-panel-days-badge">{totalDays} gün</span>
+            <span className="route-panel-days-badge">{totalDays} days</span>
             <Button
               type="text"
               icon={<CloseOutlined />}
@@ -118,9 +209,19 @@ export default function RoutePanel({
         </div>
       </div>
 
-      {showWeatherBlock && (
-        <div className="route-panel-weather" aria-label="Hava tahmini">
-          <div className="route-panel-weather-title">Hava tahmini (rota hedefi)</div>
+      <div className="route-panel-content">
+        {!showWeatherBlock && route.destination && (
+          <div className="route-panel-weather route-panel-weather--empty" role="status">
+            <div className="route-panel-weather-title">Weather Forecast</div>
+            <p className="route-panel-weather-empty-hint">
+              No daily weather forecast available for this route. Forecast is added when the AI creates the plan.
+            </p>
+          </div>
+        )}
+
+        {showWeatherBlock && (
+          <div className="route-panel-weather" aria-label="Weather forecast">
+          <div className="route-panel-weather-title">Weather Forecast (destination)</div>
           {Array.isArray(weatherForecast) && weatherForecast.length > 0 && (
             <ul className="route-panel-weather-days">
               {weatherForecast.map((row, i) => {
@@ -135,11 +236,11 @@ export default function RoutePanel({
                     <span className="route-panel-weather-date">{formatForecastDate(date)}</span>
                     <span className="route-panel-weather-temps">
                       {tMax != null && tMin != null
-                        ? `${Math.round(tMax)}° / ${Math.round(tMin)}°`
+                        ? `${Math.round(tMax)}°C / ${Math.round(tMin)}°C`
                         : "—"}
                     </span>
                     {precip != null && (
-                      <span className="route-panel-weather-rain">Yağış %{Math.round(precip)}</span>
+                      <span className="route-panel-weather-rain">Rain {Math.round(precip)}%</span>
                     )}
                   </li>
                 );
@@ -149,7 +250,7 @@ export default function RoutePanel({
           {dayPartHintLines.length > 0 && (
             <div
               className="route-panel-weather-dayparts"
-              aria-label="Seçili gün için gün içi hava ipucu"
+              aria-label="Hourly weather tips for selected day"
             >
               {dayPartHintLines.map((line, i) => (
                 <p key={i} className="route-panel-weather-dayparts-line">
@@ -159,13 +260,93 @@ export default function RoutePanel({
             </div>
           )}
           <p className="route-panel-weather-hint">
-            Bu özet, rota için seçilen bölgeye göre günlük tahmindir; program buna göre uyarlanır.
+            Forecast is relative to the destination area.
           </p>
         </div>
       )}
 
+      {/* ── Hotel Section ── */}
+      <div className="route-panel-hotel-section">
+        <div className="route-panel-hotel-section-label">
+          <HotelIcon size={14} className="route-panel-hotel-icon" />
+          Accommodation
+        </div>
+        {hotelError && (
+          <div className="route-panel-hotel-error">{hotelError}</div>
+        )}
+        {selectedHotel ? (
+          <div className="route-panel-hotel-card">
+            <div className="route-panel-hotel-card-inner">
+              <div className="route-panel-hotel-thumb">
+                {selectedHotel.imageUrl ? (
+                  <img
+                    className="route-panel-hotel-thumb-img"
+                    src={selectedHotel.imageUrl}
+                    alt={selectedHotel.hotelName}
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="route-panel-hotel-thumb-placeholder" aria-hidden>
+                    <HotelIcon size={22} className="route-panel-hotel-thumb-icon" title="Hotel" />
+                  </div>
+                )}
+              </div>
+              <div className="route-panel-hotel-info">
+                <div className="route-panel-hotel-name">{selectedHotel.hotelName}</div>
+                {selectedHotel.address && (
+                  <div className="route-panel-hotel-address">📍 {selectedHotel.address}</div>
+                )}
+                {selectedHotel.rating != null && (
+                  <div className="route-panel-hotel-stars">★ {selectedHotel.rating}</div>
+                )}
+              </div>
+            </div>
+            <div className="route-panel-hotel-actions">
+              <div className="route-panel-hotel-actions-left">
+                {selectedHotel.externalBookingUrl && (
+                  <a
+                    className="route-panel-hotel-book-btn"
+                    href={selectedHotel.externalBookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Book ↗
+                  </a>
+                )}
+                <button
+                  className="route-panel-hotel-change-btn"
+                  onClick={() => setHotelPickerOpen(true)}
+                  disabled={savingHotel}
+                >
+                  Change
+                </button>
+              </div>
+              <button
+                className="route-panel-hotel-remove-btn"
+                onClick={handleRemoveHotel}
+                disabled={savingHotel}
+              >
+                {savingHotel ? '...' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="route-panel-hotel-empty">
+            <span className="route-panel-hotel-empty-text">No hotel added yet</span>
+            <button
+              className="route-panel-hotel-add-btn"
+              onClick={() => setHotelPickerOpen(true)}
+              disabled={savingHotel || !routeId}
+            >
+              {savingHotel ? "Saving..." : "+ Add Hotel"}
+            </button>
+          </div>
+        )}
+      </div>
+
       {(dayStartLocal || dayEndLocal) && (
-        <div className="route-panel-day-window" aria-label="Gün özeti">
+        <div className="route-panel-day-window" aria-label="Day summary">
           {dayStartLocal && dayEndLocal
             ? `${dayStartLocal} – ${dayEndLocal}`
             : dayStartLocal || dayEndLocal}
@@ -182,7 +363,7 @@ export default function RoutePanel({
               className={`route-panel-tab ${isActive ? "route-panel-tab-active" : ""}`}
               onClick={() => onDayChange(d.day)}
             >
-              <span className="route-panel-tab-label">Gün {d.day}</span>
+              <span className="route-panel-tab-label">Day {d.day}</span>
               {d.title && (
                 <span className="route-panel-tab-sublabel">
                   {d.title.length > 30 ? `${d.title.slice(0, 30)}...` : d.title}
@@ -195,9 +376,32 @@ export default function RoutePanel({
 
       <div className="route-panel-waypoints">
         {waypoints.length === 0 ? (
-          <div className="route-panel-empty">Bu güne ait waypoint bulunamadı.</div>
+          <div className="route-panel-empty">No waypoints found for this day.</div>
         ) : (
           <ul className="route-panel-timeline">
+
+            {/* ── Hotel start ── */}
+            {selectedHotel && (
+              <>
+                <li className="route-panel-waypoint-row">
+                  <div className="route-panel-hotel-dot" aria-hidden>
+                    <HotelIcon size={18} className="route-panel-hotel-dot-icon" title="Hotel" />
+                  </div>
+                  <div className="route-panel-waypoint-line" />
+                  <div className="route-panel-waypoint-content" style={{ paddingTop: 4 }}>
+                    <div className="route-panel-waypoint-name">{selectedHotel.hotelName}</div>
+                    {selectedHotel.address && (
+                      <div className="route-panel-waypoint-desc">{selectedHotel.address}</div>
+                    )}
+                  </div>
+                </li>
+                <li className="route-panel-travel-leg">
+                  <div className="route-panel-travel-line" />
+                  <span className="route-panel-travel-label">Depart from hotel</span>
+                </li>
+              </>
+            )}
+
             {waypoints.map((wp, idx) => {
               const color = getCategoryColor(wp.category);
               const isLast = idx === waypoints.length - 1;
@@ -223,12 +427,12 @@ export default function RoutePanel({
                     <li className="route-panel-travel-leg">
                       <div className="route-panel-travel-line" />
                       <span className="route-panel-travel-label">
-                        Yürüyüş ~{travelMin} dk
+                        Walk ~{travelMin} min
                       </span>
                     </li>
                   )}
                   <li
-                    className={`route-panel-waypoint-row ${isLast ? "route-panel-waypoint-last" : ""}`}
+                    className={`route-panel-waypoint-row ${isLast ? "route-panel-waypoint-last" : ""} ${wp.unavailable ? "route-panel-waypoint-unavailable" : ""}`}
                     onClick={() => isClickable && onWaypointClick?.(wp)}
                     role={isClickable ? "button" : undefined}
                     tabIndex={isClickable ? 0 : undefined}
@@ -245,7 +449,7 @@ export default function RoutePanel({
                     >
                       {idx + 1}
                     </div>
-                    {!isLast && <div className="route-panel-waypoint-line" />}
+                    {(!isLast || selectedHotel) && <div className="route-panel-waypoint-line" />}
                     <div className="route-panel-waypoint-content">
                       {(arrival || departure) && (
                         <div className="route-panel-waypoint-clock">
@@ -255,20 +459,28 @@ export default function RoutePanel({
                           {dwell != null && (
                             <span className="route-panel-waypoint-dwell">
                               {" "}
-                              (~{dwell} dk)
+                              (~{dwell} min)
                             </span>
                           )}
                         </div>
                       )}
                       <div className="route-panel-waypoint-main">
-                        <span className="route-panel-waypoint-name">{wp.name}</span>
-                        {(wp.estimated_duration_min ?? wp.estimatedDurationMin) != null &&
-                          !arrival &&
-                          !departure && (
-                            <span className="route-panel-waypoint-duration">
-                              ~{wp.estimated_duration_min ?? wp.estimatedDurationMin} dk
-                            </span>
-                          )}
+                        <div className="route-panel-waypoint-title-block">
+                          <span className="route-panel-waypoint-name">{stripEmojis(wp.name)}</span>
+                          {(wp.estimated_duration_min ?? wp.estimatedDurationMin) != null &&
+                            !arrival &&
+                            !departure && (
+                              <span className="route-panel-waypoint-duration">
+                                ~{wp.estimated_duration_min ?? wp.estimatedDurationMin} min
+                              </span>
+                            )}
+                        </div>
+                        {ENABLE_ROUTE_PANEL_WAYPOINT_FEEDBACK ? (
+                          <WaypointFeedback
+                            waypoint={wp}
+                            storageKey={`d${activeDay}-i${idx}-o${wp.order ?? idx}-${stripEmojis(String(wp.name || "")).slice(0, 48)}`}
+                          />
+                        ) : null}
                       </div>
                       {wp.description && (
                         <div className="route-panel-waypoint-desc">{wp.description}</div>
@@ -279,19 +491,118 @@ export default function RoutePanel({
                             {formatTimeSlot(wp.time_slot)}
                           </span>
                         )}
+                        {wp.unavailable && (
+                          <span className="route-panel-waypoint-closed-badge">
+                            Closed
+                          </span>
+                        )}
                       </div>
+                      {!wp.unavailable && onMarkUnavailable && (
+                        <button
+                          className="route-panel-mark-closed-btn"
+                          disabled={adjustingPoi === wp.name}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setAdjustingPoi(wp.name);
+                            try {
+                              await onMarkUnavailable(wp);
+                            } finally {
+                              setAdjustingPoi(null);
+                            }
+                          }}
+                          title="I couldn't reach this place or it is closed"
+                        >
+                          {adjustingPoi === wp.name ? "Updating..." : "This place is closed"}
+                        </button>
+                      )}
                     </div>
                   </li>
                 </React.Fragment>
               );
             })}
+
+            {/* ── Hotel end (return) ── */}
+            {selectedHotel && (
+              <>
+                <li className="route-panel-travel-leg">
+                  <div className="route-panel-travel-line" />
+                  <span className="route-panel-travel-label">Return to hotel</span>
+                </li>
+                <li className="route-panel-waypoint-row route-panel-waypoint-last">
+                  <div className="route-panel-hotel-dot" aria-hidden>
+                    <HotelIcon size={18} className="route-panel-hotel-dot-icon" title="Hotel" />
+                  </div>
+                  <div className="route-panel-waypoint-content" style={{ paddingTop: 4 }}>
+                    <div className="route-panel-waypoint-name">{selectedHotel.hotelName}</div>
+                  </div>
+                </li>
+              </>
+            )}
+
           </ul>
         )}
       </div>
 
+      {(route.routeId ?? route.route_id) ? (
+        <div className="route-panel-event-recs">
+          <div className="route-panel-event-recs-head">
+            <span className="route-panel-event-recs-title">Event Recommendations</span>
+            <span className="route-panel-event-recs-desc">
+              Ticketmaster — concerts, sports, shows
+            </span>
+          </div>
+          <EventRecommendations routeId={route.routeId ?? route.route_id} tripDay={activeDay} />
+        </div>
+      ) : null}
+
       {route.notes && (
         <div className="route-panel-notes">{route.notes}</div>
       )}
+      </div>
     </div>
+  );
+
+  const hotelPicker = (
+    <HotelPickerSheet
+      open={hotelPickerOpen}
+      onClose={() => setHotelPickerOpen(false)}
+      defaultDestination={route.destination}
+      onSelect={handleHotelSelect}
+    />
+  );
+
+  if (isMobile) {
+    return <>{content}{hotelPicker}</>;
+  }
+
+  return (
+    <>
+      <Rnd
+        default={{
+          x: window.innerWidth - 640,
+          y: 84,
+          width: 480,
+          height: 600,
+        }}
+        minWidth={320}
+        minHeight={400}
+        dragHandleClassName="route-panel-header"
+        cancel=".route-panel-close, .route-panel-tab"
+        bounds="parent"
+        enableResizing={{
+          top: true,
+          right: true,
+          bottom: true,
+          left: true,
+          topRight: true,
+          bottomRight: true,
+          bottomLeft: true,
+          topLeft: true,
+        }}
+      >
+        {content}
+      </Rnd>
+      {hotelPicker}
+    </>
   );
 }

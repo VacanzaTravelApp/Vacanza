@@ -1,170 +1,68 @@
-/* Email Verification Page */
+/* Same layout rhythm as LoginCard / RegisterCard */
 
-.verify-page {
-    min-height: 100vh;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(160deg, #e0f7fa 0%, #e8f5e9 30%, #e0f2f1 60%, #f1f8e9 100%);
-    padding: 20px;
+.verify-email-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.verify-card {
-    width: 100%;
-    max-width: 380px;
-    text-align: center;
-    padding: 48px 32px 40px;
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-radius: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow:
-        0 8px 32px rgba(0, 172, 193, 0.08),
-        0 2px 8px rgba(0, 0, 0, 0.04);
+/* Matches header-subtext / login-redirect tone — not bright “success green” */
+.verify-email-inline-success {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  text-align: left;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--card-subtext);
+  transition:
+    color 1.5s ease,
+    background 1.5s ease,
+    border-color 1.5s ease;
 }
 
-/* Icon */
-.verify-icon-wrap {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 28px;
+.verify-email-inline-success-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  font-size: 15px;
+  color: var(--vivid-teal);
+  opacity: 0.9;
+  font-style: normal;
 }
 
-.verify-icon {
-    width: 88px;
-    height: 88px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(0, 172, 193, 0.12) 0%, rgba(76, 175, 80, 0.1) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: verifyIconPulse 2s ease-in-out infinite;
+/* Resend on cooldown: faded primary (matches card, not loud disabled gray) */
+.register-card .verify-email-resend-btn.ant-btn-primary.ant-btn-disabled,
+.register-card .verify-email-resend-btn.ant-btn-primary:disabled {
+  opacity: 0.42 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
 }
 
-@keyframes verifyIconPulse {
-
-    0%,
-    100% {
-        transform: scale(1);
-        box-shadow: 0 0 0 0 rgba(0, 172, 193, 0.15);
-    }
-
-    50% {
-        transform: scale(1.04);
-        box-shadow: 0 0 0 12px rgba(0, 172, 193, 0);
-    }
+.register-card .verify-email-resend-btn.ant-btn-primary.ant-btn-disabled:hover,
+.register-card .verify-email-resend-btn.ant-btn-primary:disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 0.42 !important;
 }
 
-/* Title */
-.verify-title {
-    font-size: 24px;
-    font-weight: 800;
-    color: #1c1c1e;
-    margin: 0 0 12px 0;
-    letter-spacing: -0.3px;
+.verify-email-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
 }
 
-/* Description */
-.verify-description {
-    font-size: 14px;
-    color: #6b7280;
-    font-weight: 500;
-    line-height: 1.6;
-    margin: 0 0 32px 0;
-}
-
-.verify-brand {
-    font-weight: 700;
-    color: #00acc1;
-}
-
-/* I Verified Button (Primary) */
-.verify-check-btn {
-    height: 50px !important;
-    border-radius: 14px !important;
-    font-weight: 700 !important;
-    font-size: 15px !important;
-    background: linear-gradient(135deg, #00acc1 0%, #00897b 100%) !important;
-    border: none !important;
-    box-shadow: 0 4px 14px rgba(0, 172, 193, 0.3) !important;
-    transition: all 0.3s ease !important;
-    margin-bottom: 12px !important;
-}
-
-.verify-check-btn:hover:not(:disabled) {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 20px rgba(0, 172, 193, 0.4) !important;
-}
-
-/* Resend Button (Secondary) */
-.verify-second-btn {
-    height: 50px !important;
-    border-radius: 14px !important;
-    font-weight: 700 !important;
-    font-size: 15px !important;
-    background: transparent !important;
-    border: 2px solid #e0e0e0 !important;
-    color: #4a4a4a !important;
-    box-shadow: none !important;
-    transition: all 0.3s ease !important;
-}
-
-.verify-second-btn:hover:not(:disabled) {
-    border-color: #00acc1 !important;
-    color: #00acc1 !important;
-    background: rgba(0, 172, 193, 0.04) !important;
-}
-
-.verify-second-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    border-color: #f0f0f0 !important;
-    color: #999 !important;
-}
-
-/* Inline Success */
-.verify-inline-success {
-    margin-top: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    color: #00897b;
-    font-weight: 600;
-    font-size: 13px;
-    animation: fadeInSlideUp 0.3s ease-out;
-}
-
-.success-inline-icon {
-    font-size: 14px;
-}
-
-@keyframes fadeInSlideUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Mobile */
-@media (max-width: 480px) {
-    .verify-card {
-        padding: 36px 24px 32px;
-        border-radius: 24px;
-    }
-
-    .verify-title {
-        font-size: 22px;
-    }
-
-    .verify-description {
-        font-size: 13px;
-    }
+.verify-email-loading .ant-spin-dot-item {
+  background-color: var(--btn-primary-bg);
 }

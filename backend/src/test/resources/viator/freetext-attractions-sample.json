@@ -1,0 +1,14 @@
+{
+  "attractions": {
+    "totalCount": 1,
+    "results": [
+      {
+        "id": 14159,
+        "name": "Hagia Sophia Museum",
+        "primaryDestinationId": 684
+      }
+    ]
+  },
+  "destinations": { "totalCount": 0, "results": [] },
+  "products": { "totalCount": 0, "results": [] }
+}

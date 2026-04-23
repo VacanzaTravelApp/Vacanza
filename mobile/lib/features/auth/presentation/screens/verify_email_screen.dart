@@ -1,11 +1,13 @@
+import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 
-import 'package:mobile/core/theme/app_colors.dart';
 import 'package:mobile/core/theme/app_text_styles.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/widgets/animated_background.dart';
 import 'package:mobile/core/navigation/navigation_service.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
@@ -22,6 +24,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   bool _sending = false;
   bool _checking = false;
   bool _initialTriggered = false;
+  Timer? _autoCheckTimer;
 
   @override
   void initState() {
@@ -33,6 +36,20 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         _resendVerification(silent: true);
       }
     });
+
+    // Auto-check verification in background without requiring the user to tap "I verified".
+    // This covers the common case: user verifies in browser/mail app then returns to Vacanza.
+    _autoCheckTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!_checking && mounted) {
+        _silentCheckVerified();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoCheckTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _resendVerification({bool silent = false}) async {
@@ -76,10 +93,41 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
+  Future<void> _silentCheckVerified() async {
+    final authRepo = context.read<AuthRepository>();
+    try {
+      final user = fb.FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      await user.reload();
+      final refreshed = fb.FirebaseAuth.instance.currentUser;
+      if (refreshed == null) return;
+
+      if (!refreshed.emailVerified) return;
+
+      try {
+        await authRepo.restoreSession();
+      } catch (e) {
+        dev.log('[Auth] restoreSession failed in auto-check: $e', name: 'Auth');
+      }
+
+      if (!mounted) return;
+      _autoCheckTimer?.cancel();
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeMapScreen()),
+        (_) => false,
+      );
+    } catch (e) {
+      // Ignore transient errors; next tick will retry.
+    }
+  }
+
   Future<void> _iVerified() async {
     if (!mounted) return;
     setState(() => _checking = true);
     try {
+      final authRepo = context.read<AuthRepository>();
       final user = fb.FirebaseAuth.instance.currentUser;
       if (user == null) {
         _showSnackBar('No active session. Please log in again.');
@@ -98,7 +146,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
       // Force-refresh Firebase ID token and sync backend session (GET /auth/login).
       try {
-        await context.read<AuthRepository>().restoreSession();
+        await authRepo.restoreSession();
       } catch (e) {
         // If backend session cannot be synced, keep user informed and let AuthGate
         // handle clean session resolution on next app start.
@@ -106,6 +154,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       }
 
       if (mounted) {
+        _autoCheckTimer?.cancel();
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeMapScreen()),
           (_) => false,
@@ -134,8 +183,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.vacanzaTokens;
+    final accent = context.authAccent;
+
     final titleStyle = AppTextStyles.titleLarge(context).copyWith(
-      color: AppColors.textHeading,
+      color: tokens.textMain,
     );
     final bodyMedium = AppTextStyles.bodyMedium(context);
 
@@ -160,7 +212,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       Icon(
                         Icons.mark_email_read_rounded,
                         size: 64,
-                        color: AppColors.primary,
+                        color: accent,
                       ),
                       const SizedBox(height: 24),
                       Text(
@@ -173,36 +225,24 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                         'We sent a verification link to your email address. '
                         'Please verify your email to continue to Vacanza.',
                         textAlign: TextAlign.center,
-                        style: bodyMedium.copyWith(color: AppColors.textMuted),
+                        style: bodyMedium.copyWith(color: tokens.textSub),
                       ),
                       const SizedBox(height: 32),
                       SizedBox(
                         height: 48,
-                        child: ElevatedButton(
+                        child: VacanzaGradientButton(
+                          label: 'Resend verification email',
                           onPressed: isBusy ? null : _resendVerification,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
+                          enabled: !isBusy,
+                          loading: _sending,
+                          minHeight: 48,
+                          borderRadius: 14,
+                          horizontalPadding: 16,
+                          textStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
                           ),
-                          child: _sending
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Resend verification email',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -222,7 +262,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Text(
-                                  'I verified',
+                                  'I verified (manual check)',
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,

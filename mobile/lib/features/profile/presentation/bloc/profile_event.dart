@@ -63,3 +63,18 @@ class ProfileUpdateRequested extends ProfileEvent {
 class ProfileUpdateErrorDismissed extends ProfileEvent {
   const ProfileUpdateErrorDismissed();
 }
+
+/// Upload binary profile photo (`POST /users/me/profile/photo`), then reload profile + bytes.
+class ProfilePhotoUploadRequested extends ProfileEvent {
+  final String filePath;
+
+  const ProfilePhotoUploadRequested(this.filePath);
+
+  @override
+  List<Object?> get props => [filePath];
+}
+
+/// Delete binary profile photo (`DELETE /users/me/profile/photo`), then reload profile.
+class ProfilePhotoDeleteRequested extends ProfileEvent {
+  const ProfilePhotoDeleteRequested();
+}

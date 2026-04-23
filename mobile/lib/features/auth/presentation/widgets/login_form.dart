@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:mobile/core/theme/app_colors.dart';
-import 'package:mobile/core/widgets/gradient_button.dart';
+import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 
 import 'package:mobile/features/auth/presentation/widgets/login_email_section.dart';
 import 'package:mobile/features/auth/presentation/widgets/login_password_section.dart';
@@ -10,6 +10,7 @@ import 'package:mobile/features/auth/presentation/widgets/login_password_section
 import 'package:mobile/features/auth/presentation/bloc/login_bloc.dart';
 import 'package:mobile/features/auth/presentation/bloc/login_event.dart';
 import 'package:mobile/features/auth/presentation/bloc/login_state.dart';
+import 'package:mobile/features/auth/presentation/screens/forgot_password_screen.dart';
 
 /// Login form widget that manages:
 /// - UI (email + password fields, forgot password link, button)
@@ -130,17 +131,25 @@ class _LoginFormState extends State<LoginForm> {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () {
-                    // TODO: Implement forgot password flow later.
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ForgotPasswordScreen(
+                          prefillEmail: _email.text.trim().isEmpty
+                              ? null
+                              : _email.text.trim(),
+                        ),
+                      ),
+                    );
                   },
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(0, 0),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Forgot Password?',
                     style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.primary,
+                      color: context.authAccent,
                     ),
                   ),
                 ),
@@ -161,12 +170,13 @@ class _LoginFormState extends State<LoginForm> {
               ],
 
               // LOGIN BUTTON
-              GradientButton(
-                text: "Log In",
+              VacanzaGradientButton(
+                label: 'Log In',
                 loading: isSubmitting,
-                active: canSubmit,
                 enabled: canSubmit,
                 onPressed: canSubmit ? () => _submit(context) : null,
+                minHeight: 52,
+                borderRadius: 26,
               ),
             ],
           ),

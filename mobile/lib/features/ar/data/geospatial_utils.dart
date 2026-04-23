@@ -37,8 +37,10 @@ double bearingDegrees({
   final dLon = _degToRad(lng2 - lng1);
 
   final y = math.sin(dLon) * math.cos(phi2);
-  final x = math.cos(phi1) * math.cos(phi2) * math.cos(dLon) -
-      math.sin(phi1) * math.sin(phi2);
+  // Initial bearing formula: atan2(y, x)
+  // x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(dLon)
+  final x = math.cos(phi1) * math.sin(phi2) -
+      math.sin(phi1) * math.cos(phi2) * math.cos(dLon);
   final brng = math.atan2(y, x);
 
   final deg = (_radToDeg(brng) + 360.0) % 360.0;

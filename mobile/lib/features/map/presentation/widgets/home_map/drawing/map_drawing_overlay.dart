@@ -1,10 +1,10 @@
 // map_drawing_overlay.dart
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
 
+import 'package:mobile/core/theme/app_theme.dart';
 import '../../../../../poi_search/data/models/geo_point.dart';
 import '../../../../../poi_search/data/models/selected_area.dart';
 import 'freehand_painter.dart';
@@ -48,6 +48,9 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
   // Selection polygon (screen space) -> AreaQuery’den gelen polygonun ekranda çizilecek hali
   List<Offset> _selectionScreenPath = const [];
 
+  /// Async selection rebuild’lerinde eski sonuçları yok say.
+  int _selectionRebuildGen = 0;
+
   DateTime _lastSampleAt = DateTime.fromMillisecondsSinceEpoch(0);
   static const Duration _sampleEvery = Duration(milliseconds: 35);
 
@@ -64,10 +67,19 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
       });
     }
 
+    // Çizim kapatıldı (yarım kalan jest dahil): anında path temizle
+    if (oldWidget.isDrawing && !widget.isDrawing) {
+      setState(() {
+        _drawingScreenPath.clear();
+        _drawingGeoPoints.clear();
+        _limitWarned = false;
+      });
+    }
+
     // Active selection / map değiştiyse screen path’i yeniden hesapla
     final bool selectionChanged =
         oldWidget.activeSelectionPolygon != widget.activeSelectionPolygon ||
-            oldWidget.map != widget.map;
+        oldWidget.map != widget.map;
 
     // ✅ Map idle tick geldiyse selection redraw
     final bool tickChanged = oldWidget.rebuildTick != widget.rebuildTick;
@@ -80,12 +92,35 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
   @override
   Widget build(BuildContext context) {
     final showDrawingPath = widget.isDrawing && _drawingScreenPath.isNotEmpty;
-    final showSelectionPath = !widget.isDrawing && _selectionScreenPath.isNotEmpty;
+    final showSelectionPath =
+        !widget.isDrawing && _selectionScreenPath.isNotEmpty;
 
     // Öncelik: çizim açıkken çizim path’i görünür. Çizim kapalıysa selection polygon görünür.
-    final pathToDraw = showDrawingPath
-        ? _drawingScreenPath
-        : (showSelectionPath ? _selectionScreenPath : const <Offset>[]);
+    final pathToDraw =
+        showDrawingPath
+            ? _drawingScreenPath
+            : (showSelectionPath ? _selectionScreenPath : const <Offset>[]);
+
+    final t = context.vacanzaTokens;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    // Gündüz: sıcak mercan–amber–pembe; gece: koyu mavi → gök mavi → indigo/mor
+    final strokeStops =
+        isLight
+            ? <Color>[
+              t.vividCoral,
+              t.vividAmber,
+              const Color(0xFFFF8C42),
+              const Color(0xFFFFAB91),
+              const Color(0xFFF472B6),
+            ]
+            : <Color>[
+              const Color(0xFF0F172A),
+              const Color(0xFF1E3A8A),
+              const Color(0xFF2563EB),
+              t.vividBlue,
+              const Color(0xFF4F46E5),
+              const Color(0xFF7C3AED),
+            ];
 
     return Positioned.fill(
       child: Stack(
@@ -95,7 +130,10 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
             child: IgnorePointer(
               ignoring: true,
               child: CustomPaint(
-                painter: FreehandPainter(List<Offset>.of(pathToDraw)),
+                painter: FreehandPainter(
+                  List<Offset>.of(pathToDraw),
+                  strokeStops: strokeStops,
+                ),
               ),
             ),
           ),
@@ -119,6 +157,14 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
   }
 
   void _onDrawEnd() {
+    if (!widget.isDrawing) {
+      setState(() {
+        _drawingScreenPath.clear();
+        _drawingGeoPoints.clear();
+      });
+      return;
+    }
+
     if (_drawingGeoPoints.length >= 3) {
       final polygon = PolygonArea(List<GeoPoint>.of(_drawingGeoPoints));
 
@@ -137,7 +183,7 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
 
     // yetersiz nokta -> temizle
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(content: Text('Polygon için en az 3 nokta gerekli.')),
+      const SnackBar(content: Text('Please draw at least 3 points.')),
     );
 
     setState(() {
@@ -148,7 +194,7 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
   }
 
   Future<void> _onDrawPoint(Offset localPos) async {
-    if (widget.map == null) return;
+    if (!widget.isDrawing || widget.map == null) return;
 
     final now = DateTime.now();
     if (now.difference(_lastSampleAt) < _sampleEvery) return;
@@ -158,7 +204,7 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
       if (!_limitWarned && mounted) {
         _limitWarned = true;
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(content: Text('Maksimum 200 nokta ekleyebilirsin.')),
+          const SnackBar(content: Text('You can add up to 200 points.')),
         );
       }
       return;
@@ -187,10 +233,7 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
       final map = widget.map;
       if (map == null) return null;
 
-      final screen = mb.ScreenCoordinate(
-        x: localPos.dx,
-        y: localPos.dy,
-      );
+      final screen = mb.ScreenCoordinate(x: localPos.dx, y: localPos.dy);
 
       final point = await map.coordinateForPixel(screen);
 
@@ -205,11 +248,12 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
   }
 
   Future<void> _rebuildSelectionScreenPath() async {
+    final gen = ++_selectionRebuildGen;
     final map = widget.map;
     final polygon = widget.activeSelectionPolygon;
 
     if (map == null || polygon == null || polygon.points.isEmpty) {
-      if (!mounted) return;
+      if (!mounted || gen != _selectionRebuildGen) return;
       setState(() => _selectionScreenPath = const []);
       return;
     }
@@ -218,6 +262,7 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
 
     // Polygon points -> screen points
     for (final p in polygon.points) {
+      if (!mounted || gen != _selectionRebuildGen) return;
       final screen = await _geoToScreen(p);
       if (screen != null) newPath.add(screen);
     }
@@ -227,7 +272,7 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
       newPath.add(newPath.first);
     }
 
-    if (!mounted) return;
+    if (!mounted || gen != _selectionRebuildGen) return;
     setState(() => _selectionScreenPath = List.unmodifiable(newPath));
   }
 

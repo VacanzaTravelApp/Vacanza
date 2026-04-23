@@ -3,7 +3,14 @@ import 'package:flutter/material.dart';
 /// Custom painter for the XP progress ring (gradient arc).
 class XpRingPainter extends CustomPainter {
   final double percent;
-  XpRingPainter(this.percent);
+  final Color trackColor;
+  final List<Color> gradientColors;
+
+  XpRingPainter(
+    this.percent, {
+    required this.trackColor,
+    required this.gradientColors,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -13,7 +20,7 @@ class XpRingPainter extends CustomPainter {
 
     // Track
     final trackPaint = Paint()
-      ..color = const Color(0xFFE5E7EB)
+      ..color = trackColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
     canvas.drawCircle(center, radius, trackPaint);
@@ -23,14 +30,10 @@ class XpRingPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
-      ..shader = const SweepGradient(
+      ..shader = SweepGradient(
         startAngle: -1.5708, // -π/2
         endAngle: 4.7124, // 3π/2
-        colors: [
-          Color(0xFF0096FF),
-          Color(0xFF2ECC71),
-          Color(0xFFFFD166),
-        ],
+        colors: gradientColors,
       ).createShader(Rect.fromCircle(center: center, radius: radius));
 
     const startAngle = -1.5708; // -π/2 (top)

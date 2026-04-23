@@ -24,12 +24,22 @@ public class SystemMonitoringDTO {
     private double systemHealth;
 
     /**
+     * JVM uptime in seconds since server start.
+     */
+    private long uptimeSeconds;
+
+    /**
+     * ISO-8601 timestamp of when the server was started.
+     */
+    private String serverStartTime;
+
+    /**
      * Current status of each backend service.
      */
     private List<ServiceStatus> services;
 
     /**
-     * API usage metrics per external service (Ticketmaster, SerpApi, Geoapify, etc.).
+     * API usage metrics per external service (Ticketmaster, SerpApi, Foursquare, etc.).
      */
     private List<ApiUsageMetric> apiMetrics;
 
@@ -37,6 +47,12 @@ public class SystemMonitoringDTO {
      * Recent system activity logs (last 50).
      */
     private List<LogEntry> logs;
+
+    /**
+     * ISO-8601 timestamp of when this data was generated.
+     * Helps the frontend enforce the ≤ 60-second refresh interval (FReq13).
+     */
+    private String lastRefreshedAt;
 
     // ── Inner DTOs ──────────────────────────────────────────────
 
@@ -57,6 +73,7 @@ public class SystemMonitoringDTO {
         private String apiName;         // e.g. "Ticketmaster", "SerpApi"
         private long totalCalls;        // total API calls today
         private long errorCount;        // 4xx + 5xx responses today
+        private long consecutiveErrors; // current streak of consecutive errors
         private double avgResponseMs;   // average response time in ms
     }
 

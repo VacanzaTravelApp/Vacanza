@@ -1,9 +1,15 @@
-import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
-/// Profile chip/badge (map top-left). Avatar from [imageUrl] or [imagePath] or placeholder.
+import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
+
+/// Profile chip/badge (map top-left). Avatar from [profilePhotoBytes], then [imageUrl], [imagePath], or placeholder.
 class ProfileBadge extends StatelessWidget {
   final String name;
   final String subtitle;
+
+  /// Binary photo from [GET /users/me/profile/photo] when [UserProfile.hasProfilePhoto].
+  final Uint8List? profilePhotoBytes;
 
   /// Network URL for profile image (from profile.profileImageUrl).
   final String? imageUrl;
@@ -17,55 +23,79 @@ class ProfileBadge extends StatelessWidget {
     super.key,
     required this.name,
     required this.subtitle,
+    this.profilePhotoBytes,
     this.imageUrl,
     this.imagePath,
     this.onTap,
   });
 
-  Widget _buildAvatar() {
-    final hasNetworkUrl = imageUrl != null && imageUrl!.trim().isNotEmpty;
-    final hasAssetPath = imagePath != null && imagePath!.isNotEmpty;
-    if (hasNetworkUrl) {
+  static const double _avatarSize = 38;
+
+  Widget _buildAvatar(BuildContext context) {
+    final hasBytes = profilePhotoBytes != null && profilePhotoBytes!.isNotEmpty;
+    if (hasBytes) {
       return ClipOval(
-        child: Image.network(
-          imageUrl!,
-          width: 38,
-          height: 38,
-          fit: BoxFit.cover,
-          loadingBuilder: (_, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return _placeholderAvatar();
-          },
-          errorBuilder: (_, __, ___) => _placeholderAvatar(),
-        ),
-      );
-    }
-    if (hasAssetPath) {
-      return Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          image: DecorationImage(
-            image: AssetImage(imagePath!),
+        child: SizedBox(
+          width: _avatarSize,
+          height: _avatarSize,
+          child: Image.memory(
+            profilePhotoBytes!,
             fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (ctx, __, ___) => _placeholderAvatar(ctx),
           ),
         ),
       );
     }
-    return _placeholderAvatar();
+    final hasNetworkUrl = imageUrl != null && imageUrl!.trim().isNotEmpty;
+    final hasAssetPath = imagePath != null && imagePath!.isNotEmpty;
+    if (hasNetworkUrl) {
+      return ClipOval(
+        child: SizedBox(
+          width: _avatarSize,
+          height: _avatarSize,
+          child: Image.network(
+            imageUrl!,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+            loadingBuilder: (ctx, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return _placeholderAvatar(ctx);
+            },
+            errorBuilder: (ctx, __, ___) => _placeholderAvatar(ctx),
+          ),
+        ),
+      );
+    }
+    if (hasAssetPath) {
+      return ClipOval(
+        child: SizedBox(
+          width: _avatarSize,
+          height: _avatarSize,
+          child: Image.asset(
+            imagePath!,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+          ),
+        ),
+      );
+    }
+    return _placeholderAvatar(context);
   }
 
-  Widget _placeholderAvatar() {
+  Widget _placeholderAvatar(BuildContext context) {
+    final colors = context.mapControlActiveGradientColors;
     return Container(
-      width: 38,
-      height: 38,
-      decoration: const BoxDecoration(
+      width: _avatarSize,
+      height: _avatarSize,
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0096FF), Color(0xFF2ECC71)],
+          colors: colors,
         ),
       ),
       child: const Icon(Icons.person, color: Colors.white, size: 20),
@@ -74,12 +104,13 @@ class ProfileBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
     final child = Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.90),
+        color: t.pillSurface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+        border: Border.all(color: t.pillBorder),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.10),
@@ -91,7 +122,7 @@ class ProfileBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildAvatar(),
+          _buildAvatar(context),
           const SizedBox(width: 10),
 
           // Texts
@@ -101,12 +132,20 @@ class ProfileBadge extends StatelessWidget {
             children: [
               Text(
                 name,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: t.textMain,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF0096FF)),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: context.mapControlAccent,
+                ),
               ),
             ],
           ),

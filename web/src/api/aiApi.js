@@ -2,6 +2,19 @@ import http from "./http";
 
 const asArray = (data) => (Array.isArray(data) ? data : []);
 
+/**
+ * Event recommendations for a saved route (GET /routes/:routeId/event-recommendations).
+ * @returns {Promise<{ message: string, events: Array<object>, totalFound: number, hasRecommendations: boolean }>}
+ */
+export const getEventRecommendations = async (routeId, { day } = {}) => {
+    const params = {};
+    if (day != null && Number.isFinite(Number(day))) {
+        params.day = Number(day);
+    }
+    const res = await http.get(`/routes/${routeId}/event-recommendations`, { params });
+    return res.data;
+};
+
 export const aiApi = {
     // Create a new conversation
     createConversation: async () => {
@@ -17,11 +30,13 @@ export const aiApi = {
         return asArray(response.data);
     },
 
-    // Send a message to a specific conversation
-    sendMessage: async (conversationId, content) => {
-        const response = await http.post(`/chat/conversations/${conversationId}/messages`, {
-            content
-        });
+    // Send a message to a specific conversation.
+    // includeFavorites (default undefined = backend treats as true) toggles liked-POI
+    // injection into the AI profile for this request.
+    sendMessage: async (conversationId, content, { signal, includeFavorites } = {}) => {
+        const body = { content };
+        if (typeof includeFavorites === "boolean") body.includeFavorites = includeFavorites;
+        const response = await http.post(`/chat/conversations/${conversationId}/messages`, body, { signal });
         return response.data;
     },
 
@@ -43,6 +58,14 @@ export const aiApi = {
         return response.data;
     },
 
+    getEventRecommendations,
+
+    /** Viator: waypoint başına fiyat + booking URL (GET /routes/:id/pricing). */
+    getRoutePricing: async (routeId) => {
+        const response = await http.get(`/routes/${routeId}/pricing`);
+        return asArray(response.data);
+    },
+
     /** All routes saved for this conversation (oldest first). */
     getRoutesForConversation: async (conversationId) => {
         try {
@@ -56,7 +79,46 @@ export const aiApi = {
     deleteRoute: async (routeId) => {
         const response = await http.delete(`/routes/${routeId}`);
         return response.data;
-    }
+    },
+
+    setRouteHotel: async (routeId, hotel) => {
+        const response = await http.put(`/routes/${routeId}/hotel`, hotel);
+        return response.data;
+    },
+
+    removeRouteHotel: async (routeId) => {
+        const response = await http.delete(`/routes/${routeId}/hotel`);
+        return response.data;
+    },
+
+    /**
+     * Polygon-based itinerary (Task 1). Body: { coordinates, totalDays?, travelStyle?, categories? }
+     * coordinates: outer ring [[lon, lat], ...]
+     */
+    createRouteFromPolygon: async (body) => {
+        const response = await http.post('/chat/routes/from-polygon', body);
+        return response.data;
+    },
+
+    /**
+     * Kayıtlı sohbet rotasında tek günü, harita polygon'undaki POI'lara göre yeniden üretir.
+     * Body: { conversationId, day, coordinates, travelStyle?, categories? }
+     */
+    replanDayFromPolygon: async (body) => {
+        const response = await http.post('/chat/routes/replan-day-from-polygon', body);
+        return response.data;
+    },
+
+    /**
+     * FReq5 — Adaptive itinerary adjustment.
+     * Triggers deterministic replanning for a single unavailable stop.
+     * Body: { triggerType, severity, reason?, affectedPoiName?, affectedDay? }
+     * Returns: { newRouteId, originalRouteId, version, actions, userMessage, idempotencyKey }
+     */
+    adjustRoute: async (routeId, body) => {
+        const response = await http.post(`/api/routes/${routeId}/adjust`, body);
+        return response.data;
+    },
 };
 
 export default aiApi;

@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 
 import '../../data/models/gamification_profile_dto.dart';
 import '../cubit/gamification_cubit.dart';
@@ -23,7 +24,7 @@ class GamificationProfileScreen extends StatelessWidget {
     log('[GAM_UI] GamificationProfileScreen opened');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: BlocBuilder<GamificationCubit, GamificationState>(
           builder: (context, state) {
@@ -44,38 +45,37 @@ class GamificationProfileScreen extends StatelessWidget {
   // ─── Loading ───
   Widget _buildLoading() {
     return const Center(
-      child: CircularProgressIndicator(color: Color(0xFF0096FF)),
+      child: CircularProgressIndicator(),
     );
   }
 
   // ─── Error ───
   Widget _buildError(BuildContext context, String message) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline,
-                size: 48, color: Color(0xFFFF6B6B)),
+            Icon(Icons.error_outline, size: 48, color: cs.error),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
-              style:
-                  const TextStyle(fontSize: 15, color: Color(0xFF5F7A8F)),
+              style: TextStyle(fontSize: 15, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 24),
-            FilledButton.icon(
+            VacanzaGradientButton(
+              label: 'Retry',
+              icon: Icons.refresh,
               onPressed: () {
                 log('[GAM_UI] GamificationProfileScreen retry tapped');
                 context.read<GamificationCubit>().fetchProfile();
               },
-              icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Retry'),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF0096FF),
-              ),
+              enabled: true,
+              minHeight: 48,
+              borderRadius: 16,
             ),
           ],
         ),

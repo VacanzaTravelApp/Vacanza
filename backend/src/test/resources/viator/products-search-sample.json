@@ -1,0 +1,16 @@
+{
+  "products": [
+    {
+      "title": "Skip-the-Line Hagia Sophia Small-Group Tour",
+      "productUrl": "https://example.viator.com/tour",
+      "pricing": {
+        "summary": {
+          "fromPrice": 45.0,
+          "fromPriceBeforeDiscount": 50.0
+        },
+        "currency": "USD"
+      }
+    }
+  ],
+  "totalCount": 1
+}

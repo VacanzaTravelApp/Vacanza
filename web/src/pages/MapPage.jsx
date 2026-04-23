@@ -1,14 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip } from "antd";
+import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, message, notification, Spin, Popover, ConfigProvider, theme } from "antd";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LogoutOutlined,
-  UserOutlined,
   GlobalOutlined,
-  CompassOutlined,
   HeatMapOutlined,
-  UnorderedListOutlined,
+  InfoCircleOutlined,
+  CalendarOutlined,
+  SunOutlined,
+  MoonOutlined,
+  UserOutlined,
+  CompassOutlined,
   CloseOutlined,
+  ControlOutlined,
+  HeartOutlined,
+  HeartFilled,
 } from "@ant-design/icons";
+import { FiFilter } from "react-icons/fi";
+import defaultAvatar from "../assets/default-avatar.png";
 import { useNavigate } from "react-router-dom";
 
 import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
@@ -16,18 +25,28 @@ import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
+import { useUserProfile } from "../hooks/useUserProfileData";
+import { useProfilePhoto } from "../hooks/useProfilePhoto";
 import BookingSheet from "../features/booking/components/BookingSheet";
-import { CalendarOutlined } from "@ant-design/icons";
-import VacanzaChat from "../features/ai/components/VacanzaChat";
+import VacanzaChat, {
+  getSessionConversationId,
+  linkPolygonRouteConversation,
+} from "../features/ai/components/VacanzaChat";
 import RoutePanel from "../features/ai/components/RoutePanel";
+import SavedPoisPanel from "../features/ai/components/SavedPoisPanel";
 import ProfileModal from "./ProfileModal";
+import PreferencesModal from "./PreferencesModal";
+import CalendarModal from "./CalendarModal";
 import http from "../api/http";
+import { aiApi } from "../api/aiApi";
+import { postPoiFeedbackEvent } from "../api/feedbackApi";
+import { useFeedbackAffinity } from "../hooks/useFeedbackAffinity";
+import { normalizeRouteForMap } from "../features/ai/utils/routeMap";
+import { useAdjustmentStream } from "../hooks/useAdjustmentStream";
+import { buildMapPoiFeedbackPayload, deriveMapPoiFavorited } from "../features/ai/utils/feedbackVoteUtils";
+import "./MapPage.css";
 
-import cafeImg from "../assets/poi/poi_cafe.png";
-import museumImg from "../assets/poi/poi_museum.png";
-import monumentImg from "../assets/poi/poi_monument.png";
-import parkImg from "../assets/poi/poi_park.png";
-import restaurantImg from "../assets/poi/poi_restaurant.png";
+
 
 const { Header, Content, Footer } = Layout;
 
@@ -40,12 +59,104 @@ const INITIAL_VIEW_STATE = {
 };
 
 const STYLES = [
-  "mapbox://styles/mapbox/outdoors-v12",
-  "mapbox://styles/mapbox/streets-v12",
-  "mapbox://styles/mapbox/navigation-preview-night-v4",
-  "mapbox://styles/mapbox/satellite-streets-v12",
-  "mapbox://styles/mapbox/monochrome",
+  "mapbox://styles/mapbox/streets-v12",          // 0: Day (Streets)
+  "mapbox://styles/mapbox/dark-v11",             // 1: Night (Dark)
+  "mapbox://styles/mapbox/satellite-streets-v12" // 2: Live (Satellite + Labels)
 ];
+
+const RestaurantIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"></path>
+    <path d="M7 2v20"></path>
+    <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"></path>
+  </svg>
+);
+
+const CafeIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 8h1a4 4 0 1 1 0 8h-1" /><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z" /><line x1="6" y1="2" x2="6" y2="4" /><line x1="10" y1="2" x2="10" y2="4" /><line x1="14" y1="2" x2="14" y2="4" />
+  </svg>
+);
+
+const MuseumIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 22h20" /><path d="M4 22V10" /><path d="M10 22V10" /><path d="M14 22V10" /><path d="M20 22V10" /><path d="M2 10l10-8 10 8" />
+  </svg>
+);
+
+const MonumentIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m12 2-8 8v12h16V10Z" /><path d="M8 22v-4a4 4 0 1 1 8 0v4" /><path d="m11 11.5 1-1 1 1" />
+  </svg>
+);
+
+const ParkIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22v-6"></path>
+    <path d="M5 16l7-9 7 9H5z"></path>
+    <path d="M7 11l5-7 5 7H7z"></path>
+  </svg>
+);
+
+const AttractionIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><path d="M12 8v8" /><path d="M8 12h8" />
+  </svg>
+);
+
+const BarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 2h18" /><path d="M18 20a1 1 0 0 0 1-1V5H5v14a1 1 0 0 0 1 1h12z" /><path d="M12 11h.01" /><path d="M12 7h.01" /><path d="M12 15h.01" />
+  </svg>
+);
+
+const ShoppingIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" />
+  </svg>
+);
+
+const HotelIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 22h20" /><path d="M7 22v-5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v5" /><path d="M9 10h6" /><path d="M11 14h2" /><path d="M11 6h2" /><path d="M5 22V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v18" />
+  </svg>
+);
+
+const TransportIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="3" width="16" height="16" rx="2" /><path d="M9 22h6" /><path d="M8 7h8" /><path d="M12 3v16" />
+  </svg>
+);
+
+const PencilIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" />
+  </svg>
+);
+
+const LayerIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" />
+  </svg>
+);
+
+const CubeIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />
+  </svg>
+);
+
+const LogoutIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
+const SettingsIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
 
 // Results panel haritayı kapatmasın diye padding hesabında kullanıyoruz
 const RESULTS_PANEL_APPROX_HEIGHT_DESKTOP = 320;
@@ -65,73 +176,270 @@ function normalizeCategory(raw) {
   return String(raw || "").trim().toLowerCase();
 }
 
+/** Map filter keys → backend /chat/routes/from-polygon category strings (MapboxPoiSearchClient). */
+const UI_KEY_TO_BACKEND_CATEGORY = {
+  restaurant: "restaurant",
+  cafe: "cafe",
+  museum: "museum",
+  monuments: "monument",
+  park: "park",
+  attraction: "attraction",
+  bar: "bar",
+  shopping: "shopping",
+  hotel: "hotel",
+  transport: "transport",
+  others: "poi",
+};
+
 const UI_CATEGORIES = [
   {
     key: "restaurant",
     label: "Restaurants",
     geo: "catering.restaurant",
-    aliases: ["restaurant", "restaurants", "catering.restaurant"],
-    emoji: "🍽️",
-    img: restaurantImg,
-    ring: "#FFB020",
-    fill: "#FFF7E6",
-    pill: "#FFF3E0",
+    aliases: [
+      "restaurant", "restaurants", "catering.restaurant", "fast_food", "food_court",
+      "pizza_restaurant", "mexican_restaurant", "indian_restaurant", "asian_restaurant",
+      "burger_restaurant", "diner_restaurant", "noodle_restaurant", "sushi_restaurant",
+      "buffet_restaurant", "ramen_restaurant", "tapas_restaurant", "steakhouse",
+      "turkish_restaurant", "japanese_restaurant", "chinese_restaurant", "seafood_restaurant",
+      "italian_restaurant", "hawaiian_restaurant", "korean_barbeque_restaurant",
+      "portuguese_restaurant", "latin_american_restaurant", "vietnamese_restaurant",
+      "french_restaurant", "african_restaurant", "brazilian_restaurant", "filipino_restaurant",
+      "german_restaurant", "carribean_restaurant", "middle_eastern_restaurant",
+      "mediterranean_restaurant", "creole_restaurant", "peruvian_restaurant", "wings_joint",
+      "hot_dog_stand", "food_truck", "food", "food_and_drink", "deli"
+    ],
+    icon: <RestaurantIcon />,
+    pill: "rgba(255, 107, 107, 0.15)",
+    fill: "rgba(255, 107, 107, 1)",
+    ring: "#FF6B6B",
+    uiKey: "restaurant",
   },
   {
     key: "cafe",
     label: "Cafes",
     geo: "catering.cafe",
-    aliases: ["cafe", "cafes", "catering.cafe"],
-    emoji: "☕",
-    img: cafeImg,
-    ring: "#6F4E37",
-    fill: "#F5F5DC",
-    pill: "#EFEBE9",
+    aliases: [
+      "cafe", "cafes", "catering.cafe", "coffee", "coffee_shop", "teahouse", "bakery",
+      "dessert_shop", "ice_cream", "confectionery", "juice_bar", "bubble_tea", "donut_shop",
+      "bagel_shop", "frozen_yogurt_shop", "waffle_shop", "turkish_coffeehouse",
+      "coffee_roaster", "snack_bar", "tea_house"
+    ],
+    icon: <CafeIcon />,
+    pill: "rgba(255, 179, 71, 0.15)",
+    fill: "rgba(255, 179, 71, 1)",
+    ring: "#FFB347",
+    uiKey: "cafe",
   },
   {
     key: "museum",
-    label: "Museums",
-    geo: "entertainment.museum",
-    aliases: ["museum", "museums", "entertainment.museum"],
-    emoji: "🖼️",
-    img: museumImg,
-    ring: "#9B51E0",
-    fill: "#F3EBFF",
-    pill: "#F3EBFF",
+    label: "Museums & Arts",
+    geo: "tourism.attraction.museum",
+    aliases: ["museum", "museums", "tourism.attraction.museum", "planetarium", "aquarium", "art_gallery", "zoo", "zoo_exhibit", "exhibit"],
+    icon: <MuseumIcon />,
+    pill: "rgba(0, 180, 216, 0.15)",
+    fill: "rgba(0, 180, 216, 1)",
+    ring: "#00B4D8",
+    uiKey: "museum",
   },
   {
     key: "monuments",
-    label: "Monuments",
-    geo: "tourism.attraction",
-    aliases: ["monument", "monuments", "tourism.attraction"],
-    emoji: "🏛️",
-    img: monumentImg,
-    ring: "#FF7A45",
-    fill: "#FFF1E8",
-    pill: "#FFF1E8",
+    label: "Culture",
+    aliases: [
+      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre", 
+      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture", 
+      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema", 
+      "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish", 
+      "religious_buddhist", "mosque", "church", "temple", "synagogue", "buddhist_temple", 
+      "place_of_worship.muslim", "place_of_worship.christian", "place_of_worship.jewish", 
+      "place_of_worship.buddhist", "landmark", "historic", "attraction", 
+      "tourist_attraction", "sightseeing", "cultural_center", "place_of_interest",
+      "religious", "spiritual", "mosques", "churches", "temples", "synagogues", "historic_place",
+      "cathedral", "chapel", "shrine", "monastic", "abbey", "priory", "historical_landmark",
+      "religious_facility", "cultural_heritage", "basilica"
+    ],
+    icon: <MonumentIcon />,
+    pill: "rgba(99, 102, 241, 0.15)",
+    fill: "rgba(99, 102, 241, 1)",
+    ring: "#4338ca",
+    uiKey: "monuments",
   },
   {
-    key: "parks",
-    label: "Parks",
-    geo: "leisure.park",
-    aliases: ["park", "parks", "leisure.park"],
-    emoji: "🌿",
-    img: parkImg,
-    ring: "#27AE60",
-    fill: "#E9F9EF",
-    pill: "#E9F9EF",
+    key: "park",
+    label: "Parks/Nature",
+    aliases: [
+      "park", "garden", "forest", "nature_reserve", "wood", "leisure.park",
+      "recreation_ground", "national_park", "playground", "dog_park", "picnic_shelter",
+      "botanical_garden", "natural"
+    ],
+    icon: <ParkIcon />,
+    pill: "rgba(34, 197, 94, 0.15)",
+    fill: "rgba(34, 197, 94, 1)",
+    ring: "#15803d",
+    uiKey: "park",
   },
+  {
+    key: "attraction",
+    label: "Attractions",
+    aliases: [
+      "attraction", "viewpoint", "theme_park", "zoo", "aquarium", "historic",
+      "scenic_viewpoint", "tourist_attraction", "lighthouse", "waterfall", "dam",
+      "cave", "island", "mountain", "mountain_hut", "beach", "stadium", "soccer_stadium",
+      "basketball_stadium", "football_stadium", "hockey_stadium", "baseball_stadium",
+      "tennis_stadium", "racetrack", "racecourse", "casino", "amusement_park",
+      "theme_park_attraction", "fair_grounds"
+    ],
+    icon: <AttractionIcon />,
+    pill: "rgba(168, 85, 247, 0.15)",
+    fill: "rgba(168, 85, 247, 1)",
+    ring: "#7e22ce",
+    uiKey: "attraction",
+  },
+  {
+    key: "bar",
+    label: "Nightlife",
+    aliases: [
+      "bar", "pub", "night_club", "nightclub", "nightlife", "liquor_store", "alcohol",
+      "wine_bar", "beer_garden", "cocktail_bar", "lounge", "karaoke_bar", "gay_bar",
+      "beach_bar", "dive_bar", "stripclub", "brewery", "speakeasy", "champagne_bar",
+      "sake_bar", "beer_bar", "hookah_lounge", "whiskey_bar", "tiki_bar", "gastropub",
+      "biergarten"
+    ],
+    icon: <BarIcon />,
+    pill: "rgba(236, 72, 153, 0.15)",
+    fill: "rgba(236, 72, 153, 1)",
+    ring: "#be185d",
+    uiKey: "bar",
+  },
+  {
+    key: "shopping",
+    label: "Shopping",
+    aliases: [
+      "shop", "mall", "supermarket", "marketplace", "clothing_store", "bakery",
+      "convenience_store", "convenience", "electronics", "electronics_shop",
+      "hardware_store", "furniture_store", "jewelry_store", "flower_shop", "book_store",
+      "gift_shop", "toy_store", "pet_store", "pharmacy", "cosmetics_shop", "beauty_store",
+      "optician", "bicycle_shop", "liquor_store", "alcohol_shop", "vape_shop",
+      "tobacco_shop", "smoke_shop", "camera_shop", "watch_store", "hobby_shop",
+      "antique_shop", "thrift_shop", "pawnshop", "duty_free_shop", "outlet_store",
+      "luggage_store", "music_shop", "fabric_store", "frame_store", "paper_goods_store",
+      "kitchen_store", "mattress_store", "lighting_store", "arts_and_craft_store",
+      "home_repair", "baby_goods_shop", "variety_store", "pop_up_shop", "clothing", "shopping_mall", "department_store"
+    ],
+    icon: <ShoppingIcon />,
+    pill: "rgba(245, 158, 11, 0.15)",
+    fill: "rgba(245, 158, 11, 1)",
+    ring: "#b45309",
+    uiKey: "shopping",
+  },
+  {
+    key: "hotel",
+    label: "Hotels",
+    aliases: ["hotel", "motel", "hostel", "apartment", "guest_house", "accommodation", "lodging", "bed_and_breakfast", "vacation_rental", "resort", "campground", "campsite"],
+    icon: <HotelIcon />,
+    pill: "rgba(14, 165, 233, 0.15)",
+    fill: "rgba(14, 165, 233, 1)",
+    ring: "#0369a1",
+    uiKey: "hotel",
+  },
+  {
+    key: "transport",
+    label: "Transport",
+    aliases: [
+      "station", "airport", "bus_stop", "subway_entrance", "train_station",
+      "ferry_terminal", "transit_stop", "stop_area", "railway_station", "bus_station",
+      "subway_station", "light_rail_station", "public_transportation_station", "taxi",
+      "car_rental", "parking_lot", "parking", "gas_station", "charging_station",
+      "train", "bus", "rail", "subway", "metro", "metro_station", "underground",
+      "tube", "tram", "tram_stop", "public_transport"
+    ],
+    icon: <TransportIcon />,
+    pill: "rgba(71, 85, 105, 0.15)",
+    fill: "rgba(71, 85, 105, 1)",
+    ring: "#334155",
+    uiKey: "transport",
+  },
+  {
+    key: "others",
+    label: "Services",
+    aliases: [
+      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy", 
+      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist", 
+      "veterinarian", "police_station", "fire_station", "government_offices", "library", 
+      "school", "university", "college", "community_center", "mosque", "church", 
+      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners", 
+      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio", 
+      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course", 
+      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio", 
+      "recording_studio", "television_studio", "radio_studio", "design_studio", 
+      "coworking_space", "event_space", "conference_center", "offices", "factory", 
+      "warehouse", "storage", "services", "it", "consulting", "advertising_agency", 
+      "chiropractor", "physiotherapist", "alternative_healthcare", "assisted_living_facility"
+    ],
+    icon: <GlobalOutlined />,
+    pill: "rgba(100, 116, 139, 0.1)",
+    fill: "rgba(100, 116, 139, 1)",
+    ring: "#475569",
+    uiKey: "others",
+  }
 ];
 
-function poiIconByCategory(category) {
-  const c = normalizeCategory(category);
-  const found = UI_CATEGORIES.find((x) => x.aliases.includes(c));
-  if (!found) return null;
-  return { emoji: found.emoji, img: found.img, ring: found.ring, fill: found.fill, uiKey: found.key };
+function hideTrafficLayers(map) {
+  if (!map) return;
+  const style = map.getStyle();
+  if (!style || !style.layers) return;
+  style.layers.forEach((layer) => {
+    if (layer.id.includes("traffic")) {
+      map.setLayoutProperty(layer.id, "visibility", "none");
+    }
+  });
 }
 
-function labelByCategory(category) {
-  const icon = poiIconByCategory(category);
+function poiIconByCategory(poi) {
+  if (!poi) return null;
+  // Support both passing the full POI object or just the category string for legacy calls
+  const category = (typeof poi === 'string' || Array.isArray(poi)) ? poi : poi.category;
+  const name = (typeof poi === 'object' && poi !== null) ? String(poi.title || poi.name || "").toLowerCase() : "";
+
+  if (!category) return null;
+
+  // HEURISTIC: Specific overrides for famous landmarks that might have generic categories
+  if (name.includes("ayasofya") || name.includes("hagia sophia") || name.includes("blue mosque") || name.includes("sultanahmet")) {
+    const culture = UI_CATEGORIES.find(c => c.key === "monuments");
+    if (culture) return { ring: culture.ring, fill: culture.fill, uiKey: culture.key, icon: culture.icon };
+  }
+
+  // Handle both single strings, arrays, or comma-separated strings
+  const rawCatsArray = Array.isArray(category) 
+    ? category 
+    : String(category).split(',').map(s => s.trim());
+    
+  // Split by both comma AND dot to handle Mapbox dot-notation subcategories
+  const normCats = rawCatsArray.flatMap(c => c.toLowerCase().trim().split('.')).filter(Boolean);
+  
+  // Also keep the full strings for exact matching
+  rawCatsArray.forEach(c => normCats.push(c.toLowerCase().trim()));
+
+  const specificCategories = UI_CATEGORIES.filter(c => c.key !== 'others');
+  const othersCategory = UI_CATEGORIES.find(c => c.key === 'others');
+
+  for (const catObj of specificCategories) {
+    if (normCats.some(nc => catObj.aliases.includes(nc))) {
+      return { ring: catObj.ring, fill: catObj.fill, uiKey: catObj.key, icon: catObj.icon };
+    }
+  }
+
+  if (othersCategory) {
+    if (normCats.some(nc => othersCategory.aliases.includes(nc))) {
+      return { ring: othersCategory.ring, fill: othersCategory.fill, uiKey: othersCategory.key, icon: othersCategory.icon };
+    }
+  }
+
+  return null;
+}
+
+function labelByCategory(poi) {
+  const icon = poiIconByCategory(poi);
   if (!icon) return null;
   const found = UI_CATEGORIES.find((x) => x.key === icon.uiKey);
   return found?.label || null;
@@ -153,6 +461,18 @@ function getSafePoiTitle(p) {
   if (cat) return cat;
 
   return "Place";
+}
+
+/** Stable React key + favorite row id for a map / Discover POI row. */
+function getMapPoiRowKey(p) {
+  if (!p) return "";
+  if (p.poiId != null) return String(p.poiId);
+  const lat = Number(p.latitude ?? p.lat);
+  const lon = Number(p.longitude ?? p.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return `unknown:${String(p?.name || "").slice(0, 48)}`;
+  }
+  return `${lat.toFixed(5)}:${lon.toFixed(5)}:${String(p?.name || "").slice(0, 48)}`;
 }
 
 function isPointInsidePolygon(lat, lng, polygonLatLng) {
@@ -200,6 +520,13 @@ function ensureMapbox3D(map, enabled) {
   const safeRemoveSource = (id) => {
     if (map.getSource(id)) map.removeSource(id);
   };
+
+  // Force globe projection EARLY and ALWAYS
+  try {
+    map.setProjection("globe");
+  } catch (e) {
+    // ignore
+  }
 
   if (!enabled) {
     try {
@@ -292,15 +619,59 @@ export default function MapPage() {
   const navigate = useNavigate();
   const mapRef = useRef(null);
   const isMobile = useIsMobile(768);
+  const { data: profile } = useUserProfile();
+  const { profilePhotoUrl } = useProfilePhoto(profile);
   const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
     useGamificationProfile();
 
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
-  const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
-  const [styleIndex, setStyleIndex] = useState(1);
+  const queryClient = useQueryClient();
+  const { data: feedbackAffinity } = useFeedbackAffinity();
+  const [favSendingKey, setFavSendingKey] = useState(null);
+  /** Which viewport POI marker has the detail popover open (pin tap). */
+  const [viewportPoiPopoverKey, setViewportPoiPopoverKey] = useState(null);
+
+  const [viewState, setViewState] = useState({
+    longitude: 32.8597,
+    latitude: 39.9334,
+    zoom: 12,
+    pitch: 0,
+    bearing: 0,
+  });
+
+  // Attempt to center map on user's current location on mount
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setViewState((prev) => ({
+            ...prev,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            zoom: 13, // Slightly closer on user location
+          }));
+        },
+        (err) => {
+          console.log("[MapPage] Geolocation denied or failed, using default center.", err);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    }
+  }, []);
+
+  const initialDarkMode = (() => {
+    const saved = localStorage.getItem('vacanza-theme');
+    if (saved) return saved === 'night';
+    const hour = new Date().getHours();
+    return hour < 6 || hour >= 20;
+  })();
+
+  const [styleIndex, setStyleIndex] = useState(initialDarkMode ? 1 : 0);
+  const [isDarkMode, setIsDarkMode] = useState(initialDarkMode);
   const [is3D, setIs3D] = useState(false);
+  const [mapboxPois, setMapboxPois] = useState([]);
 
   const [mode, setMode] = useState("VIEWPORT"); // VIEWPORT | SELECTION
   const [selection, setSelection] = useState({ mode: null, polygon: [] });
@@ -313,7 +684,7 @@ export default function MapPage() {
   const [poisRaw, setPoisRaw] = useState([]);
   const [poiLoading, setPoiLoading] = useState(false);
 
-  const [filterOpen, setFilterOpen] = useState(true);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const [selectedCats, setSelectedCats] = useState(() => {
     const all = {};
@@ -325,14 +696,174 @@ export default function MapPage() {
   const [resultsTab, setResultsTab] = useState("all");
   const [bookingOpen, setBookingOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [preferencesModalOpen, setPreferencesModalOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeRoute, setActiveRoute] = useState(null);
   const [activeDay, setActiveDay] = useState(1);
   const [routeGeometry, setRouteGeometry] = useState(null);
-  // Results açılınca sağdaki filtre otomatik kapanır (çakışma yok)
+  const [routeViewActive, setRouteViewActive] = useState(false);
+
+  // Fly to a waypoint when user clicks it in the RoutePanel
+  const handleWaypointClick = useCallback((wp) => {
+    const lat = Number(wp.latitude ?? wp.lat);
+    const lon = Number(wp.longitude ?? wp.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    map.flyTo({ center: [lon, lat], zoom: 17, duration: 700 });
+  }, []);
+
+  // FReq5 — "Bu yer kapalı" handler: triggers adaptive adjustment and reloads route
+  const handleMarkUnavailable = useCallback(async (wp) => {
+    const routeId = activeRoute?.routeId ?? activeRoute?.route_id;
+    if (!routeId) {
+      message.warning("Bu rotanın kaydedilmiş bir ID'si yok. Lütfen rotayı tekrar oluşturun.");
+      return;
+    }
+    try {
+      const result = await aiApi.adjustRoute(routeId, {
+        triggerType: "USER_REPORTED",
+        severity: "HIGH",
+        reason: `${wp.name} kapalı veya ulaşılamaz`,
+        affectedPoiName: wp.name,
+        affectedDay: wp.day,
+      });
+      if (result.newRouteId && result.newRouteId !== routeId) {
+        const detail = await aiApi.getRoute(result.newRouteId);
+        const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
+        setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? result.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
+      }
+      message.success(result.userMessage || "Rotanız güncellendi.");
+    } catch {
+      message.error("Güncelleme sırasında bir hata oluştu.");
+    }
+  }, [activeRoute]);
+
+  // FReq5 — SSE: receives route_updated push from backend (e.g. weather alerts)
+  useAdjustmentStream(async (data) => {
+    if (!data.newRouteId) return;
+    try {
+      const detail = await aiApi.getRoute(data.newRouteId);
+      const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
+      setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? data.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
+      notification.info({
+        message: "Rotanız güncellendi",
+        description: data.userMessage || "Bir veya daha fazla durak otomatik olarak güncellendi.",
+        placement: "topRight",
+        duration: 6,
+      });
+    } catch {
+      // silently ignore — route will update on next manual refresh
+    }
+  });
+
+  /** Parametre modalı (sadece API göndermeden önce) */
+  const [polygonRouteParamsOpen, setPolygonRouteParamsOpen] = useState(false);
+  /** Üstteki rota isteği bandı kapatıldıysa; sonuç panelinde yedek CTA kalır */
+  const [polygonRouteBannerDismissed, setPolygonRouteBannerDismissed] = useState(false);
+  const [polygonRouteSubmitting, setPolygonRouteSubmitting] = useState(false);
+  const [polygonRouteForm] = Form.useForm();
+  const [chatConversationRefreshNonce, setChatConversationRefreshNonce] = useState(0);
+  /** Sohbet–harita bağlantısı (replan gün); VacanzaChat onConversationIdChange ile güncellenir. */
+  const [mapChatConversationId, setMapChatConversationId] = useState(null);
+  const [replanDaySubmitting, setReplanDaySubmitting] = useState(false);
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [fabExpanded, setFabExpanded] = useState(false);
+  const [savedPoisOpen, setSavedPoisOpen] = useState(false);
+
+  // 1. Initial State Calculation (Clock-driven unless manual)
+  // (isDarkMode is now initialized above)
+
+  const [isManual, setIsManual] = useState(() => localStorage.getItem('vacanza-manual') === 'true');
+
   useEffect(() => {
-    if (resultsOpen) setFilterOpen(false);
-  }, [resultsOpen]);
+    const syncTheme = () => {
+      if (!isManual) {
+        const hour = new Date().getHours();
+        const shouldBeDark = hour < 6 || hour >= 20;
+        if (shouldBeDark !== isDarkMode) {
+          setIsDarkMode(shouldBeDark);
+          setStyleIndex(shouldBeDark ? 1 : 0);
+        }
+      }
+    };
+
+    const timer = setInterval(syncTheme, 60000);
+    return () => clearInterval(timer);
+  }, [isManual, isDarkMode]);
+
+  const toggleTheme = () => {
+    const nextVal = !isDarkMode;
+    setIsDarkMode(nextVal);
+    setIsManual(true);
+    setStyleIndex(nextVal ? 1 : 0);
+    localStorage.setItem('vacanza-theme', nextVal ? 'night' : 'day');
+    localStorage.setItem('vacanza-manual', 'true');
+  };
+
+  const themeClass = isDarkMode ? "theme-night" : "theme-day";
+  const mapStyleIndex = isDarkMode ? 1 : 0;
+
+  const [formattedTime, setFormattedTime] = useState("");
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const h = now.getHours();
+      const m = now.getMinutes().toString().padStart(2, '0');
+      const hours12 = h % 12 || 12;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      setFormattedTime(`${hours12}:${m} ${ampm}`);
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 60000);
+    return () => clearInterval(timer);
+  }, []);
+  // Mutual exclusion for ALL panels to avoid overlaps - fixed logic
+  useEffect(() => {
+    if (resultsOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+      if (fabExpanded) setFabExpanded(false);
+    }
+  }, [resultsOpen]); // Only react when resultsOpen changes
+
+  useEffect(() => {
+    if (filterOpen) {
+      if (resultsOpen) setResultsOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+    }
+  }, [filterOpen]);
+
+  useEffect(() => {
+    if (isChatOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (resultsOpen) setResultsOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+    }
+  }, [isChatOpen]);
+
+  useEffect(() => {
+    if (bookingOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (resultsOpen) setResultsOpen(false);
+      if (fabExpanded) setFabExpanded(false);
+    }
+  }, [bookingOpen]);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      if (filterOpen) setFilterOpen(false);
+      if (isChatOpen) setIsChatOpen(false);
+      if (bookingOpen) setBookingOpen(false);
+      if (resultsOpen) setResultsOpen(false);
+      if (fabExpanded) setFabExpanded(false);
+    }
+  }, [sidebarOpen]);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
   const mapStyle = useMemo(() => STYLES[styleIndex], [styleIndex]);
@@ -374,9 +905,14 @@ export default function MapPage() {
       id: "preview-glow",
       type: "line",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-width": 10, "line-opacity": 0.22, "line-color": "#7DD3FC", "line-blur": 2.2 },
+      paint: {
+        "line-width": 12,
+        "line-opacity": 0.22,
+        "line-color": isDarkMode ? "#38BDF8" : "#FF6B6B",
+        "line-blur": 2.5,
+      },
     }),
-    []
+    [isDarkMode]
   );
 
   const previewMainLayer = useMemo(
@@ -385,17 +921,24 @@ export default function MapPage() {
       type: "line",
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
-        "line-width": 4,
+        "line-width": 3,
         "line-opacity": 0.95,
-        "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0.0, "#22C55E", 0.5, "#60A5FA", 1.0, "#A78BFA"],
+        "line-color": isDarkMode ? "#0EA5E9" : "#FF6B6B",
       },
     }),
-    []
+    [isDarkMode]
   );
 
   const selectionFillLayer = useMemo(
-    () => ({ id: "sel-fill", type: "fill", paint: { "fill-color": "#60A5FA", "fill-opacity": 0.1 } }),
-    []
+    () => ({
+      id: "sel-fill",
+      type: "fill",
+      paint: {
+        "fill-color": isDarkMode ? "#38BDF8" : "#FF6B6B",
+        "fill-opacity": 0.08,
+      },
+    }),
+    [isDarkMode]
   );
 
   const selectionOutlineGlowLayer = useMemo(
@@ -403,9 +946,14 @@ export default function MapPage() {
       id: "sel-outline-glow",
       type: "line",
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-width": 10, "line-opacity": 0.18, "line-color": "#93C5FD", "line-blur": 2.0 },
+      paint: {
+        "line-width": 12,
+        "line-opacity": 0.2,
+        "line-color": isDarkMode ? "#38BDF8" : "#FF6B6B",
+        "line-blur": 3.0,
+      },
     }),
-    []
+    [isDarkMode]
   );
 
   const selectionOutlineMainLayer = useMemo(
@@ -415,23 +963,37 @@ export default function MapPage() {
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
         "line-width": 4,
-        "line-opacity": 0.95,
-        "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0.0, "#22C55E", 0.55, "#60A5FA", 1.0, "#A78BFA"],
+        "line-opacity": 1,
+        "line-gradient": [
+          "interpolate",
+          ["linear"],
+          ["line-progress"],
+          0.0,
+          isDarkMode ? "#2DD4BF" : "#22C55E",
+          0.5,
+          isDarkMode ? "#38BDF8" : "#FF6B6B",
+          1.0,
+          isDarkMode ? "#818CF8" : "#4338CA",
+        ],
       },
     }),
-    []
+    [isDarkMode]
   );
 
   // AUTH
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
+        // Only redirect if NOT loading, but wait, we need to know if it's the first check.
+        // Actually, just set loading to false and let the user decide.
+        setLoadingAuth(false);
         navigate("/login");
         return;
       }
 
       // If email is not verified, send to verification page
       if (!currentUser.emailVerified) {
+        setLoadingAuth(false);
         navigate("/verify-email");
         return;
       }
@@ -450,6 +1012,76 @@ export default function MapPage() {
       console.error(e);
     }
   }, [navigate]);
+
+  const toggleMapPoiFavorite = useCallback(
+    async (p) => {
+      if (!user) return;
+      const lat = Number(p?.latitude ?? p?.lat);
+      const lon = Number(p?.longitude ?? p?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      const key = getMapPoiRowKey(p);
+      const base = buildMapPoiFeedbackPayload(p);
+      const favored = deriveMapPoiFavorited(feedbackAffinity, p);
+      const eventType = favored ? "THUMBS_DOWN" : "THUMBS_UP";
+      setFavSendingKey(key);
+      try {
+        await postPoiFeedbackEvent({ eventType, ...base });
+        await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
+        await queryClient.invalidateQueries({ queryKey: ["feedback", "saved-pois"] });
+        message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
+      } catch (e) {
+        message.error(e?.friendlyMessage || "Could not update favorites.");
+      } finally {
+        setFavSendingKey(null);
+      }
+    },
+    [user, feedbackAffinity, queryClient]
+  );
+
+  const handleMapIdle = useCallback(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current.getMap();
+    if (map.getZoom() < 12) {
+      setMapboxPois([]);
+      return;
+    }
+
+    // Standard Mapbox layers for diverse POIs
+    const poiLayers = [
+      'poi-label',
+      'settlement-label',
+      'medical-label',
+      'transit-label',
+      'airport-label',
+      'natural-label',
+      'park-label',
+      'place-label'
+    ];
+
+    // Safety check: only query layers that exist in current style
+    const styleLayers = map.getStyle().layers.map(l => l.id);
+    const validLayers = poiLayers.filter(id => styleLayers.includes(id));
+
+    const features = map.queryRenderedFeatures({ layers: validLayers });
+    if (!features || features.length === 0) return;
+
+    const discovered = features.map(f => {
+      const p = f.properties;
+      const name = p.name_en || p.name;
+      const type = p.type || p.maki || p.class || p.category || p.category_en || "poi";
+      const [lng, lat] = f.geometry.coordinates;
+
+      return {
+        id: `mb-${name}-${lng.toFixed(5)}-${lat.toFixed(5)}`,
+        name: name,
+        category: type.toLowerCase(),
+        location: { lat, lng },
+        source: 'mapbox'
+      };
+    }).filter(p => !!p.name);
+
+    setMapboxPois(discovered);
+  }, []);
 
   const getViewportBbox = useCallback(() => {
     const map = mapRef.current?.getMap?.();
@@ -508,6 +1140,11 @@ export default function MapPage() {
 
     debounceRef.current = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      const map = mapRef.current?.getMap?.();
+      if (map && map.getZoom() < 12) {
+        setPoisRaw([]);
+        return;
+      }
       const bbox = getViewportBbox();
       if (bbox) fetchPois({ selectionType: "BBOX", bbox });
     }, 500);
@@ -525,6 +1162,11 @@ export default function MapPage() {
 
     const t = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      const map = mapRef.current?.getMap?.();
+      if (map && map.getZoom() < 12) {
+        setPoisRaw([]);
+        return;
+      }
       const bbox = getViewportBbox();
       if (bbox) fetchPois({ selectionType: "BBOX", bbox });
     }, 600);
@@ -537,11 +1179,18 @@ export default function MapPage() {
     if (!MAPBOX_TOKEN || !user) return;
     if (mode !== "VIEWPORT") return;
 
+    const map = mapRef.current?.getMap?.();
+    if (map && map.getZoom() < 12) {
+      setPoisRaw([]);
+      return;
+    }
     const bbox = getViewportBbox();
     if (bbox) fetchPois({ selectionType: "BBOX", bbox });
   }, [selectedBackendCats, MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
 
   const startFreehand = useCallback(() => {
+    setPolygonRouteParamsOpen(false);
+    setPolygonRouteBannerDismissed(false);
     setMode("SELECTION");
     setFreehandEnabled(true);
     setFilterOpen(false);
@@ -553,6 +1202,8 @@ export default function MapPage() {
   }, []);
 
   const clearSelectionOnly = useCallback(async () => {
+    setPolygonRouteParamsOpen(false);
+    setPolygonRouteBannerDismissed(false);
     setFreehandEnabled(false);
     setPreviewLine(null);
     setSelection({ mode: null, polygon: [] });
@@ -565,8 +1216,25 @@ export default function MapPage() {
       await fetchPois({ selectionType: "BBOX", bbox, categoriesOverride: [] });
     }
 
-    setFilterOpen(true);
+    setFilterOpen(false);
   }, [fetchPois, getViewportBbox]);
+
+  const handleSelectAllFilters = useCallback(() => {
+    const all = {};
+    UI_CATEGORIES.forEach((c) => (all[c.key] = true));
+    setSelectedCats(all);
+  }, []);
+
+  const handleDeselectAllFilters = useCallback(() => {
+    const all = {};
+    UI_CATEGORIES.forEach((c) => (all[c.key] = false));
+    setSelectedCats(all);
+  }, []);
+
+  const handleResetFilters = useCallback(async () => {
+    handleSelectAllFilters();
+    await clearSelectionOnly();
+  }, [handleSelectAllFilters, clearSelectionOnly]);
 
   const onMouseDownFreehand = useCallback(
     (e) => {
@@ -604,6 +1272,8 @@ export default function MapPage() {
     setPreviewLine(null);
     setFreehandEnabled(false);
 
+
+
     if (pts.length < 3) {
       setSelection({ mode: null, polygon: [] });
       setMode("VIEWPORT");
@@ -616,44 +1286,271 @@ export default function MapPage() {
     setSelection({ mode: "polygon", polygon: poly });
 
     await fetchPois({ selectionType: "POLYGON", polygon: poly });
-    setFilterOpen(true);
 
+    // Crucial: The useEffect will handle closing others when resultsOpen becomes true
     setResultsOpen(true);
     setResultsTab("all");
-  }, [freehandEnabled, fetchPois]);
+
+    if (user) {
+      setPolygonRouteBannerDismissed(false);
+    }
+  }, [freehandEnabled, fetchPois, user]);
+
+  const openPolygonRouteParams = useCallback(() => {
+    polygonRouteForm.resetFields();
+    polygonRouteForm.setFieldsValue({
+      totalDays: 3,
+      travelStyle: "general",
+      includeFavorites: true,
+    });
+    setPolygonRouteParamsOpen(true);
+  }, [polygonRouteForm]);
+
+  const submitPolygonRoute = useCallback(
+    async (values) => {
+      if (!selection?.polygon || selection.polygon.length < 3) {
+        message.warning("Please select a valid area first.");
+        return;
+      }
+      const ring = selection.polygon.map((p) => [p.lng, p.lat]);
+      const categories = selectedBackendCats
+        .map((k) => UI_KEY_TO_BACKEND_CATEGORY[k])
+        .filter(Boolean);
+      setPolygonRouteSubmitting(true);
+      try {
+        const body = {
+          coordinates: ring,
+          totalDays: values.totalDays,
+          travelStyle: values.travelStyle,
+          includeFavorites: values.includeFavorites !== false,
+        };
+        if (categories.length) body.categories = categories;
+        const res = await aiApi.createRouteFromPolygon(body);
+        const routeData = res.route_data || res.routeData;
+        if (routeData) {
+          const routeId = res.route_id ?? res.routeId ?? null;
+          setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
+          setActiveDay(1);
+          setPolygonRouteParamsOpen(false);
+          setPolygonRouteBannerDismissed(false);
+          setResultsOpen(false);
+          setFilterOpen(false);
+          setIsChatOpen(false);
+          setSelection({ mode: null, polygon: [] });
+          setMode("VIEWPORT");
+          const convId = res.conversation_id || res.conversationId;
+          if (convId) {
+            linkPolygonRouteConversation(convId);
+            setMapChatConversationId(String(convId));
+            setChatConversationRefreshNonce((n) => n + 1);
+          }
+          const summary = res.route_summary_message || res.routeSummaryMessage;
+          if (summary) message.success(summary);
+          else message.success("Route is being displayed on the map.");
+        } else {
+          message.warning("Could not retrieve route data.");
+        }
+      } catch (e) {
+        const msg =
+          e?.response?.data?.message ||
+          e?.friendlyMessage ||
+          e?.message ||
+          "Failed to create route.";
+        message.error(msg);
+      } finally {
+        setPolygonRouteSubmitting(false);
+      }
+    },
+    [selection, selectedBackendCats]
+  );
+
+  const handleRequestDrawToEditFromChat = useCallback(() => {
+    setIsChatOpen(false);
+    setMode("SELECTION");
+    setFreehandEnabled(true);
+    message.info({
+      content:
+        "Draw an area on the map → select a day from the route panel on the right → update that day from the orange banner at the top.",
+      duration: 8,
+    });
+  }, []);
+
+  const submitReplanDayFromPolygon = useCallback(async () => {
+    if (!selection?.polygon || selection.polygon.length < 3) {
+      message.error("Please draw a valid area.");
+      return;
+    }
+    const convId = mapChatConversationId || getSessionConversationId();
+    if (!convId) {
+      message.error("Open a route from the chat first or select the chat associated with the route created from the map.");
+      return;
+    }
+    if (!activeRoute?.days?.length) {
+      message.error("No route available to replan.");
+      return;
+    }
+    const td = Number(activeRoute.total_days || activeRoute.totalDays || activeRoute.days.length);
+    if (!Number.isFinite(activeDay) || activeDay < 1 || activeDay > td) {
+      message.error("Please select a valid day.");
+      return;
+    }
+    const ring = selection.polygon.map((p) => [p.lng, p.lat]);
+    const categories = selectedBackendCats.map((k) => UI_KEY_TO_BACKEND_CATEGORY[k]).filter(Boolean);
+    setReplanDaySubmitting(true);
+    try {
+      const body = {
+        conversationId: convId,
+        day: activeDay,
+        coordinates: ring,
+        travelStyle: "general",
+      };
+      if (categories.length) body.categories = categories;
+      const res = await aiApi.replanDayFromPolygon(body);
+      const routeData = res.route_data || res.routeData;
+      if (routeData) {
+        const routeId = res.route_id ?? res.routeId ?? activeRoute?.routeId ?? null;
+        setActiveRoute(normalizeRouteForMap({ ...routeData, routeId }));
+        setActiveDay(activeDay);
+        setFilterOpen(false);
+        setIsChatOpen(true);
+        linkPolygonRouteConversation(convId);
+        setChatConversationRefreshNonce((n) => n + 1);
+        const summary = res.route_summary_message || res.routeSummaryMessage;
+        if (summary) message.success(summary);
+        else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
+      } else {
+        message.warning("Could not retrieve route data.");
+      }
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.friendlyMessage ||
+        e?.message ||
+        "Failed to replan day.";
+      message.error(msg);
+    } finally {
+      setReplanDaySubmitting(false);
+    }
+  }, [selection, mapChatConversationId, activeRoute, activeDay, selectedBackendCats]);
+
+  /** Band kapatıldı + sonuç paneli kapalıyken küçük yedek CTA */
+  const showCompactPolygonRouteCta = useMemo(
+    () =>
+      Boolean(
+        user &&
+        selection?.mode === "polygon" &&
+        (selection.polygon?.length ?? 0) >= 3 &&
+        !activeRoute &&
+        polygonRouteBannerDismissed &&
+        !resultsOpen
+      ),
+    [user, selection, activeRoute, polygonRouteBannerDismissed, resultsOpen]
+  );
+
+  /** Rota açıkken çizilen alanla tek günü yeniden planlama (sohbet + kayıtlı rota gerekir). */
+  const showReplanDayBanner = useMemo(
+    () =>
+      Boolean(
+        user &&
+        activeRoute &&
+        selection?.mode === "polygon" &&
+        (selection.polygon?.length ?? 0) >= 3
+      ),
+    [user, activeRoute, selection]
+  );
 
   // 3D toggle: pitch + gerçek 3D layerlar
   const handleToggle2D3D = useCallback(() => {
-    const nextIs3D = !is3D;
-    setIs3D(nextIs3D);
-
+    const next = !is3D;
+    setIs3D(next);
     const map = mapRef.current?.getMap?.();
     if (map) {
-      map.easeTo({ pitch: nextIs3D ? 60 : 0, duration: 650 });
-      ensureMapbox3D(map, nextIs3D);
+      map.easeTo({ pitch: next ? 60 : 0, duration: 650 });
+      ensureMapbox3D(map, next);
     }
-
-    setViewState((prev) => ({ ...prev, pitch: nextIs3D ? 60 : 0 }));
+    setViewState((prev) => ({ ...prev, pitch: next ? 60 : 0 }));
   }, [is3D]);
 
   const handleStyleChange = useCallback(() => {
     setStyleIndex((i) => (i + 1) % STYLES.length);
   }, []);
 
-  // Map load + style reload => 3D tekrar ekle
-  const onMapLoad = useCallback(() => {
-    const map = mapRef.current?.getMap?.();
-    if (map) ensureMapbox3D(map, is3D);
+  // Map load + style reload => 3D tekrar ekle + traffic sakla
+  const onMapLoad = useCallback((e) => {
+    const map = e?.target || mapRef.current?.getMap?.();
+    if (map) {
+      ensureMapbox3D(map, is3D);
+      hideTrafficLayers(map);
+      try {
+        map.setProjection("globe");
+        map.setFog({ "horizon-blend": 0.1, "space-color": "#000000", "star-intensity": 0.0 });
+      } catch (err) {
+        // ignore
+      }
+
+      // Secondary delay ensures projection sticks for styles that might override it
+      setTimeout(() => {
+        try {
+          if (map) map.setProjection("globe");
+        } catch (e) { }
+      }, 500);
+    }
   }, [is3D]);
 
-  const onStyleData = useCallback(() => {
-    const map = mapRef.current?.getMap?.();
-    if (map) ensureMapbox3D(map, is3D);
+  const onStyleData = useCallback((e) => {
+    const map = e?.target || mapRef.current?.getMap?.();
+    if (map) {
+      ensureMapbox3D(map, is3D);
+      hideTrafficLayers(map);
+
+      // Force Globe forcefully
+      try {
+        map.setProjection({ name: "globe" });
+        map.setFog({
+          "horizon-blend": 0.1,
+          "space-color": "#000000",
+          "star-intensity": 0.1,
+        });
+      } catch (err) {
+        // ignore
+      }
+
+      // Reinforce after style data settle
+      setTimeout(() => {
+        try {
+          if (map) {
+            map.setProjection({ name: "globe" });
+          }
+        } catch (e) { }
+      }, 300);
+    }
   }, [is3D]);
 
   // POI'ler: polygon içi filtre + UI filtre
+  // Combined POI list (Backend + Mapbox Discoveries)
   const pois = useMemo(() => {
-    let list = poisRaw;
+    // 1. Performance Rule: Hide POIs at low zoom levels to prevent clutter
+    if (viewState.zoom <= 10) return [];
+
+    const all = [...poisRaw];
+    const poiCoords = new Set(poisRaw.map(p => `${p.latitude?.toFixed(4)},${p.longitude?.toFixed(4)}`));
+
+    mapboxPois.forEach(mbp => {
+      const coordKey = `${mbp.location.lat.toFixed(4)},${mbp.location.lng.toFixed(4)}`;
+      if (!poiCoords.has(coordKey)) {
+        all.push({
+          poiId: mbp.id,
+          latitude: mbp.location.lat,
+          longitude: mbp.location.lng,
+          name: mbp.name,
+          category: mbp.category,
+          source: 'mapbox'
+        });
+        poiCoords.add(coordKey);
+      }
+    });
+
+    let list = all;
 
     if (mode === "SELECTION" && selection?.mode === "polygon" && selection.polygon.length >= 3) {
       list = list.filter((p) => isPointInsidePolygon(p.latitude, p.longitude, selection.polygon));
@@ -661,12 +1558,19 @@ export default function MapPage() {
 
     const activeKeys = new Set(UI_CATEGORIES.filter((c) => selectedCats[c.key]).map((c) => c.key));
 
-    return list.filter((p) => {
+    const out = list.filter((p) => {
       const icon = poiIconByCategory(p.category);
       if (!icon) return true;
       return activeKeys.has(icon.uiKey);
     });
-  }, [poisRaw, mode, selection, selectedCats]);
+
+    // 2. Performance Rule: Cap at 1000 POIs to prevent memory bloating
+    return out.slice(0, 1000);
+  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom]);
+
+  const canShowResultsPanel = useMemo(() => {
+    return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
+  }, [resultsOpen, selection]);
 
   const resultsPois = useMemo(() => {
     if (!resultsOpen) return [];
@@ -679,9 +1583,23 @@ export default function MapPage() {
     });
   }, [pois, resultsOpen, resultsTab, selection]);
 
-  const canShowResultsPanel = useMemo(() => {
-    return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
-  }, [resultsOpen, selection]);
+  const resultsCategories = useMemo(() => {
+    if (!canShowResultsPanel) return [];
+    const keys = new Set();
+    pois.forEach((p) => {
+      const icon = poiIconByCategory(p);
+      if (icon?.uiKey) keys.add(icon.uiKey);
+    });
+    return UI_CATEGORIES.filter((c) => keys.has(c.key));
+  }, [pois, canShowResultsPanel]);
+
+  useEffect(() => {
+    if (resultsTab !== "all" && resultsCategories.length > 0) {
+      if (!resultsCategories.find((c) => c.key === resultsTab)) {
+        setResultsTab("all");
+      }
+    }
+  }, [resultsCategories, resultsTab]);
 
   // Normalize waypoint coords: backend may send latitude/longitude (camelCase); ensure numeric and consistent order
   const activeWaypoints = useMemo(() => {
@@ -689,15 +1607,27 @@ export default function MapPage() {
     const dayPlan = activeRoute.days?.find(
       (d) => Number(d?.day) === Number(activeDay)
     );
-    const raw = (dayPlan?.waypoints || []).map((w) => {
+    const raw = (dayPlan?.waypoints || []).map((w, i) => {
       const lat = Number(w.latitude ?? w.lat ?? NaN);
       const lon = Number(w.longitude ?? w.lon ?? NaN);
-      return { ...w, latitude: lat, longitude: lon };
+      return { ...w, latitude: lat, longitude: lon, _originalIndex: i };
     });
     return raw.filter(
       (w) => Number.isFinite(w.latitude) && Number.isFinite(w.longitude)
     );
   }, [activeRoute, activeDay]);
+
+  // Hotel-aware waypoints for directions: prepend + append hotel coords if set
+  const directionsWaypoints = useMemo(() => {
+    const hotel = activeRoute?.selectedHotel;
+    const hlat = Number(hotel?.latitude);
+    const hlon = Number(hotel?.longitude);
+    if (!hotel || !Number.isFinite(hlat) || !Number.isFinite(hlon) || activeWaypoints.length === 0) {
+      return activeWaypoints;
+    }
+    const hotelPoint = { latitude: hlat, longitude: hlon, _isHotel: true };
+    return [hotelPoint, ...activeWaypoints, hotelPoint];
+  }, [activeWaypoints, activeRoute?.selectedHotel]);
 
   const routeLineGeoJSON = useMemo(() => {
     const coords =
@@ -763,15 +1693,19 @@ export default function MapPage() {
     let cancelled = false;
 
     const fetchRouteGeometry = async () => {
-      if (activeWaypoints.length < 2) {
+      if (directionsWaypoints.length < 2) {
         // No route for single-point days
         setRouteGeometry(null);
         return;
       }
 
+      // Clear stale geometry immediately so the previous route's line doesn't
+      // flicker on screen while the new geometry is being fetched.
+      setRouteGeometry(null);
+
       try {
         const body = {
-          waypoints: activeWaypoints.map((w) => ({
+          waypoints: directionsWaypoints.map((w) => ({
             latitude: w.latitude,
             longitude: w.longitude,
           })),
@@ -815,7 +1749,7 @@ export default function MapPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeWaypoints]);
+  }, [directionsWaypoints]);
 
   // fitBounds when route day changes
   useEffect(() => {
@@ -859,8 +1793,9 @@ export default function MapPage() {
     const bbox = polygonToBbox(selection.polygon);
     if (!bbox) return;
 
-    const bottomPad = isMobile ? 300 : RESULTS_PANEL_APPROX_HEIGHT_DESKTOP + 60;
-    const rightPad = isMobile ? 16 : filterOpen ? FILTER_PANEL_APPROX_WIDTH_DESKTOP + 60 : 90;
+    const bottomPad = isMobile ? 320 : 360; 
+    // If filter is open, push the polygon to the left slightly to avoid overlap
+    const rightPad = isMobile ? 16 : filterOpen ? (FILTER_PANEL_APPROX_WIDTH_DESKTOP + 80) : 100;
 
     map.fitBounds(
       [
@@ -868,9 +1803,9 @@ export default function MapPage() {
         [bbox.maxLng, bbox.maxLat],
       ],
       {
-        duration: 650,
+        duration: 800,
         padding: {
-          top: isMobile ? 90 : 90,
+          top: isMobile ? 80 : 100,
           left: isMobile ? 16 : 90,
           right: rightPad,
           bottom: bottomPad,
@@ -879,13 +1814,20 @@ export default function MapPage() {
     );
   }, [canShowResultsPanel, selection, filterOpen, isMobile]);
 
+  const mapPadding = useMemo(() => ({
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: (isChatOpen || activeRoute) ? (isMobile ? 0 : 440) : 0
+  }), [isChatOpen, activeRoute, isMobile]);
+
   if (loadingAuth || !user) return null;
 
   // ---------- Responsive sizes ----------
   const headerHeight = isMobile ? 54 : 64;
   const contentPadding = isMobile ? 0 : 24;
   const mapContainerRadius = isMobile ? 0 : 12;
-  const mapContainerHeight = isMobile ? `calc(100vh - ${headerHeight}px)` : "calc(100vh - 88px)";
+  const mapContainerHeight = isMobile ? `calc(100vh - ${headerHeight}px)` : `calc(100vh - ${headerHeight + contentPadding * 2}px)`;
 
   const fabSize = isMobile ? 44 : 48;
   const fabGap = isMobile ? 8 : 10;
@@ -896,610 +1838,701 @@ export default function MapPage() {
 
   const resultsWidth = isMobile ? "calc(100% - 24px)" : "min(760px, calc(100% - 48px))";
   const resultsBottom = isMobile ? 12 : 18;
-  const resultsMaxHeight = isMobile ? 240 : 260;
+  const resultsMaxHeight = isMobile ? 220 : 240;
 
-  const userCardWidth = isMobile ? 220 : 280;
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: isMobile ? "0 12px" : "0 20px",
-          height: headerHeight,
-          background: "#fff",
-          borderBottom: "1px solid #f0f0f0",
-          position: "fixed",
-          width: "100%",
-          zIndex: 100,
-        }}
-      >
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
-          onClick={() => window.location.reload()}
-        >
-          <GlobalOutlined style={{ fontSize: isMobile ? 20 : 24, color: "#1890ff" }} />
-          <span style={{ fontSize: isMobile ? 16 : 20, fontWeight: 700 }}>Vacanza Map</span>
+    <div className={`vivid-map-page ${themeClass} ${sidebarOpen ? "sidebar-open" : ""}`}>
+
+      {/* 1. Header (TOPBAR) */}
+      <header className={`vivid-map-header ${themeClass}`}>
+        <div className="header-left">
+          <div 
+            className="brand-logo vivid-brand" 
+            style={{ cursor: 'pointer' }} 
+            onClick={() => window.location.reload()}
+          >
+            Vacanza
+          </div>
+        </div>
+        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            className="header-action-btn vivid-interactive"
+            onClick={() => setBookingOpen(true)}
+            title="Book Flights & Hotels"
+          >
+            <span className="header-action-label" style={{ padding: "0 4px" }}>Book</span>
+          </button>
+          <button
+            className={`header-action-btn vivid-interactive${savedPoisOpen ? " header-action-btn--active" : ""}`}
+            onClick={() => setSavedPoisOpen((v) => !v)}
+            title="Saved Places"
+          >
+            {savedPoisOpen ? <HeartFilled style={{ fontSize: 16 }} /> : <HeartOutlined style={{ fontSize: 16 }} />}
+          </button>
+          <div
+            className="vivid-theme-toggle"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Day Mode" : "Switch to Night Mode"}
+          >
+            <button className={`toggle-btn ${isDarkMode ? 'is-night' : 'is-day'}`}>
+              {isDarkMode ? <SunOutlined /> : <MoonOutlined />}
+            </button>
+          </div>
+          <button
+            className="header-profile-btn"
+            onClick={() => setSidebarOpen(true)}
+            title="Profile & Settings"
+          >
+            <Avatar
+              size={36}
+              src={profilePhotoUrl || profile?.profileImageUrl || defaultAvatar}
+              style={{ cursor: "pointer", border: `2px solid ${isDarkMode ? 'rgba(56,189,248,0.4)' : 'rgba(255,107,107,0.3)'}` }}
+            />
+          </button>
+        </div>
+      </header>
+
+      {/* 2. Sidebar (Hamburger Menu Content) */}
+      <div className="vivid-sidebar-overlay" onClick={(e) => { e.stopPropagation(); setSidebarOpen(false); }} />
+      <aside className="vivid-sidebar">
+        <div className="sidebar-header" style={{ marginBottom: 24 }}>
+          <span className="brand-logo" style={{ marginLeft: 0, fontSize: 24 }}>Settings</span>
         </div>
 
-        <Button size={isMobile ? "small" : "middle"} icon={<LogoutOutlined />} onClick={handleLogout}>
-          {isMobile ? "" : "Log Out"}
-        </Button>
-      </Header>
+        <div className="sidebar-user-section">
+          <div className="sidebar-avatar-wrapper">
+            <Avatar size={90} src={profilePhotoUrl || profile?.profileImageUrl || defaultAvatar} className="sidebar-avatar" />
+          </div>
+          <div className="sidebar-info" style={{ textAlign: "center" }}>
+            <div className="sidebar-username">{profile?.preferredName || profile?.firstName || user?.displayName || "Adventurer"}</div>
+            <div className="sidebar-role">{gamification?.levelText || "Level 1 Explorer"}</div>
+          </div>
 
-      <Content style={{ marginTop: headerHeight, padding: contentPadding, position: "relative" }}>
-        <div
-          style={{
-            height: mapContainerHeight,
-            borderRadius: mapContainerRadius,
-            overflow: "hidden",
-            boxShadow: isMobile ? "none" : "0 4px 12px rgba(0,0,0,0.1)",
-            background: "#f5f5f5",
-            position: "relative",
-          }}
+          <div className="sidebar-xp-container">
+            <div className="xp-label">
+              <span>Level Progress</span>
+              <span>{gamification?.xpProgressPercent || 0}%</span>
+            </div>
+            <div className="sidebar-xp-bar">
+              <div className="sidebar-xp-fill" style={{ width: `${gamification?.xpProgressPercent || 0}%` }} />
+            </div>
+          </div>
+        </div>
+
+        <nav className="sidebar-menu">
+          <button className="sidebar-item vivid-interactive" onClick={() => { setProfileModalOpen(true); setSidebarOpen(false); }}>
+            <UserOutlined /> Account Profile
+          </button>
+
+          <button className="sidebar-item vivid-interactive" onClick={() => { setCalendarOpen(true); setSidebarOpen(false); }}>
+            <CalendarOutlined /> Trip Agenda
+          </button>
+
+          <button className="sidebar-item vivid-interactive" onClick={() => { setPreferencesModalOpen(true); setSidebarOpen(false); }}>
+            <SettingsIcon /> Preferences
+          </button>
+        </nav>
+
+        <button className="sidebar-item logout vivid-interactive" onClick={handleLogout}>
+          <LogoutIcon /> Sign Out
+        </button>
+      </aside>
+
+      {/* 3. Main Content (MAP) */}
+      <main className={`map-layout-content ${viewState.zoom >= 20 ? "zoom-at-max" : viewState.zoom <= 1.5 ? "zoom-at-min" : ""}`}>
+        <Map
+          ref={mapRef}
+          {...viewState}
+          padding={mapPadding}
+          onMove={(evt) => setViewState(evt.viewState)}
+          onClick={() => setViewportPoiPopoverKey(null)}
+          onIdle={handleMapIdle}
+          onMoveEnd={() => { if (mode === "VIEWPORT" && !freehandEnabled) scheduleViewportFetch(); }}
+          mapStyle={mapStyle}
+          mapboxAccessToken={MAPBOX_TOKEN}
+          onMouseDown={onMouseDownFreehand}
+          onMouseMove={onMouseMoveFreehand}
+          onMouseUp={onMouseUpFreehand}
+          onLoad={onMapLoad}
+          onStyleData={onStyleData}
+          projection="globe"
+          renderWorldCopies={false}
+          style={{ width: "100%", height: "100%" }}
+          dragPan={!freehandEnabled}
+          cursor={freehandEnabled ? "crosshair" : "grab"}
+          attributionControl={false}
+          minZoom={1.5}
+          maxZoom={20}
         >
-          <Map
-            ref={mapRef}
-            {...viewState}
-            onMove={(e) => setViewState(e.viewState)}
-            onMoveEnd={() => {
-              if (mode === "VIEWPORT" && !freehandEnabled) scheduleViewportFetch();
-            }}
-            style={{ width: "100%", height: "100%" }}
-            mapStyle={mapStyle}
-            mapboxAccessToken={MAPBOX_TOKEN}
-            attributionControl={false}
-            onMouseDown={onMouseDownFreehand}
-            onMouseMove={onMouseMoveFreehand}
-            onMouseUp={onMouseUpFreehand}
-            dragPan={!freehandEnabled}
-            cursor={freehandEnabled ? "crosshair" : "grab"}
-            onLoad={onMapLoad}
-            onStyleData={onStyleData}
-          >
-            <NavigationControl position="bottom-right" showCompass={false} />
-            <GeolocateControl position="bottom-right" />
+          <NavigationControl position="bottom-left" showCompass={false} />
+          <GeolocateControl position="bottom-left" />
 
-            {freehandEnabled && (
-              <Source id="p-src" type="geojson" data={previewGeoJSON} lineMetrics>
-                <Layer {...previewGlowLayer} />
-                <Layer {...previewMainLayer} />
-              </Source>
-            )}
+          <Source id="selection-src" type="geojson" data={selectionGeoJSON}>
+            <Layer {...selectionFillLayer} />
+          </Source>
+          <Source id="selection-outline-src" type="geojson" data={selectionOutlineGeoJSON} lineMetrics>
+            <Layer {...selectionOutlineGlowLayer} />
+            <Layer {...selectionOutlineMainLayer} />
+          </Source>
+          <Source id="preview-src" type="geojson" data={previewGeoJSON} lineMetrics>
+            <Layer {...previewGlowLayer} />
+            <Layer {...previewMainLayer} />
+          </Source>
+          {!routeViewActive && pois.map((p) => {
+            const icon = poiIconByCategory(p);
+            const catKey = icon?.uiKey || "others";
+            if (!selectedCats[catKey]) return null;
 
-            {selection?.mode === "polygon" && (
-              <>
-                <Source id="f-src" type="geojson" data={selectionGeoJSON}>
-                  <Layer {...selectionFillLayer} />
-                </Source>
-                <Source id="o-src" type="geojson" data={selectionOutlineGeoJSON} lineMetrics>
-                  <Layer {...selectionOutlineGlowLayer} />
-                  <Layer {...selectionOutlineMainLayer} />
-                </Source>
-              </>
-            )}
+            const title = getSafePoiTitle(p);
+            const catInfo = UI_CATEGORIES.find(c => c.key === catKey);
+            const markerBg = catInfo?.fill || "rgba(100, 116, 139, 1)";
+            const markerKey = getMapPoiRowKey(p);
+            const catLabel = labelByCategory(p);
+            const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
+            const zoomScale = Math.min(1.2, Math.max(0.7, viewState.zoom / 15));
 
-            {!activeRoute && pois.map((p) => {
-              const icon = poiIconByCategory(p.category);
-              const title = getSafePoiTitle(p);
-
-              const ring = icon?.ring || "#64748B";
-              const fill = icon?.fill || "#F1F5F9";
-              const emoji = icon?.emoji || "📍";
-
-              return (
-                <Marker key={p.poiId || `${p.latitude}-${p.longitude}`} longitude={p.longitude} latitude={p.latitude} anchor="center">
-                  <Tooltip title={title} placement="top">
-                    {icon?.img ? (
-                      <div
-                        style={{
-                          width: 64,
-                          height: 64,
-                          cursor: "pointer",
-                          transition: "transform 0.2s",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
-                        }}
+            const popoverContent = (
+              <div className="map-viewport-poi-card glass-panel">
+                <div className="map-viewport-poi-card__row">
+                  <div className="map-viewport-poi-card__text">
+                    <div className="map-viewport-poi-card__title">{title}</div>
+                    {catLabel ? <div className="map-viewport-poi-card__meta">{catLabel}</div> : null}
+                  </div>
+                  {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
+                    <Tooltip title={mapPoiFavored ? "Remove favorite" : "Save to favorites"}>
+                      <button
+                        type="button"
+                        className={`map-poi-fav-hit${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
+                        aria-label={mapPoiFavored ? "Remove favorite" : "Save to favorites"}
+                        aria-pressed={mapPoiFavored}
+                        disabled={favSendingKey === markerKey}
                         onClick={(e) => {
-                          e.originalEvent.stopPropagation();
+                          e.stopPropagation();
+                          toggleMapPoiFavorite(p);
                         }}
                       >
-                        <img src={icon.img} alt={title} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          background: fill,
-                          border: `2px solid ${ring}`,
-                          borderRadius: "50%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer",
-                          boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
-                          transition: "transform 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
-                        }}
-                        onClick={(e) => {
-                          e.originalEvent.stopPropagation();
-                        }}
-                      >
-                        <span style={{ fontSize: 14 }}>{emoji}</span>
-                      </div>
-                    )}
-                  </Tooltip>
-                </Marker>
-              );
-            })}
+                        {favSendingKey === markerKey ? (
+                          <Spin size="small" className="map-poi-fav-hit__spin" />
+                        ) : (
+                          <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
+                            {mapPoiFavored ? (
+                              <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
+                            ) : (
+                              <HeartOutlined className="map-poi-fav-hit__heart" />
+                            )}
+                          </span>
+                        )}
+                      </button>
+                    </Tooltip>
+                  ) : (
+                    <span className="map-viewport-poi-card__hint">Sign in to save favorites</span>
+                  )}
+                </div>
+              </div>
+            );
 
-            {activeWaypoints.length >= 2 && (
-              <Source id="route-src" type="geojson" data={routeLineGeoJSON} lineMetrics>
-                <Layer {...routeGlowLayer} />
-                <Layer {...routeMainLayer} />
-              </Source>
-            )}
-
-            {activeWaypoints.map((wp, idx) => (
-              <Marker
-                key={`route-wp-${wp.day}-${wp.order}`}
-                longitude={wp.longitude}
-                latitude={wp.latitude}
-                anchor="center"
-              >
-                <Tooltip title={wp.name} placement="top">
+            return (
+              <Marker key={p.poiId || `${p.latitude}-${p.longitude}-${title}`} longitude={p.longitude} latitude={p.latitude} anchor="bottom">
+                <Popover
+                  open={viewportPoiPopoverKey === markerKey}
+                  onOpenChange={(open) => {
+                    if (open) setViewportPoiPopoverKey(markerKey);
+                    else setViewportPoiPopoverKey((k) => (k === markerKey ? null : k));
+                  }}
+                  trigger="click"
+                  placement="top"
+                  rootClassName="map-viewport-poi-popover"
+                  styles={{ body: { padding: 0 } }}
+                  content={popoverContent}
+                >
                   <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: "50%",
-                      background: "linear-gradient(135deg, #F97316, #EF4444)",
-                      border: "2.5px solid white",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontSize: 13,
-                      fontWeight: 800,
-                      boxShadow: "0 2px 8px rgba(249,115,22,0.4)",
-                      cursor: "pointer",
-                      transition: "transform 0.2s",
+                    className={`map-viewport-marker-hit vivid-interactive${viewportPoiPopoverKey === markerKey ? " map-viewport-marker-hit--open" : ""}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${title}. Tap for details and favorites.`}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ transform: `scale(${zoomScale})`, transition: "transform 0.2s ease-out" }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setViewportPoiPopoverKey((prev) => (prev === markerKey ? null : markerKey));
+                      }
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.2)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
                   >
-                    {idx + 1}
+                    <div style={{ cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.25))" }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50% 50% 50% 0",
+                          transform: "rotate(-45deg)",
+                          background: markerBg,
+                          border:
+                            viewportPoiPopoverKey === markerKey
+                              ? "2.5px solid var(--vivid-blue, #3da8c8)"
+                              : "2.5px solid white",
+                          display: "grid",
+                          placeItems: "center",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                          position: "relative",
+                        }}
+                      >
+                        <div
+                          style={{
+                            transform: "rotate(45deg)",
+                            color: "white",
+                            display: "grid",
+                            placeItems: "center",
+                            width: 22,
+                            height: 22,
+                            fontSize: 16,
+                            lineHeight: 0,
+                          }}
+                        >
+                          {icon?.icon || <GlobalOutlined />}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Popover>
+              </Marker>
+            );
+          })}
+
+          {activeWaypoints.length >= 2 && (
+            <Source
+              key={`route-src-${activeRoute?.routeId ?? activeRoute?.route_id ?? "r"}-${activeDay}`}
+              id="route-src"
+              type="geojson"
+              data={routeLineGeoJSON}
+              lineMetrics
+            >
+              <Layer {...routeGlowLayer} />
+              <Layer {...routeMainLayer} />
+            </Source>
+          )}
+
+          {/* Hotel marker */}
+          {(() => {
+            const hotel = activeRoute?.selectedHotel;
+            const hlat = Number(hotel?.latitude);
+            const hlon = Number(hotel?.longitude);
+            if (!hotel || !Number.isFinite(hlat) || !Number.isFinite(hlon)) return null;
+            return (
+              <Marker key="hotel-marker" latitude={hlat} longitude={hlon} anchor="bottom">
+                <div className="vc-map-hotel-marker" title={hotel?.hotelName ?? "Hotel"} role="img" aria-label="Hotel">
+                  <span className="vc-map-hotel-marker__glyph" aria-hidden>🏨</span>
+                </div>
+              </Marker>
+            );
+          })()}
+
+          {activeWaypoints.map((wp) => {
+            const isUnavailable = wp.unavailable === true;
+            const displayNumber = wp._originalIndex + 1;
+            return (
+              <Marker key={`route-wp-${wp.day}-${wp.order}`} longitude={wp.longitude} latitude={wp.latitude} anchor="center">
+                <Tooltip
+                  title={isUnavailable ? `${wp.name} (Closed)` : wp.name}
+                  placement="top"
+                >
+                  <div style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: "50%",
+                    background: isUnavailable
+                      ? "linear-gradient(135deg, #9CA3AF, #6B7280)"
+                      : "linear-gradient(135deg, #F97316, #EF4444)",
+                    border: `2.5px solid ${isUnavailable ? "#D1D5DB" : "white"}`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    boxShadow: isUnavailable
+                      ? "0 2px 6px rgba(107,114,128,0.35)"
+                      : "0 2px 8px rgba(249,115,22,0.4)",
+                    cursor: "pointer",
+                    opacity: isUnavailable ? 0.6 : 1,
+                  }}>
+                    {displayNumber}
                   </div>
                 </Tooltip>
               </Marker>
-            ))}
-          </Map>
+            );
+          })}
+        </Map>
 
-          {activeRoute && (
-            <RoutePanel
-              route={activeRoute}
-              activeDay={activeDay}
-              onDayChange={setActiveDay}
-              onClose={() => {
-                setActiveRoute(null);
-                setActiveDay(1);
-                setFilterOpen(true);
-              }}
-              onWaypointClick={(wp) => {
-                if (!Number.isFinite(wp.longitude) || !Number.isFinite(wp.latitude)) return;
-                mapRef.current?.getMap?.()?.flyTo({
-                  center: [wp.longitude, wp.latitude],
-                  zoom: 15,
-                  duration: 800,
-                });
-              }}
-            />
-          )}
-
-          <Card
-            onClick={() => setProfileModalOpen(true)}
-            style={{
-              position: "fixed",
-              top: isMobile ? headerHeight + 10 : headerHeight + contentPadding + 20,
-              left: isMobile ? 12 : contentPadding + 20,
-              zIndex: 100,
-              width: isMobile ? 240 : 280,
-              borderRadius: 20,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-              cursor: "pointer",
-              background: "rgba(255, 255, 255, 0.95)",
-              backdropFilter: "blur(8px)",
-              transition: "transform 0.2s ease",
-              border: "none"
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
-            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <Avatar
-                size={48}
-                src={user?.photoURL}
-                icon={<UserOutlined />}
-                style={{ border: "2px solid #e6f7ff" }}
-              />
-              <div>
-                <b style={{ fontSize: 16, display: "block" }}>{user?.displayName || "Gezgin"}</b>
-                <span style={{ fontSize: 13, color: "#8c8c8c" }}>{gamification?.roleText || "Newbie"}</span>
-              </div>
+        {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel and chat are closed */}
+        {!canShowResultsPanel && !isChatOpen && (
+          <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
+            setFilterOpen(false);
+            setFabExpanded(false);
+            setIsChatOpen(true);
+          }}>
+            <div className="pill-content">
+              <CompassOutlined className="pill-icon" />
+              <span className="pill-text">Ask Vacanza AI</span>
             </div>
+          </button>
+        )}
 
-            <div style={{ background: "#f5f5f5", padding: "12px", borderRadius: "14px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: "600", color: "#1890ff" }}>
-                  {gamification?.levelText || "Level 1"}
-                </span>
-              </div>
+        {/* 5. Unified Action FAB (RIGHT) */}
+        <div className="vivid-fab-group">
+          <Tooltip title={fabExpanded ? "Close" : "Actions"} placement="left">
+            <button className={`main-fab vivid-interactive ${fabExpanded ? "expanded" : ""}`} onClick={() => {
+              const next = !fabExpanded;
+              if (next) {
+                setFilterOpen(false);
+                setIsChatOpen(false);
+              }
+              setFabExpanded(next);
+            }}>
+              {fabExpanded ? <CloseOutlined /> : <CompassOutlined style={{ fontSize: 24 }} />}
+            </button>
+          </Tooltip>
 
-              <div style={{ width: "100%", height: 6, background: "#e8e8e8", borderRadius: 10, overflow: "hidden", marginBottom: 6 }}>
-                <div style={{
-                  width: `${gamification?.xpProgressPercent || 0}%`,
-                  height: "100%",
-                  background: "linear-gradient(90deg, #1890ff, #69c0ff)",
-                  transition: "width 0.5s ease-in-out"
-                }} />
-              </div>
-
-              <div style={{ fontSize: 11, color: "#595959", textAlign: "center" }}>
-                {gamification?.totalXp || 0} XP - {gamification?.xpProgressPercent || 0}% to next level
-              </div>
-            </div>
-          </Card>
-          {/* sağdaki butonlar */}
-          <div
-            style={{
-              position: "fixed",
-              top: isMobile ? headerHeight + 12 : headerHeight + contentPadding + 18,
-              right: isMobile ? 12 : contentPadding + 18,
-              zIndex: 60,
-              display: "flex",
-              flexDirection: "column",
-              gap: fabGap,
-            }}
-          >
-            <Tooltip title="Ask Vacanza AI" placement="left">
-              <Button
-                shape="circle"
-                onClick={() => {
-                  setIsChatOpen(true);
-                  setFilterOpen(false);
-                }}
-                style={{
-                  width: fabSize,
-                  height: fabSize,
-                  fontSize: isMobile ? "18px" : "20px",
-                  background: "linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)", // Figma'daki gibi hafif gradyan
-                  border: "none",
-                  color: "white",
-                  boxShadow: "0 4px 12px rgba(96, 165, 250, 0.4)",
-                }}
-              >
-                ✨
-              </Button>
+          <div className={`fab-sub-actions ${fabExpanded ? "visible" : ""}`}>
+            <Tooltip title="Local Filters" placement="left">
+              <button className="sub-fab vivid-interactive" onClick={() => {
+                const next = !filterOpen;
+                if (next) setIsChatOpen(false);
+                setFilterOpen(next);
+                setFabExpanded(false);
+              }}>
+                <FiFilter style={{ fontSize: 20 }} />
+              </button>
             </Tooltip>
-
             <Tooltip title="Draw Area" placement="left">
-              <Button
-                shape="circle"
-                onClick={startFreehand}
-                style={{
-                  width: fabSize,
-                  height: fabSize,
-                  border: freehandEnabled ? "2px solid #1890ff" : "none",
-                }}
-              >
-                ✏️
-              </Button>
+              <button className="sub-fab vivid-interactive" onClick={() => { startFreehand(); setFabExpanded(false); }}>
+                <PencilIcon />
+              </button>
             </Tooltip>
-
-            <Tooltip title="Toggle Filter" placement="left">
-              <Button
-                shape="circle"
-                icon={<UnorderedListOutlined />}
-                onClick={() => {
-                  setResultsOpen(false);
-                  setFilterOpen((v) => !v);
-                }}
-                style={{ width: fabSize, height: fabSize }}
-              />
+            <Tooltip title={is3D ? "Reset to 2D View" : "Enable 3D Perspective"} placement="left">
+              <button className="sub-fab vivid-interactive" onClick={() => { handleToggle2D3D(); /* No setFabExpanded(false) */ }}>
+                <CubeIcon />
+              </button>
             </Tooltip>
-
-            <Tooltip title={is3D ? "Switch to 2D View" : "Switch to 3D View"} placement="left">
-              <Button
-                shape="circle"
-                icon={<CompassOutlined />}
-                onClick={handleToggle2D3D}
-                style={{ width: fabSize, height: fabSize, color: is3D ? "#1890ff" : "#555" }}
-              />
-            </Tooltip>
-
-            <Tooltip title="Change Map Style" placement="left">
-              <Button
-                shape="circle"
-                icon={<HeatMapOutlined />}
-                onClick={handleStyleChange}
-                style={{ width: fabSize, height: fabSize }}
-              />
-            </Tooltip>
-
-            <Tooltip title="Open Bookings" placement="left">
-              <Button
-                shape="circle"
-                icon={<CalendarOutlined />}
-                onClick={() => setBookingOpen(true)}
-                style={{
-                  width: fabSize,
-                  height: fabSize,
-                  border: "none",
-                  background: bookingOpen ? "#1890ff" : "rgba(255,255,255,0.95)",
-                  color: bookingOpen ? "#fff" : "#333",
-                  backdropFilter: "blur(8px)",
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
-                }}
-              />
+            <Tooltip title="Switch Map Theme" placement="left">
+              <button className="sub-fab vivid-interactive" onClick={() => { handleStyleChange(); /* No setFabExpanded(false) */ }}>
+                <LayerIcon />
+              </button>
             </Tooltip>
           </div>
+        </div>
 
-          {/* Filter panel */}
-          {filterOpen && !activeRoute && (
-            <div
-              style={{
-                position: "fixed",
-                top: isMobile ? headerHeight + 10 : headerHeight + contentPadding + 28,
-                right: isMobile ? 12 : 78 + contentPadding,
-                zIndex: 70,
-                width: filterPanelWidth,
-                maxHeight: isMobile ? "62vh" : "unset",
-                overflow: isMobile ? "auto" : "visible",
-                background: "rgba(255,255,255,0.95)",
-                borderRadius: 16,
-                boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-                padding: 14,
-                backdropFilter: "blur(6px)",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-                <b style={{ fontSize: 14 }}>Filter</b>
-                <Button type="text" icon={<CloseOutlined />} onClick={() => setFilterOpen(false)} />
-              </div>
-
-              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                <Button size="small" onClick={clearSelectionOnly}>
-                  Reset Area
-                </Button>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {UI_CATEGORIES.map((c) => (
-                  <button
-                    key={c.key}
-                    onClick={() => setSelectedCats((prev) => ({ ...prev, [c.key]: !prev[c.key] }))}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      padding: 10,
-                      borderRadius: 10,
-                      border: selectedCats[c.key] ? `2px solid ${c.ring}` : "1px solid #eee",
-                      background: selectedCats[c.key] ? c.pill : "#fff",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      {c.img ? (
-                        <img src={c.img} alt={c.label} style={{ width: 32, height: 32, objectFit: "contain" }} />
-                      ) : (
-                        <span
-                          style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: 12,
-                            background: c.fill,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            border: `1px solid ${c.ring}`,
-                          }}
-                        >
-                          <span style={{ fontSize: 13 }}>{c.emoji}</span>
-                        </span>
-                      )}
-                      <b>{c.label}</b>
-                    </div>
-
-                    <span style={{ fontSize: 12, color: "#555" }}>
-                      {pois.filter((p) => poiIconByCategory(p.category)?.uiKey === c.key).length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Results bottom sheet */}
-          {canShowResultsPanel && (
-            <div
-              style={{
-                position: "fixed",
-                left: "50%",
-                transform: "translateX(-50%)",
-                bottom: resultsBottom,
-                zIndex: 80,
-                width: resultsWidth,
-              }}
-            >
-              <Card
-                style={{
-                  borderRadius: 18,
-                  boxShadow: "0 14px 40px rgba(0,0,0,0.18)",
-                  overflow: "hidden",
-                  background: "rgba(255,255,255,0.96)",
-                  backdropFilter: "blur(6px)",
-                }}
-                // ✅ antd warning fix: bodyStyle -> styles.body
-                styles={{ body: { padding: 14 } }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <div style={{ fontWeight: 800, fontSize: 16 }}>Results in Your Area</div>
-                    <div style={{ fontSize: 12, color: "#777" }}>
-                      {resultsPois.length} place{resultsPois.length === 1 ? "" : "s"} found in your selected zone
-                    </div>
-                  </div>
-
-                  <Button
-                    type="text"
-                    icon={<CloseOutlined />}
-                    onClick={async () => {
-                      // ✅ alanı sil + VIEWPORT'a dön + tüm POI'leri getir
-                      setResultsOpen(false);
-                      setResultsTab("all");
-                      setSelection({ mode: null, polygon: [] });
-                      setMode("VIEWPORT");
-
-                      const bbox = getViewportBbox();
-                      if (bbox) {
-                        await fetchPois({ selectionType: "BBOX", bbox, categoriesOverride: [] });
-                      }
-
-                      setFilterOpen(true);
-                    }}
-                    aria-label="Close results"
-                  />
-                </div>
-
-                <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 6 }}>
-                  {[{ key: "all", label: "All" }, ...UI_CATEGORIES.map((c) => ({ key: c.key, label: c.label, emoji: c.emoji }))].map(
-                    (t) => {
-                      const active = resultsTab === t.key;
-                      return (
-                        <button
-                          key={t.key}
-                          onClick={() => setResultsTab(t.key)}
-                          style={{
-                            flex: "0 0 auto",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "8px 12px",
-                            borderRadius: 999,
-                            border: active ? "1px solid #1890ff" : "1px solid #e6e6e6",
-                            background: active ? "rgba(24,144,255,0.10)" : "#fff",
-                            cursor: "pointer",
-                            fontWeight: 700,
-                            fontSize: 13,
-                            color: active ? "#1677ff" : "#444",
-                          }}
-                        >
-                          {t.emoji ? <span>{t.emoji}</span> : null}
-                          <span>{t.label}</span>
-                        </button>
-                      );
-                    }
-                  )}
-                </div>
-
-                <div style={{ marginTop: 12, maxHeight: resultsMaxHeight, overflowY: "auto", paddingRight: 6 }}>
-                  {poiLoading ? (
-                    <div style={{ padding: 10, color: "#777" }}>Loading results...</div>
-                  ) : resultsPois.length === 0 ? (
-                    <div style={{ padding: 10, color: "#777" }}>No places found for the current filter.</div>
-                  ) : (
-                    resultsPois.map((p) => {
-                      const title = getSafePoiTitle(p);
-                      const icon = poiIconByCategory(p.category);
-                      const subtitle = labelByCategory(p.category) || "POI";
-
-                      return (
-                        <div
-                          key={p.poiId || `${p.latitude}-${p.longitude}-${title}`}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            padding: 12,
-                            borderRadius: 14,
-                            border: "1px solid #f0f0f0",
-                            marginBottom: 10,
-                            background: "#fff",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                            <div
-                              style={{
-                                width: 38,
-                                height: 38,
-                                borderRadius: 12,
-                                display: "grid",
-                                placeItems: "center",
-                                background: icon?.fill || "#F1F5F9",
-                                border: `1px solid ${icon?.ring || "#CBD5E1"}`,
-                                flex: "0 0 auto",
-                              }}
-                            >
-                              <span style={{ fontSize: 18 }}>{icon?.emoji || "📍"}</span>
-                            </div>
-
-                            <div style={{ display: "flex", flexDirection: "column" }}>
-                              <div style={{ fontWeight: 800, lineHeight: 1.15 }}>{title}</div>
-                              <div style={{ fontSize: 12, color: "#777" }}>{subtitle}</div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-              </Card>
-            </div>
-          )}
-          {/* End of User card logic */}
-          <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
-          <VacanzaChat
-            isOpen={isChatOpen}
-            onClose={() => setIsChatOpen(false)}
-            onRouteGenerated={(routeData) => {
-              setActiveRoute(routeData);
-              setActiveDay(1);
-              setIsChatOpen(false);
-              setFilterOpen(false);
+        {/* Saved Places Panel */}
+        {savedPoisOpen && (
+          <SavedPoisPanel
+            onClose={() => setSavedPoisOpen(false)}
+            onFlyTo={(lat, lng) => {
+              const map = mapRef.current?.getMap?.();
+              if (map) {
+                map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 });
+              }
             }}
           />
-          <ProfileModal
-            open={profileModalOpen}
-            onClose={() => setProfileModalOpen(false)}
-            user={user}
-          />
-        </div>
-      </Content>
+        )}
 
-      {!isMobile && (
-        <Footer style={{ textAlign: "center", padding: "12px 50px", background: "#fff" }}>
-          Vacanza App ©{new Date().getFullYear()}
-        </Footer>
-      )}
-    </Layout>
+        {/* 5. Filter Panel (Glass) */}
+        {filterOpen && (
+          <div className="glass-panel filter-panel">
+            <div className="filter-header">
+              <span className="filter-title">Filter Places</span>
+              <div className="filter-header-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <Button size="small" type="link" onClick={handleSelectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>All</Button>
+                <div style={{ height: 12, width: 1, background: "rgba(0,0,0,0.1)" }} />
+                <Button size="small" type="link" onClick={handleDeselectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>None</Button>
+                <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setFilterOpen(false)} style={{ marginLeft: 4 }} />
+              </div>
+            </div>
+            <div className="filter-body">
+              {UI_CATEGORIES.map((c) => (
+                <div key={c.key} className="cat-pill vivid-interactive" onClick={() => setSelectedCats(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
+                  style={{
+                    background: selectedCats[c.key] ? c.pill : "rgba(var(--vivid-navy-rgb, 26,35,50), 0.05)",
+                    border: selectedCats[c.key] ? `2.5px solid ${c.ring}` : "1.5px solid rgba(255,255,255,0.08)",
+                    opacity: selectedCats[c.key] ? 1 : 0.6
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div className="cat-pill-icon" style={{ color: selectedCats[c.key] ? c.ring : "var(--text-sub)" }}>{c.icon}</div>
+                    <span className="cat-pill-label">{c.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 6. Results Sheet (Glass) */}
+        {canShowResultsPanel && (
+          <div className="glass-panel results-sheet">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 18 }}>Discover Local Gems</div>
+                <div style={{ fontSize: 13, color: "var(--text-sub)" }}>{resultsPois.length} curated spots found</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {user && !activeRoute && (
+                  <Button 
+                    type="primary" 
+                    shape="round" 
+                    onClick={openPolygonRouteParams} 
+                    className="vivid-create-route-btn-glass"
+                  >
+                    Create AI Route
+                  </Button>
+                )}
+                <Button type="text" icon={<CloseOutlined />} onClick={clearSelectionOnly} />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
+              {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...resultsCategories].map(t => {
+                const active = resultsTab === t.key;
+                return (
+                  <button key={t.key} onClick={() => setResultsTab(t.key)}
+                    style={{
+                      flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
+                      border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
+                      background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
+                      color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
+                    }}
+                  >
+                    {t.icon || <GlobalOutlined />} {t.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ height: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4, display: "flex", flexDirection: "column" }}>
+              {poiLoading ? (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, opacity: 0.8 }}>
+                  <Spin size="large" />
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sub)" }}>Finding nearby gems...</div>
+                </div>
+              ) : resultsPois.length > 0 ? (
+                resultsPois.map((p) => {
+                  const favRowKey = getMapPoiRowKey(p);
+                  const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
+                  return (
+                  <div key={favRowKey} style={{
+                    display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
+                    borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
+                    marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
+                    backdropFilter: "blur(4px)",
+                    flexShrink: 0
+                  }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 14,
+                      background: "rgba(255,255,255,0.05)",
+                      display: "grid", placeItems: "center",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      border: "1px solid rgba(255,255,255,0.1)"
+                    }}>
+                      <div style={{
+                        color: poiIconByCategory(p)?.ring,
+                        fontSize: 20,
+                        filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                      }}>
+                        {poiIconByCategory(p)?.icon}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p)}</div>
+                    </div>
+                    {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
+                      <Tooltip title={mapPoiFavored ? "Remove favorite" : "Favorite"}>
+                        <button
+                          type="button"
+                          className={`map-poi-fav-hit map-poi-fav-hit--in-sheet${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
+                          aria-label={mapPoiFavored ? "Remove favorite" : "Add favorite"}
+                          aria-pressed={mapPoiFavored}
+                          disabled={favSendingKey === favRowKey}
+                          onClick={() => toggleMapPoiFavorite(p)}
+                        >
+                          {favSendingKey === favRowKey ? (
+                            <Spin size="small" className="map-poi-fav-hit__spin" />
+                          ) : (
+                            <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
+                              {mapPoiFavored ? (
+                                <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
+                              ) : (
+                                <HeartOutlined className="map-poi-fav-hit__heart" />
+                              )}
+                            </span>
+                          )}
+                        </button>
+                      </Tooltip>
+                    ) : null}
+                  </div>
+                  );
+                })
+              ) : (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
+                  <GlobalOutlined style={{ fontSize: 32, marginBottom: 12 }} />
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>No results in this area</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <ConfigProvider
+          theme={{
+            algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
+            token: {
+              borderRadius: 14,
+              colorPrimary: "#38bdf8",
+            }
+          }}
+        >
+          <Modal 
+            title={<div className="vivid-modal-title">Plan a Route</div>} 
+            open={polygonRouteParamsOpen} 
+            onCancel={() => setPolygonRouteParamsOpen(false)} 
+            footer={null} 
+            maskClosable={false}
+            zIndex={1150}
+            className={`vivid-premium-modal route-plan-modal ${themeClass}`}
+            rootClassName={themeClass}
+            centered
+            width={400}
+            styles={{
+              mask: { backdropFilter: 'blur(10px)', background: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.2)' },
+              content: {
+                background: isDarkMode ? "#0f172a" : "#fff",
+                padding: '32px',
+                overflow: 'hidden'
+              }
+            }}
+          >
+            <Spin spinning={polygonRouteSubmitting}>
+              <Form form={polygonRouteForm} layout="vertical" onFinish={submitPolygonRoute}>
+                <Form.Item name="totalDays" label="Trip Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
+                <Form.Item name="travelStyle" label="Preferred Travel Style">
+                  <Select
+                    className="route-plan-select"
+                    popupClassName="vivid-premium-dropdown route-plan-select-dropdown"
+                    getPopupContainer={(trigger) => trigger.parentNode}
+                    options={[{ value: "general", label: "Balanced" }, { value: "history", label: "Historical" }, { value: "food", label: "Gourmet" }, { value: "nature", label: "Outdoors" }]}
+                  />
+                </Form.Item>
+                <Form.Item
+                  name="includeFavorites"
+                  label={
+                    <span>
+                      <HeartFilled style={{ color: "#ef4444", marginRight: 8 }} />
+                      Include my liked places
+                    </span>
+                  }
+                  valuePropName="checked"
+                  tooltip="Liked POIs inside the drawn area are offered to the AI. It may skip some if they don't fit the plan — you can always refine later via chat."
+                >
+                  <Switch />
+                </Form.Item>
+                <Button
+                  type="primary" 
+                  block 
+                  size="large" 
+                  htmlType="submit" 
+                  loading={polygonRouteSubmitting} 
+                  className="vivid-create-route-btn"
+                  style={{ marginTop: 12 }}
+                >
+                  Done
+                </Button>
+              </Form>
+            </Spin>
+          </Modal>
+        </ConfigProvider>
+
+        <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
+
+        {/* 7. Itinerary/Route Card (RoutePanel) - RESTORED */}
+        {activeRoute && (
+          <RoutePanel
+            route={activeRoute}
+            activeDay={activeDay}
+            onDayChange={setActiveDay}
+            onClose={() => { setActiveRoute(null); setRouteViewActive(false); }}
+            onWaypointClick={handleWaypointClick}
+            onMarkUnavailable={handleMarkUnavailable}
+            onRouteUpdate={setActiveRoute}
+          />
+        )}
+
+        <VacanzaChat
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          externalConversationRefreshNonce={chatConversationRefreshNonce}
+          onConversationIdChange={setMapChatConversationId}
+          onRequestDrawToEdit={handleRequestDrawToEditFromChat}
+          onRouteGenerated={(routeData, meta) => {
+            const routeId = meta?.routeId ?? routeData?.routeId ?? routeData?.route_id ?? null;
+            const currentId = activeRoute?.routeId ?? activeRoute?.route_id;
+            const preservedHotel = (routeId && routeId === currentId) ? (activeRoute?.selectedHotel ?? null) : null;
+            const fromChatHotel = routeData?.selectedHotel ?? null;
+            setActiveRoute(normalizeRouteForMap({ ...routeData, routeId, selectedHotel: fromChatHotel ?? preservedHotel }));
+            setActiveDay(1);
+            setRouteViewActive(true);
+            setIsChatOpen(false);
+          }}
+        />
+        <ProfileModal
+          open={profileModalOpen}
+          onClose={() => setProfileModalOpen(false)}
+          user={user}
+          themeClass={themeClass}
+          isDarkMode={isDarkMode}
+          onOpenPreferences={() => {
+            setProfileModalOpen(false);
+            setPreferencesModalOpen(true);
+          }}
+          onOpenCalendar={() => {
+            setProfileModalOpen(false);
+            setCalendarOpen(true);
+          }}
+        />
+        <PreferencesModal
+          open={preferencesModalOpen}
+          onClose={() => setPreferencesModalOpen(false)}
+          themeClass={themeClass}
+          isDarkMode={isDarkMode}
+        />
+        <CalendarModal
+          open={calendarOpen}
+          onClose={() => setCalendarOpen(false)}
+          themeClass={themeClass}
+          isDarkMode={isDarkMode}
+          onOpenRouteFromCalendar={async (routeId) => {
+            setCalendarOpen(false);
+            try {
+              const d = await aiApi.getRoute(routeId);
+              const raw = d?.routeData && typeof d.routeData === "object" ? d.routeData : {};
+              setActiveRoute(
+                normalizeRouteForMap({
+                  ...raw,
+                  title: d.title ?? raw.title,
+                  destination: d.destination ?? raw.destination,
+                  total_days: d.totalDays ?? raw.total_days,
+                  totalDays: d.totalDays ?? raw.totalDays,
+                  selectedHotel: d.selectedHotel ?? null,
+                })
+              );
+              setActiveDay(1);
+              setIsChatOpen(false);
+            } catch (e) {
+              message.error(e?.friendlyMessage || "Could not load route.");
+            }
+          }}
+        />
+      </main>
+    </div>
   );
 }

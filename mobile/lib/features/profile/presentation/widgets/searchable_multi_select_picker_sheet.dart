@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:mobile/features/booking/presentation/widgets/search/booking_search_field_styles.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
+
 import '../../data/profile_preference_options.dart';
+import '../styles/profile_sheet_styles.dart';
 
 /// Config for the searchable multi-select picker bottom sheet.
 class SearchableMultiSelectPickerConfig {
@@ -91,14 +95,12 @@ class _SearchableMultiSelectPickerSheetState
   Widget build(BuildContext context) {
     final accent = widget.config.accentColor;
     final options = _filteredOptions;
+    final cs = Theme.of(context).colorScheme;
 
-    return Container(
+    return ProfileSheetStyles.sheetPanel(
+      context: context,
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.88,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -114,17 +116,17 @@ class _SearchableMultiSelectPickerSheetState
                       onPressed: () => Navigator.of(context).pop(),
                       icon: const Icon(Icons.arrow_back),
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.grey.shade100,
+                        backgroundColor: cs.surfaceContainerHighest,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         widget.config.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF111827),
+                          color: cs.onSurface,
                         ),
                       ),
                     ),
@@ -132,7 +134,7 @@ class _SearchableMultiSelectPickerSheetState
                       '${_selected.length} selected',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade600,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -142,12 +144,16 @@ class _SearchableMultiSelectPickerSheetState
                   TextField(
                     controller: _searchController,
                     onChanged: (_) => setState(() {}),
+                    style: TextStyle(color: cs.onSurface),
                     decoration: InputDecoration(
                       hintText: 'Search…',
-                      prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey.shade400),
+                      hintStyle: TextStyle(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.85),
+                      ),
+                      prefixIcon: Icon(Icons.search, size: 20, color: cs.onSurfaceVariant),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.close, size: 20),
+                              icon: Icon(Icons.close, size: 20, color: cs.onSurfaceVariant),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {});
@@ -155,10 +161,25 @@ class _SearchableMultiSelectPickerSheetState
                             )
                           : null,
                       filled: true,
-                      fillColor: Colors.grey.shade100,
+                      fillColor: BookingSearchFieldStyles.fieldFill(context),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: accent,
+                          width: 1.5,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -170,18 +191,21 @@ class _SearchableMultiSelectPickerSheetState
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            color: BookingSearchFieldStyles.fieldBorderInactive(context),
+          ),
           // List
           Flexible(
             child: options.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.all(24),
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
                     child: Center(
                       child: Text(
                         'No results',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF9CA3AF),
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -210,7 +234,9 @@ class _SearchableMultiSelectPickerSheetState
                                   border: Border.all(
                                     color: active
                                         ? Colors.transparent
-                                        : Colors.grey.shade300,
+                                        : BookingSearchFieldStyles.fieldBorderInactive(
+                                            context,
+                                          ),
                                     width: 2,
                                   ),
                                 ),
@@ -226,9 +252,9 @@ class _SearchableMultiSelectPickerSheetState
                               Expanded(
                                 child: Text(
                                   formatOptionLabel(option),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: Color(0xFF1F2937),
+                                    color: cs.onSurface,
                                   ),
                                 ),
                               ),
@@ -245,16 +271,12 @@ class _SearchableMultiSelectPickerSheetState
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             child: SizedBox(
               width: double.infinity,
-              child: FilledButton(
+              child: VacanzaGradientButton(
+                label: 'Done (${_selected.length} selected)',
                 onPressed: _done,
-                style: FilledButton.styleFrom(
-                  backgroundColor: accent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: Text('Done (${_selected.length} selected)'),
+                enabled: true,
+                minHeight: 50,
+                borderRadius: 14,
               ),
             ),
           ),

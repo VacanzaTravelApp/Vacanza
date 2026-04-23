@@ -6,9 +6,13 @@ import com.vacanza.backend.dto.response.TransportOptionDTO;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.time.LocalDate;
+
 
 /**
  * Jackson POJOs for deserializing SerpApi Google Flights response.
@@ -110,7 +114,7 @@ public class SerpApiFlightResponse {
     // --- Mapping ---
 
     public static List<TransportOptionDTO> toTransportOptions(
-            SerpApiFlightResponse response, String currency) {
+            SerpApiFlightResponse response, String currency, LocalDate returnDate) {
         if (response == null) {
             return Collections.emptyList();
         }
@@ -168,11 +172,33 @@ public class SerpApiFlightResponse {
                     String flightNumber = firstFlight.getFlightNumber();
                     String travelClass = firstFlight.getTravelClass();
 
-                    // Build a descriptive Google Flights deep-link
-                    String bookingUrl = String.format(
-                            "https://www.google.com/travel/flights?q=%s+to+%s+on+%s",
-                            origin, destination,
-                            departureTime != null ? departureTime.substring(0, 10) : "");
+                    // Build a descriptive Google Flights deep-link using
+                    // human-readable names so Google can resolve the query
+                    String originName = firstFlight.getDepartureAirport() != null
+                            && firstFlight.getDepartureAirport().getName() != null
+                            ? firstFlight.getDepartureAirport().getName()
+                            : origin;
+                    String destinationName = lastFlight.getArrivalAirport() != null
+                            && lastFlight.getArrivalAirport().getName() != null
+                            ? lastFlight.getArrivalAirport().getName()
+                            : destination;
+
+                    String dateStr = departureTime != null && departureTime.length() >= 10
+                            ? departureTime.substring(0, 10)
+                            : "";
+
+                    String rawQuery;
+                    if (returnDate != null) {
+                        // Using IATA codes and a simple space-separated format is much more robust for Google Flights deep-links
+                        rawQuery = String.format("flights %s to %s %s %s",
+                                origin, destination, dateStr, returnDate.toString()).trim();
+                    } else {
+                        rawQuery = String.format("flights %s to %s %s",
+                                origin, destination, dateStr).trim();
+                    }
+
+                    String bookingUrl = "https://www.google.com/travel/flights?q="
+                            + URLEncoder.encode(rawQuery, StandardCharsets.UTF_8);
 
                     // departure_token is only present in round-trip first-leg responses;
                     // fall back to booking_token for one-way flights.
