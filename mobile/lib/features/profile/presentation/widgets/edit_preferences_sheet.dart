@@ -571,7 +571,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
                           label,
                           style: TextStyle(
                             fontSize: 12,
-                            color: cs.onSurfaceVariant,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.85),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -580,7 +580,11 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: value.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
+                            // Keep selection summary slightly more subtle than the label,
+                            // matching the web UI hierarchy.
+                            color: value.isEmpty
+                                ? cs.onSurfaceVariant.withValues(alpha: 0.62)
+                                : cs.onSurfaceVariant.withValues(alpha: 0.72),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
