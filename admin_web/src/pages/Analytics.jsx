@@ -20,6 +20,20 @@ const THEME = {
     subtext: '#5A6B7A'
 };
 
+const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+        return (
+            <div style={{ background: 'white', padding: '16px', borderRadius: '16px', boxShadow: '0 20px 50px rgba(0,0,0,0.15)', zIndex: 9999, position: 'relative' }}>
+                <p style={{ margin: 0, color: THEME.subtext, fontSize: 12, fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>{label}</p>
+                <p style={{ margin: 0, color: THEME.navy, fontSize: 24, fontWeight: 900 }}>
+                    <span style={{ color: THEME.coral }}>{payload[0].value}</span> <span style={{ fontSize: 13, color: THEME.subtext }}>Users Joined</span>
+                </p>
+            </div>
+        );
+    }
+    return null;
+};
+
 const Analytics = () => {
     const { data, loading } = useFetch('/admin/analytics');
 
@@ -62,8 +76,8 @@ const Analytics = () => {
     ];
 
     return (
-        <div className="dashboard-container">
-            <Row gutter={[48, 48]}>
+        <div className="dashboard-container" style={{ padding: '0 24px 24px' }}>
+            <Row gutter={[24, 24]}>
                 <Col span={24}>
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
                         <Title
@@ -90,16 +104,31 @@ const Analytics = () => {
                                 lineHeight: '1.5'
                             }}
                         >
-                            Real-time data synchronization and growth trajectory monitoring across the global Vacanza infrastructure.
+                            Track new user registrations and monitor the total growth of the Vacanza platform over time.
                         </Text>
                     </motion.div>
                 </Col>
 
-                <Col xs={24} lg={16}>
+                <Col span={24}>
+                    <Card className="glass-card" bordered={false} styles={{ body: { background: THEME.navy, borderRadius: '24px', padding: '20px 32px' } }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 24 }}>
+                            <div>
+                                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 4 }}>Total Registered Users</Text>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <UserOutlined style={{ color: THEME.coral, fontSize: 24 }} />
+                                    <span style={{ color: 'white', fontWeight: 900, fontSize: 36, lineHeight: 1 }}>{data?.matrixUsers || 0}</span>
+                                </div>
+                            </div>
+                            <Tag color={THEME.coral} variant="filled" style={{ borderRadius: 6, fontWeight: 800, padding: '4px 16px', fontSize: 11 }}>PLATFORM TOTAL</Tag>
+                        </div>
+                    </Card>
+                </Col>
+
+                <Col span={24}>
                     <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>User Growth Trend</span>}>
-                        <div style={{ height: 400, width: '100%', marginTop: 24 }}>
+                        <div style={{ height: 320, width: '100%', marginTop: 16 }}>
                             <ResponsiveContainer>
-                                <AreaChart data={data?.growthTrajectory || []}>
+                                <AreaChart data={data?.growthTrajectory || []} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor={THEME.coral} stopOpacity={0.2} />
@@ -109,54 +138,24 @@ const Analytics = () => {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(26, 35, 50, 0.05)" />
                                     <XAxis dataKey="period" axisLine={false} tickLine={false} tick={{ fill: THEME.subtext, fontSize: 12, fontWeight: 600 }} />
                                     <YAxis axisLine={false} tickLine={false} tick={{ fill: THEME.subtext, fontSize: 12, fontWeight: 600 }} />
-                                    <Tooltip
-                                        labelStyle={{ color: THEME.navy, fontWeight: 700 }}
-                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', padding: '16px' }}
+                                    <Tooltip content={(props) => <CustomTooltip {...props} />} cursor={{ stroke: 'rgba(26, 35, 50, 0.1)', strokeWidth: 2, strokeDasharray: '4 4' }} />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="newUsers"
+                                        name="New Users"
+                                        stroke={THEME.coral}
+                                        strokeWidth={4}
+                                        fillOpacity={1}
+                                        fill="url(#colorValue)"
+                                        activeDot={{ r: 8, fill: THEME.coral, stroke: '#fff', strokeWidth: 3, style: { filter: 'drop-shadow(0px 4px 6px rgba(255, 107, 107, 0.4))' } }}
                                     />
-                                    <Area type="monotone" dataKey="newUsers" name="New Users" stroke={THEME.coral} strokeWidth={4} fillOpacity={1} fill="url(#colorValue)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </Card>
                 </Col>
-
-                <Col xs={24} lg={8}>
-                    <Row gutter={[0, 48]}>
-                        <Col span={24}>
-                            <Card className="glass-card" bordered={false} styles={{ body: { background: THEME.navy, borderRadius: '24px' } }}>
-                                <Statistic
-                                    title={<Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Total Registered Users</Text>}
-                                    value={data?.matrixUsers || 0}
-                                    prefix={<UserOutlined style={{ color: THEME.coral }} />}
-                                    styles={{ content: { color: 'white', fontWeight: 800, fontSize: 48 } }}
-                                />
-                                <div style={{ marginTop: 16 }}>
-                                    <Tag color={THEME.coral} variant="filled" style={{ borderRadius: 8, fontWeight: 800 }}>PLATFORM TOTAL</Tag>
-                                </div>
-                            </Card>
-                        </Col>
-                        <Col span={24}>
-                            <Card className="glass-card" bordered={false}>
-                                <Statistic
-                                    title={<Text style={{ color: THEME.subtext, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Global Traffic Volume</Text>}
-                                    value={data?.activeNodes || 0}
-                                    prefix={<GlobalOutlined style={{ color: THEME.teal }} />}
-                                    styles={{ content: { color: THEME.navy, fontWeight: 800, fontSize: 48 } }}
-                                />
-                                <div style={{ marginTop: 24, padding: '16px', background: 'rgba(26, 35, 50, 0.03)', borderRadius: '12px' }}>
-                                    <Text style={{ fontSize: 11, color: THEME.subtext, fontWeight: 700, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Avg. Planning Session</Text>
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                                        <Title level={3} style={{ margin: 0, fontWeight: 900, color: THEME.navy }}>{data?.avgDuration || 0}h</Title>
-                                        <Text style={{ fontSize: 12, color: THEME.subtext, fontWeight: 500 }}>per researcher</Text>
-                                    </div>
-                                    <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: 8 }}>Time spent by users building travel itineraries.</Text>
-                                </div>
-                            </Card>
-                        </Col>
-                    </Row>
-                </Col>
             </Row>
-        </div>
+        </div >
     );
 };
 

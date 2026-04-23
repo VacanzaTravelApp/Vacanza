@@ -142,7 +142,7 @@ export default function Home() {
                                 fontFamily: "'DM Sans', sans-serif"
                             }}
                         >
-                            Real-time orchestration of user growth, system telemetry, and strategic assets.
+                            Overview of system health, active users, and application performance.
                         </Text>
                     </div>
                 </div>
@@ -193,7 +193,7 @@ export default function Home() {
                                             fontFamily: "'DM Sans', sans-serif"
                                         }}
                                     >
-                                        Real-time telemetry, provider node health, and granular performance metrics.
+                                        Monitor the performance and health of the required APIs and external services.
                                     </Paragraph>
                                     <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Button type="primary" style={{ background: THEME.warning, border: 'none', borderRadius: 10, fontWeight: 700, height: '40px' }}>
@@ -247,7 +247,7 @@ export default function Home() {
                                             fontFamily: "'DM Sans', sans-serif"
                                         }}
                                     >
-                                        Deep-dive behavioral patterns, revenue trajectory, and asset engagement ranking.
+                                        Review new user registrations and track the overall growth of the platform.
                                     </Paragraph>
                                     <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <Button type="primary" style={{ background: THEME.primary, border: 'none', borderRadius: 10, fontWeight: 700, height: '40px' }}>
@@ -258,7 +258,7 @@ export default function Home() {
                                 </Card>
                             </motion.div>
                         </Col>
-                    </Row>
+                    </Row >
 
                     <motion.div variants={item} style={{ marginTop: 24 }}>
                         <Card
@@ -300,7 +300,7 @@ export default function Home() {
                             </Row>
                         </Card>
                     </motion.div>
-                </Col>
+                </Col >
 
                 <Col xs={24} lg={8}>
                     <motion.div variants={item} style={{ height: '100%' }}>
@@ -344,7 +344,7 @@ export default function Home() {
                         </Card>
                     </motion.div>
                 </Col>
-            </Row>
-        </motion.div>
+            </Row >
+        </motion.div >
     );
 }
