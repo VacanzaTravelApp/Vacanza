@@ -43,12 +43,13 @@ function routeDataFromSavedDetail(detail) {
   const raw = detail.routeData;
   if (typeof raw === "string") {
     try {
-      return normalizeRouteForMap(JSON.parse(raw));
+      const parsed = JSON.parse(raw);
+      return normalizeRouteForMap({ ...parsed, selectedHotel: detail.selectedHotel ?? null });
     } catch {
       return null;
     }
   }
-  return normalizeRouteForMap(raw);
+  return normalizeRouteForMap({ ...raw, selectedHotel: detail.selectedHotel ?? null });
 }
 
 function routesForMessage(msg) {

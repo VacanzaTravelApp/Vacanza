@@ -186,8 +186,20 @@ class ActiveRouteCubit extends Cubit<ActiveRouteState> {
         );
         return;
       }
+      final selectedHotelRaw = json['selectedHotel'] ?? json['selected_hotel'];
+      RouteHotel? selectedHotel;
+      if (selectedHotelRaw is Map<String, dynamic>) {
+        selectedHotel = RouteHotel.fromJson(selectedHotelRaw);
+      } else if (selectedHotelRaw is Map) {
+        selectedHotel = RouteHotel.fromJson(
+          Map<String, dynamic>.from(selectedHotelRaw),
+        );
+      }
       final chatLike = ChatRouteData.fromJson(routeData);
-      final model = RouteMapModel.fromChat(chatLike);
+      final model = RouteMapModel.fromSavedRoute(
+        routeData: chatLike,
+        selectedHotel: selectedHotel,
+      );
       emit(
         state.copyWith(
           status: ActiveRouteStatus.ready,

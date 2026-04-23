@@ -1,5 +1,48 @@
 import 'package:dio/dio.dart';
 
+/// Hotel/accommodation payload stored on a saved route (PUT /routes/{id}/hotel).
+class RouteHotelPayload {
+  final String hotelName;
+  final String? hotelExternalId;
+  final String? address;
+  final double? latitude;
+  final double? longitude;
+  final String? imageUrl;
+  final String? externalBookingUrl;
+  final double? pricePerNight;
+  final String? currency;
+  final double? rating;
+  final String? providerName;
+
+  const RouteHotelPayload({
+    required this.hotelName,
+    this.hotelExternalId,
+    this.address,
+    this.latitude,
+    this.longitude,
+    this.imageUrl,
+    this.externalBookingUrl,
+    this.pricePerNight,
+    this.currency,
+    this.rating,
+    this.providerName,
+  });
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'hotelName': hotelName,
+    'hotelExternalId': hotelExternalId,
+    'address': address,
+    'latitude': latitude,
+    'longitude': longitude,
+    'imageUrl': imageUrl,
+    'externalBookingUrl': externalBookingUrl,
+    'pricePerNight': pricePerNight,
+    'currency': currency,
+    'rating': rating,
+    'providerName': providerName,
+  };
+}
+
 /// Viator / tour pricing row from GET /routes/{id}/pricing.
 class WaypointPricingRow {
   final String waypointName;
@@ -51,6 +94,19 @@ class AiRouteApiClient {
   final Dio _dio;
 
   AiRouteApiClient(this._dio);
+
+  /// PUT /routes/{routeId}/hotel — set selected accommodation for the route.
+  Future<void> setRouteHotel({
+    required String routeId,
+    required RouteHotelPayload hotel,
+  }) async {
+    await _dio.put<dynamic>('/routes/$routeId/hotel', data: hotel.toJson());
+  }
+
+  /// DELETE /routes/{routeId}/hotel — remove selected accommodation.
+  Future<void> removeRouteHotel({required String routeId}) async {
+    await _dio.delete<dynamic>('/routes/$routeId/hotel');
+  }
 
   /// GET /routes/{routeId}/pricing — Viator museum/tour prices per waypoint.
   Future<List<WaypointPricingRow>> getRoutePricing(String routeId) async {

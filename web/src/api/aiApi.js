@@ -81,6 +81,16 @@ export const aiApi = {
         return response.data;
     },
 
+    setRouteHotel: async (routeId, hotel) => {
+        const response = await http.put(`/routes/${routeId}/hotel`, hotel);
+        return response.data;
+    },
+
+    removeRouteHotel: async (routeId) => {
+        const response = await http.delete(`/routes/${routeId}/hotel`);
+        return response.data;
+    },
+
     /**
      * Polygon-based itinerary (Task 1). Body: { coordinates, totalDays?, travelStyle?, categories? }
      * coordinates: outer ring [[lon, lat], ...]

@@ -4,7 +4,7 @@
    ───────────────────────────────────────────────────────────────────────────── */
 
 /* ═══ Design‑Token Layer ═══ */
-.vacanza-chat, .route-panel {
+.vacanza-chat, .route-panel, .hps-overlay {
   /* Light / default */
   --vc-primary: #FF6B6B;
   --vc-primary-hover: #ff5252;
@@ -50,7 +50,7 @@
 }
 
 /* ═══ Dark‑Mode Token Overrides (ancestor carries .theme-night) ═══ */
-.theme-night .vacanza-chat, .theme-night .route-panel {
+.theme-night .vacanza-chat, .theme-night .route-panel, .theme-night .hps-overlay {
   --vc-primary: #38BDF8;
   --vc-primary-hover: #56c7f7;
   --vc-primary-soft: rgba(56, 189, 248, 0.12);
