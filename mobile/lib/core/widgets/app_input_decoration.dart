@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
 /// Input decoration consistent with Auth (Login/Register) theme.
 /// Use for TextField/InputDecorator: same fill, border radius, and focus border as [AppTextField].
@@ -15,21 +15,29 @@ class AppInputDecoration {
       );
 
   /// Returns [InputDecoration] with Auth-like enabled/focused borders.
-  /// Focused state uses [AppColors.primary]; enabled uses [AppColors.inputBorder].
+  /// Theme-aware: uses tokens + [ColorScheme].
   static InputDecoration decoration({
     String? hintText,
     String? labelText,
     Widget? suffixIcon,
+    required BuildContext context,
   }) {
+    final theme = Theme.of(context);
+    final tokens = context.vacanzaTokens;
+    final isLight = theme.brightness == Brightness.light;
+    final accent = context.authAccent;
+
     return InputDecoration(
       hintText: hintText,
       labelText: labelText,
-      hintStyle: const TextStyle(color: AppColors.inputPlaceholder),
+      hintStyle: TextStyle(
+        color: tokens.textSub.withValues(alpha: isLight ? 0.70 : 0.62),
+      ),
       filled: true,
-      fillColor: AppColors.inputFill,
+      fillColor: isLight ? context.lightGlassFieldFill : tokens.pillSurface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      enabledBorder: _border(AppColors.inputBorder),
-      focusedBorder: _border(AppColors.primary),
+      enabledBorder: _border(tokens.cardBorder),
+      focusedBorder: _border(accent),
       errorBorder: _border(Colors.red),
       focusedErrorBorder: _border(Colors.red),
       suffixIcon: suffixIcon,

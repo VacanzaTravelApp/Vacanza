@@ -25,4 +25,11 @@ export const userApi = {
   getCheckins: () => http.get("/users/me/checkins"),
   getStats: () => http.get("/users/me/stats"),
   autoCheckIn: (coords) => http.post("/users/me/checkins/auto", coords),
+
+  // Photos
+  getPhoto: () => http.get("/users/me/profile/photo", { responseType: "blob" }),
+  uploadPhoto: (formData) => http.post("/users/me/profile/photo", formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  }),
+  deletePhoto: () => http.delete("/users/me/profile/photo"),
 };

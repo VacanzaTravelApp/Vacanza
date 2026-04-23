@@ -1,5 +1,6 @@
 package com.vacanza.backend.config;
 
+import com.vacanza.backend.component.ApiMetricsCollector;
 import io.netty.channel.ChannelOption;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -11,43 +12,32 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriComponentsBuilder;
-import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
-import reactor.util.retry.Retry;
-
-import java.time.Duration;
 
 @Slf4j
 @Configuration
-@EnableConfigurationProperties({ GeoapifyProperties.class, AiServiceProperties.class,
+@EnableConfigurationProperties({ FoursquareProperties.class, AiServiceProperties.class,
         SerpApiProperties.class, MapboxProperties.class, TicketmasterProperties.class,
-        OpenMeteoProperties.class })
+        OpenMeteoProperties.class, ViatorProperties.class, FrankfurterProperties.class })
 public class WebClientConfig {
 
+    private final ApiMetricsCollector apiMetricsCollector;
+
+    public WebClientConfig(ApiMetricsCollector apiMetricsCollector) {
+        this.apiMetricsCollector = apiMetricsCollector;
+    }
+
     @Bean
-    @Qualifier("geoapifyWebClient")
-    public WebClient geoapifyWebClient(GeoapifyProperties props) {
+    @Qualifier("foursquareWebClient")
+    public WebClient foursquareWebClient(FoursquareProperties props) {
         return WebClient.builder()
                 .baseUrl(props.getBaseUrl())
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(addApiKey(props))
-                .filter(log4xx5xx("[GEOAPIFY]"))
-                .filter(retryOn429And5xx())
-                .build();
-    }
-
-    @Bean
-    @Qualifier("geoapifyGeocodeWebClient")
-    public WebClient geoapifyGeocodeWebClient(GeoapifyProperties props) {
-        return WebClient.builder()
-                .baseUrl("https://api.geoapify.com")
-                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
-                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(addApiKey(props))
-                .filter(log4xx5xx("[GEOAPIFY-GEOCODE]"))
+                .defaultHeader("Authorization", props.getApiKey())
+                .filter(apiMetricsAndLogFilter("Foursquare API", "[FOURSQUARE]"))
                 .build();
     }
 
@@ -59,7 +49,7 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
                 .filter(addMapboxAccessToken(props))
-                .filter(log4xx5xx("[MAPBOX-GEOCODE]"))
+                .filter(apiMetricsAndLogFilter("Mapbox Geocoding", "[MAPBOX-GEOCODE]"))
                 .build();
     }
 
@@ -76,7 +66,7 @@ public class WebClientConfig {
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(log4xx5xx("[AI-SERVICE]"))
+                .filter(apiMetricsAndLogFilter("AI Services", "[AI-SERVICE]"))
                 .build();
     }
 
@@ -93,7 +83,7 @@ public class WebClientConfig {
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(log4xx5xx("[SERPAPI]"))
+                .filter(apiMetricsAndLogFilter("SerpApi / Booking", "[SERPAPI]"))
                 .build();
     }
 
@@ -110,7 +100,7 @@ public class WebClientConfig {
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(log4xx5xx("[TICKETMASTER]"))
+                .filter(apiMetricsAndLogFilter("Ticketmaster API", "[TICKETMASTER]"))
                 .build();
     }
 
@@ -126,27 +116,45 @@ public class WebClientConfig {
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .defaultHeader(HttpHeaders.ACCEPT, "application/json")
                 .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
-                .filter(log4xx5xx("[OPEN-METEO]"))
+                .filter(apiMetricsAndLogFilter("OpenMeteo API", "[OPEN-METEO]"))
                 .build();
     }
 
-    /**
-     * Automatically appends ?apiKey=... to every Geoapify request
-     */
-    private ExchangeFilterFunction addApiKey(GeoapifyProperties props) {
-        return (request, next) -> {
-            var newUrl = UriComponentsBuilder
-                    .fromUri(request.url())
-                    .queryParam("apiKey", props.getApiKey())
-                    .build(false)
-                    .toUri();
-            var newRequest = ClientRequest
-                    .from(request)
-                    .url(newUrl)
-                    .build();
+    @Bean
+    @Qualifier("frankfurterWebClient")
+    public WebClient frankfurterWebClient(FrankfurterProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
 
-            return next.exchange(newRequest);
-        };
+        return WebClient.builder()
+                .baseUrl(props.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(apiMetricsAndLogFilter("Frankfurter API", "[FRANKFURTER]"))
+                .build();
+    }
+
+    @Bean
+    @Qualifier("viatorWebClient")
+    public WebClient viatorWebClient(ViatorProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        WebClient.Builder builder = WebClient.builder()
+                .baseUrl(props.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json;version=2.0")
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(apiMetricsAndLogFilter("Viator API", "[VIATOR]"));
+        if (StringUtils.hasText(props.getApiKey())) {
+            builder.defaultHeader("exp-api-key", props.getApiKey());
+        }
+        return builder.build();
     }
 
     /**
@@ -168,43 +176,31 @@ public class WebClientConfig {
         };
     }
 
-    private ExchangeFilterFunction log4xx5xx(String tag) {
-        return (request, next) -> next.exchange(request)
-                .doOnNext(resp -> {
-                    int code = resp.statusCode().value();
-                    if (code >= 400) {
-                        log.warn("{} {} {} -> {}", tag, request.method(), request.url(), code);
-                    }
-                });
-    }
-
-    private ExchangeFilterFunction retryOn429And5xx() {
-        return (request, next) -> next.exchange(request)
-                .flatMap(resp -> {
-                    if (!resp.statusCode().isError()) {
-                        return Mono.just(resp);
-                    }
-
-                    return resp.bodyToMono(String.class)
-                            .defaultIfEmpty("")
-                            .flatMap(body -> Mono.error(
-                                    new WebClientResponseException(
-                                            "Geoapify error " + resp.statusCode().value(),
-                                            resp.statusCode().value(),
-                                            resp.statusCode().toString(),
-                                            resp.headers().asHttpHeaders(),
-                                            body.getBytes(),
-                                            null)));
-                })
-                .retryWhen(
-                        Retry.backoff(2, Duration.ofSeconds(1))
-                                .maxBackoff(Duration.ofSeconds(5))
-                                .filter(ex -> {
-                                    if (ex instanceof WebClientResponseException w) {
-                                        int s = w.getStatusCode().value();
-                                        return s == 429 || (s >= 500 && s <= 599);
-                                    }
-                                    return false;
-                                }));
+    private ExchangeFilterFunction apiMetricsAndLogFilter(String apiName, String tag) {
+        return (request, next) -> {
+            long start = System.currentTimeMillis();
+            return next.exchange(request)
+                    .doOnNext(resp -> {
+                        long duration = System.currentTimeMillis() - start;
+                        int code = resp.statusCode().value();
+                        if (code >= 400) {
+                            log.warn("{} {} {} -> {}", tag, request.method(), request.url(), code);
+                            if (code >= 500 || code == 429) {
+                                apiMetricsCollector.recordError(apiName);
+                            } else {
+                                // 4xx is usually client error, we still count as success response structurally or count as error?
+                                // Usually 4xx is considered user error, but for monitoring external endpoints, often both are errors.
+                                // Let's log it as an error to track failed external attempts overall.
+                                apiMetricsCollector.recordError(apiName);
+                            }
+                        } else {
+                            apiMetricsCollector.recordCall(apiName, duration);
+                        }
+                    })
+                    .doOnError(throwable -> {
+                        log.warn("{} Error {} {} -> {}", tag, request.method(), request.url(), throwable.getMessage());
+                        apiMetricsCollector.recordError(apiName);
+                    });
+        };
     }
 }

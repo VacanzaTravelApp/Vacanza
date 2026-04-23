@@ -1,3 +1,6 @@
+import 'poi_category_catalog.dart';
+import 'poi_data_source.dart';
+
 class Poi {
   final String poiId;
   final String name;
@@ -8,6 +11,9 @@ class Poi {
   final String? priceLevel;
   final String? externalId;
 
+  /// [PoiDataSource.backend] | [PoiDataSource.mapboxStyle]
+  final String source;
+
   const Poi({
     required this.poiId,
     required this.name,
@@ -17,46 +23,23 @@ class Poi {
     this.rating,
     this.priceLevel,
     this.externalId,
+    this.source = PoiDataSource.backend,
   });
+
+  /// Check-in / backend eşleşmesi gereken akışlar için (sentetik Mapbox id yok)
+  bool get isEligibleForBackendCheckin => source == PoiDataSource.backend;
 
   factory Poi.fromJson(Map<String, dynamic> json) {
     final lat = (json["latitude"] as num?)?.toDouble() ?? 0.0;
     final lng = (json["longitude"] as num?)?.toDouble() ?? 0.0;
 
-    String _fallbackNameFromCategory(String rawCategory) {
-      final c = rawCategory.trim().toLowerCase();
-
-      switch (c) {
-        case 'parks':
-        case 'park':
-          return 'Park';
-        case 'museums':
-        case 'museum':
-          return 'Museum';
-        case 'monuments':
-        case 'monument':
-          return 'Monument';
-        case 'restaurant':
-        case 'restaurant':
-          return 'Restaurant';
-        case 'cafe':
-        case 'cafes':
-          return 'Cafe';
-        default:
-          if (c.isEmpty) return 'Place';
-          return c[0].toUpperCase() + c.substring(1); // son çare
-      }
-    }
-
-    bool _isUnnamed(String s) {
-      final n = s.trim().toLowerCase();
-      return n.isEmpty || n == 'unnamed' || n == 'unamed';
-    }
-
     final category = (json["category"] ?? "").toString();
     final rawName = (json["name"] ?? "").toString();
 
-    final name = _isUnnamed(rawName) ? _fallbackNameFromCategory(category) : rawName;
+    final name = PoiCategoryCatalog.safePoiTitle(
+      name: rawName,
+      rawCategory: category,
+    );
 
     return Poi(
       poiId: (json["poiId"] ?? "").toString(),
@@ -67,6 +50,7 @@ class Poi {
       rating: (json["rating"] as num?)?.toDouble(),
       priceLevel: json["priceLevel"]?.toString(),
       externalId: json["externalId"]?.toString(),
+      source: (json["source"] ?? PoiDataSource.backend).toString(),
     );
   }
 }

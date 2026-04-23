@@ -1,5 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
+import 'package:mobile/core/theme/app_theme.dart';
 
 import '../../data/repositories/booking_repository.dart';
 import '../cubit/booking_cubit.dart';
@@ -24,32 +28,61 @@ class BookingBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return BlocProvider(
       create: (ctx) => BookingCubit(
         repository: ctx.read<BookingRepository>(),
       ),
-      child: DraggableScrollableSheet(
+      // Lifts the whole sheet above the keyboard so flight/hotel autocomplete
+      // dropdowns stay visible (inner scroll padding alone is not enough).
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: DraggableScrollableSheet(
         initialChildSize: 0.65,
         minChildSize: 0.35,
         maxChildSize: 0.85,
         expand: false,
         builder: (context, scrollController) {
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.95),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(_sheetRadius),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 32,
-                  offset: const Offset(0, -8),
-                ),
-              ],
+          final t = context.vacanzaTokens;
+          final cs = Theme.of(context).colorScheme;
+          final isLight = Theme.of(context).brightness == Brightness.light;
+          final secondary = cs.secondary;
+          return ClipRRect(
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(_sheetRadius),
             ),
-            child: Column(
-              children: [
+            child: BackdropFilter(
+              filter: ImageFilter.blur(
+                sigmaX: isLight ? 14 : 0,
+                sigmaY: isLight ? 14 : 0,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  // Day: bright frosted glass. Night: solid surface.
+                  color: isLight
+                      ? context.lightGlassPanelColor
+                      : cs.surface.withValues(alpha: 0.98),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(_sheetRadius),
+                  ),
+                  border: Border.all(
+                    color: isLight
+                        ? secondary.withValues(alpha: 0.22)
+                        : t.cardBorder.withValues(alpha: 0.6),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 32,
+                      offset: const Offset(0, -8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
                 // ─── Handle bar ──────────────────────────────────
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
@@ -61,7 +94,9 @@ class BookingBottomSheet extends StatelessWidget {
                         width: _handleWidth,
                         height: _handleHeight,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300.withValues(alpha: 0.5),
+                          color: isLight
+                              ? secondary.withValues(alpha: 0.35)
+                              : cs.outline.withValues(alpha: 0.45),
                           borderRadius: BorderRadius.circular(100),
                         ),
                       ),
@@ -72,7 +107,13 @@ class BookingBottomSheet extends StatelessWidget {
                 // ─── Header ──────────────────────────────────────
                 _SheetHeader(onClose: () => Navigator.of(context).pop()),
 
-                const Divider(height: 1, thickness: 0.5),
+                Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  color: isLight
+                      ? secondary.withValues(alpha: 0.22)
+                      : cs.outline.withValues(alpha: 0.35),
+                ),
 
                 // ─── State-driven body ───────────────────────────
                 Expanded(
@@ -83,20 +124,23 @@ class BookingBottomSheet extends StatelessWidget {
                         onTap: () => FocusScope.of(context).unfocus(),
                         child: SingleChildScrollView(
                           controller: scrollController,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 24,
-                          ),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          // Bottom inset handled by [AnimatedPadding] above.
+                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
                           child: _buildBody(context, state),
                         ),
                       );
                     },
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
           );
         },
+        ),
       ),
     );
   }
@@ -137,6 +181,11 @@ class _SheetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final chipFill = isLight
+        ? context.lightGlassFieldFill
+        : cs.surfaceContainerHighest;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
@@ -163,13 +212,13 @@ class _SheetHeader extends StatelessWidget {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF2F2F2),
+                          color: cs.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(100),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.chevron_left_rounded,
                           size: 24,
-                          color: Color(0xFF666666),
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -177,10 +226,10 @@ class _SheetHeader extends StatelessWidget {
                   ],
                   Text(
                     _headerTitle(state),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                      color: cs.onSurface,
                     ),
                   ),
                 ],
@@ -193,13 +242,13 @@ class _SheetHeader extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F2),
+                color: chipFill,
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Icon(
                 Icons.close,
                 size: 20,
-                color: Colors.grey.shade500,
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -231,14 +280,15 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       children: [
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFFEF2F2),
-            border: Border.all(color: const Color(0xFFFECACA)),
+            color: cs.errorContainer.withValues(alpha: 0.65),
+            border: Border.all(color: cs.error.withValues(alpha: 0.35)),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -247,15 +297,15 @@ class _ErrorView extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEE2E2),
+                  color: cs.error.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(100),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     '!',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFEF4444),
+                      color: cs.error,
                     ),
                   ),
                 ),
@@ -265,20 +315,20 @@ class _ErrorView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Unable to load results',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF7F1D1D),
+                        color: cs.onErrorContainer,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       message,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFFB91C1C),
+                        color: cs.onErrorContainer.withValues(alpha: 0.9),
                       ),
                     ),
                   ],
@@ -286,12 +336,12 @@ class _ErrorView extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: onRetry,
-                child: const Text(
+                child: Text(
                   'Retry',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFDC2626),
+                    color: cs.error,
                   ),
                 ),
               ),

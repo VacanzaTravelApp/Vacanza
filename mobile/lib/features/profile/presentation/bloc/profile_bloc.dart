@@ -1,4 +1,5 @@
 import 'dart:developer' as dev;
+import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -23,6 +24,8 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     on<PreferencesUpdateErrorDismissed>(_onPreferencesUpdateErrorDismissed);
     on<ProfileUpdateRequested>(_onProfileUpdateRequested);
     on<ProfileUpdateErrorDismissed>(_onProfileUpdateErrorDismissed);
+    on<ProfilePhotoUploadRequested>(_onProfilePhotoUploadRequested);
+    on<ProfilePhotoDeleteRequested>(_onProfilePhotoDeleteRequested);
   }
 
   /// Build PUT /users/me/profile patch: only changed editable keys; no nulls; empty string allowed.
@@ -226,6 +229,56 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     emit(state.copyWith(clearPreferencesUpdateError: true));
   }
 
+  Future<void> _onProfilePhotoUploadRequested(
+    ProfilePhotoUploadRequested event,
+    Emitter<ProfileState> emit,
+  ) async {
+    emit(state.copyWith(
+      isProfilePhotoBusy: true,
+      clearProfileUpdateError: true,
+    ));
+    try {
+      await _repository.uploadProfilePhoto(event.filePath);
+      await _loadProfile(emit);
+    } catch (e) {
+      if (!isClosed) {
+        emit(state.copyWith(
+          isProfilePhotoBusy: false,
+          profileUpdateError: e.toString(),
+        ));
+      }
+      return;
+    }
+    if (!isClosed) {
+      emit(state.copyWith(isProfilePhotoBusy: false));
+    }
+  }
+
+  Future<void> _onProfilePhotoDeleteRequested(
+    ProfilePhotoDeleteRequested event,
+    Emitter<ProfileState> emit,
+  ) async {
+    emit(state.copyWith(
+      isProfilePhotoBusy: true,
+      clearProfileUpdateError: true,
+    ));
+    try {
+      await _repository.deleteProfilePhoto();
+      await _loadProfile(emit);
+    } catch (e) {
+      if (!isClosed) {
+        emit(state.copyWith(
+          isProfilePhotoBusy: false,
+          profileUpdateError: e.toString(),
+        ));
+      }
+      return;
+    }
+    if (!isClosed) {
+      emit(state.copyWith(isProfilePhotoBusy: false));
+    }
+  }
+
   /// Load all sections in parallel; each section's failure is isolated.
   Future<void> _onProfileStarted(
     ProfileStarted event,
@@ -312,15 +365,41 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     if (!isClosed) {
       try {
         final profile = await _repository.getProfile();
+        Uint8List? photoBytes;
+        if (profile.hasProfilePhoto) {
+          try {
+            photoBytes = await _repository.fetchProfilePhotoBytes();
+          } catch (_) {
+            photoBytes = null;
+          }
+        }
         if (!isClosed) {
           final errors =
               Map<ProfileSection, String>.from(state.sectionErrors)
                 ..remove(ProfileSection.profile);
-          emit(state.copyWith(
-            profileStatus: LoadStatus.success,
-            profile: profile,
-            sectionErrors: errors,
-          ));
+          if (!profile.hasProfilePhoto) {
+            emit(state.copyWith(
+              profileStatus: LoadStatus.success,
+              profile: profile,
+              clearProfilePhotoBytes: true,
+              sectionErrors: errors,
+            ));
+          } else if (photoBytes != null) {
+            emit(state.copyWith(
+              profileStatus: LoadStatus.success,
+              profile: profile,
+              profilePhotoBytes: photoBytes,
+              clearProfilePhotoBytes: false,
+              sectionErrors: errors,
+            ));
+          } else {
+            emit(state.copyWith(
+              profileStatus: LoadStatus.success,
+              profile: profile,
+              clearProfilePhotoBytes: true,
+              sectionErrors: errors,
+            ));
+          }
         }
       } catch (e) {
         if (!isClosed) {
@@ -329,6 +408,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
                 ..[ProfileSection.profile] = e.toString();
           emit(state.copyWith(
             profileStatus: LoadStatus.failure,
+            clearProfilePhotoBytes: true,
             sectionErrors: errors,
           ));
         }

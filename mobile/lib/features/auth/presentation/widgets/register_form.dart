@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/theme/app_colors.dart';
-// NOTE: Keeping this import as-is (even if not directly used here),
-// to avoid confusion in the existing widget structure.
-import '../../../../core/widgets/app_text_field.dart';
-
 import '../bloc/register_bloc.dart';
 import '../bloc/register_event.dart';
 import '../bloc/register_state.dart';
@@ -14,6 +9,7 @@ import 'auth_card_container.dart';
 import 'register_name_section.dart';
 import 'register_email_section.dart';
 import 'register_password_section.dart';
+import 'register_optional_fields_section.dart';
 import 'register_terms_and_button_section.dart';
 
 /// Register form widget.
@@ -56,6 +52,11 @@ class _RegisterFormState extends State<RegisterForm> {
   // Preferred name selections
   bool _preferredFirst = false;
   bool _preferredMiddle = false;
+
+  /// Optional — only non-empty values are sent to `POST /auth/register`.
+  String? _optionalCountry;
+  String? _optionalBirthDateIso;
+  String? _optionalGender;
 
   @override
   void initState() {
@@ -183,6 +184,9 @@ class _RegisterFormState extends State<RegisterForm> {
         email: _email.text.trim(),
         password: _password.text,
         preferredNames: preferredNames,
+        country: _optionalCountry,
+        birthDate: _optionalBirthDateIso,
+        gender: _optionalGender,
       ),
     );
   }
@@ -207,7 +211,6 @@ class _RegisterFormState extends State<RegisterForm> {
       },
       builder: (context, state) {
         final isSubmitting = state.isSubmitting;
-        final canSubmit = _formValid && _terms && !isSubmitting;
 
         return AuthCardContainer(
           child: Form(
@@ -301,11 +304,23 @@ class _RegisterFormState extends State<RegisterForm> {
 
                   const SizedBox(height: 20),
 
+                  RegisterOptionalFieldsSection(
+                    country: _optionalCountry,
+                    birthDateIso: _optionalBirthDateIso,
+                    gender: _optionalGender,
+                    onCountryChanged: (v) => setState(() => _optionalCountry = v),
+                    onBirthDateChanged: (v) =>
+                        setState(() => _optionalBirthDateIso = v),
+                    onGenderChanged: (v) => setState(() => _optionalGender = v),
+                  ),
+
+                  const SizedBox(height: 20),
+
                   // TERMS + BUTTON SECTION
                   RegisterTermsAndButtonSection(
                     terms: _terms,
                     loading: isSubmitting,
-                    formValid: _formValid,
+                    formValid: _formValid && !isSubmitting,
                     onTermsChanged: (v) {
                       setState(() => _terms = v ?? false);
                     },

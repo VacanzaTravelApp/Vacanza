@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/models/sort_criteria.dart';
 import '../../cubit/booking_state.dart';
+import 'booking_search_field_styles.dart';
 
 /// Sort criteria dropdown showing type-appropriate options.
 class SortDropdown extends StatelessWidget {
@@ -16,8 +17,6 @@ class SortDropdown extends StatelessWidget {
     required this.onChanged,
   });
 
-  static const _accent = Color(0xFF0096FF);
-
   static const _labels = {
     SortCriteria.priceAsc: 'Price: Low to High',
     SortCriteria.priceDesc: 'Price: High to Low',
@@ -30,18 +29,16 @@ class SortDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = bookingAccentColor(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 4),
           child: Text(
             'Sort by',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF999999),
-            ),
+            style: BookingSearchFieldStyles.fieldLabel(context),
           ),
         ),
         DropdownButtonFormField<SortCriteria>(
@@ -55,41 +52,44 @@ class SortDropdown extends StatelessWidget {
                   value: s,
                   child: Text(
                     _labels[s]!,
-                    style: const TextStyle(fontSize: 13),
+                    style: BookingSearchFieldStyles.dropdownMenuItem(context)
+                        .copyWith(fontSize: 13),
                   ),
                 ),
               )
               .toList(),
-          icon: const Icon(
+          icon: Icon(
             Icons.swap_vert_rounded,
             size: 18,
-            color: Color(0xFFAAAAAA),
+            color: cs.onSurfaceVariant,
           ),
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFFAFAFA),
+            fillColor: BookingSearchFieldStyles.fieldFill(context),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 14,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+              borderSide: BorderSide(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
+              borderSide: BorderSide(
+                color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: const BorderSide(color: _accent, width: 1.5),
+              borderSide: BorderSide(color: accent, width: 1.5),
             ),
           ),
-          dropdownColor: Colors.white,
-          style: const TextStyle(
+          dropdownColor: cs.surface,
+          style: BookingSearchFieldStyles.dropdownMenuItem(context).copyWith(
             fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF1A1A1A),
           ),
         ),
       ],

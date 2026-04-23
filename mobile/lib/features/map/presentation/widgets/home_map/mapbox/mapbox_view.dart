@@ -1,32 +1,40 @@
 // mapbox_view.dart
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
 import 'package:mobile/core/config/mapbox_config.dart';
 
 import '../../../../../poi_search/data/models/selected_area.dart';
 
-/// Map widget + viewport bbox emitter (debounced).
-/// - Gesture ignore: drawing modunda map interaction kapatmak için.
-/// - İlk idle’da da bbox gönderir.
-/// - ✅ Parent isterse her idle eventini dinleyebilir (selection redraw için).
+/// Map widget + viewport bbox emitter.
+///
+/// Uses [onCameraChangeListener] with debounce to track viewport changes.
+/// This is more reliable than relying solely on [onMapIdleListener] because
+/// continuous animations (e.g. location puck pulsing) can prevent the map
+/// from ever reaching idle state.
 class MapboxView extends StatefulWidget {
   final bool ignoreGestures;
 
-  /// Parent map referansını saklayabilsin diye.
+  /// Initial camera; use user coordinates when available so the map does not
+  /// flash a world view before GPS.
+  final mb.CameraOptions cameraOptions;
+
+  /// Optional key for the underlying [mb.MapWidget] (e.g. remount when
+  /// switching between fallback and user-centered camera).
+  final Key? mapWidgetKey;
+
   final Future<void> Function(mb.MapboxMap mapboxMap) onMapCreated;
 
-  /// Viewport bbox üretildiğinde parent’a gönderir.
   final void Function(BboxArea bbox) onViewportBbox;
 
-  /// ✅ Map idle olduğunda parent bilgilensin (bbox dışında işler için)
   final VoidCallback? onMapIdle;
 
   const MapboxView({
     super.key,
     required this.ignoreGestures,
+    required this.cameraOptions,
+    this.mapWidgetKey,
     required this.onMapCreated,
     required this.onViewportBbox,
     this.onMapIdle,
@@ -39,10 +47,8 @@ class MapboxView extends StatefulWidget {
 class _MapboxViewState extends State<MapboxView> {
   mb.MapboxMap? _map;
 
-  bool _initialViewportSent = false;
-
   Timer? _debounce;
-  static const Duration _debounceDuration = Duration(milliseconds: 500);
+  static const Duration _debounceDuration = Duration(milliseconds: 600);
 
   @override
   void dispose() {
@@ -55,8 +61,8 @@ class _MapboxViewState extends State<MapboxView> {
     return IgnorePointer(
       ignoring: widget.ignoreGestures,
       child: mb.MapWidget(
-        key: const ValueKey('mapbox-map'),
-        cameraOptions: MapboxConfig.initialCamera,
+        key: widget.mapWidgetKey ?? const ValueKey('mapbox-map'),
+        cameraOptions: widget.cameraOptions,
         styleUri: MapboxConfig.styleStandard,
         onMapCreated: (mapboxMap) async {
           _map = mapboxMap;
@@ -64,16 +70,11 @@ class _MapboxViewState extends State<MapboxView> {
         },
         onMapIdleListener: (_) {
           if (_map == null) return;
-
-          // ✅ Parent'a idle sinyali (selection polygon redraw vb.)
           widget.onMapIdle?.call();
-
-          if (!_initialViewportSent) {
-            _initialViewportSent = true;
-            unawaited(_emitViewportBboxNow());
-            return;
-          }
-
+          _scheduleViewportBbox();
+        },
+        onCameraChangeListener: (_) {
+          if (_map == null) return;
           _scheduleViewportBbox();
         },
       ),

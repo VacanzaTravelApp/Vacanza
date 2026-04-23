@@ -17,12 +17,25 @@ import java.util.List;
 @Builder
 public class AdminAnalyticsDTO {
 
-    private long totalUsers;
+    private long matrixUsers;
+    private double globalRevenue;
+    private long activeNodes;
+    private double avgDuration;
+
+    /**
+     * Number of users who logged in within the last 30 minutes (approximate active sessions).
+     */
     private long activeSessions;
-    private long totalCheckins;
-    private List<GrowthMetric> growthTrends;
-    private List<CategoryMetric> categoryDistribution;
-    private List<TopPoiMetric> topPois;
+
+    private List<GrowthMetric> growthTrajectory;
+    private List<CategoryMetric> categoryBreakdown;
+    private List<HighPerformanceAssetMetric> highPerformanceAssets;
+
+    /**
+     * ISO-8601 timestamp of when this data was generated.
+     * Helps the frontend enforce the ≤ 60-second refresh interval (FReq13).
+     */
+    private String lastRefreshedAt;
 
     // ── Inner DTOs ──────────────────────────────────────────────
 
@@ -40,17 +53,17 @@ public class AdminAnalyticsDTO {
     @AllArgsConstructor
     @Builder
     public static class CategoryMetric {
-        private String category;  // e.g. "History", "Nature", "Culture"
-        private long count;
+        private String name;   // e.g. "History", "Nature", "Culture"
+        private long value;
     }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
-    public static class TopPoiMetric {
+    public static class HighPerformanceAssetMetric {
         private String name;
         private String category;
-        private long visitCount;
+        private double score;
     }
 }

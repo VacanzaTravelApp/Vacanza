@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/area_source.dart';
 import '../../data/models/selected_area.dart';
+import '../../data/utils/poi_client_category_filter.dart';
 import '../../data/repositories/poi_search_repository.dart';
 import '../../data/repositories/poi_search_repository_exception.dart';
 import 'poi_search_event.dart';
@@ -24,6 +25,9 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
 
     on<SearchRequested>(_onSearchRequested);
     on<LoadNextPage>(_onLoadNextPage); // opsiyonel
+
+    on<HidePoiMarkers>(_onHidePoiMarkers);
+    on<ShowPoiMarkers>(_onShowPoiMarkers);
   }
 
   /// Son gelen viewport bbox’u burada cache’liyoruz.
@@ -46,9 +50,12 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
       return;
     }
 
-    // ✅ Aynı bbox geldiyse spam request atma
-    if (state.selectedArea is BboxArea && state.selectedArea == event.bbox) {
-      return;
+    // ✅ Aynı bbox veya görünür alan pratikte aynı (stil/pitch sonrası float farkı)
+    if (state.selectedArea is BboxArea) {
+      final cur = state.selectedArea as BboxArea;
+      if (cur == event.bbox || cur.isNearlyEqual(event.bbox)) {
+        return;
+      }
     }
 
     emit(
@@ -99,6 +106,17 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
     }
   }
 
+  void _onHidePoiMarkers(HidePoiMarkers event, Emitter<PoiSearchState> emit) {
+    emit(state.copyWith(hidePoiMarkers: true));
+  }
+
+  void _onShowPoiMarkers(ShowPoiMarkers event, Emitter<PoiSearchState> emit) {
+    emit(state.copyWith(hidePoiMarkers: false));
+    if (state.hasUsableArea) {
+      add(const SearchRequested());
+    }
+  }
+
   bool _bboxTooLargeForSearch(BboxArea b) {
     final latSpan = (b.maxLat - b.minLat).abs();
     final lngSpan = (b.maxLng - b.minLng).abs();
@@ -108,21 +126,21 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
   }
 
   void _onCategoryChanged(CategoryChanged event, Emitter<PoiSearchState> emit) {
-    emit(
-      state.copyWith(
-        selectedCategories: List.unmodifiable(event.categories),
-        page: 0,
-      ),
+    final next = state.copyWith(
+      selectedCategories: List.unmodifiable(event.categories),
+      page: 0,
     );
+    emit(next);
 
-    if (state.hasUsableArea) {
+    if (next.hasUsableArea) {
       add(const SearchRequested());
     }
   }
 
   void _onSortChanged(SortChanged event, Emitter<PoiSearchState> emit) {
-    emit(state.copyWith(sort: event.sort, page: 0));
-    if (state.hasUsableArea) add(const SearchRequested());
+    final next = state.copyWith(sort: event.sort, page: 0);
+    emit(next);
+    if (next.hasUsableArea) add(const SearchRequested());
   }
 
   Future<void> _onSearchRequested(
@@ -130,6 +148,22 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
       Emitter<PoiSearchState> emit,
       ) async {
     if (!state.hasUsableArea) return;
+
+    // ✅ Hiç kategori seçilmediyse (None): haritada POI yok — backend "tümü" ile karışmasın.
+    if (state.selectedCategories.isEmpty) {
+      emit(
+        state.copyWith(
+          status: PoiSearchStatus.success,
+          count: 0,
+          pois: const [],
+          countsByCategory: const {},
+          page: 0,
+          errorCode: null,
+          errorMessage: null,
+        ),
+      );
+      return;
+    }
 
     final page = 0;
     final limit = state.limit.clamp(1, 500);
@@ -144,9 +178,13 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
     );
 
     try {
+      // Composite repo: backend’e kategori gönderilmez; bu sadece istemci tarafı filtre.
+      final categories =
+          PoiClientCategoryFilter.categoriesForSearch(state.selectedCategories);
+
       final res = await _repo.searchInArea(
         area: state.selectedArea,
-        categories: state.selectedCategories.isEmpty ? null : state.selectedCategories,
+        categories: categories,
         page: page,
         limit: limit,
         sort: state.sort,
@@ -186,4 +224,5 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
   Future<void> _onLoadNextPage(LoadNextPage event, Emitter<PoiSearchState> emit) async {
     // ops: şimdilik MVP dışı.
   }
+
 }

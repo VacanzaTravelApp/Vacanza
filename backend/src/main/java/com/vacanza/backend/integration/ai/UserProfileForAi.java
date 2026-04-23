@@ -13,7 +13,7 @@ import java.util.List;
  * Combines identity (UserInfo) + travel preferences (UserPreferences).
  */
 @Value
-@Builder
+@Builder(toBuilder = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class UserProfileForAi {
 
@@ -54,6 +54,9 @@ public class UserProfileForAi {
         // ── Language ──────────────────────────────────────────────
         String preferredLanguage;
         List<String> spokenLanguages;
+
+        // ── Favorited / Saved POIs (injected by ChatProxyController) ──────────
+        List<String> savedPoiNames;
 
         /**
          * Build AI profile from user info + optional preferences.

@@ -1,6 +1,14 @@
 import React from "react";
 import { Typography, Row, Col, Button, Spin, Alert } from "antd";
-import { ArrowLeftOutlined, ExclamationCircleFilled } from "@ant-design/icons";
+import {
+    ArrowLeftOutlined,
+    ExclamationCircleFilled,
+    ThunderboltOutlined,
+    CoffeeOutlined,
+    BankOutlined,
+    EnvironmentOutlined,
+    CompassOutlined
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useGamificationProfile } from "./useGamificationProfile";
 import "./GamificationSummary.css";
@@ -16,7 +24,7 @@ const GamificationSummary = () => {
         return (
             <div className="gamification-page">
                 <div className="gamification-loading">
-                    <Spin size="large" tip="Yükleniyor..." />
+                    <Spin size="large" tip="Loading..." />
                 </div>
             </div>
         );
@@ -143,12 +151,12 @@ const GamificationSummary = () => {
                                     return (
                                         <div key={badge.id} className={`badge-item ${isLocked ? "locked" : ""}`}>
                                             <div className={`badge-icon ${badge.color || "blue"}`}>
-                                                <span style={{ fontSize: '28px' }}>
-                                                    {badge.key === 'speed' ? '⚡' :
-                                                        badge.key === 'foodie' ? '🍴' :
-                                                            badge.key === 'culture' ? '🏛️' :
-                                                                badge.key === 'nature' ? '🌲' :
-                                                                    badge.key === 'explorer' ? '🧭' : '📍'}
+                                                <span style={{ fontSize: '28px', color: 'inherit' }}>
+                                                    {badge.key === 'speed' ? <ThunderboltOutlined /> :
+                                                        badge.key === 'foodie' ? <CoffeeOutlined /> :
+                                                            badge.key === 'culture' ? <BankOutlined /> :
+                                                                badge.key === 'nature' ? <EnvironmentOutlined /> :
+                                                                    badge.key === 'explorer' ? <CompassOutlined /> : <CompassOutlined />}
                                                 </span>
                                             </div>
                                             <div className="badge-title">{badge.title}</div>

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+
 import '../../../data/models/accommodation_option.dart';
 import '../../../data/models/booking_utils.dart';
 import '../booking_url_launcher.dart';
+import '../search/booking_search_field_styles.dart';
 
 /// Card displaying a single hotel result.
 class HotelCard extends StatefulWidget {
@@ -17,10 +20,10 @@ class HotelCard extends StatefulWidget {
 class _HotelCardState extends State<HotelCard> {
   bool _isLaunching = false;
 
-  static const _accent = Color(0xFF0096FF);
-
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final accent = context.mapControlAccent;
     final hotel = widget.hotel;
     final validUrl = isValidBookingUrl(hotel.externalBookingUrl);
     final enabled = validUrl && !_isLaunching;
@@ -29,12 +32,14 @@ class _HotelCardState extends State<HotelCard> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: const Color(0xFFF0F0F0)),
+        color: cs.surface,
+        border: Border.all(
+          color: BookingSearchFieldStyles.fieldBorderInactive(context),
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: cs.shadow.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -59,12 +64,12 @@ class _HotelCardState extends State<HotelCard> {
               width: 90,
               height: 90,
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.hotel_rounded,
-                color: Color(0xFFB0B0B0),
+                color: cs.onSurfaceVariant,
                 size: 32,
               ),
             ),
@@ -85,10 +90,10 @@ class _HotelCardState extends State<HotelCard> {
                             hotel.hotelName,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
+                              color: cs.onSurface,
                               height: 1.3,
                             ),
                           ),
@@ -108,10 +113,10 @@ class _HotelCardState extends State<HotelCard> {
                     const SizedBox(width: 8),
                     Text(
                       '\$${hotel.price.toStringAsFixed(2)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: _accent,
+                        color: accent,
                       ),
                     ),
                   ],
@@ -125,7 +130,7 @@ class _HotelCardState extends State<HotelCard> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade500,
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -141,10 +146,10 @@ class _HotelCardState extends State<HotelCard> {
                         const SizedBox(width: 3),
                         Text(
                           ratingText,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF1A1A1A),
+                            color: cs.onSurface,
                           ),
                         ),
                       ],
@@ -155,7 +160,7 @@ class _HotelCardState extends State<HotelCard> {
                           '(${hotel.totalReviews} reviews)',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade600,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                     ],
@@ -169,7 +174,7 @@ class _HotelCardState extends State<HotelCard> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade700,
+                      color: cs.onSurface.withValues(alpha: 0.85),
                     ),
                   ),
                 ],
@@ -178,10 +183,10 @@ class _HotelCardState extends State<HotelCard> {
                   const SizedBox(height: 6),
                   Text(
                     hotel.providerName!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
-                      color: Color(0xFF888888),
+                      color: cs.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -210,15 +215,15 @@ class _HotelCardState extends State<HotelCard> {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: _accent.withValues(alpha: 0.1),
+                          color: accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           _isLaunching ? 'Opening…' : 'Open booking',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: _accent,
+                            color: accent,
                           ),
                         ),
                       ),

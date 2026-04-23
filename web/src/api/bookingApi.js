@@ -1,5 +1,5 @@
 import axios from "axios";
-import { auth } from "../firebase"; // senin verdiğin dosya
+import { auth } from "../firebase";
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -8,11 +8,12 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
+    "Accept-Language": "en",
   },
   timeout: 15000,
 });
 
-// 🔥 Firebase token interceptor
+// Firebase token interceptor
 api.interceptors.request.use(async (config) => {
   const user = auth.currentUser;
 
@@ -66,13 +67,9 @@ function mapError(error) {
 // HOTELS
 // ======================
 
-export async function searchHotels(body) {
+export async function searchHotels(params) {
   try {
-    const res = await api.post(
-      "/bookings/accommodations/search",
-      body
-    );
-
+    const res = await api.post("/bookings/accommodations/search", params);
     return { success: true, data: res.data || [] };
   } catch (error) {
     return { success: false, error: mapError(error) };
@@ -83,15 +80,38 @@ export async function searchHotels(body) {
 // FLIGHTS
 // ======================
 
-export async function searchFlights(body) {
+export async function searchFlights(params) {
   try {
-    const res = await api.post(
-      "/bookings/transportation/search",
-      body
-    );
-
+    const res = await api.post("/bookings/transportation/search", params);
     return { success: true, data: res.data || [] };
   } catch (error) {
     return { success: false, error: mapError(error) };
+  }
+}
+
+// ======================
+// AIRPORTS (AUTOCOMPLETE)
+// ======================
+
+export async function searchAirports(query) {
+  try {
+    const res = await api.get(`/bookings/airports/search?q=${encodeURIComponent(query)}`);
+    return res.data || [];
+  } catch (error) {
+    console.error("Airport search error:", error);
+    return [];
+  }
+}
+
+// ======================
+// DESTINATIONS (HOTELS AUTOCOMPLETE)
+// ======================
+export async function searchDestinations(query) {
+  try {
+    const res = await api.get(`/bookings/destinations/search?q=${encodeURIComponent(query)}`);
+    return res.data || [];
+  } catch (error) {
+    console.error("Hotel destination search error:", error);
+    return [];
   }
 }

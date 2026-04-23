@@ -26,8 +26,17 @@ public final class AiChatDto {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MessageSendRequest {
         private String content;
+
+        /**
+         * Java-internal toggle. When null/true the backend injects the user's liked POIs
+         * into the AI profile as a hint. Read from the frontend request but never forwarded
+         * to the Python AI service (WRITE_ONLY = deserialize-in, skip-on-serialize).
+         */
+        @JsonProperty(value = "includeFavorites", access = JsonProperty.Access.WRITE_ONLY)
+        private Boolean includeFavorites;
     }
 
     /** Response when creating a conversation. */
@@ -78,9 +87,26 @@ public final class AiChatDto {
         @JsonProperty("route_data")
         private RouteData routeData;
 
-        /** Short contextual message about the route (e.g. "Müzeleri sevdiğini biliyordum, o yüzden rotanda ağırlıklı olarak müzeler var."). */
+        /** Short contextual message about the route. */
         @JsonProperty("route_summary_message")
         private String routeSummaryMessage;
+
+        /** ID of the saved assistant message in the Python service DB. */
+        @JsonProperty("message_id")
+        private UUID messageId;
+
+        /**
+         * Persisted {@code ai_routes.route_id} after this turn saved route JSON (Java-only).
+         */
+        @JsonProperty("route_id")
+        private UUID routeId;
+
+        /**
+         * Set by Java when the response is tied to a known conversation (e.g. map polygon route flow).
+         * Not returned by the Python AI service for normal chat sends.
+         */
+        @JsonProperty("conversation_id")
+        private UUID conversationId;
     }
 
     /** A single stop/place in a day's route plan. */
@@ -112,6 +138,13 @@ public final class AiChatDto {
 
         @JsonProperty("departure_time_local")
         private String departureTimeLocal;
+
+        /**
+         * Set to {@code true} by adaptive adjustment when this stop is known to be
+         * closed or inaccessible. The frontend should render it with a visual indicator
+         * rather than removing it from the map, allowing users to see what was affected.
+         */
+        private Boolean unavailable;
     }
 
     /** One day's itinerary within a multi-day route. */
@@ -143,6 +176,20 @@ public final class AiChatDto {
         @JsonProperty("total_days")
         private int totalDays;
 
+        /**
+         * When {@code true}, event search uses the trip date range from weather/route (narrow). When {@code false}
+         * or {@code null}/omitted, search uses a ~30-day window from today (broad).
+         */
+        @JsonProperty("trip_dates_user_specified")
+        private Boolean tripDatesUserSpecified;
+
+        /**
+         * First calendar day of the trip when the user stated dates (ISO {@code YYYY-MM-DD}). Takes precedence over
+         * weather for event search and itinerary alignment.
+         */
+        @JsonProperty("trip_start_date")
+        private String tripStartDate;
+
         private List<DayPlan> days;
         private String notes;
 
@@ -167,5 +214,117 @@ public final class AiChatDto {
         private String preferenceValue;
 
         private Double confidence;
+    }
+
+    /** POST /events/recommend-for-route — AI ranking and personalized message. */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class DaySummaryAi {
+        private int day;
+        private String title;
+        private List<String> categories;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RouteSummaryForRecommend {
+        private String destination;
+
+        @JsonProperty("total_days")
+        private int totalDays;
+
+        @JsonProperty("start_date")
+        private String startDate;
+
+        @JsonProperty("day_summaries")
+        private List<DaySummaryAi> daySummaries;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class UserPreferenceSummaryAi {
+        @JsonProperty("travel_style")
+        private String travelStyle;
+
+        @JsonProperty("favorite_categories")
+        private List<String> favoriteCategories;
+
+        @JsonProperty("event_interest")
+        private String eventInterest;
+
+        @JsonProperty("preferred_language")
+        private String preferredLanguage;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class AvailableEventAi {
+        private String id;
+        private String name;
+        private String description;
+
+        @JsonProperty("start_time")
+        private String startTime;
+
+        @JsonProperty("end_time")
+        private String endTime;
+
+        @JsonProperty("venue_name")
+        private String venueName;
+        private String category;
+        private Double latitude;
+        private Double longitude;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EventRecommendAiRequest {
+        @JsonProperty("route_summary")
+        private RouteSummaryForRecommend routeSummary;
+
+        @JsonProperty("user_preferences")
+        private UserPreferenceSummaryAi userPreferences;
+
+        @JsonProperty("available_events")
+        private List<AvailableEventAi> availableEvents;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RecommendedEventResultAi {
+        @JsonProperty("event_id")
+        private String eventId;
+
+        @JsonProperty("matched_day")
+        private Integer matchedDay;
+
+        @JsonProperty("match_reason")
+        private String matchReason;
+
+        @JsonProperty("relevance_score")
+        private Double relevanceScore;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class EventRecommendAiResponse {
+        private String message;
+
+        @JsonProperty("recommended_events")
+        private List<RecommendedEventResultAi> recommendedEvents;
     }
 }

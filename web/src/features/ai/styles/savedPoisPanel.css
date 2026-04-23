@@ -1,0 +1,335 @@
+/* ═══ Saved Places Panel — Vacanza Design System ═══ */
+.saved-pois-panel {
+  /* Token layer — matches vacanzaChat/routePanel pattern */
+  --vc-primary: #FF6B6B;
+  --vc-primary-hover: #ff5252;
+  --vc-primary-soft: rgba(255, 107, 107, 0.10);
+  --vc-text: #2c3545;
+  --vc-text-secondary: #5a6b7a;
+  --vc-muted: #94a3b8;
+  --vc-border: rgba(0, 0, 0, 0.07);
+  --vc-card-bg: #ffffff;
+  --vc-surface: #f4f6fa;
+  --vc-row-hover: rgba(0, 0, 0, 0.03);
+  --vc-card-shadow: 0 10px 40px -8px rgba(15, 23, 42, 0.14),
+                    0 4px 12px -4px rgba(15, 23, 42, 0.07);
+
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  position: fixed;
+  top: 80px;
+  left: 16px;
+  width: 296px;
+  max-height: calc(100vh - 110px);
+  display: flex;
+  flex-direction: column;
+  z-index: 1100;
+  overflow: hidden;
+  background: var(--vc-card-bg);
+  border-radius: 20px;
+  border: 1px solid var(--vc-border);
+  box-shadow: var(--vc-card-shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: spp-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.theme-night .saved-pois-panel {
+  --vc-primary: #38BDF8;
+  --vc-primary-hover: #56c7f7;
+  --vc-primary-soft: rgba(56, 189, 248, 0.12);
+  --vc-text: #F8FAFC;
+  --vc-text-secondary: #94A3B8;
+  --vc-muted: #64748b;
+  --vc-border: rgba(56, 189, 248, 0.12);
+  --vc-card-bg: #1A1B26;
+  --vc-surface: rgba(255, 255, 255, 0.06);
+  --vc-row-hover: rgba(255, 255, 255, 0.04);
+  --vc-card-shadow: 0 10px 50px -8px rgba(0, 0, 0, 0.65),
+                    0 0 0 1px rgba(56, 189, 248, 0.12);
+}
+
+@keyframes spp-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* ─── Accent line ─── */
+.saved-pois-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--vc-primary), #2DD4A8, #38BDF8);
+  border-radius: 20px 20px 0 0;
+  z-index: 3;
+}
+
+/* ─── Header ─── */
+.saved-pois-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid var(--vc-border);
+  flex-shrink: 0;
+  background: var(--vc-card-bg);
+  z-index: 2;
+}
+
+.saved-pois-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saved-pois-icon {
+  font-size: 16px;
+  color: var(--vc-primary);
+  line-height: 1;
+}
+
+.saved-pois-title-text {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--vc-text);
+  letter-spacing: -0.01em;
+}
+
+.saved-pois-count {
+  background: var(--vc-primary-soft);
+  color: var(--vc-primary);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 2px 8px;
+  letter-spacing: 0.01em;
+}
+
+.saved-pois-close {
+  color: var(--vc-muted) !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.15s, color 0.15s !important;
+}
+.saved-pois-close:hover {
+  background: var(--vc-surface) !important;
+  color: var(--vc-text) !important;
+}
+
+/* ─── Body ─── */
+.saved-pois-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 6px 0 8px;
+}
+
+.saved-pois-body::-webkit-scrollbar {
+  width: 3px;
+}
+.saved-pois-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.saved-pois-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.10);
+  border-radius: 2px;
+}
+.theme-night .saved-pois-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+/* ─── Loading / Empty ─── */
+.saved-pois-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 0;
+}
+
+.saved-pois-empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 36px 24px 32px;
+}
+
+.saved-pois-empty-icon {
+  font-size: 32px;
+  color: var(--vc-muted);
+  opacity: 0.5;
+}
+
+.saved-pois-empty-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vc-text-secondary);
+}
+
+.saved-pois-empty-sub {
+  font-size: 12px;
+  color: var(--vc-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ─── List ─── */
+.saved-pois-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ─── Row ─── */
+.saved-poi-item {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  transition: background 0.15s;
+  padding-right: 4px;
+}
+.saved-poi-item:hover {
+  background: var(--vc-row-hover);
+}
+
+.saved-poi-main {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 9px 8px 9px 10px;
+  border-radius: 12px;
+  color: inherit;
+}
+.saved-poi-main:disabled {
+  cursor: default;
+}
+
+/* color dot */
+.saved-poi-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.06);
+}
+
+.saved-poi-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.saved-poi-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
+}
+
+.saved-poi-meta {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.saved-poi-category {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--vc-primary);
+  background: var(--vc-primary-soft);
+  border-radius: 5px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.saved-poi-date {
+  font-size: 10.5px;
+  color: var(--vc-muted);
+  flex-shrink: 0;
+}
+
+/* map pin icon — shown on hover */
+.saved-poi-map-icon {
+  font-size: 14px;
+  color: var(--vc-primary);
+  opacity: 0;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.saved-poi-item:hover .saved-poi-map-icon {
+  opacity: 0.75;
+}
+
+/* remove button */
+.saved-poi-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--vc-muted);
+  font-size: 12px;
+  padding: 5px 7px;
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.saved-poi-item:hover .saved-poi-remove {
+  opacity: 1;
+}
+.saved-poi-remove:hover {
+  color: #ff4d4f;
+  background: rgba(255, 77, 79, 0.08);
+}
+
+/* ─── Footer (count line) ─── */
+.saved-pois-footer {
+  border-top: 1px solid var(--vc-border);
+  padding: 9px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.saved-pois-footer-text {
+  font-size: 11px;
+  color: var(--vc-muted);
+}
+
+/* ─── Mobile ─── */
+@media (max-width: 768px) {
+  .saved-pois-panel {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    top: 62px;
+    max-height: 56vh;
+    border-radius: 18px;
+  }
+}

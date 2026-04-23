@@ -66,3 +66,13 @@ class SortChanged extends PoiSearchEvent {
   @override
   List<Object?> get props => [sort];
 }
+
+/// Rota haritada gösterilirken POI marker'larını gizle.
+class HidePoiMarkers extends PoiSearchEvent {
+  const HidePoiMarkers();
+}
+
+/// Rota kapatıldığında POI marker'larını geri getir.
+class ShowPoiMarkers extends PoiSearchEvent {
+  const ShowPoiMarkers();
+}

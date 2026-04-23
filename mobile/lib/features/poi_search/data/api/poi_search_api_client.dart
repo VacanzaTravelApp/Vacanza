@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'package:dio/dio.dart';
 
 import 'poi_search_in_area_request_dto.dart';

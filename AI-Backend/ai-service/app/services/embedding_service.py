@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from openai import APIConnectionError, APIError, RateLimitError
+from openai import APIConnectionError, APIError, BadRequestError, RateLimitError
 from openai import OpenAI
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -59,6 +59,10 @@ class EmbeddingService:
                 input=text.strip(),
                 model=self._model,
             )
+        except BadRequestError as e:
+            # 400 errors (e.g. token limit exceeded) are permanent — do not retry
+            logger.warning("Embedding API bad request (non-retryable): %s", e)
+            raise EmbeddingServiceError(f"Embedding API bad request: {e}") from e
         except (RateLimitError, APIConnectionError, APIError) as e:
             logger.warning("Embedding API error (retryable): %s", e)
             raise

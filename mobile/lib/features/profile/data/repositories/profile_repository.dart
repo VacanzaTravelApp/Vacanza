@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
+import '../../../../core/network/backend_error_parser.dart';
 import '../datasources/profile_remote_data_source.dart';
 import '../models/check_in.dart';
 import '../models/travel_stats.dart';
@@ -41,6 +44,33 @@ class ProfileRepository {
       throw _mapDioException(e);
     } on FormatException {
       throw const ProfileException('Invalid response');
+    }
+  }
+
+  Future<void> uploadProfilePhoto(String filePath) async {
+    try {
+      await _dataSource.uploadProfilePhoto(filePath);
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    } on FormatException catch (e) {
+      throw ProfileException(e.message);
+    }
+  }
+
+  /// `null` when no binary photo (404).
+  Future<Uint8List?> fetchProfilePhotoBytes() async {
+    try {
+      return await _dataSource.fetchProfilePhotoBytes();
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    }
+  }
+
+  Future<void> deleteProfilePhoto() async {
+    try {
+      await _dataSource.deleteProfilePhoto();
+    } on DioException catch (e) {
+      throw _mapDioException(e);
     }
   }
 
@@ -98,6 +128,9 @@ class ProfileRepository {
     }
     if (status == 401 || status == 403) {
       return const ProfileException('Unauthorized');
+    }
+    if (status == 400) {
+      return ProfileException(extractBackendMessage(e));
     }
     if (status != null) {
       return ProfileException('Request failed (status: $status)');

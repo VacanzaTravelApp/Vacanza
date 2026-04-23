@@ -6,6 +6,7 @@ import com.vacanza.backend.dto.request.AccommodationSearchRequestDTO;
 import com.vacanza.backend.dto.request.TransportSearchRequestDTO;
 import com.vacanza.backend.dto.response.AccommodationOptionDTO;
 import com.vacanza.backend.dto.response.TransportOptionDTO;
+import com.vacanza.backend.integration.booking.SerpApiAirportSuggestion;
 import com.vacanza.backend.service.BookingService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -184,6 +187,52 @@ public class BookingControllerTest {
                 mockMvc.perform(post("/bookings/transportation/search")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isBadRequest());
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // Airport autocomplete
+        // ──────────────────────────────────────────────────────────────
+
+        @Test
+        @DisplayName("GET /bookings/airports/search — 200 with valid query")
+        void searchAirports_Success() throws Exception {
+                SerpApiAirportSuggestion ist = new SerpApiAirportSuggestion();
+                ist.setIataCode("IST");
+                ist.setName("Istanbul Airport");
+                ist.setCity("Istanbul");
+                ist.setCountry("Turkey");
+
+                SerpApiAirportSuggestion saw = new SerpApiAirportSuggestion();
+                saw.setIataCode("SAW");
+                saw.setName("Istanbul Sabiha Gokcen Airport");
+                saw.setCity("Istanbul");
+                saw.setCountry("Turkey");
+
+                when(bookingService.searchAirports(anyString())).thenReturn(List.of(ist, saw));
+
+                mockMvc.perform(get("/bookings/airports/search")
+                                .param("q", "istanbul"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$[0].iataCode").value("IST"))
+                                .andExpect(jsonPath("$[0].name").value("Istanbul Airport"))
+                                .andExpect(jsonPath("$[0].city").value("Istanbul"))
+                                .andExpect(jsonPath("$[0].country").value("Turkey"))
+                                .andExpect(jsonPath("$[1].iataCode").value("SAW"));
+        }
+
+        @Test
+        @DisplayName("GET /bookings/airports/search — 400 when query is too short (1 char)")
+        void searchAirports_QueryTooShort() throws Exception {
+                mockMvc.perform(get("/bookings/airports/search")
+                                .param("q", "i"))
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("GET /bookings/airports/search — 400 when q parameter is missing")
+        void searchAirports_MissingParam() throws Exception {
+                mockMvc.perform(get("/bookings/airports/search"))
                                 .andExpect(status().isBadRequest());
         }
 }

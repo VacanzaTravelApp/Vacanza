@@ -72,6 +72,9 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
         preferredName: event.preferredNames.isEmpty
             ? null
             : event.preferredNames.join(' '),
+        country: event.country,
+        birthDate: event.birthDate,
+        gender: event.gender,
       );
 
       // 3) İşlem başarılı → success state'e geç.

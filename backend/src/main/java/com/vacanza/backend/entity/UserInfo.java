@@ -64,6 +64,14 @@ public class UserInfo {
     @Column(name = "profile_image_url")
     private String profileImageUrl;
 
+    /** Profil fotoğrafı binary verisi — PostgreSQL bytea olarak saklanır */
+    @Column(name = "profile_image_data", columnDefinition = "bytea")
+    private byte[] profileImageData;
+
+    /** Fotoğrafın MIME tipi (image/jpeg, image/png vb.) */
+    @Column(name = "profile_image_type", length = 50)
+    private String profileImageType;
+
     @Column(name = "join_date", nullable = false, updatable = false)
     private Instant joinDate;
 

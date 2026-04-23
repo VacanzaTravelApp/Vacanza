@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
+
 import '../../../data/models/accommodation_search_request.dart';
+import '../../../data/models/airport_suggestion.dart';
+import '../../../data/models/booking_currency.dart';
 import '../../../data/models/sort_criteria.dart';
 import '../../../data/models/transport_search_request.dart';
 import '../../cubit/booking_cubit.dart';
@@ -10,8 +15,10 @@ import 'adults_stepper.dart';
 import 'booking_date_field.dart';
 import 'booking_type_toggle.dart';
 import 'budget_field.dart';
+import 'airport_autocomplete_field.dart';
 import 'iata_text_field.dart';
 import 'sort_dropdown.dart';
+import 'booking_search_field_styles.dart';
 
 /// UC1.8-MOB6 — Orchestrator form for hotel/flight search.
 class BookingSearchForm extends StatefulWidget {
@@ -24,8 +31,6 @@ class BookingSearchForm extends StatefulWidget {
 }
 
 class _BookingSearchFormState extends State<BookingSearchForm> {
-  static const _accent = Color(0xFF0096FF);
-
   late BookingType _type;
 
   // Hotels
@@ -74,7 +79,14 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         _budgetCtrl,
       ];
 
-  void _onFieldChanged() => setState(() {});
+  void _onFieldChanged() {
+    if (_type == BookingType.hotels) {
+      context.read<BookingCubit>().onHotelDestinationFieldTextChanged(
+            _hotelQueryCtrl.text,
+          );
+    }
+    setState(() {});
+  }
 
   @override
   void dispose() {
@@ -91,6 +103,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     if (_type == BookingType.hotels) {
       final req = cubit.lastHotelRequest;
       if (req != null) {
+        cubit.setCurrency(req.currency);
         _hotelQueryCtrl.text = req.query;
         _checkInCtrl.text = req.checkInDate;
         _checkOutCtrl.text = req.checkOutDate;
@@ -102,8 +115,7 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     } else {
       final req = cubit.lastFlightRequest;
       if (req != null) {
-        _originCtrl.text = req.origin;
-        _destinationCtrl.text = req.destination;
+        cubit.setCurrency(req.currency);
         _departureCtrl.text = req.departureDate;
         _returnCtrl.text = req.returnDate ?? '';
         _isRoundTrip = req.returnDate != null;
@@ -111,19 +123,73 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         _budgetCtrl.text = req.budget?.toString() ?? '';
         _sort = req.sortBy ?? SortCriteria.priceAsc;
         _departureDate = DateTime.tryParse(req.departureDate);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final c = context.read<BookingCubit>();
+          final r = c.lastFlightRequest;
+          if (r == null) return;
+          if (c.state is! BookingSearch) return;
+          if (r.origin.trim().isNotEmpty) {
+            final o = _suggestionFromResolvedId(r.origin);
+            c.selectOriginAirport(o);
+            _originCtrl.text = o.dropdownLabel;
+          }
+          if (r.destination.trim().isNotEmpty) {
+            final d = _suggestionFromResolvedId(r.destination);
+            c.selectDestinationAirport(d);
+            _destinationCtrl.text = d.dropdownLabel;
+          }
+        });
       }
     }
   }
 
-  bool get _isValid {
+  /// Rebuilds a minimal [AirportSuggestion] from a stored request id (TASK-10 restore).
+  AirportSuggestion _suggestionFromResolvedId(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) {
+      return const AirportSuggestion(name: '', city: '', country: '');
+    }
+    final upper = t.toUpperCase();
+    final asIata = RegExp(r'^[A-Z]{3}$').hasMatch(upper);
+    return AirportSuggestion(
+      iataCode: asIata ? upper : null,
+      kgmid: asIata ? null : t,
+      name: '',
+      city: '',
+      country: '',
+    );
+  }
+
+  bool _isValid(BookingSearch? search) {
     if (_type == BookingType.hotels) {
-      return _hotelQueryCtrl.text.trim().isNotEmpty &&
+      final destOk = search?.hotelDestination.selected != null ||
+          _hotelQueryCtrl.text.trim().length >= 2;
+      return destOk &&
           _checkInCtrl.text.isNotEmpty &&
           _checkOutCtrl.text.isNotEmpty;
     }
-    return _originCtrl.text.trim().length >= 3 &&
-        _destinationCtrl.text.trim().length >= 3 &&
-        _departureCtrl.text.isNotEmpty;
+    final originOk = search?.originAirport.selected != null;
+    final destOk = search?.destinationAirport.selected != null;
+    return originOk && destOk && _departureCtrl.text.isNotEmpty;
+  }
+
+  /// Shown when the user typed in an airport field but did not pick a suggestion (TASK-10).
+  Widget? _flightSelectionHint(BookingSearch? search) {
+    if (search == null) return null;
+    final needOrigin =
+        _originCtrl.text.trim().isNotEmpty && search.originAirport.selected == null;
+    final needDest = _destinationCtrl.text.trim().isNotEmpty &&
+        search.destinationAirport.selected == null;
+    if (!needOrigin && !needDest) return null;
+    return Text(
+      'Pick origin and destination from the suggestions list.',
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: Colors.orange.shade800,
+      ),
+    );
   }
 
   void _onTypeChanged(BookingType type) {
@@ -164,6 +230,9 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
       initialRange = DateTimeRange(start: start, end: end);
     }
 
+    final accent = context.mapControlAccent;
+    final surface = Theme.of(context).colorScheme.surface;
+
     final picked = await showDateRangePicker(
       context: context,
       firstDate: firstDate,
@@ -174,16 +243,16 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
         return Theme(
           data: baseTheme.copyWith(
             colorScheme: baseTheme.colorScheme.copyWith(
-              primary: _accent,
+              primary: accent,
               onPrimary: Colors.white,
             ),
             datePickerTheme: baseTheme.datePickerTheme.copyWith(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
-              headerBackgroundColor: _accent,
+              headerBackgroundColor: accent,
               headerForegroundColor: Colors.white,
-              backgroundColor: Colors.white,
+              backgroundColor: surface,
             ),
           ),
           child: child!,
@@ -239,33 +308,45 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
   }
 
   void _onSearch() {
-    if (!_isValid) return;
-
     final cubit = context.read<BookingCubit>();
+    final search =
+        cubit.state is BookingSearch ? cubit.state as BookingSearch : null;
+    if (!_isValid(search)) return;
+
     final budget = BudgetField.parse(_budgetCtrl.text);
+    final currency = BookingCurrencies.normalize(search?.currency);
 
     if (_type == BookingType.hotels) {
+      final fromSelection =
+          search?.hotelDestination.selected?.searchQuery.trim() ?? '';
+      final query = fromSelection.isNotEmpty
+          ? fromSelection
+          : _hotelQueryCtrl.text.trim();
       cubit.searchHotels(
         AccommodationSearchRequest(
-          query: _hotelQueryCtrl.text.trim(),
+          query: query,
           checkInDate: _checkInCtrl.text,
           checkOutDate: _checkOutCtrl.text,
           adults: _adults,
           budget: budget,
+          currency: currency,
           sortBy: _sort,
         ),
       );
     } else {
+      final originSel = search!.originAirport.selected!;
+      final destSel = search.destinationAirport.selected!;
       cubit.searchFlights(
         TransportSearchRequest(
-          origin: _originCtrl.text,
-          destination: _destinationCtrl.text,
+          origin: originSel.resolvedSearchId,
+          destination: destSel.resolvedSearchId,
           departureDate: _departureCtrl.text,
           returnDate: _isRoundTrip && _returnCtrl.text.isNotEmpty
               ? _returnCtrl.text
               : null,
           adults: _adults,
           budget: budget,
+          currency: currency,
           sortBy: _sort,
         ),
       );
@@ -276,6 +357,10 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
 
   @override
   Widget build(BuildContext context) {
+    final cubit = context.watch<BookingCubit>();
+    final search =
+        cubit.state is BookingSearch ? cubit.state as BookingSearch : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -284,49 +369,25 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
           onChanged: _onTypeChanged,
         ),
         const SizedBox(height: 20),
-        if (_type == BookingType.hotels) ..._hotelFields(),
-        if (_type == BookingType.flights) ..._flightFields(),
+        if (_type == BookingType.hotels) ..._hotelFields(context),
+        if (_type == BookingType.flights) ..._flightFields(context, search),
         const SizedBox(height: 12),
-        _sharedFields(),
+        _sharedFields(context, search),
         const SizedBox(height: 28),
-        _searchButton(),
+        _searchButton(context, search),
       ],
     );
   }
 
-  List<Widget> _hotelFields() {
+  List<Widget> _hotelFields(BuildContext context) {
     final now = DateTime.now();
     return [
-      TextField(
+      IataTextField(
         controller: _hotelQueryCtrl,
-        cursorColor: _accent,
-        decoration: InputDecoration(
-          labelText: 'Search hotels',
-          hintText: 'e.g. Hotels in Paris, Bali resorts',
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: Color(0xFFAAAAAA),
-          ),
-          filled: true,
-          fillColor: const Color(0xFFFAFAFA),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: Color(0xFFE5E5E5)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: Color(0xFF0096FF),
-              width: 1.5,
-            ),
-          ),
-        ),
-        textInputAction: TextInputAction.search,
-        onSubmitted: (_) => _onSearch(),
+        label: 'Destination',
+        placeholder: 'e.g. Paris or Istanbul',
+        icon: Icons.location_city_rounded,
+        onSubmitted: _onSearch,
       ),
       const SizedBox(height: 12),
       Row(
@@ -357,26 +418,33 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     ];
   }
 
-  List<Widget> _flightFields() {
+  List<Widget> _flightFields(BuildContext context, BookingSearch? search) {
     final now = DateTime.now();
+    final hint = _flightSelectionHint(search);
     return [
-      IataTextField(
+      AirportAutocompleteField(
         controller: _originCtrl,
         label: 'Origin',
-        placeholder: 'e.g. IST or Istanbul',
+        placeholder: 'e.g. Istanbul or IST',
         icon: Icons.flight_takeoff_rounded,
+        isOrigin: true,
       ),
       const SizedBox(height: 12),
-      IataTextField(
+      AirportAutocompleteField(
         controller: _destinationCtrl,
         label: 'Destination',
-        placeholder: 'e.g. CDG or Paris',
-        icon: Icons.search_rounded,
+        placeholder: 'e.g. Paris or CDG',
+        icon: Icons.flight_land_rounded,
+        isOrigin: false,
       ),
+      if (hint != null) ...[
+        const SizedBox(height: 8),
+        hint,
+      ],
       const SizedBox(height: 12),
 
       // Round-trip toggle
-      _roundTripToggle(),
+      _roundTripToggle(context),
       const SizedBox(height: 12),
 
       // Date row
@@ -407,7 +475,9 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     ];
   }
 
-  Widget _roundTripToggle() {
+  Widget _roundTripToggle(BuildContext context) {
+    final accent = context.mapControlAccent;
+    final inactiveBorder = BookingSearchFieldStyles.fieldBorderInactive(context);
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -422,10 +492,10 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
             width: 20,
             height: 20,
             decoration: BoxDecoration(
-              color: _isRoundTrip ? _accent : Colors.transparent,
+              color: _isRoundTrip ? accent : Colors.transparent,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: _isRoundTrip ? _accent : const Color(0xFFCCCCCC),
+                color: _isRoundTrip ? accent : inactiveBorder,
                 width: 1.5,
               ),
             ),
@@ -435,20 +505,16 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
                 : null,
           ),
           const SizedBox(width: 8),
-          const Text(
+          Text(
             'Round trip',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF555555),
-            ),
+            style: BookingSearchFieldStyles.inlineControlLabel(context),
           ),
         ],
       ),
     );
   }
 
-  Widget _sharedFields() {
+  Widget _sharedFields(BuildContext context, BookingSearch? search) {
     return Column(
       children: [
         Row(
@@ -464,6 +530,9 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
             Expanded(
               child: BudgetField(
                 controller: _budgetCtrl,
+                currencyCode: BookingCurrencies.normalize(search?.currency),
+                onCurrencyChanged: (c) =>
+                    context.read<BookingCubit>().setCurrency(c),
                 label: _type == BookingType.hotels
                     ? 'Budget per night'
                     : 'Budget (Optional)',
@@ -484,51 +553,15 @@ class _BookingSearchFormState extends State<BookingSearchForm> {
     );
   }
 
-  Widget _searchButton() {
-    final enabled = _isValid;
-    return GestureDetector(
-      onTap: enabled ? _onSearch : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          gradient: enabled
-              ? const LinearGradient(
-                  colors: [Color(0xFF0096FF), Color(0xFF00C6FF)],
-                )
-              : null,
-          color: enabled ? null : const Color(0xFFE0E0E0),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: enabled
-              ? [
-                  BoxShadow(
-                    color: _accent.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_rounded,
-              size: 20,
-              color: enabled ? Colors.white : const Color(0xFFAAAAAA),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Search ${_type == BookingType.hotels ? 'Hotels' : 'Flights'}',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: enabled ? Colors.white : const Color(0xFFAAAAAA),
-              ),
-            ),
-          ],
-        ),
-      ),
+  Widget _searchButton(BuildContext context, BookingSearch? search) {
+    final enabled = _isValid(search);
+    return VacanzaGradientButton(
+      label: 'Search ${_type == BookingType.hotels ? 'Hotels' : 'Flights'}',
+      icon: Icons.search_rounded,
+      enabled: enabled,
+      onPressed: enabled ? _onSearch : null,
+      minHeight: 54,
+      borderRadius: 20,
     );
   }
 }

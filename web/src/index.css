@@ -9,6 +9,37 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Make non-functional text non-selectable for a more native/app feel */
+h1, h2, h3, h4, h5, h6, 
+.brand-name, .brand-logo, 
+.local-time-badge, 
+.vivid-tag, .badge, 
+label, .ant-form-item-label,
+.user-select-none {
+  user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+.modal-shell {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.modal-shell input, 
+.modal-shell textarea, 
+.modal-shell [contenteditable="true"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+.modal-shell input, 
+.modal-shell textarea, 
+.modal-shell [contenteditable="true"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
 /* Linkler için basit stil */
 a {
   font-weight: 500;
@@ -22,6 +53,20 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Herhangi bir input, text veya mesaj balonunun kopyalanabilmesine izin ver */
+input, textarea, [contenteditable="true"],
+.vacanza-chat .msg-text,
+.route-panel-notes,
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  -ms-user-select: text;
+  cursor: text;
 }
 
 /* React root'u tüm ekranı kaplasın */
@@ -33,4 +78,83 @@ body {
 /* Genel button reset – AntD butonlarını çok etkilemez */
 button {
   font-family: inherit;
+}
+
+/* Force placeholders to have normal font-weight globally */
+::placeholder {
+  font-weight: 500 !important;
+  opacity: 0.7 !important; /* Bump default opacity */
+}
+::-webkit-input-placeholder {
+  font-weight: 500 !important;
+  opacity: 0.7 !important;
+}
+::-moz-placeholder {
+  font-weight: 500 !important;
+  opacity: 0.7 !important;
+}
+:-ms-input-placeholder {
+  font-weight: 500 !important;
+  opacity: 0.7 !important;
+}
+
+.theme-night ::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+  opacity: 1 !important;
+}
+.theme-night ::-webkit-input-placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+  opacity: 1 !important;
+}
+
+/* ═══ Mapbox Control overrides directly inherited by theme-night ═══ */
+.mapboxgl-ctrl-group {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.mapboxgl-ctrl-group button {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+  transition: background-color 0.2s ease;
+}
+
+.mapboxgl-ctrl-group button:last-child {
+  border-bottom: none !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.theme-night .mapboxgl-ctrl-group {
+  background-color: rgba(30, 41, 59, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+.theme-night .mapboxgl-ctrl-group button {
+  border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.theme-night .mapboxgl-ctrl-group button:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.theme-night .mapboxgl-ctrl-icon {
+  filter: invert(1) hue-rotate(180deg) brightness(1.3) !important;
+}
+
+.mapboxgl-ctrl-icon {
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.mapboxgl-ctrl-group button:hover .mapboxgl-ctrl-icon {
+  opacity: 1;
 }

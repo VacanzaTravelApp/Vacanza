@@ -25,12 +25,18 @@ const PrivateRoute = ({ children }) => {
     return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
+const PublicRoute = ({ children }) => {
+    const { isAuthenticated, loading } = useAuth();
+    if (loading) return null;
+    return isAuthenticated ? <Navigate to="/" replace /> : children;
+};
+
 function App() {
     return (
         <ConfigProvider
             theme={{
                 token: {
-                    colorPrimary: "#1677ff",
+                    colorPrimary: "#FF6B6B",
                     borderRadius: 8,
                 },
             }}
@@ -38,7 +44,11 @@ function App() {
             <AntApp>
                 <BrowserRouter>
                     <Routes>
-                        <Route path="/login" element={<Login />} />
+                        <Route path="/login" element={
+                            <PublicRoute>
+                                <Login />
+                            </PublicRoute>
+                        } />
 
                         <Route path="/" element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
                             <Route index element={<Home />} />

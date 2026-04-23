@@ -1,8 +1,14 @@
 // ======================= area_results_bottom_sheet.dart =======================
 // lib/features/poi_search/presentation/widgets/area_results/area_results_bottom_sheet.dart
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
+import 'package:mobile/core/theme/vacanza_tokens.dart';
 
 import '../../../data/models/poi.dart';
+import '../../../data/models/poi_category_catalog.dart';
 import 'area_results_header.dart';
 import 'area_results_list.dart';
 
@@ -31,6 +37,21 @@ class AreaResultsSheet extends StatelessWidget {
   /// X’e basınca: selection temizlenip viewport’a dönülecek (A senaryosu)
   final VoidCallback onClose;
 
+  /// POI tap: open same detail UI as marker tap.
+  final ValueChanged<Poi>? onPoiTap;
+
+  /// Alan çizimi (user selection) sonrası: 0 POI’lı chip’leri gösterme.
+  /// Viewport / genel harita akışında `false` — tüm seçili kategoriler chip’te kalır.
+  final bool hideZeroCountCategories;
+
+  /// Drawn-area flow: show primary action to generate an AI route from the polygon.
+  final bool showCreateRouteFromArea;
+
+  /// While the route is being generated (shared loading state).
+  final bool isCreatingRoute;
+
+  final VoidCallback? onCreateRouteFromArea;
+
   const AreaResultsSheet({
     super.key,
     required this.isVisible,
@@ -41,81 +62,47 @@ class AreaResultsSheet extends StatelessWidget {
     required this.activeChipKey,
     required this.onChipSelected,
     required this.onClose,
+    this.onPoiTap,
+    this.hideZeroCountCategories = false,
+    this.showCreateRouteFromArea = false,
+    this.isCreatingRoute = false,
+    this.onCreateRouteFromArea,
   });
 
   String _labelFor(String key) {
-    switch (key) {
-      case 'restaurant':
-        return 'Restaurant';
-      case 'cafe':
-        return 'Cafes';
-      case 'museum':
-        return 'Museums';
-      case 'monuments':
-        return 'Monuments';
-      case 'parks':
-        return 'Parks';
-      default:
-        if (key.isEmpty) return key;
-        return key[0].toUpperCase() + key.substring(1);
-    }
+    final def = PoiCategoryCatalog.definitionForUiKey(key);
+    if (def != null) return def.label;
+    if (key.isEmpty) return key;
+    return key[0].toUpperCase() + key.substring(1);
   }
 
   IconData _iconFor(String key) {
-    switch (key) {
-      case 'restaurant':
-        return Icons.restaurant_rounded;
-      case 'cafe':
-        return Icons.local_cafe_rounded;
-      case 'museum':
-        return Icons.museum_rounded;
-      case 'monuments':
-        return Icons.account_balance_rounded;
-      case 'parks':
-        return Icons.park_rounded;
-      default:
-        return Icons.place_rounded;
-    }
+    return PoiCategoryCatalog.definitionForUiKey(key)?.iconData ??
+        Icons.place_rounded;
   }
 
-  Color _colorFor(String key) {
-    switch (key) {
-      case 'museum':
-        return const Color(0xFF0096FF);
-      case 'restaurant':
-        return const Color(0xFFFFD166);
-      case 'cafe':
-        return const Color(0xFFB37AFF);
-      case 'monuments':
-        return const Color(0xFFFF9F43);
-      case 'parks':
-        return const Color(0xFF2ECC71);
-      default:
-        return const Color(0xFF0096FF);
-    }
+  Color _colorFor(BuildContext context, String key) {
+    return PoiCategoryCatalog.definitionForUiKey(key)?.ringColor ??
+        Theme.of(context).colorScheme.primary;
   }
 
-  List<String> _normalizedSelectedCategories() {
-    // güvenli normalize
+  int _countFor(String key) => countsByCategory[key] ?? 0;
+
+  /// Seçili kategoriler + sıra (count filtresi yok).
+  List<String> _normalizedSelectedCategoriesAll() {
     final set = <String>{};
     for (final c in selectedCategories) {
       final k = c.trim().toLowerCase();
       if (k.isNotEmpty) set.add(k);
     }
 
-    // Eğer bir sebeple boş geldiyse countsByCategory’den fallback
     if (set.isEmpty && countsByCategory.isNotEmpty) {
       set.addAll(countsByCategory.keys.map((e) => e.trim().toLowerCase()));
     }
 
-    // Stabil order (figma uyumlu)
-    const baseOrder = <String>[
-      'restaurant',
-      'cafe',
-      'museum',
-      'monuments',
-      'parks',
-    ];
+    final baseOrder = PoiCategoryCatalog.all
+        .map((e) => e.key)
+        .toList(growable: false);
     final ordered = <String>[];
 
     for (final k in baseOrder) {
@@ -128,85 +115,176 @@ class AreaResultsSheet extends StatelessWidget {
     return ordered;
   }
 
+  /// Sadece en az 1 POI olan kategoriler (alan çizimi akışı).
+  List<String> _normalizedSelectedCategoriesPositiveOnly() {
+    final set = <String>{};
+    for (final c in selectedCategories) {
+      final k = c.trim().toLowerCase();
+      if (k.isNotEmpty && _countFor(k) > 0) set.add(k);
+    }
+
+    if (set.isEmpty && countsByCategory.isNotEmpty) {
+      for (final e in countsByCategory.entries) {
+        final k = e.key.trim().toLowerCase();
+        if (k.isNotEmpty && _countFor(k) > 0) set.add(k);
+      }
+    }
+
+    final baseOrder = PoiCategoryCatalog.all
+        .map((e) => e.key)
+        .toList(growable: false);
+    final ordered = <String>[];
+
+    for (final k in baseOrder) {
+      if (set.contains(k) && _countFor(k) > 0) ordered.add(k);
+    }
+
+    final extras =
+        set.where((k) => !baseOrder.contains(k) && _countFor(k) > 0).toList()
+          ..sort();
+    ordered.addAll(extras);
+
+    return ordered;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!isVisible) return const SizedBox.shrink();
 
-    final activeKey = activeChipKey?.trim().toLowerCase();
+    final t = context.vacanzaTokens;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isLight = theme.brightness == Brightness.light;
+
+    final chips =
+        hideZeroCountCategories
+            ? _normalizedSelectedCategoriesPositiveOnly()
+            : _normalizedSelectedCategoriesAll();
+
+    final rawActive = activeChipKey?.trim().toLowerCase();
+    final String? activeKey;
+    if (hideZeroCountCategories) {
+      activeKey =
+          (rawActive != null &&
+                  rawActive.isNotEmpty &&
+                  chips.contains(rawActive))
+              ? rawActive
+              : null;
+    } else {
+      activeKey =
+          (rawActive != null && rawActive.isNotEmpty) ? rawActive : null;
+    }
     final allActive = activeKey == null || activeKey.isEmpty;
 
     // ✅ UI filtreleme: backend'e gitmeden mevcut pois içinde gez
-    final List<Poi> visiblePois = allActive
-        ? pois
-        : pois.where((p) => p.category.trim().toLowerCase() == activeKey).toList();
+    final List<Poi> visiblePois =
+        allActive
+            ? pois
+            : pois.where((p) {
+              final ui = PoiCategoryCatalog.poiCategoryForRaw(p.category)?.key;
+              return ui == activeKey;
+            }).toList();
 
     final visibleCount = visiblePois.length;
 
-    final chips = _normalizedSelectedCategories();
+    final screenH = MediaQuery.sizeOf(context).height;
+    final sheetHeight = (screenH * 0.52).clamp(300.0, 560.0);
 
-    return Positioned(
-      left: 16,
-      right: 16,
-      bottom: 16,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          constraints: const BoxConstraints(maxHeight: 500),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
+    final sheet = ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: isLight ? 14 : 14,
+          sigmaY: isLight ? 14 : 14,
+        ),
+        child: SizedBox(
+          height: sheetHeight,
+          child: Container(
+            decoration: BoxDecoration(
+              // Night theme: keep the glass surface that you liked.
+              // Day theme: also glass, but neutral (avoid bluish tint).
+              color: isLight ? context.lightGlassPanelColor : t.glassBg,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color:
+                    isLight
+                        ? context.mapControlAccent.withValues(alpha: 0.22)
+                        : t.cardBorder,
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // handle bar
-              const SizedBox(height: 10),
-              Container(
-                width: 46,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: (isLight ? cs.shadow : t.overlayScrim).withValues(
+                    alpha: isLight ? 0.12 : 0.35,
+                  ),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
                 ),
-              ),
-              const SizedBox(height: 10),
-
-              AreaResultsHeader(
-                title: 'Results in Your Area',
-                subtitle:
-                allActive ? '$count places found' : '$visibleCount places found',
-                onClose: onClose,
-              ),
-
-              // ✅ CHIP BAR (NO COUNTS)
-              _ChipBar(
-                chips: chips,
-                activeChipKey: allActive ? null : activeKey,
-                labelFor: _labelFor,
-                iconFor: _iconFor,
-                colorFor: _colorFor,
-                onChipSelected: onChipSelected,
-              ),
-
-              const Divider(height: 1),
-
-              Expanded(
-                child: AreaResultsList(
-                  pois: visiblePois,
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // handle bar
+                const SizedBox(height: 10),
+                Container(
+                  width: 46,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: t.textSub.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+
+                AreaResultsHeader(
+                  title: 'Results in Your Area',
+                  subtitle:
+                      allActive
+                          ? '$count places found'
+                          : '$visibleCount places found',
+                  onClose: onClose,
+                ),
+
+                // ✅ CHIP BAR (NO COUNTS)
+                _ChipBar(
+                  chips: chips,
+                  activeChipKey: allActive ? null : activeKey,
+                  labelFor: _labelFor,
+                  iconFor: _iconFor,
+                  colorFor: (key) => _colorFor(context, key),
+                  onChipSelected: onChipSelected,
+                ),
+
+                Divider(height: 1, color: t.cardBorder),
+
+                Expanded(
+                  child: AreaResultsList(pois: visiblePois, onPoiTap: onPoiTap),
+                ),
+
+                if (showCreateRouteFromArea &&
+                    onCreateRouteFromArea != null) ...[
+                  Divider(height: 1, color: t.cardBorder),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                    child: VacanzaGradientButton(
+                      label: 'Create a route',
+                      onPressed:
+                          (isCreatingRoute ? null : onCreateRouteFromArea),
+                      enabled: !isCreatingRoute,
+                      loading: isCreatingRoute,
+                      minHeight: 50,
+                      borderRadius: 14,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
     );
+
+    return Material(color: Colors.transparent, child: sheet);
   }
 }
 
@@ -234,6 +312,8 @@ class _ChipBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allSelected = activeChipKey == null;
+    final t = context.vacanzaTokens;
+    final accent = Theme.of(context).colorScheme.primary;
 
     return SizedBox(
       height: 46,
@@ -242,9 +322,10 @@ class _ChipBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
         children: [
           _buildChip(
+            t: t,
             label: 'All',
             icon: Icons.apps_rounded,
-            color: const Color(0xFF0096FF),
+            color: accent,
             selected: allSelected,
             onTap: () => onChipSelected(null),
           ),
@@ -257,6 +338,7 @@ class _ChipBar extends StatelessWidget {
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: _buildChip(
+                t: t,
                 label: labelFor(k),
                 icon: iconFor(k),
                 color: colorFor(k),
@@ -271,6 +353,7 @@ class _ChipBar extends StatelessWidget {
   }
 
   Widget _buildChip({
+    required VacanzaTokens t,
     required String label,
     required IconData icon,
     required Color color,
@@ -283,32 +366,24 @@ class _ChipBar extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.14) : Colors.white,
+          color: selected ? color.withValues(alpha: 0.14) : t.pillSurface,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected
-                ? color.withValues(alpha: 0.45)
-                : Colors.black.withValues(alpha: 0.10),
+            color: selected ? color.withValues(alpha: 0.45) : t.cardBorder,
             width: 1,
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 16,
-              color: selected ? color : Colors.black.withValues(alpha: 0.55),
-            ),
+            Icon(icon, size: 16, color: selected ? color : t.textSub),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: selected
-                    ? Colors.black87
-                    : Colors.black.withValues(alpha: 0.70),
+                color: selected ? t.textMain : t.textSub,
               ),
             ),
           ],
