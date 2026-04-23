@@ -25,12 +25,34 @@ const ROUTE_EVENT_COLOR = '#8B5CF6';
 function formatRouteDayLabel(re) {
     const td = Number(re.totalDays) || 1;
     const id = Number(re.itineraryDay) || 1;
-    if (td > 1) return `Day ${id}/${td} · ${re.title}`;
+    if (td > 1) return `${id}/${td} · ${re.title}`;
     return re.title;
+}
+
+/** Extract destination from title like "3-Day Trip to Istanbul" -> "Istanbul" */
+function getTripDestination(title) {
+    if (!title) return "";
+    if (title.includes("Trip to ")) {
+        return title.split("Trip to ").pop().trim();
+    }
+    // Fallback: remove common words
+    return title.replace(/\d+-Day\s+/, "").replace(/Trip/gi, "").trim();
 }
 
 function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDay(y, m) { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; }
+
+/** Generate a consistent readable color from a string ID (HSL). */
+function getRouteColor(id) {
+    if (!id) return "#8B5CF6";
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+        hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash % 360);
+    // Prefer pleasant teal/purple/blue/orange ranges, steer clear of pure red/yellow
+    return `hsl(${hue}, 60%, 55%)`;
+}
 
 export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, isDarkMode = true, themeClass = "theme-night" }) {
     const { isAuthenticated } = useAuth();
@@ -180,6 +202,7 @@ export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, 
             setSelectStart(day);
             setSelectEnd(null);
             setShowForm(false);
+            closeEventDetail();
         } else if (!selectEnd) {
             setSelectEnd(day);
             const gridRect = gridRef.current?.getBoundingClientRect();
@@ -272,272 +295,263 @@ export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, 
                 )}
             >
                 <div className={`cal-modal-row ${eventDetail ? 'cal-modal-row--split' : ''}`}>
-                <div className={`cal-container ${eventDetail ? 'cal-container--split-left' : ''}`}>
-                    <div className="cal-nav">
-                        <div>
-                            <div className="cal-nav-heading">
-                                <span className="cal-month-name">{MONTH_NAMES[month]}</span>
-                                <span className="cal-year">{year}</span>
+                    <div className={`cal-container ${eventDetail ? 'cal-container--split-left' : ''}`}>
+                        <div className="cal-nav">
+                            <div>
+                                <div className="cal-nav-heading">
+                                    <span className="cal-month-name">{MONTH_NAMES[month]}</span>
+                                    <span className="cal-year">{year}</span>
+                                </div>
+                                <p className="cal-help-line">
+                                    Click an event to open details on the right — map, remove one day, or remove the whole trip.
+                                    Double-click a date to add a note.
+                                </p>
                             </div>
-                            <p className="cal-help-line">
-                                Click an event to open details on the right — map, remove one day, or remove the whole trip.
-                                Double-click a date to add a note.
-                            </p>
-                        </div>
-                        <div className="cal-nav-right">
-                            {remoteLoading ? (
-                                <Spin size="small" style={{ marginRight: 8 }} aria-label="Loading calendar" />
-                            ) : null}
-                            {selectStart && (
-                                <Button size="small" className="cal-cancel-sel" onClick={resetSelection}>Cancel</Button>
-                            )}
-                            <Button size="small" className="cal-nav-btn" onClick={prev}><LeftOutlined /></Button>
-                            <Button size="small" className="cal-today-btn" onClick={goToday}>Today</Button>
-                            <Button size="small" className="cal-nav-btn" onClick={next}><RightOutlined /></Button>
-                            
-                            <Button
-                                icon={<CloseOutlined style={{ fontSize: 14 }} />}
-                                type="text"
-                                style={{
-                                    color: "var(--cal-text)", marginLeft: 8, padding: 0, width: 34, height: 34,
-                                    borderRadius: "50%", background: "var(--cal-nav-bg)",
-                                    display: "flex", alignItems: "center", justifyContent: "center"
-                                }}
-                                onClick={onClose}
-                            />
-                        </div>
-                    </div>
-
-                    {selectStart && !selectEnd && (
-                        <div className="cal-range-hint">
-                            Select end date (started from <strong>{selectStart} {MONTH_NAMES[month]}</strong>)
-                        </div>
-                    )}
-
-                    <div className="cal-grid cal-header-row">
-                        {DAYS.map(d => <div key={d} className="cal-header-cell">{d}</div>)}
-                    </div>
-
-                    <div className="cal-grid cal-body" ref={gridRef} style={{ position: 'relative' }}>
-                        {cells.map((c, idx) => {
-                            const evts = c.cur ? getEvts(c.day) : [];
-                            const inRange = c.cur && isInRange(c.day);
-                            const isRangeStart = c.cur && c.day === rangeMin();
-                            const isRangeEnd = c.cur && c.day === rangeMax();
-
-                            return (
-                                <div key={idx}
-                                    className={`cal-cell ${c.cur ? '' : 'cal-cell-other'} ${isToday(c.day) && c.cur ? 'cal-cell-today' : ''} ${inRange ? 'cal-cell-selected' : ''} ${isRangeStart ? 'cal-range-start' : ''} ${isRangeEnd ? 'cal-range-end' : ''} ${selectStart && !selectEnd && c.cur ? 'cal-selecting' : ''}`}
-                                    onClick={(e) => handleCellClick(c.day, c.cur, e)}
-                                    onMouseEnter={() => { if (selectStart && !selectEnd && c.cur) setHoverDay(c.day); }}>
-                                    <div className="cal-cell-top">
-                                        <div className={`cal-day-number ${isToday(c.day) && c.cur ? 'cal-today-num' : ''}`}>
-                                            {c.day}
-                                        </div>
-                                        {c.cur && !selectStart && <PlusOutlined className="cal-add-icon" />}
-                                    </div>
-                                    <div className="cal-events">
-                                        {evts.map((ev) => {
-                                            const routeMulti = !!(ev.routeId && ev.totalDays > 1);
-                                            const primaryText = (ev.shortTitle || ev.title || "").trim();
-                                            return (
-                                                <div
-                                                    key={ev.key}
-                                                    className={`cal-event-pill ${ev.routeId ? "cal-event-pill--route" : "cal-event-pill--local"}`}
-                                                    style={
-                                                        ev.routeId
-                                                            ? undefined
-                                                            : { "--local-pill-bg": ev.color }
-                                                    }
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        className="cal-event-pill-main cal-event-pill-main--full"
-                                                        title="Open details"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEventDetail({ ev, dayOfMonth: c.day });
-                                                        }}
-                                                    >
-                                                        <span className="cal-event-pill-line">
-                                                            {routeMulti ? (
-                                                                <>
-                                                                    <span className="cal-event-pill-meta">
-                                                                        Day {ev.itineraryDay} of {ev.totalDays}
-                                                                    </span>
-                                                                    <span className="cal-event-pill-sep" aria-hidden>
-                                                                        ·
-                                                                    </span>
-                                                                </>
-                                                            ) : null}
-                                                            <span className="cal-event-pill-ellip">{primaryText}</span>
-                                                        </span>
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {showForm && (
-                            <div className="cal-popup" style={{ top: formPos.top, left: formPos.left }}
-                                onClick={e => e.stopPropagation()}>
-                                <div className="cal-popup-header">
-                                    <span style={{ fontSize: 15, fontWeight: 800 }}>
-                                        {rangeMin()} {rangeMin() !== rangeMax() ? `– ${rangeMax()} ` : ''}{MONTH_NAMES[month].slice(0, 3)}
-                                    </span>
-                                    <Button type="text" size="small" icon={<CloseOutlined />}
-                                        onClick={resetSelection} style={{ color: 'var(--cal-text-muted)', opacity: 0.6 }} />
-                                </div>
-
-                                {getEvts(rangeMin()).length > 0 && (
-                                    <div className="cal-popup-events">
-                                        {getEvts(rangeMin()).map((ev) => {
-                                            const localEv = ev.localIndex != null ? events[ev.localIndex] : null;
-                                            return (
-                                                <div
-                                                    key={ev.key}
-                                                    className="cal-popup-event-row cal-popup-event-row--clickable"
-                                                    role="button"
-                                                    tabIndex={0}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEventDetail({ ev, dayOfMonth: rangeMin() });
-                                                    }}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter' || e.key === ' ') {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            setEventDetail({ ev, dayOfMonth: rangeMin() });
-                                                        }
-                                                    }}
-                                                >
-                                                    <span className="cal-popup-dot" style={{ background: ev.color }} />
-                                                    <span className="cal-popup-event-text">
-                                                        {ev.title}
-                                                        {localEv?.endDay ? (
-                                                            <span className="cal-popup-event-range">
-                                                                {' '}({localEv.day}–{localEv.endDay})
-                                                            </span>
-                                                        ) : null}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                            <div className="cal-nav-right">
+                                {remoteLoading ? (
+                                    <Spin size="small" style={{ marginRight: 8 }} aria-label="Loading calendar" />
+                                ) : null}
+                                {selectStart && (
+                                    <Button size="small" className="cal-cancel-sel" onClick={resetSelection}>Cancel</Button>
                                 )}
+                                <Button size="small" className="cal-nav-btn" onClick={prev}><LeftOutlined /></Button>
+                                <Button size="small" className="cal-today-btn" onClick={goToday}>Today</Button>
+                                <Button size="small" className="cal-nav-btn" onClick={next}><RightOutlined /></Button>
 
-                                <div className="cal-popup-form">
-                                    <Input
-                                        placeholder="What's happening?"
-                                        value={newTitle}
-                                        onChange={e => setNewTitle(e.target.value)}
-                                        onPressEnter={addEvent}
-                                        autoFocus
-                                        className="cal-popup-input"
-                                    />
-                                    <div className="cal-popup-row">
-                                        <Select size="small" value={newCat} onChange={setNewCat}
-                                            className="cal-popup-select" popupMatchSelectWidth={false}
-                                            getPopupContainer={trigger => trigger.parentNode}
-                                            variant="borderless">
-                                            {CATEGORIES.map(c => (
-                                                <Option key={c.key} value={c.key}>
-                                                    <span className="cal-cat-dot" style={{ background: c.color }} /> {c.key}
-                                                </Option>
-                                            ))}
-                                        </Select>
-                                        <Button type="primary" size="small" onClick={addEvent}
-                                            className="cal-popup-add-btn" disabled={!newTitle.trim()}>
-                                            Add
-                                        </Button>
-                                    </div>
-                                </div>
+                                <Button
+                                    icon={<CloseOutlined style={{ fontSize: 14 }} />}
+                                    type="text"
+                                    style={{
+                                        color: "var(--cal-text)", marginLeft: 8, padding: 0, width: 34, height: 34,
+                                        borderRadius: "50%", background: "var(--cal-nav-bg)",
+                                        display: "flex", alignItems: "center", justifyContent: "center"
+                                    }}
+                                    onClick={onClose}
+                                />
+                            </div>
+                        </div>
+
+                        {selectStart && !selectEnd && (
+                            <div className="cal-range-hint">
+                                Select end date (started from <strong>{selectStart} {MONTH_NAMES[month]}</strong>)
                             </div>
                         )}
-                    </div>
-                </div>
 
-                {eventDetail ? (
-                    (() => {
-                        const { ev, dayOfMonth } = eventDetail;
-                        const primaryText = (ev.shortTitle || ev.title || '').trim();
-                        const routeMulti = !!(ev.routeId && ev.totalDays > 1);
-                        const localEv = ev.localIndex != null ? events[ev.localIndex] : null;
-                        const dateStr = `${MONTH_NAMES[month]} ${dayOfMonth}, ${year}`;
-                        return (
-                            <aside
-                                className={`cal-event-detail-aside ${ev.routeId ? 'cal-event-detail-aside--route' : 'cal-event-detail-aside--local'}`}
-                                style={ev.routeId ? undefined : { '--detail-accent': ev.color }}
-                                aria-label="Event details"
-                            >
-                                <div className="cal-event-detail-inner">
-                                    <div className="cal-event-detail-top">
-                                        <button
-                                            type="button"
-                                            className="cal-event-detail-close"
-                                            aria-label="Close"
-                                            onClick={closeEventDetail}
-                                        >
-                                            <CloseOutlined />
-                                        </button>
+                        <div className="cal-grid cal-header-row">
+                            {DAYS.map(d => <div key={d} className="cal-header-cell">{d}</div>)}
+                        </div>
+
+                        <div className="cal-grid cal-body" ref={gridRef} style={{ position: 'relative' }}>
+                            {cells.map((c, idx) => {
+                                const evts = c.cur ? getEvts(c.day) : [];
+                                const inRange = c.cur && isInRange(c.day);
+                                const isRangeStart = c.cur && c.day === rangeMin();
+                                const isRangeEnd = c.cur && c.day === rangeMax();
+
+                                return (
+                                    <div key={idx}
+                                        className={`cal-cell ${c.cur ? '' : 'cal-cell-other'} ${isToday(c.day) && c.cur ? 'cal-cell-today' : ''} ${inRange ? 'cal-cell-selected' : ''} ${isRangeStart ? 'cal-range-start' : ''} ${isRangeEnd ? 'cal-range-end' : ''} ${selectStart && !selectEnd && c.cur ? 'cal-selecting' : ''}`}
+                                        onClick={(e) => handleCellClick(c.day, c.cur, e)}
+                                        onMouseEnter={() => { if (selectStart && !selectEnd && c.cur) setHoverDay(c.day); }}>
+                                        <div className="cal-cell-top">
+                                            <div className={`cal-day-number ${isToday(c.day) && c.cur ? 'cal-today-num' : ''}`}>
+                                                {c.day}
+                                            </div>
+                                            {c.cur && !selectStart && <PlusOutlined className="cal-add-icon" />}
+                                        </div>
+                                        <div className="cal-events">
+                                            {evts.map((ev) => {
+                                                const routeMulti = !!(ev.routeId && ev.totalDays > 1);
+                                                const displayTitle = ev.routeId ? getTripDestination(ev.title) : (ev.title || "").trim();
+                                                const primaryText = (ev.title || "").trim();
+                                                return (
+                                                    <div
+                                                        key={ev.key}
+                                                        className={`cal-event-pill ${ev.routeId ? "cal-event-pill--route" : "cal-event-pill--local"}`}
+                                                        style={
+                                                            ev.routeId
+                                                                ? { "--route-pill-bg": getRouteColor(ev.routeId) }
+                                                                : { "--local-pill-bg": ev.color }
+                                                        }
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            className="cal-event-pill-main cal-event-pill-main--full"
+                                                            title={primaryText}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEventDetail({ ev, dayOfMonth: c.day });
+                                                            }}
+                                                        >
+                                                            <span className="cal-event-pill-line">
+                                                                <span className="cal-event-pill-ellip">{displayTitle}</span>
+                                                            </span>
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                    <p className="cal-event-detail-kicker">{dateStr}</p>
-                                    {routeMulti ? (
-                                        <p className="cal-event-detail-daytag">
-                                            Day {ev.itineraryDay} of {ev.totalDays}
-                                        </p>
-                                    ) : null}
-                                    <h2 className="cal-event-detail-title">{primaryText}</h2>
+                                );
+                            })}
 
-                                    <div className="cal-event-detail-actions">
-                                        {ev.routeId && onOpenRouteFromCalendar ? (
-                                            <button
-                                                type="button"
-                                                className="cal-event-detail-btn cal-event-detail-btn--primary"
-                                                onClick={() => onOpenRouteFromCalendar(ev.routeId)}
-                                            >
-                                                Open on map
-                                            </button>
-                                        ) : null}
+                            {showForm && (
+                                <div className="cal-popup" style={{ top: formPos.top, left: formPos.left }}
+                                    onClick={e => e.stopPropagation()}>
+                                    <div className="cal-popup-header">
+                                        <span style={{ fontSize: 15, fontWeight: 800 }}>
+                                            {rangeMin()} {rangeMin() !== rangeMax() ? `– ${rangeMax()} ` : ''}{MONTH_NAMES[month].slice(0, 3)}
+                                        </span>
+                                        <Button type="text" size="small" icon={<CloseOutlined />}
+                                            onClick={resetSelection} style={{ color: 'var(--cal-text-muted)', opacity: 0.6 }} />
+                                    </div>
 
-                                        {ev.eventId ? (
-                                            <button
-                                                type="button"
-                                                className="cal-event-detail-btn cal-event-detail-btn--danger"
-                                                onClick={() => removeRemoteEvent(ev.eventId)}
-                                            >
-                                                Remove this day
-                                            </button>
-                                        ) : null}
+                                    {getEvts(rangeMin()).length > 0 && (
+                                        <div className="cal-popup-events">
+                                            {getEvts(rangeMin()).map((ev) => {
+                                                const localEv = ev.localIndex != null ? events[ev.localIndex] : null;
+                                                return (
+                                                    <div
+                                                        key={ev.key}
+                                                        className="cal-popup-event-row cal-popup-event-row--clickable"
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEventDetail({ ev, dayOfMonth: rangeMin() });
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                setEventDetail({ ev, dayOfMonth: rangeMin() });
+                                                            }
+                                                        }}
+                                                    >
+                                                        <span className="cal-popup-dot" style={{ background: ev.color }} />
+                                                        <span className="cal-popup-event-text">
+                                                            {ev.title}
+                                                            {localEv?.endDay ? (
+                                                                <span className="cal-popup-event-range">
+                                                                    {' '}({localEv.day}–{localEv.endDay})
+                                                                </span>
+                                                            ) : null}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
 
-                                        {ev.routeId && routeMulti ? (
-                                            <button
-                                                type="button"
-                                                className="cal-event-detail-btn cal-event-detail-btn--muted"
-                                                onClick={() => removeRemoteRouteAll(ev.routeId)}
-                                            >
-                                                Remove all {ev.totalDays} days
-                                            </button>
-                                        ) : null}
-
-                                        {ev.localIndex != null ? (
-                                            <button
-                                                type="button"
-                                                className="cal-event-detail-btn cal-event-detail-btn--danger"
-                                                onClick={() => removeEvent(ev.localIndex)}
-                                            >
-                                                {localEv?.endDay ? 'Remove note from calendar' : 'Remove note'}
-                                            </button>
-                                        ) : null}
+                                    <div className="cal-popup-form">
+                                        <Input
+                                            placeholder="What's happening?"
+                                            value={newTitle}
+                                            onChange={e => setNewTitle(e.target.value)}
+                                            onPressEnter={addEvent}
+                                            autoFocus
+                                            className="cal-popup-input"
+                                        />
+                                        <div className="cal-popup-row">
+                                            <Select size="small" value={newCat} onChange={setNewCat}
+                                                className="cal-popup-select" popupMatchSelectWidth={false}
+                                                getPopupContainer={trigger => trigger.parentNode}
+                                                variant="borderless">
+                                                {CATEGORIES.map(c => (
+                                                    <Option key={c.key} value={c.key}>
+                                                        <span className="cal-cat-dot" style={{ background: c.color }} /> {c.key}
+                                                    </Option>
+                                                ))}
+                                            </Select>
+                                            <Button type="primary" size="small" onClick={addEvent}
+                                                className="cal-popup-add-btn" disabled={!newTitle.trim()}>
+                                                Add
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
-                            </aside>
-                        );
-                    })()
-                ) : null}
+                            )}
+                        </div>
+                    </div>
+
+                    {eventDetail ? (
+                        (() => {
+                            const { ev, dayOfMonth } = eventDetail;
+                            const primaryText = (ev.shortTitle || ev.title || '').trim();
+                            const routeMulti = !!(ev.routeId && ev.totalDays > 1);
+                            const localEv = ev.localIndex != null ? events[ev.localIndex] : null;
+                            const dateStr = `${MONTH_NAMES[month]} ${dayOfMonth}, ${year}`;
+                            return (
+                                <aside
+                                    className={`cal-event-detail-aside ${ev.routeId ? 'cal-event-detail-aside--route' : 'cal-event-detail-aside--local'}`}
+                                    style={ev.routeId ? undefined : { '--detail-accent': ev.color }}
+                                    aria-label="Event details"
+                                >
+                                    <div className="cal-event-detail-inner">
+                                        <div className="cal-event-detail-top">
+                                            <button
+                                                type="button"
+                                                className="cal-event-detail-close"
+                                                aria-label="Close"
+                                                onClick={closeEventDetail}
+                                            >
+                                                <CloseOutlined />
+                                            </button>
+                                        </div>
+                                        <p className="cal-event-detail-kicker">{dateStr}</p>
+                                        {routeMulti ? (
+                                            <p className="cal-event-detail-daytag">
+                                                {ev.itineraryDay}/{ev.totalDays}
+                                            </p>
+                                        ) : null}
+                                        <h2 className="cal-event-detail-title">{primaryText}</h2>
+
+                                        <div className="cal-event-detail-actions">
+                                            {ev.routeId && onOpenRouteFromCalendar ? (
+                                                <button
+                                                    type="button"
+                                                    className="cal-event-detail-btn cal-event-detail-btn--primary"
+                                                    onClick={() => onOpenRouteFromCalendar(ev.routeId)}
+                                                >
+                                                    Open on map
+                                                </button>
+                                            ) : null}
+
+                                            {ev.eventId ? (
+                                                <button
+                                                    type="button"
+                                                    className="cal-event-detail-btn cal-event-detail-btn--danger"
+                                                    onClick={() => removeRemoteEvent(ev.eventId)}
+                                                >
+                                                    Remove this day
+                                                </button>
+                                            ) : null}
+
+                                            {ev.routeId && routeMulti ? (
+                                                <button
+                                                    type="button"
+                                                    className="cal-event-detail-btn cal-event-detail-btn--muted"
+                                                    onClick={() => removeRemoteRouteAll(ev.routeId)}
+                                                >
+                                                    Remove all {ev.totalDays} days
+                                                </button>
+                                            ) : null}
+
+                                            {ev.localIndex != null ? (
+                                                <button
+                                                    type="button"
+                                                    className="cal-event-detail-btn cal-event-detail-btn--danger"
+                                                    onClick={() => removeEvent(ev.localIndex)}
+                                                >
+                                                    {localEv?.endDay ? 'Remove note from calendar' : 'Remove note'}
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                </aside>
+                            );
+                        })()
+                    ) : null}
                 </div>
             </Modal>
         </ConfigProvider>
