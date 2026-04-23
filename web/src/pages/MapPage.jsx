@@ -477,7 +477,7 @@ function getMapPoiRowKey(p) {
 }
 
 function isPointInsidePolygon(lat, lng, polygonLatLng) {
-  if (!polygonLatLng || polygonLatLng.length < 3) return false;
+  if (!polygonLatLng || polygonLatLng.length < 3) return true;
   let inside = false;
   for (let i = 0, j = polygonLatLng.length - 1; i < polygonLatLng.length; j = i++) {
     const xi = polygonLatLng[i].lng,
@@ -1104,7 +1104,7 @@ export default function MapPage() {
           polygon: selectionType === "POLYGON" ? polygon : null,
           categories: categoriesOverride !== undefined ? categoriesOverride : selectedBackendCats,
           page: 0,
-          limit: 200,
+          limit: 400,
           sort: "RATING_DESC",
         };
         const res = await fetch("/pois/search-in-area", {
@@ -2248,7 +2248,7 @@ export default function MapPage() {
                 <Button size="small" type="link" onClick={handleSelectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>All</Button>
                 <div style={{ height: 12, width: 1, background: "rgba(0,0,0,0.1)" }} />
                 <Button size="small" type="link" onClick={handleDeselectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>None</Button>
-                <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setFilterOpen(false)} style={{ marginLeft: 4 }} />
+                <Button type="text" size="small" icon={<CloseOutlined />} onClick={clearSelectionOnly} style={{ marginLeft: 4 }} />
               </div>
             </div>
             <div className="filter-body">
