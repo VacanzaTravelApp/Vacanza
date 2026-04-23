@@ -33,27 +33,23 @@ enum _Step {
   dietaryRestrictions,
   dailyBudget,
   budgetCurrency,
-  advancedToggle,
   tripPace,
   accommodationType,
   transportPreference,
-  preferredClimate,
   accessibilityNeeds,
-  avoidCategories,
-  splurgeCategories,
   preferredLanguage,
   spokenLanguages,
 }
 
 class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
   late UserPreferences _draft;
-  var _advancedOpen = false;
   late TextEditingController _budgetController;
   late ScrollController _scrollController;
   late FocusNode _budgetFocusNode;
   late Color _accentBlue;
 
-  static const _stepCount = 17;
+  // Keep keys aligned with step enum indices.
+  static final int _stepCount = _Step.values.length;
   late final List<GlobalKey> _stepKeys;
 
   var _isAutoScrolling = false;
@@ -74,6 +70,14 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
   static const _accentDietary = Color(0xFFFF6B6B);
   static const _accentAccessibility = Color(0xFF9C27B0);
   static const _accentLanguage = Color(0xFF2ECC71);
+
+  static const _optionFontSize = 12.0;
+  static const _optionFontWeight = FontWeight.w700;
+
+  var _showMoreTravelStyle = false;
+  var _showMoreAccommodation = false;
+  var _showMoreTransport = false;
+  var _showMoreLanguages = false;
 
   @override
   void initState() {
@@ -122,18 +126,6 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
   /// Scroll so the step at [index] is at the TOP of the viewport. If step is Advanced and collapsed, expand first.
   void _scrollToStep(int index) {
     if (!mounted) return;
-    // Step 7 = advancedToggle: expand Advanced then scroll to TripPace (8).
-    if (index == _Step.advancedToggle.index && !_advancedOpen) {
-      setState(() => _advancedOpen = true);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToStep(_Step.tripPace.index);
-      });
-      return;
-    }
-    if (index == _Step.advancedToggle.index) {
-      _scrollToStep(_Step.tripPace.index);
-      return;
-    }
     // DailyBudget and BudgetCurrency share the same row (same key).
     final keyIndex = index == _Step.budgetCurrency.index
         ? _Step.dailyBudget.index
@@ -265,7 +257,6 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildBasicsSection(_accentBlue),
-                  _buildAdvancedSection(),
                 ],
               ),
             ),
@@ -297,7 +288,7 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
           Row(
             children: [
               Text(
-                'Edit Preferences',
+                'Preferences',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -327,8 +318,8 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
         text,
         style: TextStyle(
           fontSize: 10,
-          fontWeight: FontWeight.w600,
-          color: cs.onSurfaceVariant,
+          fontWeight: FontWeight.w800,
+          color: cs.onSurfaceVariant.withValues(alpha: 0.92),
           letterSpacing: 1.2,
         ),
       ),
@@ -339,29 +330,19 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 16, bottom: 8),
-          child: Text(
-            'BASICS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: accentBlue,
-              letterSpacing: 1.2,
-            ),
-          ),
-        ),
-        _sectionLabel('Travel Style'),
-        _wrapWithKey(_Step.travelStyle, _singleChips(
+        _sectionLabel('Travel Preferences'),
+        _wrapWithKey(_Step.travelStyle, _chipSingleWithMore(
           options: optionTravelStyle,
           value: _draft.travelStyle,
+          maxVisible: 5,
+          isExpanded: _showMoreTravelStyle,
+          onToggleMore: () => setState(() => _showMoreTravelStyle = !_showMoreTravelStyle),
           onChanged: (v) {
             _updateDraft((d) => d.copyWith(travelStyle: v));
             _onStepCompleted(_Step.travelStyle);
           },
         )),
         _sectionLabel('Favorite Categories'),
-        _chipPreview(_draft.favoriteCategories, accentBlue),
         _wrapWithKey(_Step.favoriteCategories, _selectRow(
           label: 'Select categories',
           value: _draft.favoriteCategories,
@@ -374,63 +355,6 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
             true,
             (d, sel) => d.copyWith(favoriteCategories: sel),
             onAfterCloseAdvanceStep: _Step.favoriteCategories,
-          ),
-        )),
-        _sectionLabel('Activity Level'),
-        _wrapWithKey(_Step.activityLevel, _segmented(
-          options: optionActivityLevel,
-          value: _draft.activityLevel,
-          onChanged: (v) {
-            _updateDraft((d) => d.copyWith(activityLevel: v));
-            _onStepCompleted(_Step.activityLevel);
-          },
-        )),
-        _sectionLabel('Cuisine Preferences'),
-        _chipPreview(_draft.cuisinePreferences, _accentCuisine),
-        _wrapWithKey(_Step.cuisinePreferences, _selectRow(
-          label: 'Select cuisines',
-          value: _draft.cuisinePreferences,
-          accentColor: _accentCuisine,
-          onTap: () => _openPickerAndSet(
-            'Cuisine Preferences',
-            optionCuisinePreferences,
-            _draft.cuisinePreferences,
-            _accentCuisine,
-            true,
-            (d, sel) => d.copyWith(cuisinePreferences: sel),
-            onAfterCloseAdvanceStep: _Step.cuisinePreferences,
-          ),
-        )),
-        _sectionLabel('Dietary Restrictions & Allergens'),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              Icon(Icons.bolt, size: 12, color: _accentBlue),
-              const SizedBox(width: 4),
-              Text(
-                'Used by AI to filter recommendations',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: _accentBlue,
-                ),
-              ),
-            ],
-          ),
-        ),
-        _chipPreview(_draft.dietaryRestrictions, _accentDietary),
-        _wrapWithKey(_Step.dietaryRestrictions, _selectRow(
-          label: 'Select dietary restrictions',
-          value: _draft.dietaryRestrictions,
-          accentColor: _accentDietary,
-          onTap: () => _openPickerAndSet(
-            'Dietary Restrictions',
-            optionDietaryRestrictions,
-            _draft.dietaryRestrictions,
-            _accentDietary,
-            true,
-            (d, sel) => d.copyWith(dietaryRestrictions: sel),
-            onAfterCloseAdvanceStep: _Step.dietaryRestrictions,
           ),
         )),
         _sectionLabel('Daily Budget'),
@@ -466,212 +390,144 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
             ),
           ],
         )),
-      ],
-    );
-  }
 
-  Widget _buildAdvancedSection() {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 24),
-        InkWell(
-          onTap: () => setState(() => _advancedOpen = !_advancedOpen),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'ADVANCED PREFERENCES',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurfaceVariant,
-                    letterSpacing: 1.2,
-                  ),
+        _sectionLabel('Activity Level'),
+        _wrapWithKey(_Step.activityLevel, _segmented(
+          options: optionActivityLevel,
+          value: _draft.activityLevel,
+          onChanged: (v) {
+            _updateDraft((d) => d.copyWith(activityLevel: v));
+            _onStepCompleted(_Step.activityLevel);
+          },
+        )),
+
+        _sectionLabel('Cuisine Preferences'),
+        _wrapWithKey(_Step.cuisinePreferences, _selectRow(
+          label: 'Select cuisines',
+          value: _draft.cuisinePreferences,
+          accentColor: _accentCuisine,
+          onTap: () => _openPickerAndSet(
+            'Cuisine Preferences',
+            optionCuisinePreferences,
+            _draft.cuisinePreferences,
+            _accentCuisine,
+            true,
+            (d, sel) => d.copyWith(cuisinePreferences: sel),
+            onAfterCloseAdvanceStep: _Step.cuisinePreferences,
+          ),
+        )),
+        _sectionLabel('Dietary Restrictions & Allergens'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              Icon(Icons.bolt, size: 12, color: _accentBlue),
+              const SizedBox(width: 4),
+              Text(
+                'Used by AI filter',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: _accentBlue,
                 ),
-                Row(
-                  children: [
-                    Text(
-                      _advancedOpen ? 'Hide' : 'Show',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                    Icon(
-                      _advancedOpen ? Icons.expand_less : Icons.expand_more,
-                      size: 20,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-        if (_advancedOpen) ...[
-          _sectionLabel('Trip Pace'),
-          _wrapWithKey(_Step.tripPace, _segmented(
-            options: optionTripPace,
-            value: _draft.tripPace,
-            onChanged: (v) {
-              _updateDraft((d) => d.copyWith(tripPace: v));
-              _onStepCompleted(_Step.tripPace);
-            },
-          )),
-          _sectionLabel('Accommodation Type'),
-          _wrapWithKey(_Step.accommodationType, _singleChips(
-            options: optionAccommodationType,
-            value: _draft.accommodationType,
-            onChanged: (v) {
-              _updateDraft((d) => d.copyWith(accommodationType: v));
-              _onStepCompleted(_Step.accommodationType);
-            },
-          )),
-          _sectionLabel('Transport Preference'),
-          _wrapWithKey(_Step.transportPreference, _singleChips(
-            options: optionTransportPreference,
-            value: _draft.transportPreference,
-            onChanged: (v) {
-              _updateDraft((d) => d.copyWith(transportPreference: v));
-              _onStepCompleted(_Step.transportPreference);
-            },
-          )),
-          _sectionLabel('Preferred Climate'),
-          _wrapWithKey(_Step.preferredClimate, _singleChips(
-            options: optionPreferredClimate,
-            value: _draft.preferredClimate,
-            onChanged: (v) {
-              _updateDraft((d) => d.copyWith(preferredClimate: v));
-              _onStepCompleted(_Step.preferredClimate);
-            },
-          )),
-          _sectionLabel('Accessibility Needs'),
-          _chipPreview(_draft.accessibilityNeeds, _accentAccessibility),
-          _wrapWithKey(_Step.accessibilityNeeds, _selectRow(
-            label: 'Select accessibility needs',
-            value: _draft.accessibilityNeeds,
-            accentColor: _accentAccessibility,
-            onTap: () => _openPickerAndSet(
-              'Accessibility Needs',
-              optionAccessibilityNeeds,
-              _draft.accessibilityNeeds,
-              _accentAccessibility,
-              false,
-              (d, sel) => d.copyWith(accessibilityNeeds: sel),
-              onAfterCloseAdvanceStep: _Step.accessibilityNeeds,
-            ),
-          )),
-          _sectionLabel('Avoid Categories'),
-          _chipPreview(_draft.avoidCategories, Colors.grey),
-          _wrapWithKey(_Step.avoidCategories, _selectRow(
-            label: 'Select categories to avoid',
-            value: _draft.avoidCategories,
-            accentColor: Colors.grey,
-            onTap: () => _openPickerAndSet(
-              'Avoid Categories',
-              optionAvoidCategories,
-              _draft.avoidCategories,
-              Colors.grey,
-              true,
-              (d, sel) => d.copyWith(avoidCategories: sel),
-              onAfterCloseAdvanceStep: _Step.avoidCategories,
-            ),
-          )),
-          _sectionLabel('Splurge Categories'),
-          _chipPreview(_draft.splurgeCategories, Colors.grey),
-          _wrapWithKey(_Step.splurgeCategories, _selectRow(
-            label: 'Select categories to splurge on',
-            value: _draft.splurgeCategories,
-            accentColor: Colors.grey,
-            onTap: () => _openPickerAndSet(
-              'Splurge Categories',
-              optionSplurgeCategories,
-              _draft.splurgeCategories,
-              Colors.grey,
-              true,
-              (d, sel) => d.copyWith(splurgeCategories: sel),
-              onAfterCloseAdvanceStep: _Step.splurgeCategories,
-            ),
-          )),
-          _sectionLabel('Preferred Language'),
-          _wrapWithKey(_Step.preferredLanguage, _singleChips(
-            options: optionLanguages,
-            value: _draft.preferredLanguage,
-            onChanged: (v) {
-              _updateDraft((d) => d.copyWith(preferredLanguage: v));
-              _onStepCompleted(_Step.preferredLanguage);
-            },
-          )),
-          _sectionLabel('Spoken Languages'),
-          _chipPreview(_draft.spokenLanguages, _accentLanguage),
-          _wrapWithKey(_Step.spokenLanguages, _selectRow(
-            label: 'Select spoken languages',
-            value: _draft.spokenLanguages,
-            accentColor: _accentLanguage,
-            onTap: () => _openPickerAndSet(
-              'Spoken Languages',
-              optionLanguages,
-              _draft.spokenLanguages,
-              _accentLanguage,
-              true,
-              (d, sel) => d.copyWith(spokenLanguages: sel),
-              onAfterCloseAdvanceStep: _Step.spokenLanguages,
-            ),
-          )),
-        ],
-      ],
-    );
-  }
-
-  Widget _chipPreview(List<String> value, Color accentColor) {
-    final cs = Theme.of(context).colorScheme;
-    if (value.isEmpty) return const SizedBox.shrink();
-    final show = value.take(3).toList();
-    final extra = value.length - 3;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        children: [
-          ...show.map(
-            (v) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: accentColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                formatOptionLabel(v),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+        _wrapWithKey(_Step.dietaryRestrictions, _selectRow(
+          label: 'Select dietary restrictions',
+          value: _draft.dietaryRestrictions,
+          accentColor: _accentDietary,
+          onTap: () => _openPickerAndSet(
+            'Dietary Restrictions',
+            optionDietaryRestrictions,
+            _draft.dietaryRestrictions,
+            _accentDietary,
+            true,
+            (d, sel) => d.copyWith(dietaryRestrictions: sel),
+            onAfterCloseAdvanceStep: _Step.dietaryRestrictions,
           ),
-          if (extra > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                '+$extra',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-            ),
-        ],
-      ),
+        )),
+
+        _sectionLabel('Accessibility Needs'),
+        _wrapWithKey(_Step.accessibilityNeeds, _selectRow(
+          label: 'Select accessibility needs',
+          value: _draft.accessibilityNeeds,
+          accentColor: _accentAccessibility,
+          onTap: () => _openPickerAndSet(
+            'Accessibility Needs',
+            optionAccessibilityNeeds,
+            _draft.accessibilityNeeds,
+            _accentAccessibility,
+            false,
+            (d, sel) => d.copyWith(accessibilityNeeds: sel),
+            onAfterCloseAdvanceStep: _Step.accessibilityNeeds,
+          ),
+        )),
+
+        _sectionLabel('Trip Pace'),
+        _wrapWithKey(_Step.tripPace, _segmented(
+          options: optionTripPace,
+          value: _draft.tripPace,
+          onChanged: (v) {
+            _updateDraft((d) => d.copyWith(tripPace: v));
+            _onStepCompleted(_Step.tripPace);
+          },
+        )),
+
+        _sectionLabel('Accommodation'),
+        _wrapWithKey(_Step.accommodationType, _chipSingleWithMore(
+          options: optionAccommodationType,
+          value: _draft.accommodationType,
+          maxVisible: 3,
+          isExpanded: _showMoreAccommodation,
+          onToggleMore: () => setState(() => _showMoreAccommodation = !_showMoreAccommodation),
+          onChanged: (v) {
+            _updateDraft((d) => d.copyWith(accommodationType: v));
+            _onStepCompleted(_Step.accommodationType);
+          },
+        )),
+
+        _sectionLabel('Transport'),
+        _wrapWithKey(_Step.transportPreference, _chipSingleWithMore(
+          options: optionTransportPreference,
+          value: _draft.transportPreference,
+          maxVisible: 3,
+          isExpanded: _showMoreTransport,
+          onToggleMore: () => setState(() => _showMoreTransport = !_showMoreTransport),
+          onChanged: (v) {
+            _updateDraft((d) => d.copyWith(transportPreference: v));
+            _onStepCompleted(_Step.transportPreference);
+          },
+        )),
+
+        _sectionLabel('Languages'),
+        _wrapWithKey(_Step.preferredLanguage, _chipSingleWithMore(
+          options: optionLanguages,
+          value: _draft.preferredLanguage,
+          maxVisible: 7,
+          isExpanded: _showMoreLanguages,
+          circle: true,
+          onToggleMore: () => setState(() => _showMoreLanguages = !_showMoreLanguages),
+          onChanged: (v) {
+            _updateDraft((d) => d.copyWith(preferredLanguage: v));
+            _onStepCompleted(_Step.preferredLanguage);
+          },
+        )),
+        _wrapWithKey(_Step.spokenLanguages, _selectRow(
+          label: 'Spoken languages',
+          value: _draft.spokenLanguages,
+          accentColor: _accentLanguage,
+          onTap: () => _openPickerAndSet(
+            'Spoken Languages',
+            optionLanguages,
+            _draft.spokenLanguages,
+            _accentLanguage,
+            true,
+            (d, sel) => d.copyWith(spokenLanguages: sel),
+            onAfterCloseAdvanceStep: _Step.spokenLanguages,
+          ),
+        )),
+      ],
     );
   }
 
@@ -722,11 +578,9 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
                         Text(
                           summary,
                           style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: value.isEmpty
-                                ? cs.onSurfaceVariant
-                                : accentColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: value.isEmpty ? cs.onSurfaceVariant : cs.onSurface,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -747,52 +601,121 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
     );
   }
 
-  Widget _singleChips({
+  Widget _chipSingleWithMore({
     required List<String> options,
     required String? value,
     required void Function(String) onChanged,
+    required int maxVisible,
+    required bool isExpanded,
+    required VoidCallback onToggleMore,
+    bool circle = false,
+    int columns = 4,
   }) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: options.map((o) {
-        final selected = value == o;
-        final borderColor = selected
-            ? Colors.white.withValues(alpha: 0.35)
-            : cs.outline.withValues(alpha: isDark ? 0.28 : 0.35);
-        return GestureDetector(
-          onTap: () => onChanged(o),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: selected ? _accentBlue : cs.surfaceContainerHighest,
-              border: Border.all(color: borderColor),
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: selected
-                  ? [
-                      BoxShadow(
-                        color: _accentBlue.withValues(alpha: 0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Text(
-              formatOptionLabel(o),
-              style: TextStyle(
-                fontSize: 12,
-                color: selected ? Colors.white : cs.onSurfaceVariant,
+    final visible = isExpanded ? options : options.take(maxVisible).toList();
+    final hasMore = options.length > maxVisible;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.hardEdge,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = 10.0;
+            final colCount = columns.clamp(2, 6);
+            final chipWidth = circle
+                ? null
+                : ((constraints.maxWidth - (gap * (colCount - 1))) / colCount)
+                    .clamp(90.0, constraints.maxWidth);
+
+            Widget buildChip({
+              required String label,
+              required bool selected,
+              required VoidCallback onTap,
+              bool isMore = false,
+            }) {
+            final borderColor = selected
+                ? Colors.white.withValues(alpha: 0.35)
+                : cs.outline.withValues(alpha: isDark ? 0.20 : 0.28);
+
+            final base = GestureDetector(
+              onTap: onTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: circle ? 44 : chipWidth,
+                height: circle ? 44 : 44,
+                decoration: BoxDecoration(
+                  color: selected ? _accentBlue : cs.surfaceContainerHighest,
+                  border: Border.all(color: borderColor),
+                  borderRadius: BorderRadius.circular(circle ? 999 : 14),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: _accentBlue.withValues(alpha: 0.16),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Center(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      // Match segmented controls typography (Trip Pace / Activity Level).
+                      fontSize: _optionFontSize,
+                      fontWeight: _optionFontWeight,
+                      letterSpacing: -0.2,
+                      color: selected
+                          ? Colors.white
+                          : (isMore
+                              ? _accentBlue
+                              : cs.onSurfaceVariant.withValues(alpha: 0.72)),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+
+            return base;
+          }
+
+          final chips = <Widget>[
+            ...visible.map((o) {
+              final selected = value == o;
+              return buildChip(
+                label: formatOptionLabel(o),
+                selected: selected,
+                onTap: () => onChanged(o),
+              );
+            }),
+            if (hasMore)
+              buildChip(
+                label: 'More...',
+                selected: false,
+                isMore: true,
+                onTap: onToggleMore,
+              ),
+          ];
+
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: chips,
+            );
+          },
+        ),
+      ),
     );
   }
+
+  // _singleChips removed; use _chipSingleWithMore/_chipSingle instead.
 
   Widget _segmented({
     required List<String> options,
@@ -826,8 +749,12 @@ class _EditPreferencesSheetState extends State<EditPreferencesSheet> {
                     child: Text(
                       formatOptionLabel(o),
                       style: TextStyle(
-                        fontSize: 12,
-                        color: selected ? Colors.white : cs.onSurfaceVariant,
+                        fontSize: _optionFontSize,
+                        fontWeight: _optionFontWeight,
+                        letterSpacing: -0.2,
+                        color: selected
+                            ? Colors.white
+                            : cs.onSurfaceVariant.withValues(alpha: 0.72),
                       ),
                     ),
                   ),
