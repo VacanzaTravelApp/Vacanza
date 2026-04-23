@@ -17,6 +17,7 @@ import 'route_sheet_extent.dart';
 import 'route_sheet_helpers.dart';
 import 'route_sheet_plan_tab.dart';
 import 'route_sheet_weather.dart';
+import 'route_hotel_picker_sheet.dart';
 import 'route_waypoint_tile.dart';
 
 /// Bottom sheet for the active AI route, with optional [DraggableScrollableSheet] integration.
@@ -52,6 +53,9 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
 
   /// 1-based stop index in the active day list when user last flew to a waypoint (Plan).
   int? _lastFlyToDisplayOrder;
+
+  bool _hotelSaving = false;
+  String? _hotelError;
 
   ScrollController get _effectiveScrollController =>
       widget.scrollController ?? _ownedScrollController!;
@@ -338,6 +342,15 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
                                 height: 1.35,
                                 color: tokens.textSub,
                               ),
+                            ),
+                          ],
+                          if (routeId != null) ...[
+                            SizedBox(height: compact ? 8 : 10),
+                            _hotelSection(
+                              context,
+                              route: route,
+                              routeId: routeId,
+                              compact: compact,
                             ),
                           ],
                           SizedBox(height: compact ? 6 : 10),
@@ -674,6 +687,15 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
                                 ),
                               ),
                             ],
+                            if (routeId != null) ...[
+                              SizedBox(height: compact ? 8 : 10),
+                              _hotelSection(
+                                context,
+                                route: route,
+                                routeId: routeId,
+                                compact: compact,
+                              ),
+                            ],
                             SizedBox(height: compact ? 6 : 10),
                             if (routeId != null)
                               Padding(
@@ -801,6 +823,201 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
       behavior: HitTestBehavior.translucent,
       onTap: () => expandRouteSheetFromPeek(widget.sheetExtentController),
       child: child,
+    );
+  }
+
+  Widget _hotelSection(
+    BuildContext context, {
+    required RouteMapModel route,
+    required String routeId,
+    required bool compact,
+  }) {
+    final tokens = context.vacanzaTokens;
+    final accent = context.mapControlAccent;
+    final hotel = route.selectedHotel;
+
+    Future<void> openPicker() async {
+      final routeCubit = context.read<ActiveRouteCubit>();
+      setState(() {
+        _hotelError = null;
+      });
+      await RouteHotelPickerSheet.show(
+        context,
+        routeId: routeId,
+        defaultDestination: route.destination,
+      );
+      if (!mounted) return;
+      setState(() => _hotelSaving = true);
+      try {
+        await routeCubit.loadSavedRoute(routeId);
+      } catch (_) {
+        // ActiveRouteCubit already reports errors via state; keep this quiet.
+      } finally {
+        if (mounted) setState(() => _hotelSaving = false);
+      }
+    }
+
+    Future<void> removeHotel() async {
+      final api = context.read<AiRouteApiClient>();
+      final routeCubit = context.read<ActiveRouteCubit>();
+      setState(() {
+        _hotelSaving = true;
+        _hotelError = null;
+      });
+      try {
+        await api.removeRouteHotel(routeId: routeId);
+        if (!mounted) return;
+        await routeCubit.loadSavedRoute(routeId);
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _hotelError = 'Could not remove hotel.';
+        });
+      } finally {
+        if (mounted) setState(() => _hotelSaving = false);
+      }
+    }
+
+    final cardBg = Theme.of(context).colorScheme.surface.withValues(alpha: 0.72);
+    final border = tokens.cardBorder.withValues(alpha: 0.55);
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 14,
+        vertical: compact ? 10 : 12,
+      ),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                CupertinoIcons.bed_double_fill,
+                size: compact ? 16 : 18,
+                color: accent,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Accommodation',
+                  style: TextStyle(
+                    fontSize: compact ? 13 : 14,
+                    fontWeight: FontWeight.w700,
+                    color: tokens.textMain,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              if (_hotelSaving)
+                const CupertinoActivityIndicator(radius: 10)
+              else
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: openPicker,
+                  child: Text(
+                    hotel == null ? '+ Add' : 'Change',
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: compact ? 13 : 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (_hotelError != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _hotelError!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          if (hotel == null)
+            Text(
+              'No hotel added yet.',
+              style: TextStyle(
+                color: tokens.textSub,
+                fontSize: compact ? 12.5 : 13,
+              ),
+            )
+          else ...[
+            Text(
+              hotel.hotelName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: tokens.textMain,
+                fontSize: compact ? 13.5 : 14.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+              ),
+            ),
+            if (hotel.address != null && hotel.address!.trim().isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                hotel.address!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: tokens.textSub,
+                  fontSize: compact ? 12 : 12.5,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (hotel.externalBookingUrl != null &&
+                    hotel.externalBookingUrl!.trim().isNotEmpty)
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: () async {
+                      final u = Uri.tryParse(hotel.externalBookingUrl!.trim());
+                      if (u == null) return;
+                      if (await canLaunchUrl(u)) {
+                        await launchUrl(
+                          u,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
+                    },
+                    child: Text(
+                      'Book ↗',
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: compact ? 13 : 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                const Spacer(),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: _hotelSaving ? null : removeHotel,
+                  child: Text(
+                    'Remove',
+                    style: TextStyle(
+                      color: tokens.textSub,
+                      fontSize: compact ? 13 : 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 

@@ -2,6 +2,55 @@ import 'dart:math' as math;
 
 import 'package:mobile/features/chat/data/models/chat_models.dart';
 
+class RouteHotel {
+  final String hotelName;
+  final String? hotelExternalId;
+  final String? address;
+  final double? latitude;
+  final double? longitude;
+  final String? imageUrl;
+  final String? externalBookingUrl;
+  final double? pricePerNight;
+  final String? currency;
+  final double? rating;
+  final String? providerName;
+
+  const RouteHotel({
+    required this.hotelName,
+    this.hotelExternalId,
+    this.address,
+    this.latitude,
+    this.longitude,
+    this.imageUrl,
+    this.externalBookingUrl,
+    this.pricePerNight,
+    this.currency,
+    this.rating,
+    this.providerName,
+  });
+
+  factory RouteHotel.fromJson(Map<String, dynamic> json) {
+    num? n(dynamic v) => v is num ? v : (v is String ? num.tryParse(v) : null);
+    return RouteHotel(
+      hotelName: (json['hotelName'] ?? json['hotel_name'] ?? '').toString(),
+      hotelExternalId:
+          (json['hotelExternalId'] ?? json['hotel_external_id'])?.toString(),
+      address: (json['address'])?.toString(),
+      latitude: n(json['latitude'])?.toDouble(),
+      longitude: n(json['longitude'])?.toDouble(),
+      imageUrl: (json['imageUrl'] ?? json['image_url'])?.toString(),
+      externalBookingUrl:
+          (json['externalBookingUrl'] ?? json['external_booking_url'])
+              ?.toString(),
+      pricePerNight: n(json['pricePerNight'] ?? json['price_per_night'])
+          ?.toDouble(),
+      currency: (json['currency'])?.toString(),
+      rating: n(json['rating'])?.toDouble(),
+      providerName: (json['providerName'] ?? json['provider_name'])?.toString(),
+    );
+  }
+}
+
 /// Normalized route model for map rendering (day-based waypoints).
 ///
 /// Keeps this independent of chat transport models so we can also hydrate it
@@ -12,6 +61,8 @@ class RouteMapModel {
   final int totalDays;
   final List<RouteMapDay> days;
   final String? notes;
+
+  final RouteHotel? selectedHotel;
 
   final bool? tripDatesUserSpecified;
   final String? tripStartDate;
@@ -24,6 +75,7 @@ class RouteMapModel {
     required this.totalDays,
     required this.days,
     this.notes,
+    this.selectedHotel,
     this.tripDatesUserSpecified,
     this.tripStartDate,
     this.weatherForecast = const [],
@@ -76,10 +128,30 @@ class RouteMapModel {
       totalDays: computedTotalDays,
       days: days,
       notes: route.notes,
+      selectedHotel: null,
       tripDatesUserSpecified: route.tripDatesUserSpecified,
       tripStartDate: route.tripStartDate,
       weatherForecast: route.weatherForecast,
       weatherDayParts: route.weatherDayParts,
+    );
+  }
+
+  factory RouteMapModel.fromSavedRoute({
+    required ChatRouteData routeData,
+    required RouteHotel? selectedHotel,
+  }) {
+    final base = RouteMapModel.fromChat(routeData);
+    return RouteMapModel(
+      title: base.title,
+      destination: base.destination,
+      totalDays: base.totalDays,
+      days: base.days,
+      notes: base.notes,
+      selectedHotel: selectedHotel,
+      tripDatesUserSpecified: base.tripDatesUserSpecified,
+      tripStartDate: base.tripStartDate,
+      weatherForecast: base.weatherForecast,
+      weatherDayParts: base.weatherDayParts,
     );
   }
 }
