@@ -156,6 +156,14 @@ Available POIs from search (real coordinates and metadata):
 
 {must_visit_section}
 
+PRE-PLANNING — DO THIS BEFORE BUILDING ANY DAY:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1 — ANCHOR SIGHTS: Using your world knowledge, mentally list the top {days}×2 most iconic, must-see attractions for this destination. These are the sights every visitor talks about — famous museums, palaces, historic squares, world-class viewpoints.
+Step 2 — DISTRIBUTE EVENLY: Assign exactly 2 anchor sights to EACH day before doing any geographic clustering. Day 1 gets 2, Day 2 gets 2, Day 3 gets 2, and so on. Do NOT concentrate the famous ones into Day 1.
+Step 3 — FILL AROUND ANCHORS: For each day, find POIs from the list that are geographically close to that day's 2 anchors and fill the remaining slots. Apply geographic clustering WITHIN each day, not across days.
+Result: every day is equally exciting because it anchors on 2 iconic sights, then clusters nearby POIs around them.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 SIGHTSEEING stops (museum, monument, landmark, historic_site, park, neighborhood, attraction, church, mosque, palace, bridge, square, ruins, art_gallery):
 - Use YOUR WORLD KNOWLEDGE to pick the best sights for this destination. You know which places are iconic and must-see.
 - If a sight exists in the POI list above, use its exact coordinates from the list.
@@ -232,17 +240,17 @@ SELF-CHECK (do this mentally before outputting each day):
 
 QUALITY BALANCE ACROSS DAYS (CRITICAL — prevents day-1 bias):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Do NOT front-load all iconic/famous attractions into day 1. Every day must feel equally exciting to the traveller.
-- Each day MUST contain at least 2 landmark-level or iconic sights (famous museums, palaces, historic squares, well-known viewpoints, etc.). If a geographic cluster is weak, supplement it with a must-see from your world knowledge (null coordinates — the app will geocode).
-- After you assign POIs to clusters, ask yourself: "Would a traveller be just as happy on day 2 as on day 1?" If not, rebalance — move a strong attraction to the weaker day or add one from world knowledge.
-- The POI list is a resource pool, NOT a ranking. Ignore the list order when deciding day quality — a POI at position 50 in the list may be more iconic than position 5.
+- You already assigned 2 anchor sights per day in the PRE-PLANNING step above. Honour those assignments — do NOT quietly move all the famous ones back to Day 1.
+- Each day MUST contain at least 2 landmark-level or iconic sights. If a day's anchors turned out less impressive, add one from world knowledge (null coordinates).
+- Final gut-check: "Would a traveller be equally excited about Day 3 as Day 1?" If NO → swap a stronger attraction into the weaker day or add one from world knowledge.
+- The POI list is a resource pool, NOT a quality ranking. Position 50 in the list may be more iconic than position 5.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-GEOGRAPHIC CLUSTERING (CRITICAL — prevents costly back-and-forth travel):
+GEOGRAPHIC CLUSTERING (applies WITHIN each day — after anchor assignment):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Before assigning POIs to days, mentally cluster them by distance:
-- POIs within ~3 km of each other → assign to the SAME day.
-- POIs more than 5 km apart → assign to DIFFERENT days.
+Each day already has its 2 anchor sights from the PRE-PLANNING step. Now fill the remaining slots with POIs that are geographically close to those anchors:
+- POIs within ~3 km of the day's anchors → assign to that day.
+- POIs more than 5 km from all of that day's anchors → save for another day.
 - NEVER put two POIs on the same day if reaching both requires going 5+ km out, then 5+ km back (a "detour"). Example: Sultanahmet cluster + Rumeli Fortress 12 km away = two separate days, NOT one day.
 - Order each day's waypoints as a continuous walking/transit path — each next stop must be the nearest unvisited stop. NO zigzagging.
 
@@ -1310,10 +1318,8 @@ def _fix_route_dining(route_data: RouteData) -> RouteData:
                 "[FIX_DINING] Day %s has no lunch restaurant — will be enforced by _fix_dining_proximity",
                 day_plan.day,
             )
-            # Insert a sentinel placeholder so _fix_dining_proximity replaces it with a real nearby one.
-            # Position: after slot 3 (index 2), or mid-day.
             insert_at = min(3, len(wps))
-            sentinel = RouteWaypoint(
+            wps.insert(insert_at, RouteWaypoint(
                 name="__LUNCH_PLACEHOLDER__",
                 category="restaurant",
                 day=day_plan.day,
@@ -1322,8 +1328,25 @@ def _fix_route_dining(route_data: RouteData) -> RouteData:
                 time_slot="lunch",
                 latitude=None,
                 longitude=None,
+            ))
+
+        # --- Pass 5: flag missing dinner ---
+        has_dinner = any(pos >= len(wps) * 0.5 for pos in restaurant_positions)
+        if not has_dinner:
+            logger.warning(
+                "[FIX_DINING] Day %s has no dinner restaurant — will be enforced by _fix_dining_proximity",
+                day_plan.day,
             )
-            wps.insert(insert_at, sentinel)
+            wps.append(RouteWaypoint(
+                name="__DINNER_PLACEHOLDER__",
+                category="restaurant",
+                day=day_plan.day,
+                order=len(wps) + 1,
+                estimated_duration_min=65,
+                time_slot="dinner",
+                latitude=None,
+                longitude=None,
+            ))
 
         # --- Renumber order ---
         for idx, wp in enumerate(wps):
@@ -1355,6 +1378,21 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
     ]
     if not route_data.days or not dining_pool:
         return route_data
+
+    # Build a cross-day set of committed dining names so placeholder replacements
+    # never pick a restaurant already placed in another day (would cause _fix_duplicate_waypoints
+    # to silently delete the replacement, leaving the day without that meal).
+    globally_committed_dining: set[str] = set()
+    for dp in route_data.days:
+        for wp in (dp.waypoints or []):
+            cat = (wp.category or "").lower()
+            if cat not in _DINING_CATS:
+                continue
+            name = (wp.name or "").lower()
+            if name.startswith("__") and name.endswith("__"):
+                continue  # skip placeholders
+            if wp.latitude is not None:
+                globally_committed_dining.add(name)
 
     for day_plan in route_data.days:
         wps = day_plan.waypoints
@@ -1429,12 +1467,14 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             def _score_candidate(p_lat: float, p_lon: float) -> float:
                 return _adjacent_score(i, p_lat, p_lon)
 
-            # Find the in-range replacement with the best adjacent score
+            # Find the in-range replacement with the best adjacent score.
+            # Exclude names used in this day AND names already committed to other days
+            # (cross-day duplicates would be removed by _fix_duplicate_waypoints, leaving no meal).
             best: dict | None = None
             best_score = float("inf")
             for p in dining_pool:
                 p_name = (p.get("name") or "").lower()
-                if p_name in used_names:
+                if p_name in used_names or p_name in globally_committed_dining:
                     continue
                 p_cat = (p.get("category") or "").lower()
                 if cat in _RESTAURANT_CATS and p_cat not in _RESTAURANT_CATS:
@@ -1453,7 +1493,7 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             if best is None:
                 for p in dining_pool:
                     p_name = (p.get("name") or "").lower()
-                    if p_name in used_names:
+                    if p_name in used_names or p_name in globally_committed_dining:
                         continue
                     if _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0) > _MAX_DINING_DISTANCE_M:
                         continue
@@ -1471,6 +1511,7 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
                     day_plan.day, wp.name, dist, adj_score, best.get("name"), best_score, log_suffix,
                 )
                 used_names.discard((wp.name or "").lower())
+                best_name_lower = (best.get("name") or "").lower()
                 wps[i] = RouteWaypoint(
                     name=best.get("name"),
                     description=wp.description,
@@ -1482,7 +1523,8 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
                     estimated_duration_min=wp.estimated_duration_min,
                     time_slot=wp.time_slot,
                 )
-                used_names.add((best.get("name") or "").lower())
+                used_names.add(best_name_lower)
+                globally_committed_dining.add(best_name_lower)
             else:
                 if is_placeholder:
                     # No nearby restaurant found — remove the placeholder rather than leaving garbage in the route.
