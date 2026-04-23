@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as dev;
 
 import 'package:flutter/material.dart';
@@ -23,6 +24,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   bool _sending = false;
   bool _checking = false;
   bool _initialTriggered = false;
+  Timer? _autoCheckTimer;
 
   @override
   void initState() {
@@ -34,6 +36,20 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         _resendVerification(silent: true);
       }
     });
+
+    // Auto-check verification in background without requiring the user to tap "I verified".
+    // This covers the common case: user verifies in browser/mail app then returns to Vacanza.
+    _autoCheckTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!_checking && mounted) {
+        _silentCheckVerified();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoCheckTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _resendVerification({bool silent = false}) async {
@@ -77,6 +93,36 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     }
   }
 
+  Future<void> _silentCheckVerified() async {
+    final authRepo = context.read<AuthRepository>();
+    try {
+      final user = fb.FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      await user.reload();
+      final refreshed = fb.FirebaseAuth.instance.currentUser;
+      if (refreshed == null) return;
+
+      if (!refreshed.emailVerified) return;
+
+      try {
+        await authRepo.restoreSession();
+      } catch (e) {
+        dev.log('[Auth] restoreSession failed in auto-check: $e', name: 'Auth');
+      }
+
+      if (!mounted) return;
+      _autoCheckTimer?.cancel();
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeMapScreen()),
+        (_) => false,
+      );
+    } catch (e) {
+      // Ignore transient errors; next tick will retry.
+    }
+  }
+
   Future<void> _iVerified() async {
     if (!mounted) return;
     setState(() => _checking = true);
@@ -108,6 +154,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       }
 
       if (mounted) {
+        _autoCheckTimer?.cancel();
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomeMapScreen()),
           (_) => false,
@@ -215,7 +262,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Text(
-                                  'I verified',
+                                  'I verified (manual check)',
                                   style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,

@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["XPRHK47S46.com.aserhatsahin.vacanza"],
+        "paths": ["/confirm-email*", "/confirm-email"]
+      }
+    ]
+  }
+}
+

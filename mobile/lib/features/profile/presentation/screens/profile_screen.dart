@@ -7,6 +7,7 @@ import 'package:mobile/core/navigation/navigation_service.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/core/theme/theme_cubit.dart';
 import 'package:mobile/features/auth/data/repositories/auth_repository.dart';
+import 'package:mobile/features/auth/presentation/screens/change_password_screen.dart';
 import 'package:mobile/features/booking/presentation/widgets/search/booking_search_field_styles.dart';
 import 'package:mobile/features/trip_agenda/trip_agenda_calendar_sheet.dart';
 
@@ -160,7 +161,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   );
                 },
-                child: const _TravelPreferencesPreview(),
+              ),
+              const SizedBox(height: 16),
+
+              _ProfileMenuCard(
+                title: 'Change Password',
+                subtitle: 'Update your account password',
+                icon: Icons.lock_rounded,
+                iconGradient: ProfileIconGradient.editProfile(context),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChangePasswordScreen(),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
 
@@ -519,95 +535,6 @@ class _ActionsCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _TravelPreferencesPreview extends StatelessWidget {
-  const _TravelPreferencesPreview();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return BlocBuilder<ProfileBloc, ProfileState>(
-      buildWhen: (p, n) =>
-          p.preferencesStatus != n.preferencesStatus ||
-          p.preferences != n.preferences,
-      builder: (context, state) {
-        if (state.preferencesStatus == LoadStatus.loading &&
-            state.preferences == null) {
-          return Row(
-            children: [
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text('Loading…', style: TextStyle(color: cs.onSurfaceVariant)),
-            ],
-          );
-        }
-
-        if (state.preferencesStatus == LoadStatus.failure) {
-          final msg =
-              state.errorFor(ProfileSection.preferences) ?? 'Error';
-          return Text(
-            msg,
-            style: TextStyle(color: cs.error, fontSize: 12),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          );
-        }
-
-        final prefs = state.preferences;
-        if (prefs == null) {
-          return Text(
-            'No preferences set',
-            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-          );
-        }
-
-        final travelStyle = prefs.travelStyle != null
-            ? _capitalize(prefs.travelStyle!.replaceAll('_', ' '))
-            : '—';
-        final cats = prefs.favoriteCategories.take(3).toList();
-        final extra = prefs.favoriteCategories.length - cats.length;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Travel style: $travelStyle',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              ),
-            ),
-            if (cats.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  ...cats.map(
-                    (c) => ProfileChipStyle.categoryPill(
-                      context,
-                      _capitalize(c),
-                    ),
-                  ),
-                  if (extra > 0)
-                    ProfileChipStyle.extraPill(context, '+$extra'),
-                ],
-              ),
-            ],
-          ],
-        );
-      },
     );
   }
 }

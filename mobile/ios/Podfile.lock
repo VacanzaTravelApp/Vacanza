@@ -1,4 +1,6 @@
 PODS:
+  - app_links (6.4.1):
+    - Flutter
   - ar_flutter_plugin_engine (0.6.2):
     - ARCore/CloudAnchors (~> 1.53.0)
     - Flutter
@@ -185,6 +187,7 @@ PODS:
     - Flutter
 
 DEPENDENCIES:
+  - app_links (from `.symlinks/plugins/app_links/ios`)
   - ar_flutter_plugin_engine (from `.symlinks/plugins/ar_flutter_plugin_engine/ios`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - firebase_auth (from `.symlinks/plugins/firebase_auth/ios`)
@@ -243,6 +246,8 @@ SPEC REPOS:
     - Turf
 
 EXTERNAL SOURCES:
+  app_links:
+    :path: ".symlinks/plugins/app_links/ios"
   ar_flutter_plugin_engine:
     :path: ".symlinks/plugins/ar_flutter_plugin_engine/ios"
   camera_avfoundation:
@@ -279,6 +284,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/url_launcher_ios/ios"
 
 SPEC CHECKSUMS:
+  app_links: 3dbc685f76b1693c66a6d9dd1e9ab6f73d97dc0a
   ar_flutter_plugin_engine: 0085bc2027ed854cd2eb259034acf91585f6902d
   ARCore: b9e941435f572a5e25c75db86718937f1b8df540
   BlueCryptor: b0aee3d9b8f367b49b30de11cda90e1735571c24

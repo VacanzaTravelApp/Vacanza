@@ -107,14 +107,23 @@ class ProfileRemoteDataSource {
   }
 
   Future<UserPreferencesDto> getPreferences() async {
-    final response = await _dio.get<dynamic>('$_basePath/preferences');
-    final data = response.data;
-    if (data is! Map<String, dynamic>) {
-      throw FormatException(
-        'Expected Map from $_basePath/preferences, got ${data.runtimeType}',
-      );
+    try {
+      final response = await _dio.get<dynamic>('$_basePath/preferences');
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw FormatException(
+          'Expected Map from $_basePath/preferences, got ${data.runtimeType}',
+        );
+      }
+      return UserPreferencesDto.fromJson(data);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        // New user: preferences row may not exist yet.
+        // Treat as empty preferences so the UI can render and user can set them via PUT (upsert).
+        return const UserPreferencesDto(preferencesId: '', userId: '');
+      }
+      rethrow;
     }
-    return UserPreferencesDto.fromJson(data);
   }
 
   Future<UserPreferencesDto> updatePreferences(Map<String, dynamic> partial) async {
