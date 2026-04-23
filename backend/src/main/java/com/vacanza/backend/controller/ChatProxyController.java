@@ -53,7 +53,8 @@ public class ChatProxyController {
          */
         private static final List<String> DEFAULT_POLYGON_CATEGORIES = List.of(
                         "museum", "monument", "historic_site", "church", "park", "neighborhood",
-                        "landmark", "art_gallery", "tourist_attraction", "restaurant", "cafe", "bar");
+                        "landmark", "art_gallery", "tourist_attraction",
+                        "restaurant", "cafe", "bar", "fast_food", "bakery");
 
         /**
          * Dining categories that should be fetched using a tight bbox around sightseeing POIs,
@@ -1231,7 +1232,7 @@ public class ChatProxyController {
 
                 // Phase 2: compute a tight bbox around sightseeing POIs (+1500 m padding)
                 // so dining results stay near where the traveller will actually be.
-                double[] dBbox = tightBboxWithPaddingMeters(all, dest, 1500.0);
+                double[] dBbox = tightBboxWithPaddingMeters(all, dest, 2500.0);
 
                 // Phase 3: fetch dining categories with tight bbox
                 for (String c : diningCats) {

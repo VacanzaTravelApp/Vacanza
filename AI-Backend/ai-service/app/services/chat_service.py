@@ -2520,7 +2520,7 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
     llm_messages.extend(history)
     llm_messages.append(HumanMessage(content=user_content))
 
-    llm = create_chat_model(settings)
+    llm = create_chat_model(settings, temperature=0.3)
 
     # Turn2: backend sends POI list as a tool result marker (and may include the original tool call)
     tool_pois = _parse_tool_result_pois(user_content)
