@@ -556,6 +556,12 @@ public class ChatProxyController {
                                 // remove any museum/historic stops that ended up at or after 16:45 —
                                 // these venues close at 17:00 and the walking overhead pushed them past closing.
                                 stripLateClosingVenueStops(response.getRouteData());
+                                // If we adjusted any stops (replace/flag), recompute the day timeline once more
+                                // so the frontend receives consistent arrival/departure and travel legs.
+                                routeTimelineService.enrichTimeline(response.getRouteData(), profile);
+                                // Prevent the AI from scheduling the same landmark on multiple days:
+                                // keep first occurrence, replace later duplicates where possible.
+                                dedupeWaypointsAcrossDays(response.getRouteData());
                                 logRouteShape("final", response.getRouteData());
                                 UUID savedRouteId = saveRoute(user, conversationId, response.getRouteData());
                                 if (savedRouteId != null) {
@@ -594,6 +600,8 @@ public class ChatProxyController {
                         logRouteShape("turn3_after_strip_null", response.getRouteData());
                         routeTimelineService.enrichTimeline(response.getRouteData(), profile);
                         stripLateClosingVenueStops(response.getRouteData());
+                        routeTimelineService.enrichTimeline(response.getRouteData(), profile);
+                        dedupeWaypointsAcrossDays(response.getRouteData());
                         logRouteShape("turn3_final", response.getRouteData());
 
                         // Build a short human-readable reason from the user's edit request
@@ -708,21 +716,321 @@ public class ChatProxyController {
          */
         private void stripNullCoordinateWaypoints(AiChatDto.RouteData routeData) {
                 if (routeData == null || routeData.getDays() == null) return;
+                String destination = routeData.getDestination();
+                DestinationGeocodeResult destGeo = null;
+                if (destination != null && !destination.isBlank()) {
+                        try {
+                                destGeo = mapboxPoiSearchClient.geocodeDestination(destination.trim()).blockOptional().orElse(null);
+                        } catch (Exception e) {
+                                destGeo = null;
+                        }
+                }
                 for (AiChatDto.DayPlan dayPlan : routeData.getDays()) {
                         if (dayPlan.getWaypoints() == null) continue;
+                        int removed = 0;
+                        int replaced = 0;
+
+                        java.util.Set<String> existingNames = new java.util.HashSet<>();
+                        for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
+                                if (wp.getName() != null && !wp.getName().isBlank()) {
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                }
+                        }
+
+                        // Replace null-coordinate waypoints where possible; remove only as a last resort.
+                        for (int i = 0; i < dayPlan.getWaypoints().size(); i++) {
+                                AiChatDto.RouteWaypoint wp = dayPlan.getWaypoints().get(i);
+                                if (wp == null) continue;
+                                if (wp.getLatitude() != null && wp.getLongitude() != null) continue;
+                                if (wp.getName() == null || wp.getName().isBlank()) continue;
+
+                                PoiResult repl = findNullCoordReplacement(dayPlan.getWaypoints(), i, wp, existingNames, destGeo);
+                                if (repl != null) {
+                                        String originalName = wp.getName();
+                                        existingNames.remove(originalName.trim().toLowerCase(java.util.Locale.ROOT));
+                                        wp.setName(repl.getName());
+                                        wp.setLatitude(repl.getLat());
+                                        wp.setLongitude(repl.getLon());
+                                        if (repl.getCategory() != null) {
+                                                wp.setCategory(repl.getCategory());
+                                        }
+                                        wp.setUnavailable(null);
+                                        wp.setArrivalTimeLocal(null);
+                                        wp.setDepartureTimeLocal(null);
+                                        wp.setTravelFromPreviousMin(null);
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                        replaced++;
+                                        log.info("[STRIP NULL] Day {} — '{}' had null coords → replaced with '{}' ({},{})",
+                                                dayPlan.getDay(), originalName, repl.getName(), repl.getLat(), repl.getLon());
+                                }
+                        }
+
                         int before = dayPlan.getWaypoints().size();
-                        dayPlan.getWaypoints().removeIf(
-                                wp -> wp.getLatitude() == null || wp.getLongitude() == null);
-                        int removed = before - dayPlan.getWaypoints().size();
-                        if (removed > 0) {
-                                log.warn("[STRIP NULL] Day {} — removed {} waypoint(s) with no coordinates; renumbering",
+                        dayPlan.getWaypoints().removeIf(wp -> wp == null || wp.getLatitude() == null || wp.getLongitude() == null);
+                        removed = before - dayPlan.getWaypoints().size();
+
+                        if (removed > 0 || replaced > 0) {
+                                if (removed > 0) {
+                                        log.warn("[STRIP NULL] Day {} — removed {} waypoint(s) with no coordinates (after replacement attempts); renumbering",
                                                 dayPlan.getDay(), removed);
+                                }
                                 int order = 1;
                                 for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
                                         wp.setOrder(order++);
                                 }
                         }
                 }
+        }
+
+        /**
+         * Attempt to replace a null-coordinate waypoint with a nearby POI of a similar category.
+         *
+         * Strategy:
+         * - Anchor search around nearest neighbour waypoint with valid coordinates (prev/next/any in day).
+         * - If no neighbour has coordinates, fall back to destination center if available.
+         * - Category fallback is tourist_attraction.
+         */
+        private PoiResult findNullCoordReplacement(
+                List<AiChatDto.RouteWaypoint> dayWaypoints,
+                int idx,
+                AiChatDto.RouteWaypoint missing,
+                java.util.Set<String> existingNamesLower,
+                DestinationGeocodeResult destGeo) {
+                if (missing == null) return null;
+
+                Double anchorLat = null;
+                Double anchorLon = null;
+
+                // 1) nearest prev with coords
+                for (int j = idx - 1; j >= 0; j--) {
+                        AiChatDto.RouteWaypoint w = dayWaypoints.get(j);
+                        if (w != null && w.getLatitude() != null && w.getLongitude() != null) {
+                                anchorLat = w.getLatitude();
+                                anchorLon = w.getLongitude();
+                                break;
+                        }
+                }
+                // 2) nearest next with coords
+                if (anchorLat == null || anchorLon == null) {
+                        for (int j = idx + 1; j < dayWaypoints.size(); j++) {
+                                AiChatDto.RouteWaypoint w = dayWaypoints.get(j);
+                                if (w != null && w.getLatitude() != null && w.getLongitude() != null) {
+                                        anchorLat = w.getLatitude();
+                                        anchorLon = w.getLongitude();
+                                        break;
+                                }
+                        }
+                }
+                // 3) any in day
+                if (anchorLat == null || anchorLon == null) {
+                        for (AiChatDto.RouteWaypoint w : dayWaypoints) {
+                                if (w != null && w.getLatitude() != null && w.getLongitude() != null) {
+                                        anchorLat = w.getLatitude();
+                                        anchorLon = w.getLongitude();
+                                        break;
+                                }
+                        }
+                }
+                // 4) destination center
+                if ((anchorLat == null || anchorLon == null) && destGeo != null) {
+                        anchorLat = destGeo.getCenterLat();
+                        anchorLon = destGeo.getCenterLon();
+                }
+                if (anchorLat == null || anchorLon == null) {
+                        return null;
+                }
+
+                // ~1.5km-ish bbox.
+                double r = 0.014;
+                double minLon = anchorLon - r;
+                double minLat = anchorLat - r;
+                double maxLon = anchorLon + r;
+                double maxLat = anchorLat + r;
+
+                String cat = missing.getCategory();
+                String category = (cat != null && !cat.isBlank()) ? cat.trim() : "tourist_attraction";
+
+                // Try similar category first, then broaden.
+                List<String> cats = List.of(
+                        category,
+                        "tourist_attraction",
+                        "landmark",
+                        "monument",
+                        "park",
+                        "viewpoint",
+                        "neighborhood"
+                );
+
+                for (String c : cats) {
+                        if (c == null || c.isBlank()) continue;
+                        List<PoiResult> candidates;
+                        try {
+                                candidates = mapboxPoiSearchClient
+                                        .searchByCategory(c, minLon, minLat, maxLon, maxLat)
+                                        .block(java.time.Duration.ofSeconds(4));
+                        } catch (Exception e) {
+                                candidates = null;
+                        }
+                        if (candidates == null || candidates.isEmpty()) continue;
+
+                        PoiResult best = null;
+                        double bestRating = -1.0;
+                        for (PoiResult p : candidates) {
+                                if (p == null || p.getName() == null || p.getName().isBlank()) continue;
+                                String nameLower = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                if (existingNamesLower != null && existingNamesLower.contains(nameLower)) continue;
+                                // Avoid obvious self / close-name reuse
+                                if (missing.getName() != null) {
+                                        String a = missing.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        String b = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        if (!a.isEmpty() && !b.isEmpty() && (a.contains(b) || b.contains(a))) {
+                                                continue;
+                                        }
+                                }
+                                double rating = p.getRating() != null ? p.getRating() : 0.0;
+                                if (rating > bestRating) {
+                                        bestRating = rating;
+                                        best = p;
+                                }
+                        }
+                        if (best != null) {
+                                return best;
+                        }
+                }
+                return null;
+        }
+
+        /**
+         * Deduplicate repeated landmarks across days.
+         *
+         * We use {@link PoiDedup} token-prefix + proximity to treat sub-features ("parking", "entrance")
+         * as the same landmark. First occurrence is kept; later duplicates are replaced with a nearby
+         * alternative of similar category around the duplicate's own coordinates. If no replacement is
+         * found, the duplicate is removed (last resort).
+         */
+        private void dedupeWaypointsAcrossDays(AiChatDto.RouteData routeData) {
+                if (routeData == null || routeData.getDays() == null) return;
+                java.util.List<PoiResult> seen = new java.util.ArrayList<>();
+
+                for (AiChatDto.DayPlan day : routeData.getDays()) {
+                        if (day == null || day.getWaypoints() == null || day.getWaypoints().isEmpty()) continue;
+
+                        java.util.Set<String> existingNames = new java.util.HashSet<>();
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                if (wp != null && wp.getName() != null && !wp.getName().isBlank()) {
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                }
+                        }
+
+                        java.util.List<AiChatDto.RouteWaypoint> toRemove = new java.util.ArrayList<>();
+
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                if (wp == null || wp.getName() == null || wp.getName().isBlank()) continue;
+                                if (wp.getLatitude() == null || wp.getLongitude() == null) continue;
+
+                                PoiResult asPoi = new PoiResult(wp.getName(), wp.getCategory(), wp.getLatitude(), wp.getLongitude());
+
+                                if (!PoiDedup.isNearDuplicateOfAny(asPoi, seen)) {
+                                        seen.add(asPoi);
+                                        continue;
+                                }
+
+                                PoiResult repl = findDuplicateReplacement(wp, existingNames);
+                                if (repl != null) {
+                                        String originalName = wp.getName();
+                                        existingNames.remove(originalName.trim().toLowerCase(java.util.Locale.ROOT));
+                                        wp.setName(repl.getName());
+                                        wp.setLatitude(repl.getLat());
+                                        wp.setLongitude(repl.getLon());
+                                        if (repl.getCategory() != null) {
+                                                wp.setCategory(repl.getCategory());
+                                        }
+                                        wp.setUnavailable(null);
+                                        wp.setArrivalTimeLocal(null);
+                                        wp.setDepartureTimeLocal(null);
+                                        wp.setTravelFromPreviousMin(null);
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                        log.info("[ROUTE_DEDUP] Day {} — duplicate '{}' → replaced with '{}'",
+                                                day.getDay(), originalName, repl.getName());
+                                        // Track the replacement as seen so it won't repeat later.
+                                        seen.add(new PoiResult(wp.getName(), wp.getCategory(), wp.getLatitude(), wp.getLongitude()));
+                                } else {
+                                        log.warn("[ROUTE_DEDUP] Day {} — duplicate '{}' removed (no replacement found)",
+                                                day.getDay(), wp.getName());
+                                        toRemove.add(wp);
+                                }
+                        }
+
+                        if (!toRemove.isEmpty()) {
+                                day.getWaypoints().removeAll(toRemove);
+                        }
+                        // Keep stable ordering
+                        int order = 1;
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                wp.setOrder(order++);
+                        }
+                }
+        }
+
+        private PoiResult findDuplicateReplacement(
+                AiChatDto.RouteWaypoint duplicate,
+                java.util.Set<String> existingNamesLower) {
+                if (duplicate == null || duplicate.getLatitude() == null || duplicate.getLongitude() == null) {
+                        return null;
+                }
+                double lat = duplicate.getLatitude();
+                double lon = duplicate.getLongitude();
+                double r = 0.012; // ~1.3km-ish
+
+                String category = (duplicate.getCategory() != null && !duplicate.getCategory().isBlank())
+                        ? duplicate.getCategory().trim()
+                        : "tourist_attraction";
+
+                // Similar category first, then flexible outdoor categories.
+                java.util.List<String> cats = java.util.List.of(
+                        category,
+                        "tourist_attraction",
+                        "landmark",
+                        "monument",
+                        "park",
+                        "viewpoint",
+                        "neighborhood"
+                );
+
+                for (String c : cats) {
+                        if (c == null || c.isBlank()) continue;
+                        java.util.List<PoiResult> candidates;
+                        try {
+                                candidates = mapboxPoiSearchClient
+                                        .searchByCategory(c, lon - r, lat - r, lon + r, lat + r)
+                                        .block(java.time.Duration.ofSeconds(4));
+                        } catch (Exception e) {
+                                candidates = null;
+                        }
+                        if (candidates == null || candidates.isEmpty()) continue;
+
+                        PoiResult best = null;
+                        double bestRating = -1.0;
+                        for (PoiResult p : candidates) {
+                                if (p == null || p.getName() == null || p.getName().isBlank()) continue;
+                                String nameLower = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                if (existingNamesLower != null && existingNamesLower.contains(nameLower)) continue;
+                                if (duplicate.getName() != null) {
+                                        String a = duplicate.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        String b = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        if (!a.isEmpty() && !b.isEmpty() && (a.contains(b) || b.contains(a))) {
+                                                continue;
+                                        }
+                                }
+                                double rating = p.getRating() != null ? p.getRating() : 0.0;
+                                if (rating > bestRating) {
+                                        bestRating = rating;
+                                        best = p;
+                                }
+                        }
+                        if (best != null) return best;
+                }
+                return null;
         }
 
         /**
@@ -1119,30 +1427,135 @@ public class ChatProxyController {
                 if (routeData == null || routeData.getDays() == null) return;
                 for (AiChatDto.DayPlan day : routeData.getDays()) {
                         if (day.getWaypoints() == null) continue;
-                        int before = day.getWaypoints().size();
-                        day.getWaypoints().removeIf(wp -> {
+                        int lateCount = 0;
+                        java.util.Set<String> existingNames = new java.util.HashSet<>();
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                if (wp.getName() != null && !wp.getName().isBlank()) {
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                }
+                        }
+
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
                                 String cat = wp.getCategory() == null
                                         ? "" : wp.getCategory().trim().toLowerCase(java.util.Locale.ROOT);
-                                if (!EARLY_CLOSE_CATS.contains(cat)) return false;
+                                if (!EARLY_CLOSE_CATS.contains(cat)) continue;
                                 String arrival = wp.getArrivalTimeLocal();
-                                if (arrival == null || arrival.isBlank()) return false;
+                                if (arrival == null || arrival.isBlank()) continue;
+                                java.time.LocalTime t;
                                 try {
-                                        java.time.LocalTime t = java.time.LocalTime.parse(arrival.trim(), HH_MM_FMT);
-                                        return !t.isBefore(VENUE_LATEST_ARRIVAL);
+                                        t = java.time.LocalTime.parse(arrival.trim(), HH_MM_FMT);
                                 } catch (Exception e) {
-                                        return false; // can't parse → keep safe
+                                        continue; // can't parse → keep safe
                                 }
-                        });
-                        int removed = before - day.getWaypoints().size();
-                        if (removed > 0) {
-                                log.warn("[TIMELINE] Day {}: removed {} venue stop(s) with arrival ≥ {} (closes 17:00); renumbering",
-                                        day.getDay(), removed, VENUE_LATEST_ARRIVAL);
+                                if (t.isBefore(VENUE_LATEST_ARRIVAL)) continue;
+
+                                lateCount++;
+
+                                // Instead of removing the stop and leaving a "hole" in the day, try to replace it
+                                // with an outdoor/anytime-stop nearby (viewpoint/park/neighborhood/etc.).
+                                PoiResult replacement = findLateVenueReplacement(wp, existingNames);
+                                if (replacement != null) {
+                                        String originalName = wp.getName();
+                                        existingNames.remove(originalName == null ? "" : originalName.trim().toLowerCase(java.util.Locale.ROOT));
+                                        wp.setName(replacement.getName());
+                                        wp.setLatitude(replacement.getLat());
+                                        wp.setLongitude(replacement.getLon());
+                                        if (replacement.getCategory() != null) {
+                                                wp.setCategory(replacement.getCategory());
+                                        }
+                                        wp.setUnavailable(null);
+                                        wp.setArrivalTimeLocal(null);
+                                        wp.setDepartureTimeLocal(null);
+                                        wp.setTravelFromPreviousMin(null);
+                                        if (wp.getName() != null) {
+                                                existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                        }
+                                        log.info("[TIMELINE] Day {}: '{}' arrived at {} (late) → replaced with '{}'",
+                                                day.getDay(), originalName, arrival.trim(), replacement.getName());
+                                } else {
+                                        // Fallback: keep it but flag unavailable so the user sees why the day is sparse.
+                                        wp.setUnavailable(true);
+                                        log.warn("[TIMELINE] Day {}: '{}' arrived at {} (late) — no replacement found, marked unavailable",
+                                                day.getDay(), wp.getName(), arrival.trim());
+                                }
+                        }
+
+                        if (lateCount > 0) {
+                                // Keep stable ordering in the list after replacements.
                                 int order = 1;
                                 for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
                                         wp.setOrder(order++);
                                 }
                         }
                 }
+        }
+
+        /**
+         * Find a nearby replacement for a late-closing venue stop.
+         * We intentionally avoid early-closing categories and prefer "anytime" stops.
+         */
+        private PoiResult findLateVenueReplacement(
+                AiChatDto.RouteWaypoint wp,
+                java.util.Set<String> existingNamesLower) {
+                if (wp == null || wp.getLatitude() == null || wp.getLongitude() == null) {
+                        return null;
+                }
+                double lat = wp.getLatitude();
+                double lon = wp.getLongitude();
+                double r = 0.012; // ~1.3km-ish
+
+                // Priority order: outdoor / flexible categories first.
+                List<String> cats = List.of(
+                        "viewpoint",
+                        "park",
+                        "neighborhood",
+                        "landmark",
+                        "tourist_attraction",
+                        "monument"
+                );
+
+                for (String c : cats) {
+                        try {
+                                List<PoiResult> candidates = mapboxPoiSearchClient
+                                        .searchByCategory(c, lon - r, lat - r, lon + r, lat + r)
+                                        .block(java.time.Duration.ofSeconds(4));
+                                if (candidates == null || candidates.isEmpty()) {
+                                        continue;
+                                }
+                                PoiResult best = null;
+                                double bestRating = -1.0;
+                                for (PoiResult p : candidates) {
+                                        if (p == null || p.getName() == null || p.getName().isBlank()) continue;
+                                        String nameLower = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        if (existingNamesLower != null && existingNamesLower.contains(nameLower)) continue;
+                                        if (wp.getName() != null) {
+                                                String a = wp.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                                String b = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                                if (!a.isEmpty() && !b.isEmpty() && (a.contains(b) || b.contains(a))) {
+                                                        continue;
+                                                }
+                                        }
+                                        // Avoid swapping late museum with another early-closing venue.
+                                        if (p.getCategory() != null) {
+                                                String pc = p.getCategory().trim().toLowerCase(java.util.Locale.ROOT);
+                                                if (EARLY_CLOSE_CATS.contains(pc)) continue;
+                                        }
+                                        double rating = p.getRating() != null ? p.getRating() : 0.0;
+                                        if (rating > bestRating) {
+                                                bestRating = rating;
+                                                best = p;
+                                        }
+                                }
+                                if (best != null) {
+                                        return best;
+                                }
+                        } catch (Exception e) {
+                                // Non-blocking: just try the next category.
+                                log.debug("[TIMELINE] Replacement search failed for cat={} name='{}': {}",
+                                        c, wp.getName(), e.getMessage());
+                        }
+                }
+                return null;
         }
 
         /**
