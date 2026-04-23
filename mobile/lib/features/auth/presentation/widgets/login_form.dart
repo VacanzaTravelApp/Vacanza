@@ -10,6 +10,7 @@ import 'package:mobile/features/auth/presentation/widgets/login_password_section
 import 'package:mobile/features/auth/presentation/bloc/login_bloc.dart';
 import 'package:mobile/features/auth/presentation/bloc/login_event.dart';
 import 'package:mobile/features/auth/presentation/bloc/login_state.dart';
+import 'package:mobile/features/auth/presentation/screens/forgot_password_screen.dart';
 
 /// Login form widget that manages:
 /// - UI (email + password fields, forgot password link, button)
@@ -130,7 +131,15 @@ class _LoginFormState extends State<LoginForm> {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () {
-                    // TODO: Implement forgot password flow later.
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ForgotPasswordScreen(
+                          prefillEmail: _email.text.trim().isEmpty
+                              ? null
+                              : _email.text.trim(),
+                        ),
+                      ),
+                    );
                   },
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
