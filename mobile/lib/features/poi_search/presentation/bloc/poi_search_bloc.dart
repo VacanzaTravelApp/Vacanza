@@ -111,11 +111,10 @@ class PoiSearchBloc extends Bloc<PoiSearchEvent, PoiSearchState> {
   }
 
   void _onShowPoiMarkers(ShowPoiMarkers event, Emitter<PoiSearchState> emit) {
-    emit(state.copyWith(
-      hidePoiMarkers: false,
-      pois: const [],
-      count: 0,
-    ));
+    emit(state.copyWith(hidePoiMarkers: false));
+    if (state.hasUsableArea) {
+      add(const SearchRequested());
+    }
   }
 
   bool _bboxTooLargeForSearch(BboxArea b) {

@@ -50,6 +50,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   PoiMarkersController? _poiMarkers;
   RouteMarkersController? _routeMarkers;
   mb.PolylineAnnotationManager? _routeLineMgr;
+  mb.CircleAnnotationManager? _hotelMarkerMgr;
   StylePoiDiscoveryBinding? _styleBinding;
 
   String? _lastStyleUri;
@@ -618,6 +619,9 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       try {
         await lineMgr.deleteAll();
       } catch (_) {}
+      try {
+        await _hotelMarkerMgr?.deleteAll();
+      } catch (_) {}
       return;
     }
 
@@ -631,9 +635,53 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
     await markers.setWaypoints(typed, isLight: isLight);
 
+    // Hotel pin — place a circle annotation at the selected hotel location.
+    final hotel = routeState.route!.selectedHotel;
+    final hotelLat = hotel?.latitude;
+    final hotelLon = hotel?.longitude;
+    final hotelHasCoords = hotelLat != null && hotelLon != null;
+    final hotelMgr = _hotelMarkerMgr;
+    if (hotelMgr != null) {
+      try {
+        await hotelMgr.deleteAll();
+      } catch (_) {}
+      if (hotelHasCoords) {
+        final accent = Theme.of(context).colorScheme.primary;
+        await hotelMgr.create(
+          mb.CircleAnnotationOptions(
+            geometry: mb.Point(
+              coordinates: mb.Position(hotelLon!, hotelLat!),
+            ),
+            circleColor: accent.toARGB32(),
+            circleRadius: 13.0,
+            circleStrokeColor: Colors.white.toARGB32(),
+            circleStrokeWidth: 3.0,
+          ),
+        );
+      }
+    }
+
+    // Directions waypoints: hotel as start + end (matching web pattern).
+    final hotelEntry = hotelHasCoords
+        ? <String, dynamic>{
+            'latitude': hotelLat!,
+            'longitude': hotelLon!,
+          }
+        : null;
+    final directionsWaypoints = <Map<String, dynamic>>[
+      if (hotelEntry != null) hotelEntry,
+      ...typed.map(
+        (w) => <String, dynamic>{
+          'latitude': w.latitude,
+          'longitude': w.longitude,
+        },
+      ),
+      if (hotelEntry != null) hotelEntry,
+    ];
+
     try {
       await lineMgr.deleteAll();
-      if (typed.length < 2) {
+      if (directionsWaypoints.length < 2) {
         return;
       }
       final lineColor =
@@ -642,15 +690,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       List<mb.Position>? pathPositions;
       try {
         final res = await routeApi.getDirectionsGeometry(
-          waypoints:
-              typed
-                  .map(
-                    (w) => <String, dynamic>{
-                      'latitude': w.latitude,
-                      'longitude': w.longitude,
-                    },
-                  )
-                  .toList(growable: false),
+          waypoints: directionsWaypoints,
         );
         if (!mounted || lineEpoch != _directionsEpoch) {
           return;
@@ -663,8 +703,13 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       final coords =
           (pathPositions != null && pathPositions.length >= 2)
               ? pathPositions
-              : typed
-                  .map((w) => mb.Position(w.longitude, w.latitude))
+              : directionsWaypoints
+                  .map(
+                    (w) => mb.Position(
+                      (w['longitude'] as num).toDouble(),
+                      (w['latitude'] as num).toDouble(),
+                    ),
+                  )
                   .toList(growable: false);
 
       if (!mounted || lineEpoch != _directionsEpoch) {
@@ -739,6 +784,9 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     final routeMarkers = RouteMarkersController(mapboxMap);
     await routeMarkers.init();
     _routeMarkers = routeMarkers;
+
+    _hotelMarkerMgr =
+        await mapboxMap.annotations.createCircleAnnotationManager();
 
     if (mounted) {
       context.read<MapBloc>().add(MapInitialized(mapboxMap));
