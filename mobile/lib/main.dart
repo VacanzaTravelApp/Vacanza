@@ -12,6 +12,7 @@ import 'firebase_options.dart';
 
 import 'core/navigation/navigation_service.dart';
 import 'core/network/app_dio.dart';
+import 'core/deeplinks/deep_link_listener.dart';
 
 import 'features/auth/data/repositories/auth_repository.dart';
 import 'features/auth/data/storage/secure_storage_service.dart';
@@ -177,6 +178,11 @@ class VacanzaApp extends StatelessWidget {
                   theme: AppTheme.light(),
                   darkTheme: AppTheme.dark(),
                   themeMode: themeState.resolvedThemeMode,
+                  builder: (context, child) {
+                    return DeepLinkListener(
+                      child: child ?? const SizedBox.shrink(),
+                    );
+                  },
                   home: const AuthGate(),
                 ),
               );
