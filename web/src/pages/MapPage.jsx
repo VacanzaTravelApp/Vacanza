@@ -19,6 +19,7 @@ import {
 import { FiFilter } from "react-icons/fi";
 import defaultAvatar from "../assets/default-avatar.png";
 import { useNavigate } from "react-router-dom";
+import webIcon from "../web-icon.svg";
 
 import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
 
@@ -246,13 +247,13 @@ const UI_CATEGORIES = [
     key: "monuments",
     label: "Culture",
     aliases: [
-      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre", 
-      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture", 
-      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema", 
-      "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish", 
-      "religious_buddhist", "mosque", "church", "temple", "synagogue", "buddhist_temple", 
-      "place_of_worship.muslim", "place_of_worship.christian", "place_of_worship.jewish", 
-      "place_of_worship.buddhist", "landmark", "historic", "attraction", 
+      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre",
+      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture",
+      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema",
+      "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish",
+      "religious_buddhist", "mosque", "church", "temple", "synagogue", "buddhist_temple",
+      "place_of_worship.muslim", "place_of_worship.christian", "place_of_worship.jewish",
+      "place_of_worship.buddhist", "landmark", "historic", "attraction",
       "tourist_attraction", "sightseeing", "cultural_center", "place_of_interest",
       "religious", "spiritual", "mosques", "churches", "temples", "synagogues", "historic_place",
       "cathedral", "chapel", "shrine", "monastic", "abbey", "priory", "historical_landmark",
@@ -363,17 +364,17 @@ const UI_CATEGORIES = [
     key: "others",
     label: "Services",
     aliases: [
-      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy", 
-      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist", 
-      "veterinarian", "police_station", "fire_station", "government_offices", "library", 
-      "school", "university", "college", "community_center", "mosque", "church", 
-      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners", 
-      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio", 
-      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course", 
-      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio", 
-      "recording_studio", "television_studio", "radio_studio", "design_studio", 
-      "coworking_space", "event_space", "conference_center", "offices", "factory", 
-      "warehouse", "storage", "services", "it", "consulting", "advertising_agency", 
+      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy",
+      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist",
+      "veterinarian", "police_station", "fire_station", "government_offices", "library",
+      "school", "university", "college", "community_center", "mosque", "church",
+      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners",
+      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio",
+      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course",
+      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio",
+      "recording_studio", "television_studio", "radio_studio", "design_studio",
+      "coworking_space", "event_space", "conference_center", "offices", "factory",
+      "warehouse", "storage", "services", "it", "consulting", "advertising_agency",
       "chiropractor", "physiotherapist", "alternative_healthcare", "assisted_living_facility"
     ],
     icon: <GlobalOutlined />,
@@ -410,13 +411,13 @@ function poiIconByCategory(poi) {
   }
 
   // Handle both single strings, arrays, or comma-separated strings
-  const rawCatsArray = Array.isArray(category) 
-    ? category 
+  const rawCatsArray = Array.isArray(category)
+    ? category
     : String(category).split(',').map(s => s.trim());
-    
+
   // Split by both comma AND dot to handle Mapbox dot-notation subcategories
   const normCats = rawCatsArray.flatMap(c => c.toLowerCase().trim().split('.')).filter(Boolean);
-  
+
   // Also keep the full strings for exact matching
   rawCatsArray.forEach(c => normCats.push(c.toLowerCase().trim()));
 
@@ -620,7 +621,7 @@ export default function MapPage() {
   const mapRef = useRef(null);
   const isMobile = useIsMobile(768);
   const { data: profile } = useUserProfile();
-  const { profilePhotoUrl } = useProfilePhoto(profile);
+  const { profilePhotoUrl } = useProfilePhoto();
   const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
     useGamificationProfile();
 
@@ -1793,7 +1794,7 @@ export default function MapPage() {
     const bbox = polygonToBbox(selection.polygon);
     if (!bbox) return;
 
-    const bottomPad = isMobile ? 320 : 360; 
+    const bottomPad = isMobile ? 320 : 360;
     // If filter is open, push the polygon to the left slightly to avoid overlap
     const rightPad = isMobile ? 16 : filterOpen ? (FILTER_PANEL_APPROX_WIDTH_DESKTOP + 80) : 100;
 
@@ -1847,11 +1848,12 @@ export default function MapPage() {
       {/* 1. Header (TOPBAR) */}
       <header className={`vivid-map-header ${themeClass}`}>
         <div className="header-left">
-          <div 
-            className="brand-logo vivid-brand" 
-            style={{ cursor: 'pointer' }} 
+          <div
+            className="brand-logo vivid-brand"
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
             onClick={() => window.location.reload()}
           >
+            <img src={webIcon} alt="Vacanza" style={{ width: 36, height: 36 }} />
             Vacanza
           </div>
         </div>
@@ -2278,10 +2280,10 @@ export default function MapPage() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {user && !activeRoute && (
-                  <Button 
-                    type="primary" 
-                    shape="round" 
-                    onClick={openPolygonRouteParams} 
+                  <Button
+                    type="primary"
+                    shape="round"
+                    onClick={openPolygonRouteParams}
                     className="vivid-create-route-btn-glass"
                   >
                     Create AI Route
@@ -2320,57 +2322,57 @@ export default function MapPage() {
                   const favRowKey = getMapPoiRowKey(p);
                   const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
                   return (
-                  <div key={favRowKey} style={{
-                    display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
-                    borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
-                    marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
-                    backdropFilter: "blur(4px)",
-                    flexShrink: 0
-                  }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 14,
-                      background: "rgba(255,255,255,0.05)",
-                      display: "grid", placeItems: "center",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      border: "1px solid rgba(255,255,255,0.1)"
+                    <div key={favRowKey} style={{
+                      display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
+                      borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
+                      marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
+                      backdropFilter: "blur(4px)",
+                      flexShrink: 0
                     }}>
                       <div style={{
-                        color: poiIconByCategory(p)?.ring,
-                        fontSize: 20,
-                        filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                        width: 48, height: 48, borderRadius: 14,
+                        background: "rgba(255,255,255,0.05)",
+                        display: "grid", placeItems: "center",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                        border: "1px solid rgba(255,255,255,0.1)"
                       }}>
-                        {poiIconByCategory(p)?.icon}
+                        <div style={{
+                          color: poiIconByCategory(p)?.ring,
+                          fontSize: 20,
+                          filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                        }}>
+                          {poiIconByCategory(p)?.icon}
+                        </div>
                       </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
+                        <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p)}</div>
+                      </div>
+                      {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
+                        <Tooltip title={mapPoiFavored ? "Remove favorite" : "Favorite"}>
+                          <button
+                            type="button"
+                            className={`map-poi-fav-hit map-poi-fav-hit--in-sheet${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
+                            aria-label={mapPoiFavored ? "Remove favorite" : "Add favorite"}
+                            aria-pressed={mapPoiFavored}
+                            disabled={favSendingKey === favRowKey}
+                            onClick={() => toggleMapPoiFavorite(p)}
+                          >
+                            {favSendingKey === favRowKey ? (
+                              <Spin size="small" className="map-poi-fav-hit__spin" />
+                            ) : (
+                              <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
+                                {mapPoiFavored ? (
+                                  <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
+                                ) : (
+                                  <HeartOutlined className="map-poi-fav-hit__heart" />
+                                )}
+                              </span>
+                            )}
+                          </button>
+                        </Tooltip>
+                      ) : null}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p)}</div>
-                    </div>
-                    {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
-                      <Tooltip title={mapPoiFavored ? "Remove favorite" : "Favorite"}>
-                        <button
-                          type="button"
-                          className={`map-poi-fav-hit map-poi-fav-hit--in-sheet${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
-                          aria-label={mapPoiFavored ? "Remove favorite" : "Add favorite"}
-                          aria-pressed={mapPoiFavored}
-                          disabled={favSendingKey === favRowKey}
-                          onClick={() => toggleMapPoiFavorite(p)}
-                        >
-                          {favSendingKey === favRowKey ? (
-                            <Spin size="small" className="map-poi-fav-hit__spin" />
-                          ) : (
-                            <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
-                              {mapPoiFavored ? (
-                                <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
-                              ) : (
-                                <HeartOutlined className="map-poi-fav-hit__heart" />
-                              )}
-                            </span>
-                          )}
-                        </button>
-                      </Tooltip>
-                    ) : null}
-                  </div>
                   );
                 })
               ) : (
@@ -2392,11 +2394,11 @@ export default function MapPage() {
             }
           }}
         >
-          <Modal 
-            title={<div className="vivid-modal-title">Plan a Route</div>} 
-            open={polygonRouteParamsOpen} 
-            onCancel={() => setPolygonRouteParamsOpen(false)} 
-            footer={null} 
+          <Modal
+            title={<div className="vivid-modal-title">Plan a Route</div>}
+            open={polygonRouteParamsOpen}
+            onCancel={() => setPolygonRouteParamsOpen(false)}
+            footer={null}
             maskClosable={false}
             zIndex={1150}
             className={`vivid-premium-modal route-plan-modal ${themeClass}`}
@@ -2437,11 +2439,11 @@ export default function MapPage() {
                   <Switch />
                 </Form.Item>
                 <Button
-                  type="primary" 
-                  block 
-                  size="large" 
-                  htmlType="submit" 
-                  loading={polygonRouteSubmitting} 
+                  type="primary"
+                  block
+                  size="large"
+                  htmlType="submit"
+                  loading={polygonRouteSubmitting}
                   className="vivid-create-route-btn"
                   style={{ marginTop: 12 }}
                 >

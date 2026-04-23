@@ -105,6 +105,15 @@
   color: var(--card-subtext) !important;
 }
 
+.register-card .ant-form-item-required::before {
+  display: inline-block;
+  margin-right: 4px;
+  color: #FF6B6B !important;
+  font-size: 11px;
+  font-family: var(--font-sans) !important;
+  content: "*";
+}
+
 .register-card .ant-form-item-explain-error {
   font-size: 11px !important;
   color: var(--vivid-coral) !important;

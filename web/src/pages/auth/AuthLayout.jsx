@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import './AuthLayout.css';
+import webIcon from '../../web-icon.svg';
 
 const calculateTimeState = () => {
   const now = new Date();
@@ -10,11 +11,11 @@ const calculateTimeState = () => {
   const isNight = hours < 6 || hours >= 20;
 
   let theme = isNight ? 'theme-midnight' : 'theme-sunrise';
-  
+
   // Quick dynamic celestial calc based on time
-  let cyclePeriod = isNight 
-    ? (hours >= 20 ? (hours - 20) + minutes/60 : hours + 4 + minutes/60) / 10
-    : (hours - 6 + minutes/60) / 14;
+  let cyclePeriod = isNight
+    ? (hours >= 20 ? (hours - 20) + minutes / 60 : hours + 4 + minutes / 60) / 10
+    : (hours - 6 + minutes / 60) / 14;
 
   const elevation = Math.sin(cyclePeriod * Math.PI);
   // Y ranges from 550 (below mountains) to 120 (high noon/midnight sky)
@@ -136,12 +137,7 @@ const TravelScene = ({ timeState, isLoaded }) => {
 };
 
 const TinyCompass = () => (
-  <svg className="tiny-compass" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1" opacity="0.5" />
-    <circle cx="12" cy="12" r="2" fill="var(--scene-coral)" />
-    <polygon points="12,3 13.5,10 12,8.5 10.5,10" fill="currentColor" opacity="0.5" />
-    <polygon points="12,21 13.5,14 12,15.5 10.5,14" fill="currentColor" opacity="0.3" />
-  </svg>
+  <img src={webIcon} className="tiny-compass" alt="Vacanza Icon" style={{ width: 32, height: 32 }} />
 );
 
 const PlaneIcon = () => (
@@ -226,10 +222,10 @@ const AuthLayout = ({ children }) => {
               {isConfirmEmailPage
                 ? 'Secure steps from your email, right here.'
                 : isVerifyPage
-                ? 'Confirm your email to unlock the full experience.'
-                : isLoginPage
-                ? 'Your plans are waiting.'
-                : 'AI-powered travel planning.'}
+                  ? 'Confirm your email to unlock the full experience.'
+                  : isLoginPage
+                    ? 'Your plans are waiting.'
+                    : 'AI-powered travel planning.'}
             </p>
           </div>
 

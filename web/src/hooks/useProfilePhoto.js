@@ -1,30 +1,43 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { userApi } from "../api/userApi";
+import { useAuthReady } from "./useUserProfileData";
 
-export const useProfilePhoto = (profile) => {
-    const [profilePhotoUrl, setProfilePhotoUrl] = useState(null);
-    const [loading, setLoading] = useState(false);
+const blobToBase64 = (blob) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+};
 
-    useEffect(() => {
-        let objectUrl = null;
-        if (profile?.hasProfilePhoto) {
-            setLoading(true);
-            userApi.getPhoto().then(res => {
-                objectUrl = URL.createObjectURL(res.data);
-                setProfilePhotoUrl(objectUrl);
-            }).catch(err => {
-                console.error("[useProfilePhoto] Failed to load binary photo", err);
-            }).finally(() => {
-                setLoading(false);
-            });
-        } else {
-            setProfilePhotoUrl(null);
-        }
+export const useProfilePhoto = () => {
+    const isReady = useAuthReady();
 
-        return () => {
-            if (objectUrl) URL.revokeObjectURL(objectUrl);
-        };
-    }, [profile?.hasProfilePhoto]);
+    const { data: profilePhotoUrl, isLoading: loading } = useQuery({
+        queryKey: ["user", "photo"],
+        queryFn: async () => {
+            try {
+                const res = await userApi.getPhoto();
+                const base64Str = await blobToBase64(res.data);
+                localStorage.setItem("profilePhotoBase64", base64Str);
+                return base64Str;
+            } catch (err) {
+                if (err.response?.status === 404) {
+                    localStorage.removeItem("profilePhotoBase64");
+                    return null;
+                }
+                throw err;
+            }
+        },
+        enabled: isReady,
+        initialData: () => {
+            const cached = localStorage.getItem("profilePhotoBase64");
+            return cached ? cached : undefined;
+        },
+        staleTime: 1000 * 60 * 5, // 5 mins before fetching in background
+        cacheTime: 1000 * 60 * 60, // 1 hour
+    });
 
     return { profilePhotoUrl, loading };
 };

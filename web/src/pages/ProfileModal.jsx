@@ -521,18 +521,18 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
     const fileInputRef = React.useRef(null);
 
     useEffect(() => {
-        if (profile || user) {
+        if (profile) {
             form.setFieldsValue({
-                firstName: profile?.firstName,
-                middleName: profile?.middleName,
-                lastName: profile?.lastName,
-                preferredName: profile?.preferredName,
-                country: profile?.country,
-                birthDate: profile?.birthDate ? dayjs(profile.birthDate) : null,
-                gender: profile?.gender || ""
+                firstName: profile.firstName,
+                middleName: profile.middleName,
+                lastName: profile.lastName,
+                preferredName: profile.preferredName,
+                country: profile.country,
+                birthDate: profile.birthDate ? dayjs(profile.birthDate) : null,
+                gender: profile.gender || ""
             });
         }
-    }, [profile, user, form]);
+    }, [profile, form]);
 
     return (
         <div style={{ background: "var(--bg-main, #0D1526)", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: 40 }}>
@@ -836,7 +836,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
     const { data: checkins } = useUserCheckins();
     const { data: gamification } = useGamificationProfile();
 
-    const { profilePhotoUrl } = useProfilePhoto(profile);
+    const { profilePhotoUrl } = useProfilePhoto();
 
     const uploadPhotoMutation = useMutation({
         mutationFn: (file) => {
