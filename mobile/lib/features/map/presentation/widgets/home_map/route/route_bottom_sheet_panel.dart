@@ -1021,6 +1021,88 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
     );
   }
 
+  Widget _hotelStopTile(
+    RouteHotel hotel, {
+    required String label,
+    required bool isIos,
+    required Color accent,
+  }) {
+    final tokens = context.vacanzaTokens;
+    final hasCoords = hotel.latitude != null && hotel.longitude != null;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap:
+            hasCoords
+                ? () {
+                  collapseRouteSheetForMap(
+                    widget.sheetExtentController,
+                    _effectiveScrollController,
+                  );
+                  context.read<MapBloc>().add(
+                    FlyToPoiRequested(
+                      latitude: hotel.latitude!,
+                      longitude: hotel.longitude!,
+                      zoom: 16,
+                    ),
+                  );
+                }
+                : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  CupertinoIcons.bed_double_fill,
+                  size: 15,
+                  color: accent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hotel.hotelName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: isIos ? 16 : 15,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: isIos ? -0.3 : 0,
+                        color: tokens.textMain,
+                      ),
+                    ),
+                    Text(
+                      'Hotel · $label',
+                      style: TextStyle(fontSize: 13, color: tokens.textSub),
+                    ),
+                  ],
+                ),
+              ),
+              if (hasCoords)
+                Icon(
+                  CupertinoIcons.chevron_forward,
+                  size: 18,
+                  color: tokens.textSub.withValues(alpha: 0.65),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// [tappedDisplayOrder] is 1-based index in [wps] for the stop the user flew to.
   String? _peekNextStopLine(List<RouteMapWaypoint> wps) {
     final o = _lastFlyToDisplayOrder;
@@ -1042,6 +1124,8 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
     required ScrollController routeScrollController,
   }) {
     final tokens = context.vacanzaTokens;
+    final hotel = route.selectedHotel;
+    final divider = Divider(height: 1, thickness: 0.5, color: tokens.cardBorder);
     return [
       SliverToBoxAdapter(
         child: SizedBox(
@@ -1068,26 +1152,43 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
         ),
       ),
       const SliverToBoxAdapter(child: SizedBox(height: 8)),
+      if (hotel != null) ...[
+        SliverToBoxAdapter(
+          child: _hotelStopTile(hotel, label: 'Start', isIos: isIos, accent: accent),
+        ),
+        SliverToBoxAdapter(child: divider),
+      ],
       if (waypoints.isEmpty)
-        SliverFillRemaining(
-          hasScrollBody: false,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'No stops for this day.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: tokens.textSub),
+        hotel != null
+            ? SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Text(
+                    'No stops for this day.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 15, color: tokens.textSub),
+                  ),
+                ),
               ),
-            ),
-          ),
-        )
+            )
+            : SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Text(
+                    'No stops for this day.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 15, color: tokens.textSub),
+                  ),
+                ),
+              ),
+            )
       else
         SliverList.separated(
           itemCount: waypoints.length,
-          separatorBuilder:
-              (_, __) =>
-                  Divider(height: 1, thickness: 0.5, color: tokens.cardBorder),
+          separatorBuilder: (_, __) => divider,
           itemBuilder: (context, i) {
             final w = waypoints[i];
             return RouteWaypointTile(
@@ -1104,6 +1205,12 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
             );
           },
         ),
+      if (hotel != null) ...[
+        SliverToBoxAdapter(child: divider),
+        SliverToBoxAdapter(
+          child: _hotelStopTile(hotel, label: 'End', isIos: isIos, accent: accent),
+        ),
+      ],
     ];
   }
 

@@ -48,7 +48,16 @@ class ActiveRouteCubit extends Cubit<ActiveRouteState> {
   void setFromChatResponse(MessageSendResponse res) {
     final rd = res.routeData;
     if (rd == null) return;
-    final model = RouteMapModel.fromChat(rd);
+    // Chat messages don't carry hotel data — preserve the existing hotel when
+    // the same route is being updated so open/close chat doesn't wipe it.
+    final preservedHotel =
+        (res.routeId != null && res.routeId == state.routeId)
+            ? state.route?.selectedHotel
+            : null;
+    final model = RouteMapModel.fromSavedRoute(
+      routeData: rd,
+      selectedHotel: preservedHotel,
+    );
     final day = firstCalendarDayForMap(model);
     emit(
       state.copyWith(
