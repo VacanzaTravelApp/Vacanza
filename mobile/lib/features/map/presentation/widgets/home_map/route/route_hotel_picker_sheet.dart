@@ -3,6 +3,8 @@ import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
@@ -325,7 +327,9 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final maxSheetHeight = size.height * 0.92;
     final cs = Theme.of(context).colorScheme;
     final t = context.vacanzaTokens;
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -379,12 +383,16 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
             ),
             child: SafeArea(
               top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxSheetHeight),
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                     // Handle
                     Center(
                       child: Container(
@@ -524,6 +532,12 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
                                   isLight
                                       ? MapboxConfig.styleStandard
                                       : MapboxConfig.styleDark,
+                              // Compete with parent scroll/sheet: map only receives unclaimed drags if null.
+                              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                                Factory<OneSequenceGestureRecognizer>(
+                                  () => EagerGestureRecognizer(),
+                                ),
+                              },
                               onMapCreated: (map) async {
                                 _mapController = map;
                                 _pinManager = await map.annotations
@@ -590,7 +604,8 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
                         ),
                       ),
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
