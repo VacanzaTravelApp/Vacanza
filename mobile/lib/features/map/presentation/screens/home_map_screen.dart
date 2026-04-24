@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'package:mobile/core/navigation/route_open_requests.dart';
 import 'package:mobile/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/favorite_poi_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/saved_pois_cubit.dart';
@@ -154,6 +155,7 @@ class _HomeMapViewState extends State<_HomeMapView>
   /// Cached reference to avoid context.read in dispose/lifecycle callbacks.
   late final LocationBloc _locationBloc;
   late final ChatCubit _chatCubit;
+  StreamSubscription<RouteOpenRequest>? _routeOpenSub;
 
   /// GPS tracking was active before app went to background
   bool _wasTracking = false;
@@ -376,6 +378,41 @@ class _HomeMapViewState extends State<_HomeMapView>
       context.read<AiRouteApiClient>(),
     )..startConversation();
 
+    _routeOpenSub = RouteOpenRequests.stream.listen((req) async {
+      final routeCubit = context.read<ActiveRouteCubit>();
+      await routeCubit.loadSavedRoute(req.routeId);
+      if (!mounted) return;
+      routeCubit.showRouteOnMapAgain();
+      if (req.day != null) {
+        routeCubit.setActiveDay(req.day!);
+      }
+      setState(() => _routeOpen = true);
+
+      // Fit map camera to the selected day (or whole route).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final model = routeCubit.state.route;
+        if (model == null) return;
+        final day = req.day ?? routeCubit.state.activeDay;
+        var wps = waypointsForDay(model, day);
+        if (wps.isEmpty) {
+          wps = allWaypointsForMap(model);
+        }
+        final b = boundsOfWaypoints(wps);
+        final brg = bearingFirstToLast(wps);
+        if (b == null) return;
+        context.read<MapBloc>().add(
+          FitRouteBoundsRequested(
+            minLat: b.minLat,
+            maxLat: b.maxLat,
+            minLng: b.minLng,
+            maxLng: b.maxLng,
+            bearing: brg,
+          ),
+        );
+      });
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _locationBloc.add(const StartTracking());
       context.read<ProfileBloc>().add(ProfileStarted());
@@ -388,6 +425,7 @@ class _HomeMapViewState extends State<_HomeMapView>
     // Stop GPS tracking before disposal (use cached ref — context is unsafe here)
     _locationBloc.add(const StopTracking());
     _chatCubit.close();
+    _routeOpenSub?.cancel();
     super.dispose();
   }
 
@@ -741,7 +779,19 @@ class _HomeMapViewState extends State<_HomeMapView>
             onOpenTripAgenda: () {
               _closeControlsMenu();
               _dismissUserSelectionIfAny();
-              showTripAgendaCalendar(context);
+              showTripAgendaCalendar(
+                context,
+                onOpenRouteFromCalendar: (rid) async {
+                  // Ensure we return to the map screen even if Trip Agenda
+                  // was opened from a pushed route (Profile/Settings).
+                  Navigator.of(context).popUntil((r) => r.isFirst);
+                  final routeCubit = context.read<ActiveRouteCubit>();
+                  await routeCubit.loadSavedRoute(rid);
+                  if (!context.mounted) return;
+                  routeCubit.showRouteOnMapAgain();
+                  setState(() => _routeOpen = true);
+                },
+              );
             },
 
             // ✅ Chatbot
