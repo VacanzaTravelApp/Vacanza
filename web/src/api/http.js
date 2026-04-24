@@ -72,6 +72,9 @@ http.interceptors.response.use(
       error.friendlyMessage = message || "Invalid request. Please check your input.";
     } else if (status === 409) {
       error.friendlyMessage = message || "This action conflicts with existing data.";
+    } else if (status >= 500 || !status) {
+      console.error("Server or Network error:", error);
+      error.friendlyMessage = "We are performing a quick maintenance. Please try again in a few minutes.";
     }
 
     return Promise.reject(error);

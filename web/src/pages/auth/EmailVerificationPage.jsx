@@ -78,7 +78,7 @@ const EmailVerificationPage = () => {
         try {
             await user.reload();
             if (auth.currentUser?.emailVerified) {
-                message.success("Email verified! Redirecting...");
+                // message.success("Email verified! Redirecting...");
                 setTimeout(() => navigate("/map"), 600);
             }
         } catch {

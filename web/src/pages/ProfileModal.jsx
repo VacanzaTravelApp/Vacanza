@@ -852,7 +852,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
         onSuccess: () => {
             queryClient.invalidateQueries(["user", "profile"]);
             queryClient.invalidateQueries(["user", "photo"]);
-            message.success("Profile photo updated!");
+            // message.success("Profile photo updated!");
         },
         onError: (err) => {
             setOptimisticPhotoUrl(null); // Revert on error
@@ -869,7 +869,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
             queryClient.invalidateQueries(["user", "profile"]);
             queryClient.invalidateQueries(["user", "photo"]);
             setOptimisticPhotoUrl(null);
-            message.success("Photo removed");
+            // message.success("Photo removed");
         },
         onError: (err) => {
             setOptimisticPhotoUrl(null);
@@ -890,7 +890,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
         mutationFn: (values) => userApi.updateProfile(values),
         onSuccess: () => {
             queryClient.invalidateQueries(["user", "profile"]);
-            message.success("Your profile is all set!");
+            // message.success("Your profile is all set!");
             setView('MAIN');
         },
         onError: (err) => {
