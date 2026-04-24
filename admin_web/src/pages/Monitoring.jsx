@@ -70,12 +70,46 @@ const Monitoring = () => {
     const [error, setError] = useState(null);
     const [chartData, setChartData] = useState([]);
     const [lastUpdated, setLastUpdated] = useState(new Date());
+    const [realStatuses, setRealStatuses] = useState({});
+    const [hasInitialScanRun, setHasInitialScanRun] = useState(false);
+
+    const SERVICE_KEY_MAP = {
+        "Currency Exchange (Frankfurter)": "frankfurter",
+        "Weather Service (OpenMeteo)": "openmeteo",
+        "Local Places (Foursquare)": "foursquare",
+        "Maps & Geocoding (Mapbox)": "mapbox",
+        "Hotel Search (SerpApi)": "serpapi",
+        "Hotel & Flight Search (SerpApi)": "serpapi",
+        "Events (Ticketmaster)": "ticketmaster",
+        "Tours/Activities (Viator)": "viator",
+        "AI Recommendation Engine": "ai",
+    };
 
     const fetchMonitoringData = useCallback(async (isInitial = false) => {
         if (isInitial) setLoading(true);
         try {
             const response = await http.get("/admin/monitoring");
-            const newData = response.data;
+            let newData = response.data;
+
+            // Merge with any real statuses we've discovered via actual PING triggers
+            setRealStatuses(currentRealStatuses => {
+                if (Object.keys(currentRealStatuses).length > 0) {
+                    newData = {
+                        ...newData,
+                        services: newData.services.map(s => {
+                            const key = SERVICE_KEY_MAP[s.name];
+                            if (key && currentRealStatuses[key]) {
+                                const st = typeof currentRealStatuses[key] === 'object' ? currentRealStatuses[key].status : currentRealStatuses[key];
+                                const ms = typeof currentRealStatuses[key] === 'object' ? currentRealStatuses[key].ms : undefined;
+                                return { ...s, status: st, responseMs: ms };
+                            }
+                            return s;
+                        })
+                    };
+                }
+                return currentRealStatuses;
+            });
+
             setData(newData);
             setLastUpdated(new Date());
 
@@ -109,6 +143,60 @@ const Monitoring = () => {
         return () => clearInterval(interval);
     }, [fetchMonitoringData]);
 
+    const runAutomatedDiagnosticSweep = useCallback(async () => {
+        if (hasInitialScanRun) return;
+        setHasInitialScanRun(true);
+
+        const testableKeys = Object.values(SERVICE_KEY_MAP);
+
+        for (const serviceKey of testableKeys) {
+            http.post(`/admin/health-check/${serviceKey}`)
+                .then(res => {
+                    const status = res.data?.status === "UP" ? "UP" : "DOWN";
+                    setRealStatuses(prev => {
+                        const next = { ...prev, [serviceKey]: { status: status, ms: res.data?.responseMs } };
+                        // Force update data to reflect the new state immediately
+                        setData(currentData => {
+                            if (!currentData) return currentData;
+                            return {
+                                ...currentData,
+                                services: currentData.services.map(s =>
+                                    SERVICE_KEY_MAP[s.name] === serviceKey ? { ...s, status: status, responseMs: res.data?.responseMs } : s
+                                )
+                            };
+                        });
+                        return next;
+                    });
+                })
+                .catch(err => {
+                    setRealStatuses(prev => {
+                        const ms = err.response?.data?.responseMs || 0;
+                        const next = { ...prev, [serviceKey]: { status: "DOWN", ms } };
+                        setData(currentData => {
+                            if (!currentData) return currentData;
+                            return {
+                                ...currentData,
+                                services: currentData.services.map(s =>
+                                    SERVICE_KEY_MAP[s.name] === serviceKey ? { ...s, status: "DOWN", responseMs: ms } : s
+                                )
+                            };
+                        });
+                        return next;
+                    });
+                });
+        }
+    }, [hasInitialScanRun]);
+
+    useEffect(() => {
+        if (data && !hasInitialScanRun && !loading) {
+            // Wait 1.5 seconds after table renders then sweep all to discover actual reality
+            const timeout = setTimeout(() => {
+                runAutomatedDiagnosticSweep();
+            }, 1500);
+            return () => clearTimeout(timeout);
+        }
+    }, [data, hasInitialScanRun, loading, runAutomatedDiagnosticSweep]);
+
     const HealthCheckButton = ({ serviceName }) => {
         const [state, setState] = useState("idle");
         const [result, setResult] = useState(null);
@@ -124,22 +212,12 @@ const Monitoring = () => {
 
                 // Real-time synchronization with the main table
                 if (setData) {
+                    setRealStatuses(prevSt => ({ ...prevSt, [serviceName]: { status: newStatus === "up" ? "UP" : "DOWN", ms: dataResponse.responseMs } }));
                     setData(prev => ({
                         ...prev,
                         services: prev.services.map(s => {
-                            const SERVICE_KEY_MAP = {
-                                "Currency Exchange (Frankfurter)": "frankfurter",
-                                "Weather Service (OpenMeteo)": "openmeteo",
-                                "Local Places (Foursquare)": "foursquare",
-                                "Maps & Geocoding (Mapbox)": "mapbox",
-                                "Hotel Search (SerpApi)": "serpapi",
-                                "Hotel & Flight Search (SerpApi)": "serpapi",
-                                "Events (Ticketmaster)": "ticketmaster",
-                                "Tours/Activities (Viator)": "viator",
-                                "AI Recommendation Engine": "ai",
-                            };
                             return SERVICE_KEY_MAP[s.name] === serviceName
-                                ? { ...s, status: dataResponse.status }
+                                ? { ...s, status: dataResponse.status, responseMs: dataResponse.responseMs }
                                 : s;
                         })
                     }));
@@ -147,8 +225,20 @@ const Monitoring = () => {
 
                 setTimeout(() => setState("idle"), 5000);
             } catch (e) {
+                const ms = e.response?.data?.responseMs || 0;
+                setResult({ message: e.response?.data?.message || "Connection Error", responseMs: ms });
                 setState("down");
-                setResult({ message: e.response?.data?.message || "Connection Error" });
+                if (setData) {
+                    setRealStatuses(prevSt => ({ ...prevSt, [serviceName]: { status: "DOWN", ms } }));
+                    setData(prev => ({
+                        ...prev,
+                        services: prev.services.map(s => {
+                            return SERVICE_KEY_MAP[s.name] === serviceName
+                                ? { ...s, status: "DOWN", responseMs: ms }
+                                : s;
+                        })
+                    }));
+                }
                 setTimeout(() => setState("idle"), 5000);
             }
         };
@@ -177,7 +267,9 @@ const Monitoring = () => {
 
         if (state === "down") return (
             <AntTooltip title={result?.message}>
-                <Tag color="error" icon={<CloseCircleFilled />} style={{ cursor: 'help', borderRadius: '20px' }}>DOWN</Tag>
+                <Tag color="error" icon={<CloseCircleFilled />} style={{ cursor: 'help', borderRadius: '20px' }}>
+                    DOWN <span style={{ opacity: 0.8 }}>({result?.responseMs || 0}ms)</span>
+                </Tag>
             </AntTooltip>
         );
 
@@ -211,7 +303,7 @@ const Monitoring = () => {
             title: "Operational Status",
             dataIndex: "status",
             key: "status",
-            render: (status) => {
+            render: (status, record) => {
                 const isUp = status === "UP" || status === "Active";
                 return (
                     <Tag
@@ -226,6 +318,7 @@ const Monitoring = () => {
                         icon={isUp ? <CheckCircleFilled /> : <CloseCircleFilled />}
                     >
                         {status?.toUpperCase() || "UNKNOWN"}
+                        {record.responseMs !== undefined && <span style={{ marginLeft: 6, opacity: 0.85, fontSize: '0.9em' }}>({record.responseMs}ms)</span>}
                     </Tag>
                 );
             },
@@ -235,18 +328,6 @@ const Monitoring = () => {
             key: "action",
             align: 'right',
             render: (_, record) => {
-                const SERVICE_KEY_MAP = {
-                    "Currency Exchange (Frankfurter)": "frankfurter",
-                    "Weather Service (OpenMeteo)": "openmeteo",
-                    "Local Places (Foursquare)": "foursquare",
-                    "Maps & Geocoding (Mapbox)": "mapbox",
-                    "Hotel Search (SerpApi)": "serpapi",
-                    "Hotel & Flight Search (SerpApi)": "serpapi",
-                    "Events (Ticketmaster)": "ticketmaster",
-                    "Tours/Activities (Viator)": "viator",
-                    "AI Recommendation Engine": "ai",
-                };
-
                 const serviceKey = SERVICE_KEY_MAP[record.name];
                 if (!serviceKey) return <Text style={{ color: 'rgba(26, 35, 50, 0.2)', fontSize: 11, fontStyle: 'italic' }}>Internal Node</Text>;
 
@@ -410,7 +491,13 @@ const Monitoring = () => {
                     <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Service Node Topography</span>} style={{ marginTop: 48 }}>
                         <Table
                             columns={serviceColumns}
-                            dataSource={data?.services || []}
+                            dataSource={[...(data?.services || [])].sort((a, b) => {
+                                const aIsInternal = !SERVICE_KEY_MAP[a.name];
+                                const bIsInternal = !SERVICE_KEY_MAP[b.name];
+                                if (aIsInternal && !bIsInternal) return 1;
+                                if (!aIsInternal && bIsInternal) return -1;
+                                return 0;
+                            })}
                             pagination={false}
                             rowKey="name"
                             style={{ marginTop: 24 }}

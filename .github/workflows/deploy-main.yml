@@ -1,0 +1,140 @@
+name: 🚀 Deploy Backend + Web to DigitalOcean (Production)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      ##############################################################
+      # CHECKOUT
+      ##############################################################
+      - name: 📦 Checkout Repository
+        uses: actions/checkout@v3
+
+      ##############################################################
+      # TIME
+      ##############################################################
+      - name: ⏱ Get current time
+        id: time
+        run: echo "now=$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
+
+      ##############################################################
+      # DEPLOY
+      ##############################################################
+      - name: 🚀 Deploy to Main Server Over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          key: ${{ secrets.DO_SSH_KEY }}
+          command_timeout: 30m 
+          script: |
+            set -e
+
+            echo "===== 🚀 STARTING Main DEPLOYMENT ====="
+
+            ##############################################################
+            # BACKEND DEPLOY (main)
+            ##############################################################
+            echo "🔥 Updating Backend (Main)..."
+
+            cd /root/vacanza-backend/main/Vacanza
+            git fetch origin
+            git reset --hard origin/main
+
+            cd /root/vacanza-backend/main
+            docker compose -p vacanza-main-backend down --remove-orphans
+            docker compose -p vacanza-main-backend up --build -d
+
+            docker ps | grep vacanza-main-backend
+
+            echo "✔ Backend Main Deploy Finished!"
+
+            ##############################################################
+            # AI SERVICE DEPLOY (Main)
+            ##############################################################
+            echo "🤖 Updating AI Service (Main)..."
+
+            cd /root/vacanza-ai/main/Vacanza
+            git fetch origin
+            git reset --hard origin/main
+
+            cd /root/vacanza-ai/main/Vacanza/AI-Backend/ai-service
+            docker compose -p vacanza-main-ai down --remove-orphans
+            docker compose -p vacanza-main-ai up --build -d
+
+            docker ps | grep vacanza-main-ai || true
+
+            echo "✔ AI Service Main Deploy Finished!"
+
+            ##############################################################
+            # WEB DEPLOY (Main)
+            ##############################################################
+            echo "🌍 Updating Web (Main)..."
+
+            cd /root/vacanza-web/main/Vacanza
+            git fetch origin
+            git reset --hard origin/main
+
+            cd /root/vacanza-web/main
+            docker compose -p vacanza-main-web down --remove-orphans
+            docker compose -p vacanza-main-web up --build -d
+
+            docker ps | grep vacanza-web-main
+
+            echo "✔ Web Main Deploy Finished!"
+
+            ##############################################################
+            # AADMIN WEB DEPLOY (Production)
+            ##############################################################
+            #echo "🌍 Updating Admin Panel Web (Production)..."
+
+            #cd /root/vacanza-web-admin/prod/Vacanza
+            #git fetch origin
+            #git reset --hard origin/Production
+
+            #cd /root/vacanza-web-admin/prod
+            #docker compose -p vacanza-web-admin-prod down --remove-orphans
+            #docker compose -p vacanza-web-admin-prod up --build -d
+
+            #docker ps | grep vacanza-web-admin-prod
+
+            #echo "✔ Admin Panel Web Production Deploy Finished!"
+            #echo "===== 🎉 ALL PRODUCTION SERVICES UPDATED SUCCESSFULLY ====="
+
+      ##############################################################
+      # SUCCESS NOTIFICATION
+      ##############################################################
+      - name: 📢 Mattermost Success Notification (Production)
+        if: success()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ secrets.MM_WEBHOOK_URL }}
+          method: POST
+          data: >
+            {
+              "username": "CI/CD Bot",
+              "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
+              "text": "🚀 **Main Deploy Successful!**\n\n🌍 Environment: **Main**\n🛠 Services Updated: **Backend + Web**\n✨ Status: **Success**\n🕒 Time: **${{ steps.time.outputs.now }}**"
+            }
+
+      ##############################################################
+      # FAILURE NOTIFICATION
+      ##############################################################
+      - name: ❌ Mattermost Failure Notification (Main)
+        if: failure()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ secrets.MM_WEBHOOK_URL }}
+          method: POST
+          data: >
+            {
+              "username": "CI/CD Bot",
+              "icon_url": "https://cdn-icons-png.flaticon.com/512/5968/5968853.png",
+              "text": "❌ **Main Deploy FAILED!**\n\n🚨 Environment: **Main**\n📛 One or more services did not start correctly.\n🕒 Time: **${{ steps.time.outputs.now }}**"
+            }
