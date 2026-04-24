@@ -259,10 +259,7 @@ class _FilterRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final def = PoiCategoryCatalog.definitionForUiKey(catKey);
-    // [counts] tam bbox/alan listesinden (kategori filtresinden bağımsız).
-    final displayCount = counts[catKey] ?? 0;
     final isOn = selected.contains(catKey);
     final color =
         def?.ringColor ?? Theme.of(context).colorScheme.primary;
@@ -314,26 +311,6 @@ class _FilterRow extends StatelessWidget {
                     fontSize: 11,
                     color: isOn ? cs.onSurface : cs.onSurfaceVariant,
                     fontWeight: isOn ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? cs.surfaceContainerHighest.withValues(alpha: 0.55)
-                      : context.lightGlassFieldFill,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$displayCount',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isOn ? cs.onSurface : cs.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
