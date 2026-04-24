@@ -21,7 +21,7 @@ import defaultAvatar from "../assets/default-avatar.png";
 import { useNavigate } from "react-router-dom";
 import webIcon from "../web-icon.svg";
 
-import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
+import MapGL, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
@@ -162,6 +162,13 @@ const SettingsIcon = () => (
 // Results panel haritayı kapatmasın diye padding hesabında kullanıyoruz
 const RESULTS_PANEL_APPROX_HEIGHT_DESKTOP = 320;
 const FILTER_PANEL_APPROX_WIDTH_DESKTOP = 320;
+
+/**
+ * Minimum zoom to start/finish draw-area (Mapbox: higher = more zoomed in).
+ * ~12 still fits a big metro in one view; ~13 pushes “district / neighborhood” scale and
+ * makes whole-city one-shot outlines awkward. Backend still enforces max polygon footprint.
+ */
+const MIN_ZOOM_FOR_AREA_DRAW = 13;
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
@@ -491,6 +498,68 @@ function isPointInsidePolygon(lat, lng, polygonLatLng) {
   return inside;
 }
 
+function mergePoiListsByStableKey(prev, incoming) {
+  const m = new Map();
+  for (const x of prev) {
+    m.set(getMapPoiRowKey(x), x);
+  }
+  for (const x of incoming) {
+    m.set(getMapPoiRowKey(x), x);
+  }
+  return Array.from(m.values());
+}
+
+/** POST + SSE (Spring SseEmitter): frames separated by blank line, each with a {@code data:} JSON line. */
+async function consumeMapboxPoiSearchStream(url, body, { signal, onChunk, onDone }) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(t || `HTTP ${res.status}`);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body");
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    // Spring may use \n\n or \r\n\r\n between SSE events
+    while (true) {
+      const sepRn = buf.indexOf("\r\n\r\n");
+      const sepN = buf.indexOf("\n\n");
+      if (sepRn === -1 && sepN === -1) break;
+      const sep = sepRn === -1 ? sepN : sepN === -1 ? sepRn : Math.min(sepRn, sepN);
+      const rawEvent = buf.slice(0, sep).trim();
+      buf = buf.slice(sep + (buf[sep] === "\r" ? 4 : 2));
+      const lines = rawEvent.split(/\r?\n/).filter(Boolean);
+      let dataStr = null;
+      for (const line of lines) {
+        if (line.startsWith("data:")) {
+          dataStr = line.slice(5).trim();
+        }
+      }
+      if (!dataStr) continue;
+      let payload;
+      try {
+        payload = JSON.parse(dataStr);
+      } catch {
+        continue;
+      }
+      if (payload.type === "chunk") onChunk?.(payload);
+      if (payload.type === "done") onDone?.(payload);
+    }
+  }
+}
+
 function polygonToBbox(poly) {
   let minLat = Infinity,
     minLng = Infinity,
@@ -679,11 +748,17 @@ export default function MapPage() {
 
   const [freehandEnabled, setFreehandEnabled] = useState(false);
   const drawingRef = useRef({ isDown: false, points: [] });
+  const poiStreamAbortRef = useRef(null);
+  /** First non-empty Mapbox stream chunk picks the results tab once per draw. */
+  const streamAutoTabLockedRef = useRef(false);
+  const resultsTabsScrollRef = useRef(null);
 
   const [previewLine, setPreviewLine] = useState(null);
 
   const [poisRaw, setPoisRaw] = useState([]);
   const [poiLoading, setPoiLoading] = useState(false);
+  /** Mapbox SSE still fetching more category chunks — show tab-row hint. */
+  const [poiStreamLoading, setPoiStreamLoading] = useState(false);
 
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -867,6 +942,8 @@ export default function MapPage() {
   }, [sidebarOpen]);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+  /** When true, drawn-area POI search uses Mapbox Search Box (tiled) via backend instead of DB-first. */
+  const USE_MAPBOX_AREA_POI_SEARCH = import.meta.env.VITE_USE_MAPBOX_AREA_POI_SEARCH === "true";
   const mapStyle = useMemo(() => STYLES[styleIndex], [styleIndex]);
 
   const selectedBackendCats = useMemo(() => {
@@ -1095,42 +1172,93 @@ export default function MapPage() {
 
   const fetchPois = useCallback(
     async ({ selectionType, bbox, polygon, categoriesOverride }) => {
+      poiStreamAbortRef.current?.abort();
+      const ac = new AbortController();
+      poiStreamAbortRef.current = ac;
+
+      const useStream = USE_MAPBOX_AREA_POI_SEARCH && selectionType === "POLYGON";
+      const body = {
+        selectionType,
+        bbox: selectionType === "BBOX" ? bbox : null,
+        polygon: selectionType === "POLYGON" ? polygon : null,
+        categories: categoriesOverride !== undefined ? categoriesOverride : selectedBackendCats,
+        page: 0,
+        limit: 400,
+        sort: "RATING_DESC",
+        mapboxAreaSearch: USE_MAPBOX_AREA_POI_SEARCH && selectionType === "POLYGON",
+      };
+
       try {
         setPoiLoading(true);
-
-        const body = {
-          selectionType,
-          bbox: selectionType === "BBOX" ? bbox : null,
-          polygon: selectionType === "POLYGON" ? polygon : null,
-          categories: categoriesOverride !== undefined ? categoriesOverride : selectedBackendCats,
-          page: 0,
-          limit: 400,
-          sort: "RATING_DESC",
-        };
-        const res = await fetch("/pois/search-in-area", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-
-
-        if (!res.ok) {
-          setPoisRaw([]);
-          return;
+        if (useStream) {
+          setPoiStreamLoading(true);
+        } else {
+          setPoiStreamLoading(false);
         }
 
-        const data = await res.json();
-        setPoisRaw(Array.isArray(data?.pois) ? data.pois : []);
+        if (useStream) {
+          setPoisRaw([]);
+          streamAutoTabLockedRef.current = false;
+          await consumeMapboxPoiSearchStream("/pois/search-in-area/stream", body, {
+            signal: ac.signal,
+            onChunk: (payload) => {
+              const n = payload.pois?.length ?? 0;
+              setPoisRaw((prev) => mergePoiListsByStableKey(prev, payload.pois || []));
+              if (
+                n > 0 &&
+                !streamAutoTabLockedRef.current &&
+                payload.uiCategory &&
+                UI_CATEGORIES.some((c) => c.key === payload.uiCategory)
+              ) {
+                streamAutoTabLockedRef.current = true;
+                setResultsTab(payload.uiCategory);
+              }
+              if (n > 0) setPoiLoading(false);
+            },
+            onDone: () => setPoiLoading(false),
+          });
+        } else {
+          const res = await fetch("/pois/search-in-area", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+            signal: ac.signal,
+          });
+
+          if (!res.ok) {
+            setPoisRaw([]);
+            return;
+          }
+
+          const data = await res.json();
+          const list = Array.isArray(data?.pois) ? data.pois : [];
+          setPoisRaw(list);
+          if (
+            selectionType === "POLYGON" &&
+            list.length > 0 &&
+            !streamAutoTabLockedRef.current
+          ) {
+            const icon = poiIconByCategory(list[0]);
+            if (icon?.uiKey) {
+              streamAutoTabLockedRef.current = true;
+              setResultsTab(icon.uiKey);
+            }
+          }
+        }
       } catch (e) {
+        if (e?.name === "AbortError") return;
         console.error(e);
-        setPoisRaw([]);
+        if (!useStream) setPoisRaw([]);
       } finally {
         setPoiLoading(false);
+        if (useStream) {
+          setPoiStreamLoading(false);
+        }
       }
     },
-    [selectedBackendCats]
+    [selectedBackendCats, USE_MAPBOX_AREA_POI_SEARCH]
   );
 
   // Debounce viewport fetch
@@ -1190,6 +1318,16 @@ export default function MapPage() {
   }, [selectedBackendCats, MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
 
   const startFreehand = useCallback(() => {
+    if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) {
+      notification.warning({
+        message: "Haritayı yakınlaştırın",
+        description:
+          "Alan çizmek için mahalle veya ilçe ölçeğine yaklaşın; şu anki zoom seviyesi çok uzak.",
+        placement: "topRight",
+        duration: 6,
+      });
+      return;
+    }
     setPolygonRouteParamsOpen(false);
     setPolygonRouteBannerDismissed(false);
     setMode("SELECTION");
@@ -1200,7 +1338,7 @@ export default function MapPage() {
     drawingRef.current = { isDown: false, points: [] };
     setPreviewLine(null);
     setSelection({ mode: null, polygon: [] });
-  }, []);
+  }, [viewState.zoom]);
 
   const clearSelectionOnly = useCallback(async () => {
     setPolygonRouteParamsOpen(false);
@@ -1211,6 +1349,8 @@ export default function MapPage() {
     setMode("VIEWPORT");
     setResultsOpen(false);
     setResultsTab("all");
+    streamAutoTabLockedRef.current = false;
+    setPoiStreamLoading(false);
 
     const bbox = getViewportBbox();
     if (bbox) {
@@ -1240,6 +1380,7 @@ export default function MapPage() {
   const onMouseDownFreehand = useCallback(
     (e) => {
       if (!freehandEnabled) return;
+      if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) return;
       drawingRef.current.isDown = true;
       drawingRef.current.points = [{ lng: e.lngLat.lng, lat: e.lngLat.lat }];
       setPreviewLine({
@@ -1248,12 +1389,13 @@ export default function MapPage() {
         geometry: { type: "LineString", coordinates: [[e.lngLat.lng, e.lngLat.lat]] },
       });
     },
-    [freehandEnabled]
+    [freehandEnabled, viewState.zoom]
   );
 
   const onMouseMoveFreehand = useCallback(
     (e) => {
       if (!freehandEnabled || !drawingRef.current.isDown) return;
+      if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) return;
       drawingRef.current.points.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
       setPreviewLine({
         type: "Feature",
@@ -1261,7 +1403,7 @@ export default function MapPage() {
         geometry: { type: "LineString", coordinates: drawingRef.current.points.map((p) => [p.lng, p.lat]) },
       });
     },
-    [freehandEnabled]
+    [freehandEnabled, viewState.zoom]
   );
 
   const onMouseUpFreehand = useCallback(async () => {
@@ -1286,11 +1428,10 @@ export default function MapPage() {
     const poly = pts.map((p) => ({ lat: p.lat, lng: p.lng }));
     setSelection({ mode: "polygon", polygon: poly });
 
-    await fetchPois({ selectionType: "POLYGON", polygon: poly });
-
-    // Crucial: The useEffect will handle closing others when resultsOpen becomes true
     setResultsOpen(true);
     setResultsTab("all");
+    streamAutoTabLockedRef.current = false;
+    void fetchPois({ selectionType: "POLYGON", polygon: poly });
 
     if (user) {
       setPolygonRouteBannerDismissed(false);
@@ -1369,12 +1510,24 @@ export default function MapPage() {
     setIsChatOpen(false);
     setMode("SELECTION");
     setFreehandEnabled(true);
-    message.info({
-      content:
-        "Draw an area on the map → select a day from the route panel on the right → update that day from the orange banner at the top.",
+    if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) {
+      notification.warning({
+        message: "Haritayı yakınlaştırın",
+        description:
+          "Önce mahalle veya ilçe ölçeğine yaklaşın; ardından haritada alan çizebilirsiniz.",
+        placement: "topRight",
+        duration: 6,
+      });
+      return;
+    }
+    notification.info({
+      message: "Haritada alan çizin",
+      description:
+        "Sağdaki rota panelinden gün seçin; ardından üstteki turuncu banttan o günü güncelleyin.",
+      placement: "topRight",
       duration: 8,
     });
-  }, []);
+  }, [viewState.zoom]);
 
   const submitReplanDayFromPolygon = useCallback(async () => {
     if (!selection?.polygon || selection.polygon.length < 3) {
@@ -1531,25 +1684,32 @@ export default function MapPage() {
   // Combined POI list (Backend + Mapbox Discoveries)
   const pois = useMemo(() => {
     // 1. Performance Rule: Hide POIs at low zoom levels to prevent clutter
-    if (viewState.zoom <= 10) return [];
+    // Drawn-area mode: still show markers so POIs appear while browsing results.
+    const polygonSelection = mode === "SELECTION" && selection?.mode === "polygon" && selection.polygon.length >= 3;
+    if (viewState.zoom <= 10 && !polygonSelection) return [];
 
     const all = [...poisRaw];
     const poiCoords = new Set(poisRaw.map(p => `${p.latitude?.toFixed(4)},${p.longitude?.toFixed(4)}`));
 
-    mapboxPois.forEach(mbp => {
-      const coordKey = `${mbp.location.lat.toFixed(4)},${mbp.location.lng.toFixed(4)}`;
-      if (!poiCoords.has(coordKey)) {
-        all.push({
-          poiId: mbp.id,
-          latitude: mbp.location.lat,
-          longitude: mbp.location.lng,
-          name: mbp.name,
-          category: mbp.category,
-          source: 'mapbox'
-        });
-        poiCoords.add(coordKey);
-      }
-    });
+    const skipStylePoiMerge =
+      USE_MAPBOX_AREA_POI_SEARCH && mode === "SELECTION" && selection?.mode === "polygon";
+
+    if (!skipStylePoiMerge) {
+      mapboxPois.forEach(mbp => {
+        const coordKey = `${mbp.location.lat.toFixed(4)},${mbp.location.lng.toFixed(4)}`;
+        if (!poiCoords.has(coordKey)) {
+          all.push({
+            poiId: mbp.id,
+            latitude: mbp.location.lat,
+            longitude: mbp.location.lng,
+            name: mbp.name,
+            category: mbp.category,
+            source: 'mapbox'
+          });
+          poiCoords.add(coordKey);
+        }
+      });
+    }
 
     let list = all;
 
@@ -1567,7 +1727,7 @@ export default function MapPage() {
 
     // 2. Performance Rule: Cap at 1000 POIs to prevent memory bloating
     return out.slice(0, 1000);
-  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom]);
+  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom, USE_MAPBOX_AREA_POI_SEARCH]);
 
   const canShowResultsPanel = useMemo(() => {
     return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
@@ -1595,12 +1755,20 @@ export default function MapPage() {
   }, [pois, canShowResultsPanel]);
 
   useEffect(() => {
-    if (resultsTab !== "all" && resultsCategories.length > 0) {
-      if (!resultsCategories.find((c) => c.key === resultsTab)) {
-        setResultsTab("all");
-      }
+    if (resultsTab === "all") return;
+    if (resultsCategories.length === 0) return;
+    if (!resultsCategories.find((c) => c.key === resultsTab)) {
+      setResultsTab("all");
     }
   }, [resultsCategories, resultsTab]);
+
+  useEffect(() => {
+    if (!canShowResultsPanel || !resultsTabsScrollRef.current) return;
+    const tabEl = resultsTabsScrollRef.current.querySelector(`[data-results-tab="${resultsTab}"]`);
+    if (tabEl && typeof tabEl.scrollIntoView === "function") {
+      tabEl.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    }
+  }, [resultsTab, canShowResultsPanel, resultsCategories.length]);
 
   // Normalize waypoint coords: backend may send latitude/longitude (camelCase); ensure numeric and consistent order
   const activeWaypoints = useMemo(() => {
@@ -1841,6 +2009,9 @@ export default function MapPage() {
   const resultsBottom = isMobile ? 12 : 18;
   const resultsMaxHeight = isMobile ? 220 : 240;
 
+  const isDrawAreaSession = freehandEnabled && selection?.mode !== "polygon";
+  const drawAreaZoomTooLow = viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW;
+  const showDrawZoomGate = isDrawAreaSession && drawAreaZoomTooLow;
 
   return (
     <div className={`vivid-map-page ${themeClass} ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -1943,7 +2114,7 @@ export default function MapPage() {
 
       {/* 3. Main Content (MAP) */}
       <main className={`map-layout-content ${viewState.zoom >= 20 ? "zoom-at-max" : viewState.zoom <= 1.5 ? "zoom-at-min" : ""}`}>
-        <Map
+        <MapGL
           ref={mapRef}
           {...viewState}
           padding={mapPadding}
@@ -1964,7 +2135,7 @@ export default function MapPage() {
           dragPan={!freehandEnabled}
           cursor={freehandEnabled ? "crosshair" : "grab"}
           attributionControl={false}
-          minZoom={1.5}
+          minZoom={isDrawAreaSession ? MIN_ZOOM_FOR_AREA_DRAW : 1.5}
           maxZoom={20}
         >
           <NavigationControl position="bottom-left" showCompass={false} />
@@ -2166,7 +2337,18 @@ export default function MapPage() {
               </Marker>
             );
           })}
-        </Map>
+        </MapGL>
+
+        {showDrawZoomGate ? (
+          <div className="map-draw-zoom-gate" aria-live="polite">
+            <div className="map-draw-zoom-gate__hint glass-panel">
+              <div className="map-draw-zoom-gate__title">Zoom in to draw</div>
+              <p className="map-draw-zoom-gate__text">
+                This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel and chat are closed */}
         {!canShowResultsPanel && !isChatOpen && (
@@ -2208,8 +2390,22 @@ export default function MapPage() {
                 <FiFilter style={{ fontSize: 20 }} />
               </button>
             </Tooltip>
-            <Tooltip title="Draw Area" placement="left">
-              <button className="sub-fab vivid-interactive" onClick={() => { startFreehand(); setFabExpanded(false); }}>
+            <Tooltip
+              title={
+                drawAreaZoomTooLow
+                  ? "Zoom in closer — draw area works at neighborhood scale"
+                  : "Draw Area"
+              }
+              placement="left"
+            >
+              <button
+                type="button"
+                className={`sub-fab vivid-interactive${drawAreaZoomTooLow ? " sub-fab--muted" : ""}`}
+                onClick={() => {
+                  startFreehand();
+                  setFabExpanded(false);
+                }}
+              >
                 <PencilIcon />
               </button>
             </Tooltip>
@@ -2293,22 +2489,58 @@ export default function MapPage() {
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
-              {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...resultsCategories].map(t => {
-                const active = resultsTab === t.key;
-                return (
-                  <button key={t.key} onClick={() => setResultsTab(t.key)}
-                    style={{
-                      flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
-                      border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
-                      background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
-                      color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
-                    }}
-                  >
-                    {t.icon || <GlobalOutlined />} {t.label}
-                  </button>
-                );
-              })}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 4,
+              }}
+            >
+              <div
+                ref={resultsTabsScrollRef}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  gap: 10,
+                  overflowX: "auto",
+                  paddingBottom: 12,
+                }}
+              >
+                {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...resultsCategories].map(t => {
+                  const active = resultsTab === t.key;
+                  return (
+                    <button key={t.key} type="button" data-results-tab={t.key} onClick={() => setResultsTab(t.key)}
+                      style={{
+                        flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
+                        border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
+                        background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
+                        color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
+                      }}
+                    >
+                      {t.icon || <GlobalOutlined />} {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {poiStreamLoading ? (
+                <div
+                  style={{
+                    flex: "0 0 auto",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    paddingBottom: 12,
+                  }}
+                  title="More place categories are still loading"
+                >
+                  <Spin size="small" />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-sub)", whiteSpace: "nowrap" }}>
+                    Loading more…
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             <div style={{ height: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4, display: "flex", flexDirection: "column" }}>

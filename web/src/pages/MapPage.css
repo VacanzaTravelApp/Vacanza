@@ -282,6 +282,51 @@ a,
     height: 100%;
 }
 
+/* Draw-area: zoom too low — non-blocking dim + hint (pointer-events none so user can still zoom/pan) */
+.map-draw-zoom-gate {
+    position: absolute;
+    inset: 0;
+    z-index: 900;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+.map-draw-zoom-gate__hint {
+    pointer-events: none;
+    max-width: 340px;
+    padding: 20px 22px;
+    text-align: center;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.14);
+}
+
+.map-draw-zoom-gate__title {
+    font-weight: 800;
+    font-size: 17px;
+    margin-bottom: 8px;
+    color: var(--text-main);
+}
+
+.map-draw-zoom-gate__text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-sub);
+}
+
+.theme-night .map-draw-zoom-gate {
+    background: rgba(2, 6, 23, 0.5);
+}
+
+.vivid-fab-group .sub-fab--muted {
+    opacity: 0.55;
+}
+
 /* Custom Premium Topbar */
 .vivid-map-header {
     display: flex;
