@@ -2,8 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:mobile/core/navigation/route_open_requests.dart';
 import 'package:mobile/core/theme/vacanza_tokens.dart';
+import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
+import 'package:mobile/features/ai/presentation/cubit/active_route_cubit.dart';
+import 'package:mobile/features/trip_calendar/data/api/trip_calendar_api_client.dart';
+import 'package:mobile/features/trip_calendar/services/ics_export_service.dart';
 
 import 'trip_agenda_event.dart';
 
@@ -168,7 +174,12 @@ List<_Cell> _buildCells(int year, int month) {
 
 /// Trip Agenda — same behavior as web CalendarModal.
 class TripAgendaCalendarSheet extends StatefulWidget {
-  const TripAgendaCalendarSheet({super.key});
+  final void Function(String routeId)? onOpenRouteFromCalendar;
+
+  const TripAgendaCalendarSheet({
+    super.key,
+    this.onOpenRouteFromCalendar,
+  });
 
   @override
   State<TripAgendaCalendarSheet> createState() =>
@@ -181,12 +192,15 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
   late int _month;
 
   final List<TripAgendaEvent> _events = [];
+  List<TripCalendarEventRow> _remoteEvents = const [];
+  bool _remoteLoading = false;
 
   int? _selectStart;
   int? _selectEnd;
   bool _showForm = false;
   final _titleController = TextEditingController();
   String _newCategory = 'Activity';
+  bool _calendarExporting = false;
 
   /// Form overlay: fade + scale (smooth giriş/çıkış).
   late AnimationController _sheetAnim;
@@ -196,6 +210,173 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
   static const double _gridRowHeight = 76;
   static const int _gridRows = 6;
   static const double _gridHeight = _gridRows * _gridRowHeight;
+
+  Future<void> _openLocalDetail(TripAgendaEvent ev) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final p = _TripPalette.of(ctx);
+        return _detailSheet(
+          ctx,
+          palette: p,
+          title: ev.title,
+          subtitle:
+              ev.endDay != null ? '${ev.day}–${ev.endDay} ${_kMonthNames[_month - 1]} $_year' : '${ev.day} ${_kMonthNames[_month - 1]} $_year',
+          actions: [
+            _DetailAction.danger(
+              label: 'Remove note',
+              onTap: () {
+                final idx = _events.indexOf(ev);
+                if (idx >= 0) _removeEventAt(idx);
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openRemoteDetail(TripCalendarEventRow ev) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final p = _TripPalette.of(ctx);
+        final dateStr =
+            '${_kMonthNames[_month - 1]} ${ev.eventDate.day}, $_year';
+        final multi = ev.totalDays > 1;
+        final label =
+            multi ? 'Day ${ev.itineraryDay} of ${ev.totalDays}' : null;
+        final computedStart = ev.eventDate.subtract(
+          Duration(days: (ev.itineraryDay - 1).clamp(0, 3650)),
+        );
+        return _detailSheet(
+          ctx,
+          palette: p,
+          title: ev.title,
+          subtitle: [dateStr, label].whereType<String>().join(' • '),
+          actions: [
+            _DetailAction.primary(
+              label: 'Open on map',
+              onTap: () async {
+                Navigator.pop(ctx);
+                RouteOpenRequests.requestOpen(
+                  ev.routeId,
+                  day: ev.itineraryDay,
+                );
+                // Close overlays and return to the map screen.
+                Navigator.of(context).popUntil((r) => r.isFirst);
+              },
+            ),
+            _DetailAction.muted(
+              label: 'Add to phone calendar',
+              onTap: () async {
+                Navigator.pop(ctx);
+                if (_calendarExporting) return;
+                setState(() => _calendarExporting = true);
+                try {
+                  final today = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate:
+                        computedStart.isBefore(today) ? today : computedStart,
+                    firstDate: DateTime(today.year - 1),
+                    lastDate: DateTime(today.year + 5),
+                    helpText: 'Select first trip day',
+                  );
+                  if (!context.mounted) return;
+                  if (picked == null) return;
+                  await context.read<IcsExportService>().registerAndOpenRouteIcs(
+                    routeId: ev.routeId,
+                    eventDate: picked,
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  if (IcsExportService.isConflict409(e)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('This route is already on that day.'),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not export calendar file.'),
+                      ),
+                    );
+                  }
+                } finally {
+                  if (mounted) setState(() => _calendarExporting = false);
+                }
+              },
+            ),
+            _DetailAction.danger(
+              label: 'Remove this day',
+              onTap: () async {
+                Navigator.pop(ctx);
+                try {
+                  await context
+                      .read<TripCalendarApiClient>()
+                      .deleteTripCalendarEvent(ev.eventId);
+                  await _loadRemoteEvents();
+                } catch (_) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not remove calendar item.'),
+                    ),
+                  );
+                }
+              },
+            ),
+            if (multi)
+              _DetailAction.muted(
+                label: 'Remove all ${ev.totalDays} days',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await context
+                        .read<TripCalendarApiClient>()
+                        .deleteTripCalendarEventsByRoute(ev.routeId);
+                    await _loadRemoteEvents();
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Trip removed from calendar.')),
+                    );
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not remove trip from calendar.'),
+                      ),
+                    );
+                  }
+                },
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _loadRemoteEvents() async {
+    setState(() => _remoteLoading = true);
+    try {
+      final api = context.read<TripCalendarApiClient>();
+      final rows = await api.listTripCalendarEvents(year: _year, month: _month);
+      if (!mounted) return;
+      setState(() => _remoteEvents = rows);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _remoteEvents = const []);
+    } finally {
+      if (mounted) setState(() => _remoteLoading = false);
+    }
+  }
 
   @override
   void initState() {
@@ -215,6 +396,12 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
     _sheetScale = Tween<double>(begin: 0.94, end: 1.0).animate(
       CurvedAnimation(parent: _sheetAnim, curve: Curves.easeOutCubic),
     );
+
+    // Web parity: load server-side trip-calendar events for this month.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_loadRemoteEvents());
+    });
   }
 
   @override
@@ -248,6 +435,13 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
 
   List<TripAgendaEvent> _eventsForDay(int d) {
     return _events.where((e) => e.coversDay(d, _month, _year)).toList();
+  }
+
+  List<TripCalendarEventRow> _remoteEventsForDay(int d) {
+    return _remoteEvents.where((re) {
+      final dt = re.eventDate;
+      return dt.year == _year && dt.month == _month && dt.day == d;
+    }).toList();
   }
 
   void _resetSelection() {
@@ -341,6 +535,7 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
       _year = n.year;
       _month = n.month;
     });
+    unawaited(_loadRemoteEvents());
   }
 
   Future<void> _prevMonth() async {
@@ -354,6 +549,7 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
         _month--;
       }
     });
+    unawaited(_loadRemoteEvents());
   }
 
   Future<void> _nextMonth() async {
@@ -367,6 +563,7 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
         _month++;
       }
     });
+    unawaited(_loadRemoteEvents());
   }
 
   bool _isToday(int d, bool cur) {
@@ -393,6 +590,57 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
     final cells = _buildCells(_year, _month);
     final rmin = _rangeMin();
     final rmax = _rangeMax();
+    final dynamic activeRouteState = () {
+      try {
+        return context.read<ActiveRouteCubit>().state;
+      } catch (_) {
+        return null;
+      }
+    }();
+    final String? routeId = activeRouteState?.routeId as String?;
+    final route = activeRouteState?.route;
+    final tripStart =
+        IcsExportService.tryParseIsoDate(route?.tripStartDate);
+
+    Future<DateTime?> pickDate({required DateTime initial}) async {
+      final today = DateTime.now();
+      final d = await showDatePicker(
+        context: context,
+        initialDate: initial.isBefore(today) ? today : initial,
+        firstDate: DateTime(today.year - 1),
+        lastDate: DateTime(today.year + 5),
+        helpText: 'Select first trip day',
+      );
+      return d;
+    }
+
+    Future<void> exportActiveRoute() async {
+      if (routeId == null) return;
+      if (_calendarExporting) return;
+      setState(() => _calendarExporting = true);
+      try {
+        final initial = tripStart ?? DateTime.now();
+        final chosen = await pickDate(initial: initial);
+        if (chosen == null) return;
+        await context.read<IcsExportService>().registerAndOpenRouteIcs(
+          routeId: routeId,
+          eventDate: chosen,
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+        if (IcsExportService.isConflict409(e)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This route is already on that day.')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not export calendar file.')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _calendarExporting = false);
+      }
+    }
 
     return Material(
       color: p.surface,
@@ -465,6 +713,51 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                         ),
                       ),
                     if (_selectStart != null) const SizedBox(width: 6),
+                    if (_remoteLoading) ...[
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        backgroundColor: p.navBtn,
+                        foregroundColor: p.navIcon,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed:
+                          routeId == null || _calendarExporting
+                              ? null
+                              : () => unawaited(exportActiveRoute()),
+                      child:
+                          _calendarExporting
+                              ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                              : Text(
+                                'Export',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 11,
+                                  color: routeId == null
+                                      ? p.textMuted.withValues(alpha: 0.5)
+                                      : p.navIcon,
+                                ),
+                              ),
+                    ),
+                    const SizedBox(width: 6),
                     _navIconBtn(
                       p: p,
                       icon: Icons.chevron_left_rounded,
@@ -584,10 +877,11 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                       final past = _isPastDay(c.day, c.isCurrentMonth);
                       final showRangeEndBorder = isREnd;
 
-                      return IgnorePointer(
-                        ignoring: past,
-                        child: GestureDetector(
-                        onTap: () => _onCellTap(c.day, c.isCurrentMonth),
+                      return GestureDetector(
+                        onTap:
+                            past
+                                ? null
+                                : () => _onCellTap(c.day, c.isCurrentMonth),
                         behavior: HitTestBehavior.opaque,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -677,7 +971,14 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                                   child: c.isCurrentMonth
                                       ? _EventChips(
                                           events: evts,
+                                          remoteEvents: _remoteEventsForDay(
+                                            c.day,
+                                          ),
                                           muted: p.textMuted,
+                                          onTapRemote: (re) =>
+                                              unawaited(_openRemoteDetail(re)),
+                                          onTapLocal: (le) =>
+                                              unawaited(_openLocalDetail(le)),
                                         )
                                       : const SizedBox.shrink(),
                                 ),
@@ -685,7 +986,6 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                             ),
                           ),
                         ),
-                      ),
                       );
                     },
                   ),
@@ -786,29 +1086,64 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
 class _EventChips extends StatelessWidget {
   const _EventChips({
     required this.events,
+    required this.remoteEvents,
     required this.muted,
+    this.onTapLocal,
+    this.onTapRemote,
   });
 
   final List<TripAgendaEvent> events;
+  final List<TripCalendarEventRow> remoteEvents;
   final Color muted;
+  final void Function(TripAgendaEvent ev)? onTapLocal;
+  final void Function(TripCalendarEventRow ev)? onTapRemote;
 
   @override
   Widget build(BuildContext context) {
-    final list = events.take(2).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final ev in list)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 2),
+    final local = events;
+    final remote = remoteEvents;
+    final combinedCount = remote.length + local.length;
+
+    List<Widget> chips = [];
+    for (final re in remote.take(2)) {
+      chips.add(
+        GestureDetector(
+          onTap: onTapRemote == null ? null : () => onTapRemote!(re),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFF8B5CF6), // web ROUTE_EVENT_COLOR
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              _formatRemoteLabel(re),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ),
+      );
+      if (chips.length >= 2) break;
+    }
+    if (chips.length < 2) {
+      for (final le in local.take(2 - chips.length)) {
+        chips.add(
+          GestureDetector(
+            onTap: onTapLocal == null ? null : () => onTapLocal!(le),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               decoration: BoxDecoration(
-                color: ev.color,
+                color: le.color,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
-                ev.title,
+                le.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -820,9 +1155,21 @@ class _EventChips extends StatelessWidget {
               ),
             ),
           ),
-        if (events.length > 2)
+        );
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final chip in chips)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: chip,
+          ),
+        if (combinedCount > 2)
           Text(
-            '+${events.length - 2}',
+            '+${combinedCount - 2}',
             textAlign: TextAlign.right,
             style: TextStyle(
               fontSize: 8,
@@ -832,6 +1179,13 @@ class _EventChips extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  static String _formatRemoteLabel(TripCalendarEventRow re) {
+    final td = re.totalDays <= 0 ? 1 : re.totalDays;
+    final id = re.itineraryDay <= 0 ? 1 : re.itineraryDay;
+    if (td > 1) return 'Day $id/$td · ${re.title}';
+    return re.title;
   }
 }
 
@@ -1145,7 +1499,10 @@ class _AddEventPanelState extends State<_AddEventPanel> {
 }
 
 /// Opens Trip Agenda bottom sheet (web CalendarModal equivalent).
-Future<void> showTripAgendaCalendar(BuildContext context) {
+Future<void> showTripAgendaCalendar(
+  BuildContext context, {
+  void Function(String routeId)? onOpenRouteFromCalendar,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -1160,10 +1517,154 @@ Future<void> showTripAgendaCalendar(BuildContext context) {
         builder: (context, scrollController) {
           return SingleChildScrollView(
             controller: scrollController,
-            child: const TripAgendaCalendarSheet(),
+            child: TripAgendaCalendarSheet(
+              onOpenRouteFromCalendar: onOpenRouteFromCalendar,
+            ),
           );
         },
       );
     },
   );
+}
+
+class _DetailAction {
+  final String label;
+  final VoidCallback onTap;
+  final _DetailActionStyle style;
+
+  const _DetailAction({
+    required this.label,
+    required this.onTap,
+    required this.style,
+  });
+
+  factory _DetailAction.primary({
+    required String label,
+    required VoidCallback onTap,
+  }) => _DetailAction(label: label, onTap: onTap, style: _DetailActionStyle.primary);
+
+  factory _DetailAction.muted({
+    required String label,
+    required VoidCallback onTap,
+  }) => _DetailAction(label: label, onTap: onTap, style: _DetailActionStyle.muted);
+
+  factory _DetailAction.danger({
+    required String label,
+    required VoidCallback onTap,
+  }) => _DetailAction(label: label, onTap: onTap, style: _DetailActionStyle.danger);
+}
+
+enum _DetailActionStyle { primary, muted, danger }
+
+Widget _detailSheet(
+  BuildContext context, {
+  required _TripPalette palette,
+  required String title,
+  required String subtitle,
+  required List<_DetailAction> actions,
+}) {
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+    child: Material(
+      color: palette.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: palette.textMuted.withValues(alpha: 0.9),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: palette.textMain,
+              ),
+            ),
+            const SizedBox(height: 12),
+            for (final a in actions) ...[
+              _detailActionButton(context, palette: palette, action: a),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _detailActionButton(
+  BuildContext context, {
+  required _TripPalette palette,
+  required _DetailAction action,
+}) {
+  final theme = Theme.of(context);
+  final tokens = theme.extension<VacanzaTokens>() ?? VacanzaTokens.light;
+  final cs = theme.colorScheme;
+
+  switch (action.style) {
+    case _DetailActionStyle.primary:
+      return VacanzaGradientButton(
+        label: action.label,
+        onPressed: action.onTap,
+        minHeight: 46,
+        borderRadius: 16,
+        horizontalPadding: 16,
+        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+      );
+    case _DetailActionStyle.muted:
+      return SizedBox(
+        height: 46,
+        child: OutlinedButton(
+          onPressed: action.onTap,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: tokens.actionBarInactiveBg.withValues(alpha: 0.88),
+            foregroundColor: tokens.textMain,
+            side: BorderSide(
+              color: tokens.cardBorder.withValues(alpha: 0.55),
+              width: 1.2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: Text(
+            action.label,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+        ),
+      );
+    case _DetailActionStyle.danger:
+      return SizedBox(
+        height: 46,
+        child: OutlinedButton(
+          onPressed: action.onTap,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: cs.errorContainer.withValues(alpha: 0.65),
+            foregroundColor: cs.error,
+            side: BorderSide(
+              color: cs.error.withValues(alpha: 0.55),
+              width: 1.2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: Text(
+            action.label,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+        ),
+      );
+  }
 }
