@@ -233,7 +233,10 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
       final map = widget.map;
       if (map == null) return null;
 
-      final screen = mb.ScreenCoordinate(x: localPos.dx, y: localPos.dy);
+      final screen = mb.ScreenCoordinate(
+        x: localPos.dx,
+        y: localPos.dy,
+      );
 
       final point = await map.coordinateForPixel(screen);
 
