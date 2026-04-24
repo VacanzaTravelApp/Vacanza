@@ -113,7 +113,7 @@ export default function UserManagement() {
                 <Space>
                     {auth ? (
                         <Tag variant="filled" color="success" icon={<VerifiedOutlined />} style={{ borderRadius: 6, border: 'none', background: 'rgba(82, 196, 26, 0.1)', fontSize: 10 }}>
-                            Active Node
+                            Active User
                         </Tag>
                     ) : (
                         <Tag variant="filled" color="default" style={{ fontSize: 10 }}>Legacy</Tag>
@@ -129,10 +129,9 @@ export default function UserManagement() {
             render: (_, record) => (
                 <Space size="middle">
                     {record.user?.role !== "ADMIN" ? (
-                        <Tooltip title="Elevate to Administrative Role">
+                        <Tooltip title="Grant full Admin access to this user" color={THEME.admin}>
                             <Button
                                 type="primary"
-                                icon={<RocketFilled />}
                                 onClick={() => handlePromote(record.user?.email)}
                                 style={{
                                     borderRadius: '8px',
@@ -140,10 +139,10 @@ export default function UserManagement() {
                                     borderColor: THEME.admin,
                                     fontWeight: 600,
                                     fontSize: 11,
-                                    height: 32
+                                    height: 30
                                 }}
                             >
-                                Promote
+                                Make Admin
                             </Button>
                         </Tooltip>
                     ) : (
@@ -172,10 +171,10 @@ export default function UserManagement() {
                                     letterSpacing: '-1px'
                                 }}
                             >
-                                Directory Node Explorer
+                                User Directory
                             </Title>
                             <div style={{ padding: '4px 12px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '24px', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
-                                <Text strong style={{ color: THEME.primary, fontSize: 12 }}>{users?.length || 0} Nodes</Text>
+                                <Text strong style={{ color: THEME.primary, fontSize: 12 }}>{users?.length || 0} Users</Text>
                             </div>
                         </div>
                         <Text
@@ -189,14 +188,14 @@ export default function UserManagement() {
                                 lineHeight: 1.5
                             }}
                         >
-                            Manage unified user identities across the Vacanza infrastructure. Review authentication status and privilege elevation for node administrators.
+                            Manage unified user identities across the Vacanza infrastructure. Review authentication status and system privileges.
                         </Text>
                     </Col>
                 </Row>
             </motion.div>
 
             <Row gutter={[24, 24]}>
-                <Col xs={24} xl={16}>
+                <Col xs={24} xl={24}>
                     <Card
                         bordered={false}
                         className="glass-card"
@@ -205,7 +204,7 @@ export default function UserManagement() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
                                 <span style={{ fontSize: 18, color: THEME.navy }}>Unified Identity Table</span>
                                 <Input
-                                    placeholder="Search nodes..."
+                                    placeholder="Search users..."
                                     prefix={<SearchOutlined style={{ color: THEME.subtext }} />}
                                     value={searchText}
                                     onChange={e => setSearchText(e.target.value)}
@@ -223,61 +222,6 @@ export default function UserManagement() {
                             style={{ overflow: 'hidden' }}
                             scroll={{ x: 700 }}
                         />
-                    </Card>
-                </Col>
-
-                <Col xs={24} xl={8}>
-                    <Card
-                        className="glass-card"
-                        bordered={false}
-                        title={<span style={{ fontSize: 18, color: THEME.navy }}>Quick Privilege Elevation</span>}
-                        styles={{ body: { padding: "clamp(16px, 3vw, 24px)" } }}
-                    >
-                        <div style={{ marginBottom: 24 }}>
-                            <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 20 }}>
-                                Manually grant administrative access to any user node by email or identity hash.
-                            </Text>
-                            <Input
-                                size="large"
-                                placeholder="identity@vacanza.com"
-                                value={manualEmail}
-                                onChange={(e) => setManualEmail(e.target.value)}
-                                prefix={<UserOutlined style={{ color: THEME.primary }} />}
-                                style={{ borderRadius: '14px', marginBottom: 16, height: 48 }}
-                            />
-                            <Button
-                                type="primary"
-                                block
-                                size="large"
-                                icon={<RocketFilled />}
-                                onClick={() => {
-                                    if (!manualEmail) return message.warning("Please specify an identity email.");
-                                    handlePromote(manualEmail);
-                                }}
-                                style={{
-                                    backgroundColor: THEME.admin,
-                                    borderColor: THEME.admin,
-                                    height: 48,
-                                    borderRadius: '14px',
-                                    fontWeight: 700,
-                                    boxShadow: '0 10px 20px rgba(114, 46, 209, 0.15)'
-                                }}
-                            >
-                                Grand ADMIN Status
-                            </Button>
-                        </div>
-
-                        <div style={{
-                            padding: '16px',
-                            background: 'rgba(114, 46, 209, 0.03)',
-                            borderRadius: '16px',
-                            border: '1px dashed rgba(114, 46, 209, 0.2)'
-                        }}>
-                            <Title level={5} style={{ fontSize: 11, color: THEME.admin, textTransform: 'uppercase', letterSpacing: 1, margin: '0 0 8px 0' }}>Authority Warning</Title>
-                            <Text style={{ fontSize: 12, color: THEME.subtext, lineHeight: 1.5 }}>
-                                Promoting a user to <b>ADMIN</b> grants full access to system monitoring, user directory, and global telemetry controls.
-                            </Text>
-                        </div>
                     </Card>
                 </Col>
             </Row>
