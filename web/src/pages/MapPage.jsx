@@ -735,7 +735,7 @@ export default function MapPage() {
         const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
         setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? result.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
       }
-      message.success(result.userMessage || "Rotanız güncellendi.");
+      // message.success(result.userMessage || "Rotanız güncellendi.");
     } catch {
       message.error("Güncelleme sırasında bir hata oluştu.");
     }
@@ -1029,7 +1029,7 @@ export default function MapPage() {
         await postPoiFeedbackEvent({ eventType, ...base });
         await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
         await queryClient.invalidateQueries({ queryKey: ["feedback", "saved-pois"] });
-        message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
+        // message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
       } catch (e) {
         message.error(e?.friendlyMessage || "Could not update favorites.");
       } finally {
@@ -1346,8 +1346,8 @@ export default function MapPage() {
             setChatConversationRefreshNonce((n) => n + 1);
           }
           const summary = res.route_summary_message || res.routeSummaryMessage;
-          if (summary) message.success(summary);
-          else message.success("Route is being displayed on the map.");
+          // if (summary) message.success(summary);
+          // else message.success("Route is being displayed on the map.");
         } else {
           message.warning("Could not retrieve route data.");
         }
@@ -1417,8 +1417,8 @@ export default function MapPage() {
         linkPolygonRouteConversation(convId);
         setChatConversationRefreshNonce((n) => n + 1);
         const summary = res.route_summary_message || res.routeSummaryMessage;
-        if (summary) message.success(summary);
-        else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
+        // if (summary) message.success(summary);
+        // else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
       } else {
         message.warning("Could not retrieve route data.");
       }

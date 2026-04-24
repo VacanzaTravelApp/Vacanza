@@ -77,7 +77,7 @@ const LoginCard = () => {
     setResetLoading(true);
     try {
       await sendPasswordResetEmail(auth, resetEmail);
-      message.success("A password reset link has been sent to your email!");
+      // message.success("A password reset link has been sent to your email!");
       setIsResetModalOpen(false);
       setResetEmail("");
     } catch (error) {

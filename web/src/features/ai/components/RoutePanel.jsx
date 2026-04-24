@@ -148,7 +148,7 @@ export default function RoutePanel({
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      message.success("Successfully exported to calendar!");
+      // message.success("Successfully exported to calendar!");
       setAlreadyExported(true);
 
       // Persist in localStorage so it stays disabled after refresh

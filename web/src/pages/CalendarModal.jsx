@@ -176,7 +176,7 @@ export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, 
             } catch {
                 /* ignore */
             }
-            message.success('Trip removed from calendar.');
+            // message.success('Trip removed from calendar.');
         } catch (e) {
             message.error(e?.friendlyMessage || 'Could not remove trip from calendar.');
         }

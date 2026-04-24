@@ -91,7 +91,7 @@ export default function WaypointFeedback({ waypoint, storageKey }) {
       } else {
         await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
       }
-      message.success("Thanks, your preference has been saved.");
+      // message.success("Thanks, your preference has been saved.");
     } catch (e) {
       message.error(e?.friendlyMessage || "Failed to send feedback.");
     } finally {

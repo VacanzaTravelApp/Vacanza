@@ -460,7 +460,7 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
     const updatePrefsMutation = useMutation({
         mutationFn: (values) => userApi.updatePreferences(values),
         onSuccess: () => {
-            message.success("Preferences updated");
+            // message.success("Preferences updated");
             queryClient.invalidateQueries(["userPreferences"]);
             onClose();
         }

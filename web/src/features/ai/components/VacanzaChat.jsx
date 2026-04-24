@@ -670,11 +670,13 @@ export default function VacanzaChat({
             .slice(0, 2);
           const more =
             extractedPrefs.length > 2 ? ` (+${extractedPrefs.length - 2})` : "";
+          /*
           message.success(
             snippets.length > 0
               ? `Preferences saved: ${snippets.join(" · ")}${more}`
               : `${extractedPrefs.length} preferences saved to your profile.`
           );
+          */
         }
       }
       await refreshConversations();
@@ -705,7 +707,7 @@ export default function VacanzaChat({
       return prev.filter((_, i) => i !== idx.i);
     });
     handleSendMessage(text);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -848,448 +850,448 @@ export default function VacanzaChat({
         </div>
       ) : (
         <>
-      <div
-        className="chat-content-scroll"
-        ref={scrollContainerRef}
-        role="log"
-        aria-live="polite"
-        aria-relevant="additions"
-      >
-        {showMessageSpinner ? (
-          <div className="chat-loading-center">
-            <Spin tip="Loading..." />
-          </div>
-        ) : (
-          <>
-            {messages.map((msg) => {
-              const routeList = routesForMessage(msg);
-              return (
-              <div key={msg.id} className={`chat-row ${msg.type}-row`}>
-                <div className={`message-bubble ${msg.type}-bubble`}>
-                  <div className="msg-text">
-                    <ChatBubbleRichText text={msg.text} />
-                  </div>
-                  {msg.time ? <span className="msg-time">{msg.time}</span> : null}
-                </div>
-                {routeList.map((rd, rIdx) => {
-                  const totalDays = Number(
-                    rd.total_days || rd.totalDays || (rd.days || []).length || 0
-                  );
-                  const totalPlaces = (rd.days || []).reduce(
-                    (sum, d) => sum + (d.waypoints?.length || 0),
-                    0
-                  );
-                  const hasWeather = Array.isArray(rd?.weather_forecast ?? rd?.weatherForecast)
-                    ? (rd?.weather_forecast ?? rd?.weatherForecast).length > 0
-                    : false;
-
-                  const day1 = (rd.days || [])[0];
-                  const day1Names = (day1?.waypoints || [])
-                    .map((w) => stripEmojis(w.name))
-                    .filter(Boolean);
-                  const day1Preview = day1Names.slice(0, 2).join(" · ");
-                  const day1More = Math.max(0, day1Names.length - 2);
-
+          <div
+            className="chat-content-scroll"
+            ref={scrollContainerRef}
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+          >
+            {showMessageSpinner ? (
+              <div className="chat-loading-center">
+                <Spin tip="Loading..." />
+              </div>
+            ) : (
+              <>
+                {messages.map((msg) => {
+                  const routeList = routesForMessage(msg);
                   return (
-                  <div key={`${msg.id}-route-${rIdx}`} className="route-card-outer">
-                    {msg.isRouteEdit && rIdx === 0 ? (
-                      <div className="route-updated-badge" role="note">
-                        <EditOutlined aria-hidden />
-                        Updated via chat
-                      </div>
-                    ) : null}
-                    {onRequestDrawToEdit ? (
-                      <div
-                        className={`route-card-preface ${rIdx > 0 ? "route-card-preface--stacked" : ""}`}
-                        role="note"
-                      >
-                        <div className="route-card-preface-summary">
-                          <span className="route-card-preface-label">Redraw</span>
-                          <button
-                            type="button"
-                            className="route-draw-edit-btn"
-                            aria-label="Replan the day by drawing an area on the map"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onRequestDrawToEdit();
-                              onClose();
-                            }}
-                          >
-                            <EditOutlined aria-hidden />
-                            Draw on map
-                          </button>
+                    <div key={msg.id} className={`chat-row ${msg.type}-row`}>
+                      <div className={`message-bubble ${msg.type}-bubble`}>
+                        <div className="msg-text">
+                          <ChatBubbleRichText text={msg.text} />
                         </div>
-                        <p className="route-card-preface-copy route-card-preface-copy--compact">
-                          Draw an area, then select the day to <strong>reschedule</strong>.
-                        </p>
+                        {msg.time ? <span className="msg-time">{msg.time}</span> : null}
                       </div>
-                    ) : null}
-                    <div className="route-card">
-                      <div className="route-card-head">
-                        <div className="route-card-head-main">
-                          <div className="route-card-title">{rd.title}</div>
-                          <div className="route-card-meta">
-                            <span className="route-card-meta-item">{rd.destination}</span>
-                            <span className="route-card-meta-dot" aria-hidden>
-                              ·
-                            </span>
-                            <span className="route-card-meta-item">
-                              {Number.isFinite(totalDays) && totalDays > 0 ? `${totalDays} days` : "—"}
-                            </span>
-                            <span className="route-card-meta-dot" aria-hidden>
-                              ·
-                            </span>
-                            <span className="route-card-meta-item">{totalPlaces} places</span>
-                          </div>
-                          {day1Preview ? (
-                            <div className="route-card-preview" aria-label="Itinerary preview">
-                              Day 1: {day1Preview}
-                              {day1More > 0 ? (
-                                <span className="route-card-preview-more"> +{day1More}</span>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    <button
-                      type="button"
-                      className="route-show-btn"
-                      onClick={() => {
-                        if (onRouteGenerated) {
-                          onRouteGenerated(normalizeRouteForMap(rd), {
-                            conversationId: conversationId ?? undefined,
-                            routeId: msg.routeIdList?.[rIdx] ?? undefined,
-                          });
-                        }
-                        onClose();
-                      }}
-                    >
-                      <EnvironmentOutlined style={{ fontSize: 13 }} />
-                      Show Route on Map
-                    </button>
-                    <details className="route-card-details">
-                      <summary className="route-card-details-summary">
-                        <span className="route-card-details-summary-left">
-                          <CompassOutlined aria-hidden />
-                          <span className="route-card-details-summary-title">Itinerary</span>
-                          <span className="route-card-details-summary-subtitle">
-                            Stops{hasWeather ? " · Weather" : ""} · Feedback
-                          </span>
-                        </span>
-                        <span className="route-card-details-summary-kpi">
-                          {Number.isFinite(totalDays) && totalDays > 0 ? `${totalDays}d` : "—"} ·{" "}
-                          {totalPlaces} stops
-                        </span>
-                      </summary>
-                      <div className="route-card-days">
-                        {(rd.days || []).map((d) => (
-                          <div key={d.day} className="route-card-day-row">
-                            <span className="route-card-day-badge">Day {d.day}</span>
-                            <span className="route-card-day-text">
-                              {(d.waypoints || []).map((w) => stripEmojis(w.name)).join(", ")}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      <RouteWeatherStrip rd={rd} />
-                      <div className="route-card-feedback-wrap">
-                        <RouteCardFeedback
-                          route={rd}
-                          storageKey={`${msg.id}-r${rIdx}`}
-                          routeId={msg.routeIdList?.[rIdx] ?? null}
-                          initialDbVote={msg.routeFeedbackList?.[rIdx] ?? null}
-                        />
-                      </div>
-                    </details>
-                    {(() => {
-                      const routeIdForCard = msg.routeIdList?.[rIdx];
-                      const hasRouteId = !!routeIdForCard;
-                      const tk = ticketStateKey(msg.id, rIdx);
-                      const ticketLoading = ticketLoadingByKey[tk];
-                      const rawRows = ticketRowsByKey[tk];
-                      const list =
-                        rawRows === undefined
-                          ? null
-                          : (Array.isArray(rawRows) ? rawRows : []).map(normalizePricingRow).filter(Boolean);
-                      const foundList = list ? list.filter((r) => r.found) : null;
-                      const showTicketEmpty =
-                        hasRouteId && list && !ticketLoading && foundList.length === 0;
-                      const showTicketCards =
-                        hasRouteId && list && !ticketLoading && foundList.length > 0;
-                      return (
-                        <details className="route-card-subsection route-card-subsection--viator">
-                          <summary className="route-card-subsection-summary">
-                            <span className="route-card-subsection-summary-text">
-                              <span className="route-card-subsection-title">Museum &amp; tour prices</span>
-                              <span className="route-card-subsection-desc">
-                                Viator — museum / tour products based on route stops
-                              </span>
-                            </span>
-                          </summary>
-                          <div className="route-ticket-section">
-                            {!hasRouteId ? (
-                              <p className="ticket-route-id-hint">
-                                This section shows Viator prices and only works for server-saved routes. If no route ID
-                                was received, the button is disabled — request a new route or refresh the chat.
-                              </p>
+                      {routeList.map((rd, rIdx) => {
+                        const totalDays = Number(
+                          rd.total_days || rd.totalDays || (rd.days || []).length || 0
+                        );
+                        const totalPlaces = (rd.days || []).reduce(
+                          (sum, d) => sum + (d.waypoints?.length || 0),
+                          0
+                        );
+                        const hasWeather = Array.isArray(rd?.weather_forecast ?? rd?.weatherForecast)
+                          ? (rd?.weather_forecast ?? rd?.weatherForecast).length > 0
+                          : false;
+
+                        const day1 = (rd.days || [])[0];
+                        const day1Names = (day1?.waypoints || [])
+                          .map((w) => stripEmojis(w.name))
+                          .filter(Boolean);
+                        const day1Preview = day1Names.slice(0, 2).join(" · ");
+                        const day1More = Math.max(0, day1Names.length - 2);
+
+                        return (
+                          <div key={`${msg.id}-route-${rIdx}`} className="route-card-outer">
+                            {msg.isRouteEdit && rIdx === 0 ? (
+                              <div className="route-updated-badge" role="note">
+                                <EditOutlined aria-hidden />
+                                Updated via chat
+                              </div>
                             ) : null}
-                            {hasRouteId ? (
+                            {onRequestDrawToEdit ? (
+                              <div
+                                className={`route-card-preface ${rIdx > 0 ? "route-card-preface--stacked" : ""}`}
+                                role="note"
+                              >
+                                <div className="route-card-preface-summary">
+                                  <span className="route-card-preface-label">Redraw</span>
+                                  <button
+                                    type="button"
+                                    className="route-draw-edit-btn"
+                                    aria-label="Replan the day by drawing an area on the map"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      onRequestDrawToEdit();
+                                      onClose();
+                                    }}
+                                  >
+                                    <EditOutlined aria-hidden />
+                                    Draw on map
+                                  </button>
+                                </div>
+                                <p className="route-card-preface-copy route-card-preface-copy--compact">
+                                  Draw an area, then select the day to <strong>reschedule</strong>.
+                                </p>
+                              </div>
+                            ) : null}
+                            <div className="route-card">
+                              <div className="route-card-head">
+                                <div className="route-card-head-main">
+                                  <div className="route-card-title">{rd.title}</div>
+                                  <div className="route-card-meta">
+                                    <span className="route-card-meta-item">{rd.destination}</span>
+                                    <span className="route-card-meta-dot" aria-hidden>
+                                      ·
+                                    </span>
+                                    <span className="route-card-meta-item">
+                                      {Number.isFinite(totalDays) && totalDays > 0 ? `${totalDays} days` : "—"}
+                                    </span>
+                                    <span className="route-card-meta-dot" aria-hidden>
+                                      ·
+                                    </span>
+                                    <span className="route-card-meta-item">{totalPlaces} places</span>
+                                  </div>
+                                  {day1Preview ? (
+                                    <div className="route-card-preview" aria-label="Itinerary preview">
+                                      Day 1: {day1Preview}
+                                      {day1More > 0 ? (
+                                        <span className="route-card-preview-more"> +{day1More}</span>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
                               <button
                                 type="button"
-                                className="route-tickets-btn"
-                                onClick={() => handleTicketSearch(routeIdForCard, msg.id, rIdx)}
-                                disabled={ticketLoading || messagesLoading}
+                                className="route-show-btn"
+                                onClick={() => {
+                                  if (onRouteGenerated) {
+                                    onRouteGenerated(normalizeRouteForMap(rd), {
+                                      conversationId: conversationId ?? undefined,
+                                      routeId: msg.routeIdList?.[rIdx] ?? undefined,
+                                    });
+                                  }
+                                  onClose();
+                                }}
                               >
-                                Show prices
+                                <EnvironmentOutlined style={{ fontSize: 13 }} />
+                                Show Route on Map
                               </button>
-                            ) : (
-                              <Tooltip title="Viator prices cannot be queried because no route_id was received for this route.">
-                                <span className="route-tickets-btn-wrap">
-                                  <button type="button" className="route-tickets-btn" disabled>
-                                    Show prices
-                                  </button>
-                                </span>
-                              </Tooltip>
-                            )}
-                            {ticketLoading ? (
-                              <div className="ticket-loading-wrap" aria-live="polite">
-                                <Spin size="small" />
-                                <span className="ticket-loading-label">Loading prices...</span>
-                              </div>
-                            ) : null}
-                            {showTicketEmpty ? (
-                              <div className="ticket-empty" role="status">
-                                No suitable museum / tour prices found
-                              </div>
-                            ) : null}
-                            {showTicketCards ? (
-                              <ul className="ticket-card-list">
-                                {foundList.map((row, ti) => (
-                                  <li
-                                    key={`${tk}-t${ti}-${row.day}-${row.order}`}
-                                    className="ticket-card"
-                                  >
-                                    <div className="ticket-card-head">
-                                      <span className="ticket-waypoint-name">{row.waypointName}</span>
-                                      <span className="ticket-day">Day {row.day}</span>
+                              <details className="route-card-details">
+                                <summary className="route-card-details-summary">
+                                  <span className="route-card-details-summary-left">
+                                    <CompassOutlined aria-hidden />
+                                    <span className="route-card-details-summary-title">Itinerary</span>
+                                    <span className="route-card-details-summary-subtitle">
+                                      Stops{hasWeather ? " · Weather" : ""} · Feedback
+                                    </span>
+                                  </span>
+                                  <span className="route-card-details-summary-kpi">
+                                    {Number.isFinite(totalDays) && totalDays > 0 ? `${totalDays}d` : "—"} ·{" "}
+                                    {totalPlaces} stops
+                                  </span>
+                                </summary>
+                                <div className="route-card-days">
+                                  {(rd.days || []).map((d) => (
+                                    <div key={d.day} className="route-card-day-row">
+                                      <span className="route-card-day-badge">Day {d.day}</span>
+                                      <span className="route-card-day-text">
+                                        {(d.waypoints || []).map((w) => stripEmojis(w.name)).join(", ")}
+                                      </span>
                                     </div>
-                                    {row.productTitle ? (
-                                      <div className="ticket-product-title">{row.productTitle}</div>
-                                    ) : null}
-                                    {(() => {
-                                      const priceLine = formatTicketPriceLine(row);
-                                      if (priceLine) {
-                                        return <div className="ticket-price">{priceLine}</div>;
-                                      }
-                                      if (row.status === "PARTNER_UNAVAILABLE" && row.message) {
-                                        return (
-                                          <div className="ticket-price ticket-price--muted">{row.message}</div>
-                                        );
-                                      }
-                                      return <div className="ticket-price ticket-price--muted">—</div>;
-                                    })()}
-                                    {row.found && row.bookingUrl ? (
-                                      <button
-                                        type="button"
-                                        className="ticket-buy-btn"
-                                        onClick={() =>
-                                          window.open(row.bookingUrl, "_blank", "noopener,noreferrer")
-                                        }
-                                      >
-                                        Get Tickets
-                                      </button>
-                                    ) : null}
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : null}
+                                  ))}
+                                </div>
+                                <RouteWeatherStrip rd={rd} />
+                                <div className="route-card-feedback-wrap">
+                                  <RouteCardFeedback
+                                    route={rd}
+                                    storageKey={`${msg.id}-r${rIdx}`}
+                                    routeId={msg.routeIdList?.[rIdx] ?? null}
+                                    initialDbVote={msg.routeFeedbackList?.[rIdx] ?? null}
+                                  />
+                                </div>
+                              </details>
+                              {(() => {
+                                const routeIdForCard = msg.routeIdList?.[rIdx];
+                                const hasRouteId = !!routeIdForCard;
+                                const tk = ticketStateKey(msg.id, rIdx);
+                                const ticketLoading = ticketLoadingByKey[tk];
+                                const rawRows = ticketRowsByKey[tk];
+                                const list =
+                                  rawRows === undefined
+                                    ? null
+                                    : (Array.isArray(rawRows) ? rawRows : []).map(normalizePricingRow).filter(Boolean);
+                                const foundList = list ? list.filter((r) => r.found) : null;
+                                const showTicketEmpty =
+                                  hasRouteId && list && !ticketLoading && foundList.length === 0;
+                                const showTicketCards =
+                                  hasRouteId && list && !ticketLoading && foundList.length > 0;
+                                return (
+                                  <details className="route-card-subsection route-card-subsection--viator">
+                                    <summary className="route-card-subsection-summary">
+                                      <span className="route-card-subsection-summary-text">
+                                        <span className="route-card-subsection-title">Museum &amp; tour prices</span>
+                                        <span className="route-card-subsection-desc">
+                                          Viator — museum / tour products based on route stops
+                                        </span>
+                                      </span>
+                                    </summary>
+                                    <div className="route-ticket-section">
+                                      {!hasRouteId ? (
+                                        <p className="ticket-route-id-hint">
+                                          This section shows Viator prices and only works for server-saved routes. If no route ID
+                                          was received, the button is disabled — request a new route or refresh the chat.
+                                        </p>
+                                      ) : null}
+                                      {hasRouteId ? (
+                                        <button
+                                          type="button"
+                                          className="route-tickets-btn"
+                                          onClick={() => handleTicketSearch(routeIdForCard, msg.id, rIdx)}
+                                          disabled={ticketLoading || messagesLoading}
+                                        >
+                                          Show prices
+                                        </button>
+                                      ) : (
+                                        <Tooltip title="Viator prices cannot be queried because no route_id was received for this route.">
+                                          <span className="route-tickets-btn-wrap">
+                                            <button type="button" className="route-tickets-btn" disabled>
+                                              Show prices
+                                            </button>
+                                          </span>
+                                        </Tooltip>
+                                      )}
+                                      {ticketLoading ? (
+                                        <div className="ticket-loading-wrap" aria-live="polite">
+                                          <Spin size="small" />
+                                          <span className="ticket-loading-label">Loading prices...</span>
+                                        </div>
+                                      ) : null}
+                                      {showTicketEmpty ? (
+                                        <div className="ticket-empty" role="status">
+                                          No suitable museum / tour prices found
+                                        </div>
+                                      ) : null}
+                                      {showTicketCards ? (
+                                        <ul className="ticket-card-list">
+                                          {foundList.map((row, ti) => (
+                                            <li
+                                              key={`${tk}-t${ti}-${row.day}-${row.order}`}
+                                              className="ticket-card"
+                                            >
+                                              <div className="ticket-card-head">
+                                                <span className="ticket-waypoint-name">{row.waypointName}</span>
+                                                <span className="ticket-day">Day {row.day}</span>
+                                              </div>
+                                              {row.productTitle ? (
+                                                <div className="ticket-product-title">{row.productTitle}</div>
+                                              ) : null}
+                                              {(() => {
+                                                const priceLine = formatTicketPriceLine(row);
+                                                if (priceLine) {
+                                                  return <div className="ticket-price">{priceLine}</div>;
+                                                }
+                                                if (row.status === "PARTNER_UNAVAILABLE" && row.message) {
+                                                  return (
+                                                    <div className="ticket-price ticket-price--muted">{row.message}</div>
+                                                  );
+                                                }
+                                                return <div className="ticket-price ticket-price--muted">—</div>;
+                                              })()}
+                                              {row.found && row.bookingUrl ? (
+                                                <button
+                                                  type="button"
+                                                  className="ticket-buy-btn"
+                                                  onClick={() =>
+                                                    window.open(row.bookingUrl, "_blank", "noopener,noreferrer")
+                                                  }
+                                                >
+                                                  Get Tickets
+                                                </button>
+                                              ) : null}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      ) : null}
+                                    </div>
+                                  </details>
+                                );
+                              })()}
+                              {msg.routeIdList?.[rIdx] ? (
+                                <details className="route-card-subsection route-card-subsection--events">
+                                  <summary className="route-card-subsection-summary">
+                                    <span className="route-card-subsection-summary-text">
+                                      <span className="route-card-subsection-title">Event Recommendations</span>
+                                      <span className="route-card-subsection-desc">
+                                        Ticketmaster — concerts, sports, shows; ranked by your preferences
+                                      </span>
+                                    </span>
+                                  </summary>
+                                  <EventRecommendations routeId={msg.routeIdList[rIdx]} />
+                                </details>
+                              ) : null}
+                            </div>
                           </div>
-                        </details>
-                      );
-                    })()}
-                    {msg.routeIdList?.[rIdx] ? (
-                      <details className="route-card-subsection route-card-subsection--events">
-                        <summary className="route-card-subsection-summary">
-                          <span className="route-card-subsection-summary-text">
-                            <span className="route-card-subsection-title">Event Recommendations</span>
-                            <span className="route-card-subsection-desc">
-                              Ticketmaster — concerts, sports, shows; ranked by your preferences
-                            </span>
-                          </span>
-                        </summary>
-                        <EventRecommendations routeId={msg.routeIdList[rIdx]} />
-                      </details>
-                    ) : null}
+                        );
+                      })}
+                      {msg.type === "ai" && msg.noRouteHint && routeList.length === 0 ? (
+                        <div className="route-card route-card-hint">
+                          <span>Could not retrieve route data. Try one of the quick buttons above again.</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+                {loading && (
+                  <div className="chat-row ai-row">
+                    <div className="message-bubble ai-bubble chat-typing-bubble">
+                      <span className="chat-typing-label">
+                        <span className="chat-typing-dots" aria-hidden><span /><span /><span /></span>
+                        Thinking…
+                      </span>
+                      {currentTip && (
+                        <div className="chat-tip-card" key={currentTip.tip}>
+                          <span className="chat-tip-label">Travel tip</span>
+                          <p className="chat-tip-text">{currentTip.tip}</p>
+                          <div className="chat-tip-footer">
+                            {currentTip.city
+                              ? <span className="chat-tip-city">{currentTip.city}</span>
+                              : <span />
+                            }
+                            <button
+                              type="button"
+                              className="chat-tip-next"
+                              onClick={() => {
+                                tipIndexRef.current = (tipIndexRef.current + 1) % tipPoolRef.current.length;
+                                setCurrentTip(tipPoolRef.current[tipIndexRef.current]);
+                              }}
+                            >
+                              next tip →
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
+                )}
+                <div ref={messagesEndRef} />
+              </>
+            )}
+          </div>
+
+          {sendError && !loading && (
+            <div className="chat-stop-bar">
+              <button type="button" className="chat-retry-btn" onClick={handleRetry}>
+                ↺ Retry
+              </button>
+            </div>
+          )}
+
+          {!initialLoading && (
+            <div className="chat-footer-refined">
+              {(() => {
+                const hasExistingRoute = messages.some(
+                  (m) => m.routeDataList?.length > 0 || m.routeData
                 );
-                })}
-                {msg.type === "ai" && msg.noRouteHint && routeList.length === 0 ? (
-                  <div className="route-card route-card-hint">
-                    <span>Could not retrieve route data. Try one of the quick buttons above again.</span>
-                  </div>
-                ) : null}
-              </div>
-            );
-            })}
-            {loading && (
-              <div className="chat-row ai-row">
-                <div className="message-bubble ai-bubble chat-typing-bubble">
-                  <span className="chat-typing-label">
-                    <span className="chat-typing-dots" aria-hidden><span /><span /><span /></span>
-                    Thinking…
-                  </span>
-                  {currentTip && (
-                    <div className="chat-tip-card" key={currentTip.tip}>
-                      <span className="chat-tip-label">Travel tip</span>
-                      <p className="chat-tip-text">{currentTip.tip}</p>
-                      <div className="chat-tip-footer">
-                        {currentTip.city
-                          ? <span className="chat-tip-city">{currentTip.city}</span>
-                          : <span />
-                        }
+                const lastRouteMsg = [...messages]
+                  .reverse()
+                  .find((m) => m.routeDataList?.length > 0 || m.routeData);
+                const lastRoute =
+                  lastRouteMsg?.routeDataList?.[0] || lastRouteMsg?.routeData;
+                const totalDays =
+                  lastRoute?.days?.length || lastRoute?.total_days || 0;
+
+                if (hasExistingRoute) {
+                  return (
+                    <div className="chat-quick-actions">
+                      <span className="chat-quick-label">Edit route:</span>
+                      {totalDays >= 1 && (
                         <button
                           type="button"
-                          className="chat-tip-next"
-                          onClick={() => {
-                            tipIndexRef.current = (tipIndexRef.current + 1) % tipPoolRef.current.length;
-                            setCurrentTip(tipPoolRef.current[tipIndexRef.current]);
-                          }}
+                          className="chat-quick-chip"
+                          onClick={() => handleSendMessage("Make day 1 more museum-focused")}
+                          disabled={loading || messagesLoading}
                         >
-                          next tip →
+                          Day 1: more museums
                         </button>
-                      </div>
+                      )}
+                      {totalDays >= 2 && (
+                        <button
+                          type="button"
+                          className="chat-quick-chip"
+                          onClick={() => handleSendMessage("Slow down day 2")}
+                          disabled={loading || messagesLoading}
+                        >
+                          Slow down day 2
+                        </button>
+                      )}
+                      {totalDays >= 3 && (
+                        <button
+                          type="button"
+                          className="chat-quick-chip"
+                          onClick={() => handleSendMessage("Add more dining options to day 3")}
+                          disabled={loading || messagesLoading}
+                        >
+                          Day 3: more dining
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="chat-quick-chip"
+                        onClick={() => handleSendMessage("Change the pace to slow for the whole trip")}
+                        disabled={loading || messagesLoading}
+                      >
+                        Slower pace
+                      </button>
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
+                  );
+                }
 
-      {sendError && !loading && (
-        <div className="chat-stop-bar">
-          <button type="button" className="chat-retry-btn" onClick={handleRetry}>
-            ↺ Retry
-          </button>
-        </div>
+                return (
+                  <div className="chat-quick-actions">
+                    <span className="chat-quick-label">Plan a route:</span>
+                    <button
+                      type="button"
+                      className="chat-quick-chip"
+                      onClick={() => handleSendMessage("Plan a 3-day trip to Istanbul")}
+                      disabled={loading || messagesLoading}
+                    >
+                      3-day Istanbul
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-quick-chip"
+                      onClick={() => handleSendMessage("Plan a 2-day trip to Rome")}
+                      disabled={loading || messagesLoading}
+                    >
+                      2-day Rome
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-quick-chip"
+                      onClick={() => handleSendMessage("Create a 4-day Antalya vacation plan for me")}
+                      disabled={loading || messagesLoading}
+                    >
+                      4-day Antalya
+                    </button>
+                  </div>
+                );
+              })()}
+              <div className="chat-input-field-group">
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                  disabled={loading || messagesLoading}
+                />
+                <button
+                  type="button"
+                  className={`chat-send-icon${loading ? " chat-send-icon--stop" : ""}`}
+                  onClick={loading ? handleStop : () => handleSendMessage()}
+                  disabled={!loading && (!inputText.trim() || messagesLoading)}
+                  aria-label={loading ? "Stop generating" : "Send"}
+                >
+                  {loading ? <span className="chat-stop-square" aria-hidden /> : <SendOutlined />}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
-
-      {!initialLoading && (
-        <div className="chat-footer-refined">
-          {(() => {
-            const hasExistingRoute = messages.some(
-              (m) => m.routeDataList?.length > 0 || m.routeData
-            );
-            const lastRouteMsg = [...messages]
-              .reverse()
-              .find((m) => m.routeDataList?.length > 0 || m.routeData);
-            const lastRoute =
-              lastRouteMsg?.routeDataList?.[0] || lastRouteMsg?.routeData;
-            const totalDays =
-              lastRoute?.days?.length || lastRoute?.total_days || 0;
-
-            if (hasExistingRoute) {
-              return (
-                <div className="chat-quick-actions">
-                  <span className="chat-quick-label">Edit route:</span>
-                  {totalDays >= 1 && (
-                    <button
-                      type="button"
-                      className="chat-quick-chip"
-                      onClick={() => handleSendMessage("Make day 1 more museum-focused")}
-                      disabled={loading || messagesLoading}
-                    >
-                      Day 1: more museums
-                    </button>
-                  )}
-                  {totalDays >= 2 && (
-                    <button
-                      type="button"
-                      className="chat-quick-chip"
-                      onClick={() => handleSendMessage("Slow down day 2")}
-                      disabled={loading || messagesLoading}
-                    >
-                      Slow down day 2
-                    </button>
-                  )}
-                  {totalDays >= 3 && (
-                    <button
-                      type="button"
-                      className="chat-quick-chip"
-                      onClick={() => handleSendMessage("Add more dining options to day 3")}
-                      disabled={loading || messagesLoading}
-                    >
-                      Day 3: more dining
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="chat-quick-chip"
-                    onClick={() => handleSendMessage("Change the pace to slow for the whole trip")}
-                    disabled={loading || messagesLoading}
-                  >
-                    Slower pace
-                  </button>
-                </div>
-              );
-            }
-
-            return (
-              <div className="chat-quick-actions">
-                <span className="chat-quick-label">Plan a route:</span>
-                <button
-                  type="button"
-                  className="chat-quick-chip"
-                  onClick={() => handleSendMessage("Plan a 3-day trip to Istanbul")}
-                  disabled={loading || messagesLoading}
-                >
-                  3-day Istanbul
-                </button>
-                <button
-                  type="button"
-                  className="chat-quick-chip"
-                  onClick={() => handleSendMessage("Plan a 2-day trip to Rome")}
-                  disabled={loading || messagesLoading}
-                >
-                  2-day Rome
-                </button>
-                <button
-                  type="button"
-                  className="chat-quick-chip"
-                  onClick={() => handleSendMessage("Create a 4-day Antalya vacation plan for me")}
-                  disabled={loading || messagesLoading}
-                >
-                  4-day Antalya
-                </button>
-              </div>
-            );
-          })()}
-          <div className="chat-input-field-group">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              disabled={loading || messagesLoading}
-            />
-            <button
-              type="button"
-              className={`chat-send-icon${loading ? " chat-send-icon--stop" : ""}`}
-              onClick={loading ? handleStop : () => handleSendMessage()}
-              disabled={!loading && (!inputText.trim() || messagesLoading)}
-              aria-label={loading ? "Stop generating" : "Send"}
-            >
-              {loading ? <span className="chat-stop-square" aria-hidden /> : <SendOutlined />}
-            </button>
-          </div>
-        </div>
-        )}
-          </>
-        )}
     </div>
   );
 

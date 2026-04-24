@@ -100,7 +100,7 @@ const AuthActionPage = () => {
                 await confirmPasswordReset(auth, oobCode, values.password);
             }
             setStatus("resetSuccess");
-            message.success("Password updated successfully!");
+            // message.success("Password updated successfully!");
         } catch (error) {
             console.error("Password reset error:", error);
             if (error.code === "auth/weak-password") {
