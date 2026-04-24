@@ -13,6 +13,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,6 +31,9 @@ import java.util.Map;
 @Slf4j
 @Component
 public class MapboxPoiSearchClient {
+
+    /** Search Box category endpoint caps per-request results (see Mapbox docs). */
+    public static final int CATEGORY_SEARCH_MAX_LIMIT = 10;
 
     private final WebClient webClient;
 
@@ -144,7 +149,7 @@ public class MapboxPoiSearchClient {
                 .uri(uriBuilder -> uriBuilder
                         .path("/search/searchbox/v1/category/{category}")
                         .queryParam("bbox", minLon + "," + minLat + "," + maxLon + "," + maxLat)
-                        .queryParam("limit", 20)
+                        .queryParam("limit", CATEGORY_SEARCH_MAX_LIMIT)
                         .queryParam("language", "en")
                         .build(mapboxCategory))
                 .retrieve()
@@ -157,6 +162,48 @@ public class MapboxPoiSearchClient {
                             .toList();
                 })
                 .onErrorResume(e -> Mono.just(List.of()));
+    }
+
+    /**
+     * Category search split over an N×N bbox grid so each cell can return up to
+     * {@link #CATEGORY_SEARCH_MAX_LIMIT} POIs (Mapbox does not paginate category search).
+     */
+    public List<PoiResult> searchByCategoryTiled(String category,
+            double minLon, double minLat, double maxLon, double maxLat, int gridN) {
+        int n = Math.max(1, Math.min(gridN, 8));
+        Map<String, PoiResult> dedup = new LinkedHashMap<>();
+        double dLon = (maxLon - minLon) / n;
+        double dLat = (maxLat - minLat) / n;
+        if (dLon <= 0 || dLat <= 0) {
+            return List.of();
+        }
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                double cMinLon = minLon + j * dLon;
+                double cMinLat = minLat + i * dLat;
+                double cMaxLon = (j == n - 1) ? maxLon : minLon + (j + 1) * dLon;
+                double cMaxLat = (i == n - 1) ? maxLat : minLat + (i + 1) * dLat;
+                List<PoiResult> batch = searchByCategory(category, cMinLon, cMinLat, cMaxLon, cMaxLat)
+                        .blockOptional()
+                        .orElse(List.of());
+                for (PoiResult p : batch) {
+                    if (p == null) continue;
+                    dedup.putIfAbsent(dedupKey(p), p);
+                }
+            }
+        }
+        return new ArrayList<>(dedup.values());
+    }
+
+    private static String dedupKey(PoiResult p) {
+        if (p.getMapboxId() != null && !p.getMapboxId().isBlank()) {
+            return p.getMapboxId();
+        }
+        if (p.getExternalId() != null && !p.getExternalId().isBlank()) {
+            return "fsq:" + p.getExternalId();
+        }
+        String name = p.getName() != null ? p.getName().toLowerCase(Locale.ROOT) : "";
+        return String.format(Locale.ROOT, "%s|%.5f|%.5f", name, p.getLat(), p.getLon());
     }
 
     /**
