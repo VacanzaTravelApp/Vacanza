@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Unica+One&display=swap');
+
 :root {
   --vivid-navy: #1A2332;
   --vivid-navy-light: #5A6B7A;
@@ -160,16 +162,15 @@ html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
   gap: 10px;
 }
 
-.tiny-compass { width: 24px; height: 24px; color: var(--vivid-navy); }
+.tiny-compass { width: 44px; height: 44px; display: block; }
 
 .brand-name {
-  font-family: var(--font-display);
+  font-family: 'Unica One', var(--font-display);
   font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
   color: var(--text-main);
   transition: color 1.5s ease;
-  font-variation-settings: 'SOFT' 80, 'WONK' 1;
   text-shadow: var(--text-shadow);
 }
 
