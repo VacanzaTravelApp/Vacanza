@@ -149,9 +149,6 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
     // Capture theme-derived colors synchronously (avoid async BuildContext gaps).
     final base = context.mapControlAccent;
-    final hi = context.mapControlActiveGradientColors.length > 1
-        ? context.mapControlActiveGradientColors[1]
-        : base;
     final isLight = Theme.of(context).brightness == Brightness.light;
 
     final isActive =
@@ -159,7 +156,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     final poly = isActive ? (ctx.area as PolygonArea) : null;
 
     await _ensureSelectionLayers(map);
-    await _applySelectionLayerStyle(map, base: base, hi: hi, isLight: isLight);
+    await _applySelectionLayerStyle(map, base: base, isLight: isLight);
     await _setSelectionGeoJson(map, poly);
   }
 
@@ -215,7 +212,6 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   Future<void> _applySelectionLayerStyle(
     mb.MapboxMap map, {
     required Color base,
-    required Color hi,
     required bool isLight,
   }) async {
     String hexRgb(Color c) {
@@ -233,7 +229,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       return (v * 255.0).round().clamp(0, 255);
     }
 
-    // Fill: translucent accent (match web’s ~0.08 feel, but using app accent colors).
+    // Fill: translucent accent (match web's ~0.08 feel, but using app accent colors).
     final fillA = isLight ? 0.10 : 0.12;
     final fillBase = base.withValues(alpha: fillA);
     final fill =
@@ -243,7 +239,40 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     // Keep alpha only in the color; avoid stacking opacity to prevent hue shifts.
     await map.style.setStyleLayerProperty(_selFillLayerId, 'fill-opacity', 1.0);
 
-    // Outline: prefer Mapbox Flutter `LineLayer` fields so expressions serialize correctly.
+    // Outline: use the same multi-color palette as FreehandPainter so the
+    // selection polygon matches the look of the live drawing stroke.
+    final t = context.vacanzaTokens;
+    final gradColors = isLight
+        ? <Color>[
+            t.vividCoral,
+            t.vividAmber,
+            const Color(0xFFFF8C42),
+            const Color(0xFFFFAB91),
+            const Color(0xFFF472B6),
+          ]
+        : <Color>[
+            const Color(0xFF1E3A8A),
+            const Color(0xFF2563EB),
+            t.vividBlue,
+            const Color(0xFF4F46E5),
+            const Color(0xFF7C3AED),
+          ];
+
+    final gradStops = List<double>.generate(
+      gradColors.length,
+      (i) => i / (gradColors.length - 1),
+    );
+
+    final gradExpression = <Object>[
+      'interpolate',
+      ['linear'],
+      ['line-progress'],
+      for (int i = 0; i < gradColors.length; i++) ...[
+        gradStops[i],
+        hexRgb(gradColors[i]),
+      ],
+    ];
+
     final layer = await map.style.getLayer(_selOutlineLayerId);
     if (layer is mb.LineLayer) {
       layer.lineCap = mb.LineCap.ROUND;
@@ -251,16 +280,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
       layer.lineWidth = 4.0;
       layer.lineOpacity = 1.0;
       layer.lineColor = const Color(0x00000000).toARGB32();
-      // Use the same 2-color gradient family as the draw stroke, stretched across the path.
-      layer.lineGradientExpression = <Object>[
-        'interpolate',
-        ['linear'],
-        ['line-progress'],
-        0.0,
-        hexRgb(base),
-        1.0,
-        hexRgb(hi),
-      ];
+      layer.lineGradientExpression = gradExpression;
       await map.style.updateLayer(layer);
     }
   }
@@ -585,7 +605,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                   '[MapCanvas] FlyToPoi lat=$lat lng=$lng zoom=${state.flyToPoiZoom}',
                 );
                 // Longer suspend than default: route sheet taps + camera fly used to
-                // thrash viewport-driven POI reloads and relayout (sheet felt like it “collapsed”).
+                // thrash viewport-driven POI reloads and relayout (sheet felt like it "collapsed").
                 _suspendViewportFor(ms: 1400);
 
                 await map.flyTo(
