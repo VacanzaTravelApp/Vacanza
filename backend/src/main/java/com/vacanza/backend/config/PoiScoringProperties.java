@@ -49,6 +49,13 @@ public class PoiScoringProperties {
      */
     private AvoidMode avoidMode = AvoidMode.DROP;
 
+    /**
+     * Random ± jitter applied to FOOD-family POI scores after deterministic scoring, so different
+     * sessions surface different restaurants. Keep ≤ 0.5 to preserve quality ordering between
+     * meaningfully different venues (total deterministic score range is ~0–3). Set to 0 to disable.
+     */
+    private double diningVarietyJitter = 0.30;
+
     public enum AvoidMode {
         DROP,
         PENALTY

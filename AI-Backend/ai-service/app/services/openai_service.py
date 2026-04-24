@@ -5,11 +5,12 @@ from langchain_openai import ChatOpenAI
 from app.core.config import Settings
 
 
-def create_chat_model(settings: Settings) -> ChatOpenAI:
+def create_chat_model(settings: Settings, temperature: float = 0.0) -> ChatOpenAI:
     """Creates a LangChain ChatOpenAI instance from settings.
 
     Args:
         settings: Application settings containing OpenAI config.
+        temperature: Sampling temperature (0 = deterministic, 0.3 = creative variety).
 
     Returns:
         Configured ChatOpenAI instance.
@@ -17,7 +18,7 @@ def create_chat_model(settings: Settings) -> ChatOpenAI:
     return ChatOpenAI(
         api_key=settings.openai_api_key,
         model=settings.openai_model,
-        temperature=0,
+        temperature=temperature,
         max_tokens=6000,
     )
 
