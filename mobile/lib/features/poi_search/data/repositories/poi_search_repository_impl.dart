@@ -1,6 +1,8 @@
 import 'dart:developer';
+
 import 'package:dio/dio.dart';
 
+import '../api/poi_mapbox_stream_event.dart';
 import '../api/poi_search_api_client.dart';
 import '../api/poi_search_in_area_request_dto.dart';
 import '../api/poi_search_in_area_response_dto.dart';
@@ -42,6 +44,52 @@ class PoiSearchRepositoryImpl implements PoiSearchRepository {
         '[PoiSearchRepository] DioException status=${e.response?.statusCode} raw="$rawMessage"',
       );
 
+      throw PoiSearchRepositoryException(
+        code: parsed.code,
+        message: parsed.message,
+      );
+    } on FormatException catch (e) {
+      throw PoiSearchRepositoryException(
+        code: 'INVALID_RESPONSE',
+        message: e.message,
+      );
+    } catch (e) {
+      throw const PoiSearchRepositoryException(
+        code: 'UNKNOWN_ERROR',
+        message: 'Request failed',
+      );
+    }
+  }
+
+  @override
+  Stream<PoiMapboxStreamEvent> searchInAreaMapboxStream({
+    required SelectedArea area,
+    List<String>? categories,
+    int page = 0,
+    int? limit,
+    PoiSort? sort,
+    CancelToken? cancelToken,
+  }) async* {
+    final normalizedCategories = _normalizeCategories(categories);
+
+    try {
+      yield* _api.searchInAreaMapboxStream(
+        area: area,
+        categories: normalizedCategories,
+        page: page,
+        limit: limit,
+        sort: sort,
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        return;
+      }
+      final rawMessage = _extractBackendMessage(e);
+      final parsed = parseCodeMessage(rawMessage);
+      log(
+        '[PoiSearchRepository] stream DioException status=${e.response?.statusCode} raw="$rawMessage"',
+      );
       throw PoiSearchRepositoryException(
         code: parsed.code,
         message: parsed.message,

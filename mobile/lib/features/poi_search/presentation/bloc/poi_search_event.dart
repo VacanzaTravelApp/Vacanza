@@ -76,3 +76,8 @@ class HidePoiMarkers extends PoiSearchEvent {
 class ShowPoiMarkers extends PoiSearchEvent {
   const ShowPoiMarkers();
 }
+
+/// [PoiSearchState.streamSuggestedChipKey] UI uyguladıktan sonra temizle.
+class StreamChipSuggestionConsumed extends PoiSearchEvent {
+  const StreamChipSuggestionConsumed();
+}

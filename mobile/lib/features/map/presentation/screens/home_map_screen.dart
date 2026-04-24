@@ -199,7 +199,7 @@ class _HomeMapViewState extends State<_HomeMapView>
     final ps = context.read<PoiSearchBloc>().state;
     if (ps.status == PoiSearchStatus.success &&
         ps.areaSource == AreaSource.userSelection &&
-        ps.pois.isNotEmpty) {
+        (ps.pois.isNotEmpty || ps.mapboxAreaStreamLoading)) {
       setState(() => _resultsOpen = true);
     }
   }
@@ -556,6 +556,21 @@ class _HomeMapViewState extends State<_HomeMapView>
           },
         ),
 
+        BlocListener<PoiSearchBloc, PoiSearchState>(
+          listenWhen:
+              (prev, next) =>
+                  next.streamSuggestedChipKey != null &&
+                  next.streamSuggestedChipKey != prev.streamSuggestedChipKey,
+          listener: (context, state) {
+            final k = state.streamSuggestedChipKey;
+            if (k == null || !mounted) return;
+            setState(() => _activeChipKey = k);
+            context.read<PoiSearchBloc>().add(
+              const poi.StreamChipSuggestionConsumed(),
+            );
+          },
+        ),
+
         BlocListener<AreaQueryBloc, AreaQueryState>(
           listenWhen: (prev, next) => prev.context != next.context,
           listener: (context, state) {
@@ -606,7 +621,8 @@ class _HomeMapViewState extends State<_HomeMapView>
                   prev.status != next.status ||
                   prev.areaSource != next.areaSource ||
                   prev.pois != next.pois ||
-                  prev.selectedCategories != next.selectedCategories,
+                  prev.selectedCategories != next.selectedCategories ||
+                  prev.mapboxAreaStreamLoading != next.mapboxAreaStreamLoading,
           listener: (context, state) {
             // MOB-2: forward POI list to candidate cubit on any POI change
             context.read<CandidatePoiCubit>().updatePois(state.pois);
@@ -615,10 +631,10 @@ class _HomeMapViewState extends State<_HomeMapView>
               return;
             }
 
-            // User selection + success -> sheet aç
+            // User selection + success -> sheet aç (stream başlarken boş liste olabilir)
             if (state.status == PoiSearchStatus.success &&
                 state.areaSource == AreaSource.userSelection &&
-                state.pois.isNotEmpty) {
+                (state.pois.isNotEmpty || state.mapboxAreaStreamLoading)) {
               if (!_resultsOpen && mounted) {
                 setState(() {
                   _resultsOpen = true;
@@ -714,6 +730,7 @@ class _HomeMapViewState extends State<_HomeMapView>
             isCreatingRoute:
                 activeRouteState.status == ActiveRouteStatus.loading,
             onCreateRouteFromArea: _beginCreateRouteFromArea,
+            showStreamLoadingMore: poiState.mapboxAreaStreamLoading,
           );
 
           return HomeMapScaffold(

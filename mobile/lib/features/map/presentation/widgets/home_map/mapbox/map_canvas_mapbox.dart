@@ -33,6 +33,7 @@ import '../markers/poi_markers_listener.dart';
 import '../markers/route_markers_controller.dart';
 import 'mapbox_view.dart';
 import 'package:mobile/core/config/mapbox_config.dart';
+import 'package:mobile/core/config/poi_map_config.dart';
 import 'package:mobile/core/theme/app_theme.dart';
 import '../../../../../poi_search/data/services/style_poi_discovery_binding.dart';
 import 'package:mobile/features/ai/presentation/cubit/active_route_cubit.dart';
@@ -70,6 +71,9 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
   /// Yarışan GET/POST directions yanıtlarını yok say.
   int _directionsEpoch = 0;
+
+  /// Çizim modunda zoom < [PoiMapConfig.minZoomForAreaDraw] iken jestleri kapatma (haritayı yakınlaştırılabilir tut).
+  bool _drawingZoomOk = true;
 
   static String _styleUriForBasemap(MapBasemap basemap) {
     return switch (basemap) {
@@ -379,6 +383,19 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     }
   }
 
+  Future<void> _refreshDrawingZoomGate() async {
+    final map = _map;
+    if (map == null) return;
+    try {
+      final z = (await map.getCameraState()).zoom;
+      if (!mounted) return;
+      final ok = z >= PoiMapConfig.minZoomForAreaDraw;
+      if (_drawingZoomOk != ok) setState(() => _drawingZoomOk = ok);
+    } catch (e) {
+      log('[MapCanvas] _refreshDrawingZoomGate failed: $e');
+    }
+  }
+
   // ── Native location puck (minimal settings) ───────────────────────
 
   Future<void> _enableLocationPuck(mb.MapboxMap map) async {
@@ -416,6 +433,16 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
         return MultiBlocListener(
           listeners: [
+            BlocListener<MapBloc, MapState>(
+              listenWhen: (prev, next) => prev.isDrawing != next.isDrawing,
+              listener: (context, state) {
+                if (state.isDrawing) {
+                  unawaited(_refreshDrawingZoomGate());
+                } else if (!_drawingZoomOk) {
+                  setState(() => _drawingZoomOk = true);
+                }
+              },
+            ),
             // ── Basemap / perspective (web: STYLES × is3D) ────────────
             BlocListener<MapBloc, MapState>(
               listenWhen:
@@ -710,7 +737,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                     children: [
                       Positioned.fill(
                         child: MapboxView(
-                          ignoreGestures: isDrawing,
+                          ignoreGestures: isDrawing && _drawingZoomOk,
                           cameraOptions: _cameraForLocation(locState),
                           mapWidgetKey: ValueKey(
                             'map-${locState.latitude != null && locState.longitude != null ? 'gps' : 'nogps'}-${locState.status}',
@@ -718,7 +745,10 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                           onMapCreated: _onMapCreated,
                           onMapIdle: () {
                             if (_map == null) return;
-                            if (isDrawing) return;
+                            if (isDrawing) {
+                              unawaited(_refreshDrawingZoomGate());
+                              return;
+                            }
                           },
                           onViewportBbox: (bbox) {
                             if (_suspendViewportUpdates) return;
@@ -744,6 +774,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                       MapDrawingOverlay(
                         isDrawing: isDrawing,
                         map: _map,
+                        allowDrawingGestures: _drawingZoomOk,
                         // Selection polygon is rendered as a Mapbox layer (geo anchored).
                         activeSelectionPolygon: null,
                         rebuildTick: 0,
@@ -754,6 +785,39 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                           context.read<MapBloc>().add(SetDrawingEnabled(false));
                         },
                       ),
+
+                      if (isDrawing && !_drawingZoomOk)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: ColoredBox(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.scrim.withValues(alpha: 0.14),
+                              child: Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 28,
+                                  ),
+                                  child: Text(
+                                    'Alan çizmek için haritayı yakınlaştırın '
+                                    '(zoom ${PoiMapConfig.minZoomForAreaDraw.toInt()}+).',
+                                    textAlign: TextAlign.center,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(
+                                          color:
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
         );
