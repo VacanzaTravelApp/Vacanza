@@ -28,6 +28,12 @@ class PoiSearchState extends Equatable {
   final Map<String, int> countsByCategory;
   final bool hidePoiMarkers;
 
+  /// Mapbox SSE alan araması devam ediyor (polygon + flag).
+  final bool mapboxAreaStreamLoading;
+
+  /// İlk anlamlı chunk sonrası chip’e bir kez geçmek için (UI tüketince temizlenir).
+  final String? streamSuggestedChipKey;
+
   const PoiSearchState({
     required this.areaSource,
     required this.selectedArea,
@@ -42,6 +48,8 @@ class PoiSearchState extends Equatable {
     required this.pois,
     required this.countsByCategory,
     this.hidePoiMarkers = false,
+    this.mapboxAreaStreamLoading = false,
+    this.streamSuggestedChipKey,
   });
 
   factory PoiSearchState.initial() => PoiSearchState(
@@ -58,6 +66,8 @@ class PoiSearchState extends Equatable {
     pois: const [],
     countsByCategory: const {},
     hidePoiMarkers: false,
+    mapboxAreaStreamLoading: false,
+    streamSuggestedChipKey: null,
   );
 
   bool get isLoading => status == PoiSearchStatus.loading;
@@ -79,6 +89,8 @@ class PoiSearchState extends Equatable {
     List<Poi>? pois,
     Map<String, int>? countsByCategory,
     bool? hidePoiMarkers,
+    bool? mapboxAreaStreamLoading,
+    Object? streamSuggestedChipKey = _noChange,
   }) {
     return PoiSearchState(
       areaSource: areaSource ?? this.areaSource,
@@ -94,6 +106,11 @@ class PoiSearchState extends Equatable {
       pois: pois ?? this.pois,
       countsByCategory: countsByCategory ?? this.countsByCategory,
       hidePoiMarkers: hidePoiMarkers ?? this.hidePoiMarkers,
+      mapboxAreaStreamLoading:
+          mapboxAreaStreamLoading ?? this.mapboxAreaStreamLoading,
+      streamSuggestedChipKey: identical(streamSuggestedChipKey, _noChange)
+          ? this.streamSuggestedChipKey
+          : streamSuggestedChipKey as String?,
     );
   }
 
@@ -112,5 +129,7 @@ class PoiSearchState extends Equatable {
     pois,
     countsByCategory,
     hidePoiMarkers,
+    mapboxAreaStreamLoading,
+    streamSuggestedChipKey,
   ];
 }

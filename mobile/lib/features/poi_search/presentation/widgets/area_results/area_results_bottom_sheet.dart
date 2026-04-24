@@ -52,6 +52,9 @@ class AreaResultsSheet extends StatelessWidget {
 
   final VoidCallback? onCreateRouteFromArea;
 
+  /// Mapbox SSE: kategoriler gelirken ince yükleme çubuğu.
+  final bool showStreamLoadingMore;
+
   const AreaResultsSheet({
     super.key,
     required this.isVisible,
@@ -67,6 +70,7 @@ class AreaResultsSheet extends StatelessWidget {
     this.showCreateRouteFromArea = false,
     this.isCreatingRoute = false,
     this.onCreateRouteFromArea,
+    this.showStreamLoadingMore = false,
   });
 
   String _labelFor(String key) {
@@ -254,6 +258,32 @@ class AreaResultsSheet extends StatelessWidget {
                   colorFor: (key) => _colorFor(context, key),
                   onChipSelected: onChipSelected,
                 ),
+
+                if (showStreamLoadingMore) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Daha fazla kategori yükleniyor…',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: t.textSub,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            minHeight: 3,
+                            backgroundColor: t.cardBorder,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 Divider(height: 1, color: t.cardBorder),
 

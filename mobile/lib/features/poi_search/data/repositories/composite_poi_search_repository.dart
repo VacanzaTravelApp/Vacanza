@@ -1,5 +1,8 @@
 import 'dart:developer';
 
+import 'package:dio/dio.dart';
+
+import '../api/poi_mapbox_stream_event.dart';
 import '../api/poi_search_in_area_request_dto.dart';
 import '../api/poi_search_in_area_response_dto.dart';
 import '../models/poi.dart';
@@ -121,5 +124,24 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
           ),
         )
         .toList();
+  }
+
+  @override
+  Stream<PoiMapboxStreamEvent> searchInAreaMapboxStream({
+    required SelectedArea area,
+    List<String>? categories,
+    int page = 0,
+    int? limit,
+    PoiSort? sort,
+    CancelToken? cancelToken,
+  }) {
+    return _backend.searchInAreaMapboxStream(
+      area: area,
+      categories: categories,
+      page: page,
+      limit: limit,
+      sort: sort,
+      cancelToken: cancelToken,
+    );
   }
 }
