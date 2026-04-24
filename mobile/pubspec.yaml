@@ -47,6 +47,10 @@ dependencies:
   # HTTP client
   dio: ^5.7.0
 
+  # File export (ICS) + open with native handler
+  path_provider: ^2.1.5
+  open_filex: ^4.7.0
+
   # GPS & permissions (MOB-1)
   geolocator: ^14.0.2
   permission_handler: ^11.3.1

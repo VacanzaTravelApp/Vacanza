@@ -31,6 +31,8 @@ import 'features/booking/data/repositories/booking_repository.dart';
 
 import 'features/chat/data/api/chat_api_client.dart';
 import 'features/ai/data/api/ai_route_api_client.dart';
+import 'features/trip_calendar/data/api/trip_calendar_api_client.dart';
+import 'features/trip_calendar/services/ics_export_service.dart';
 
 import 'features/profile/data/datasources/profile_remote_data_source.dart';
 import 'features/profile/data/repositories/profile_repository.dart';
@@ -127,6 +129,14 @@ class VacanzaApp extends StatelessWidget {
         /// Saved AI routes + directions (shared by map AI route UI)
         RepositoryProvider<AiRouteApiClient>(
           create: (ctx) => AiRouteApiClient(ctx.read<Dio>()),
+        ),
+
+        /// Trip calendar (Smart Calendar Sync)
+        RepositoryProvider<TripCalendarApiClient>(
+          create: (ctx) => TripCalendarApiClient(ctx.read<Dio>()),
+        ),
+        RepositoryProvider<IcsExportService>(
+          create: (ctx) => IcsExportService(ctx.read<TripCalendarApiClient>()),
         ),
 
         /// Profile (MOB-9 / profile feature)
