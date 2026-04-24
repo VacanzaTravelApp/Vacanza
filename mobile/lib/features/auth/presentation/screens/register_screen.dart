@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 // BLoC yönetimi için gerekli importlar
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 // Tema dosyaları (renkler, text stilleri, arkaplan animasyonu)
 import 'package:mobile/core/theme/app_text_styles.dart';
@@ -177,21 +178,23 @@ class RegisterScreen extends StatelessWidget {
                             const TextSpan(text: 'Create Your '),
                             TextSpan(
                               text: 'Vacanza ',
-                              style: TextStyle(
-                                foreground: Paint()
-                                  ..shader = LinearGradient(
-                                    colors: [
-                                      accent,
-                                      Color.lerp(
+                              style: GoogleFonts.unicaOne(
+                                textStyle: TextStyle(
+                                  foreground: Paint()
+                                    ..shader = LinearGradient(
+                                      colors: [
+                                        accent,
+                                        Color.lerp(
+                                              accent,
+                                              Colors.white,
+                                              isLight ? 0.08 : 0.18,
+                                            ) ??
                                             accent,
-                                            Colors.white,
-                                            isLight ? 0.08 : 0.18,
-                                          ) ??
-                                          accent,
-                                    ],
-                                  ).createShader(
-                                    const Rect.fromLTWH(0, 0, 160, 32),
-                                  ),
+                                      ],
+                                    ).createShader(
+                                      const Rect.fromLTWH(0, 0, 160, 32),
+                                    ),
+                                ),
                               ),
                             ),
                             const TextSpan(text: 'Account'),
