@@ -137,7 +137,7 @@ const TravelScene = ({ timeState, isLoaded }) => {
 };
 
 const TinyCompass = () => (
-  <img src={webIcon} className="tiny-compass" alt="Vacanza Icon" style={{ width: 32, height: 32 }} />
+  <img src={webIcon} className="tiny-compass" alt="Vacanza Icon" style={{ width: 44, height: 44, display: 'block' }} />
 );
 
 const PlaneIcon = () => (

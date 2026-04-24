@@ -1853,8 +1853,8 @@ export default function MapPage() {
             style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
             onClick={() => window.location.reload()}
           >
-            <img src={webIcon} alt="Vacanza" style={{ width: 36, height: 36 }} />
-            Vacanza
+            <img src={webIcon} alt="Vacanza" style={{ width: 44, height: 44, display: 'block' }} />
+            <span style={{ lineHeight: 1 }}>Vacanza</span>
           </div>
         </div>
         <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1899,7 +1899,7 @@ export default function MapPage() {
       <div className="vivid-sidebar-overlay" onClick={(e) => { e.stopPropagation(); setSidebarOpen(false); }} />
       <aside className="vivid-sidebar">
         <div className="sidebar-header" style={{ marginBottom: 24 }}>
-          <span className="brand-logo" style={{ marginLeft: 0, fontSize: 24 }}>Settings</span>
+          <span className="sidebar-title">Settings</span>
         </div>
 
         <div className="sidebar-user-section">
