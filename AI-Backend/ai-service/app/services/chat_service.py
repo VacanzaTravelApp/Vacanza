@@ -1903,26 +1903,28 @@ def _poi_names_are_related(
 
 
 def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dict]) -> RouteData:
-    """Post-process: detect waypoints that carry ANOTHER POI's coordinates (coordinate theft).
+    """Enforce that every waypoint's coordinates come from Mapbox (via tool_pois or geocoding).
 
-    The AI reads a long POI list and occasionally copies a different POI's lat/lon to a
-    waypoint. This covers ALL categories (sightseeing and dining alike).
+    All non-null coordinates that cannot be traced back to a verified Mapbox entry in
+    tool_pois are cleared so the Java backend re-fetches them via resolveNullCoordinates.
+    This guarantees coordinates are never sourced from AI training-data knowledge.
 
-    Detection: for each waypoint with non-null coordinates, look up those coordinates
-    (≤ 4 decimal places ≈ 11 m) in the full POI index. If a match is found and the
-    matched POI's name is UNRELATED to the waypoint name, the coordinates are cleared so
-    the Java backend can geocode the correct location via Mapbox.
+    Two failure modes caught:
+    1. AI used coordinates of a *different* POI in the list (coordinate theft).
+    2. AI invented coordinates not in the list at all (hallucination).
 
-    common_words: words that appear in ≥ 3 POI names are excluded from name matching
-    (city names, generic category words like "museum"/"mosque" share across many POIs
-    and would produce false positives if used as the sole discriminating signal).
+    When tool_pois is empty (e.g. Turn-3 edit with no new POI search), every non-null
+    coordinate is cleared — all coordinates are re-verified against Mapbox.
+
+    common_words: words appearing in ≥ 3 POI names are excluded from name matching
+    to avoid false positives on shared city/category terms.
     """
-    if not route_data.days or not tool_pois:
+    if not route_data.days:
         return route_data
 
-    # Index ALL POI coordinates: (lat4, lon4) -> poi name
+    # Index verified Mapbox coordinates: (lat4, lon4) -> poi name
     coord_to_poi: dict[tuple[float, float], str] = {}
-    for p in tool_pois:
+    for p in (tool_pois or []):
         lat = p.get("lat")
         lon = p.get("lon")
         name = p.get("name") or ""
@@ -1930,17 +1932,10 @@ def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dic
             key = (round(float(lat), 4), round(float(lon), 4))
             coord_to_poi[key] = name
 
-    if not coord_to_poi:
-        return route_data
-
-    # Build common_words: words (>3 chars) that appear in ≥ 3 POI names.
-    # These are non-discriminating (city names, generic terms) and must not
-    # be counted as a match signal — prevents false positives like
-    # "Istanbul Museum of Modern Art" matching "Istanbul Archaeology Museums"
-    # solely because both contain "istanbul".
+    # Build common_words from whatever pool we have (may be empty).
     from collections import Counter
     word_counts: Counter = Counter()
-    for p in tool_pois:
+    for p in (tool_pois or []):
         name = (p.get("name") or "").lower()
         for w in name.split():
             if len(w) > 3:
@@ -1954,16 +1949,27 @@ def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dic
 
             key = (round(wp.latitude, 4), round(wp.longitude, 4))
             poi_name = coord_to_poi.get(key)
+
             if poi_name is None:
-                continue  # Coordinates not from list — AI world knowledge, leave alone
+                # Coordinates not traceable to any verified Mapbox entry.
+                # This covers both hallucinated coords and the case where tool_pois is
+                # empty (Turn-3 edit): clear so Java geocodes via Mapbox.
+                logger.warning(
+                    "[COORD_MISMATCH] Day %s: '%s' (%s) has unverified coordinates"
+                    " → clearing for Mapbox geocode",
+                    day_plan.day, wp.name, wp.category,
+                )
+                wp.latitude = None
+                wp.longitude = None
+                continue
 
             if _poi_names_are_related(wp.name, poi_name, common_words):
-                continue  # Correct: waypoint correctly references this POI's coordinates
+                continue  # Correct: coordinates match this waypoint's Mapbox entry
 
-            # Coordinate theft detected — waypoint name and list POI name are unrelated
+            # Coordinate theft: AI assigned a different POI's coordinates to this waypoint.
             logger.warning(
                 "[COORD_MISMATCH] Day %s: '%s' (%s) has coordinates of unrelated POI '%s'"
-                " → clearing for proper geocode",
+                " → clearing for Mapbox geocode",
                 day_plan.day, wp.name, wp.category, poi_name,
             )
             wp.latitude = None
