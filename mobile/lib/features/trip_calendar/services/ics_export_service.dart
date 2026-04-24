@@ -50,13 +50,20 @@ class IcsExportService {
       type: 'text/calendar',
     );
 
-    // If OS cannot handle ICS, surface a clear message.
-    if (result.type != ResultType.done) {
-      final msg = result.message;
+    if (result.type == ResultType.done) {
       NavigationService.showSnackBar(
-        msg.trim().isNotEmpty ? msg.trim() : 'Could not open calendar file on this device.',
+        "Added to Trip Agenda. To add it to your phone calendar, tap Add/Save in your calendar app.",
       );
+      return;
     }
+
+    // If OS cannot handle ICS, surface a clear message.
+    final msg = result.message;
+    NavigationService.showSnackBar(
+      msg.trim().isNotEmpty
+          ? msg.trim()
+          : 'Could not open calendar file on this device.',
+    );
   }
 
   Future<File> _writeTempIcs(Uint8List bytes, {required String filename}) async {
