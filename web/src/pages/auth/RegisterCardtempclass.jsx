@@ -111,13 +111,18 @@ const RegisterCard = () => {
       });
 
       // 2. Sync with Backend Database & Create Session
-      await authApi.register({
-        email,
-        firstName,
-        lastName,
-        middleName: middleName || null,
-        preferredName: (preferredName && preferredName.length > 0) ? preferredName[0] : null
-      });
+      try {
+        await authApi.register({
+          email,
+          firstName,
+          lastName,
+          middleName: middleName || null,
+          preferredName: (preferredName && Array.isArray(preferredName) && preferredName.length > 0) ? preferredName[0] : null
+        });
+      } catch (regErr) {
+        console.error("Backend Profile Sync Failed:", regErr);
+        message.warning("Account created, but profile could not be fully synced. You can update it in settings.");
+      }
 
       // Synchronize backend session (Spring Session sync with Firebase token)
       try {
@@ -185,17 +190,17 @@ const RegisterCard = () => {
         scrollToFirstError
         layout="vertical"
         className="auth-form"
-        requiredMark={false}
       >
         <Row gutter={12}>
           <Col span={12}>
             <Form.Item
               name="firstName"
+              label="First Name"
               rules={[{ required: true, message: 'Please enter your first name!' }]}
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="First Name *"
+                placeholder="First Name"
                 size="large"
                 autoComplete="given-name"
               />
@@ -205,6 +210,7 @@ const RegisterCard = () => {
           <Col span={12}>
             <Form.Item
               name="middleName"
+              label="Middle Name"
             >
               <Input
                 prefix={<UserOutlined />}
@@ -217,11 +223,12 @@ const RegisterCard = () => {
 
         <Form.Item
           name="lastName"
+          label="Last Name"
           rules={[{ required: true, message: 'Please enter your last name!' }]}
         >
           <Input
             prefix={<UserOutlined />}
-            placeholder="Last Name *"
+            placeholder="Last Name"
             size="large"
             autoComplete="family-name"
           />
@@ -256,7 +263,7 @@ const RegisterCard = () => {
         >
           <Input
             prefix={<MailOutlined />}
-            placeholder="Email address *"
+            placeholder="Email address"
             size="large"
             autoComplete="email"
           />
@@ -264,12 +271,25 @@ const RegisterCard = () => {
         <Form.Item
           name="password"
           label="Password"
-          rules={[{ required: true, message: 'Password is required' }]}
+          rules={[
+            { required: true, message: 'Password is required' },
+            {
+              validator: (_, value) => {
+                if (!value) return Promise.resolve();
+                if (value.length < 8) return Promise.reject(new Error('Password must be at least 8 characters long'));
+                if (!/[A-Z]/.test(value)) return Promise.reject(new Error('Password must contain an uppercase letter'));
+                if (!/[a-z]/.test(value)) return Promise.reject(new Error('Password must contain a lowercase letter'));
+                if (!/[0-9]/.test(value)) return Promise.reject(new Error('Password must contain a number'));
+                if (!/[^A-Za-z0-9]/.test(value)) return Promise.reject(new Error('Password must contain a special character'));
+                return Promise.resolve();
+              }
+            }
+          ]}
           hasFeedback
         >
           <Input.Password
             prefix={<LockOutlined />}
-            placeholder="Password *"
+            placeholder="Password"
             size="large"
             autoComplete="new-password"
           />
@@ -296,29 +316,13 @@ const RegisterCard = () => {
         >
           <Input.Password
             prefix={<LockOutlined />}
-            placeholder="Confirm Password *"
+            placeholder="Confirm Password"
             size="large"
             autoComplete="new-password"
           />
         </Form.Item>
 
-        <Form.Item
-          name="agreedToTerms"
-          valuePropName="checked"
-          validateTrigger="onSubmit"
-          rules={[
-            {
-              validator: (_, value) =>
-                value ? Promise.resolve() : Promise.reject(new Error('You must accept the terms and conditions')),
-            },
-          ]}
-        >
-          <Checkbox>
-            I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
-          </Checkbox>
-        </Form.Item>
-
-        <div style={{ padding: "0 12px", fontSize: '11px', fontWeight: 700, color: '#455A64', opacity: 0.6, marginBottom: '20px' }}>
+        <div style={{ padding: "0 12px", fontSize: '11px', fontWeight: 700, color: '#FFFFFF', opacity: 0.8, marginBottom: '20px' }}>
           <span style={{ color: '#FF6B6B' }}>*</span> indicates a mandatory field
         </div>
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import AuthLayout from "./pages/auth/AuthLayout";
@@ -25,6 +25,39 @@ function LegacyFirebaseAuthLinkRedirect() {
 }
 
 const App = () => {
+    // Mac Trackpad Pinches trigger 'wheel' (Chrome) or 'gesturestart' (Safari/Mac)
+    // We prevent default browser UI zooming UNLESS we are hovering the map
+    useEffect(() => {
+        const handleZoomEvent = (e) => {
+            // Check if gesture started or event is occurring over the map
+            const isOverMap = e.target.closest('.mapboxgl-map') ||
+                e.target.closest('.mapboxgl-canvas-container');
+
+            if (isOverMap) return;
+
+            // Block wheel zoom with ctrl (Chrome/Edge pinch)
+            if (e.type === 'wheel' && e.ctrlKey) {
+                e.preventDefault();
+            }
+
+            // Block MacOS Safari native pinch gesture
+            if (e.type === 'gesturestart' || e.type === 'gesturechange') {
+                e.preventDefault();
+            }
+        };
+
+        // passive: false is mandatory to allow preventDefault()
+        document.addEventListener('wheel', handleZoomEvent, { passive: false });
+        document.addEventListener('gesturestart', handleZoomEvent, { passive: false });
+        document.addEventListener('gesturechange', handleZoomEvent, { passive: false });
+
+        return () => {
+            document.removeEventListener('wheel', handleZoomEvent);
+            document.removeEventListener('gesturestart', handleZoomEvent);
+            document.removeEventListener('gesturechange', handleZoomEvent);
+        };
+    }, []);
+
     return (
         <Router>
             <SessionManager>

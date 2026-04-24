@@ -388,7 +388,7 @@
 }
 
 /* Keep content above selection halo */
-.cal-cell > * {
+.cal-cell>* {
     position: relative;
     z-index: 1;
 }
@@ -517,17 +517,42 @@
 }
 
 .cal-event-pill--route {
-    cursor: default;
+    cursor: pointer !important;
+    border: none !important;
+    background: var(--route-pill-bg, #8B5CF6) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.2s ease !important;
+}
+
+.theme-night .cal-event-pill--route {
+    background: var(--route-pill-bg, #9333EA) !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
+}
+
+.cal-event-pill--route:hover {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35) !important;
 }
 
 .cal-event-pill--route .cal-event-pill-main {
-    border-left: 3px solid var(--cal-pill-route-accent);
-    padding-left: 13px;
+    border-left: none !important;
+    padding-left: 10px !important;
+    color: #ffffff !important;
 }
 
-.theme-day .cal-event-pill--route {
-    background: rgba(255, 255, 255, 0.97);
-    border-color: rgba(0, 180, 216, 0.18);
+.cal-event-pill--route .cal-event-pill-meta,
+.cal-event-pill--route .cal-event-pill-ellip,
+.cal-event-pill--route .cal-event-pill-sep {
+    color: #ffffff !important;
+    opacity: 1 !important;
+}
+
+.cal-event-pill--route .cal-event-pill-meta {
+    font-size: 10px !important;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 6px;
+    letter-spacing: 0.05em;
 }
 
 .cal-event-pill--local {
@@ -588,9 +613,12 @@ button.cal-event-pill-main {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     min-width: 0;
     width: 100%;
+    font-size: 10.5px !important;
+    font-weight: 600;
+    padding: 0 4px;
 }
 
 .cal-event-pill-meta {
@@ -872,6 +900,7 @@ button.cal-event-pill-main {
         opacity: 0;
         transform: translateY(-6px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -970,7 +999,8 @@ button.cal-event-pill-main {
 }
 
 .cal-popup-select {
-    flex: 1;
+    width: 110px;
+    flex: 0 0 110px;
 }
 
 .cal-popup-select .ant-select-selector {
@@ -980,11 +1010,14 @@ button.cal-event-pill-main {
     background: var(--cal-item-bg) !important;
     color: var(--cal-text) !important;
     font-size: 13px !important;
-    padding-right: 18px !important; /* Tighter padding to match arrow */
+    padding-left: 10px !important;
+    padding-right: 22px !important;
+    /* Specific padding to contain arrow */
 }
 
 .cal-popup-select .ant-select-arrow {
-    right: 8px !important; /* Move arrow closer to text */
+    right: 8px !important;
+    /* Move arrow closer to text inside constrained width */
 }
 
 .cal-popup-add-btn {
