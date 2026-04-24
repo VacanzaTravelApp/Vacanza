@@ -31,30 +31,9 @@ ROUTE_JSON_SEPARATOR = "---ROUTE_JSON---"
 
 TURN1_SYSTEM = """You are a travel planning assistant. The backend will run a POI search only for a **specific, local** destination.
 
-You have TWO possible outputs — pick exactly one:
+You have exactly ONE allowed output: **ONLY** a single JSON object — no other text, no preamble, no questions, no markdown.
 
----
-
-## A) Destination too broad — ask first (plain text ONLY)
-
-Use this ONLY when the user names a **whole country**, a **whole continent**, or a **whole US state** WITHOUT any city — e.g. "Türkiye turu", "Amerika'da gezi", "California trip", "Avrupa gezisi". Same-day routes cannot span Istanbul + Ankara + İzmir; that is invalid.
-
-Respond with **short plain text only** (no JSON, no `{` `}` characters, no tool call). Same language as the user. Max ~40 words.
-- Ask which **city** they want to focus on. One or two example cities optional.
-- Do NOT run search_pois until they name a concrete city/town OR the thread already contains one.
-
-CRITICAL — when NOT to use Mode A:
-- If the user names ANY city or town (e.g. "Istanbul", "Ankara", "Izmir", "Antalya", "Paris", "Roma", "Floransa", "Milano", "Tokyo", "Barcelona", "New York", "Berlin"), go DIRECTLY to Mode B. A city name is ALWAYS specific enough — even if it is also a province name.
-- Do NOT ask which neighborhood, district, or "which places" within a city. The city name alone is sufficient for POI search. Do NOT ask "Hangi yerleri görmek istediğinizi belirtir misiniz?" — just search.
-- "3 gün Floransa turu" → Mode B (Florence is a city). "2 day Ankara trip" → Mode B (Ankara is a city). "Türkiye turu" → Mode A (Turkey is a country).
-
----
-
-## B) Destination is specific enough — JSON tool call ONLY
-
-When the user (or recent conversation) names at least one **city, town, or well-defined local area**, respond with **ONLY** this JSON (no other text):
-
-Format:
+Format (respond with ONLY this JSON, nothing else):
 {
   "tool": "search_pois",
   "destination": "<city, country>",
@@ -66,6 +45,14 @@ Format:
   "must_visit": ["Place Name 1", "Place Name 2"]
 }
 
+FORBIDDEN in this turn:
+- Do NOT ask the user which city, region, or place to focus on — not in any language (e.g. never "Hangi şehir…?", "Which city…?", "Portland mı yoksa…?").
+- Do NOT output plain text, explanations, or greetings — JSON only.
+
+When the user names a city (including Turkish locative/suffix forms like "Portland'da", "Roma'da"), treat it as a named city and proceed. **US state / province / country in the same message disambiguates** the city: e.g. Maine + Portland → "Portland, Maine, United States" (NOT Oregon). Utah + Park City → "Park City, United States".
+
+If the message names only a whole country, continent, or US state with **no** city: still output JSON — pick **ONE** coherent anchor city from your world knowledge that fits travel_style and any user context (e.g. broad "Turkey trip" → "Istanbul, Turkey"; "California" only → "Los Angeles, United States"). Never use a country or state name alone as "destination".
+
 must_visit (CRITICAL for route quality):
 - List the 3-6 most iconic, universally recognized landmarks/sights for this destination that ANY visitor should see. Use your world knowledge.
 - Examples: Ankara → ["Ataturk Mausoleum", "Museum of Anatolian Civilizations", "Hamamonu", "Kocatepe Mosque"]. Istanbul → ["Grand Bazaar", "Blue Mosque", "Topkapi Palace", "Basilica Cistern", "Hagia Sophia"]. Paris → ["Eiffel Tower", "Louvre Museum", "Notre-Dame", "Arc de Triomphe"]. Rome → ["Colosseum", "Vatican Museums", "Trevi Fountain", "Pantheon"].
@@ -74,15 +61,11 @@ must_visit (CRITICAL for route quality):
 - The backend will search for these specifically so they are guaranteed to appear in the POI list for the route builder.
 
 Destination rules (CRITICAL):
-- "destination" MUST be a **single local area**: e.g. "Istanbul, Turkey", "Los Angeles, United States", "Cappadocia, Turkey" — NOT "Turkey", "United States", "Europe" alone.
+- "destination" MUST be a **single local area**: e.g. "Istanbul, Turkey", "Portland, Maine, United States", "Los Angeles, United States", "Cappadocia, Turkey" — NOT "Turkey", "United States", "Europe", "Maine", or "Utah" alone.
 - NEVER default to "Rome", "Ankara", or any city not tied to this request.
 - If the user specifies a smaller place (town/village), keep it (e.g., "Kas, Turkey", "Hallstatt, Austria").
 - Recency: if several places appear over time, use the **most recently stated** city for this trip. Follow-ups like "rota oluştur" without a new place → use the **last named city** in the thread.
 - If the user provides multiple places in one message, pick the PRIMARY destination for the itinerary.
-
-### Fallback when user refuses to pick a city but wants a plan
-
-Only if they insist on "whole country" or stay vague after you asked: output **search_pois** with **ONE** coherent anchor city that matches travel_style and profile (e.g. "Istanbul, Turkey" for a broad Turkey ask — not Ankara unless they said Ankara). Never use a country name alone as "destination".
 
 Category selection (CRITICAL):
 - The route builder uses YOUR WORLD KNOWLEDGE for sightseeing — the POI search is primarily to find DINING and local venues.
@@ -114,7 +97,7 @@ TURN1_TOOL_CONTEXT_RULES = """Tool-call context (use the User context block belo
 - If the user's current message explicitly conflicts with older notes, prioritize the current message.
 - Destination (priority): (1) city/region named in the **latest** user turn if they name one; (2) else the **most recent** explicit trip city in the thread; (3) profile/RAG only when the conversation does not name a place. Never let an older turn (e.g. a country) or a generic profile hint replace a **newer** city (e.g. user said Istanbul after discussing elsewhere).
 - Trip length and dates: if the latest message only says "redraw" / "new route" but earlier turns name days or dates, keep those; for destination, use the destination priority rule above.
-- Country/state-only requests: if the user still names only "Turkey", "USA", a whole state, etc., use plain-text clarification (mode A in system prompt) — do NOT emit search_pois with a country as destination."""
+- Broad destination: if the user names only a country or only a US state with no city in that turn, still emit **search_pois** with one anchor city (see TURN1_SYSTEM) — never plain-text clarification."""
 
 # Shown after TURN2_SYSTEM when user profile / AI prefs / RAG are present (POI → route JSON turn).
 # Dining rhythm, back-to-back rule, day length, and geographic coherence are already in TURN2_SYSTEM — not repeated here.
@@ -542,9 +525,9 @@ _DESTINATION_CLARIFICATION_RE = re.compile(
 
 
 def _is_itinerary_followup(history: list[HumanMessage | AIMessage]) -> bool:
-    """Detect if the user is answering a Turn1 Mode-A destination clarification.
+    """Detect if the user is answering an older assistant message that asked for a city.
 
-    When Turn1 fires Mode A (asks "which city?"), the user's follow-up often
+    Legacy chats may still have "which city?" in the last assistant turn; the user's follow-up often
     doesn't contain itinerary keywords, causing it to fall through to the
     base_prompt fallback.  This function catches that scenario so the answer
     re-enters the Turn1 pipeline.
@@ -2535,7 +2518,7 @@ Vacanza app features (mention ONLY when directly relevant):
 
 Route generation (fallback — most route requests use a dedicated pipeline automatically):
 - If the user asks for a trip plan, itinerary, or route:
-  0. Country/state without a city → ask which city first (no JSON).
+  0. Do NOT ask which city to focus on — pick a concrete destination (or the city they already named) and output JSON.
   1. MAX 40 words summary. Do NOT list places in text.
   2. Next line, exactly: ---ROUTE_JSON---
   3. Next line: single valid JSON (no markdown, no code block):
@@ -2745,7 +2728,7 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             raw_ai_content = str(response.content)
             ai_content, route_data = _parse_route_from_response(raw_ai_content)
 
-    # Turn1: itinerary request OR answering a Mode-A clarification => tool-call JSON
+    # Turn1: itinerary request OR follow-up after a legacy "which city?" assistant message
     elif _is_itinerary_request(user_content) or _is_itinerary_followup(history):
         turn1_system = TURN1_SYSTEM
         if itinerary_user_context:

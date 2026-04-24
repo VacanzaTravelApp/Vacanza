@@ -242,7 +242,9 @@ public class ChatProxyController {
                         applyTurn3RouteEnrichmentAndSave(user, conversationId, response, profile,
                                 parentRouteForTurn3, originalContent);
                 } else {
-                        applyRouteEnrichmentAndSave(user, conversationId, response, routePlanningWeather, profile);
+                        applyRouteEnrichmentAndSave(
+                                        user, conversationId, response, routePlanningWeather, profile,
+                                        originalContent);
                 }
 
                 return ResponseEntity.ok(response);
@@ -375,7 +377,7 @@ public class ChatProxyController {
                 }
 
                 saveExtractedPreferencesIfAny(user, response);
-                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile);
+                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile, null);
 
                 response.setConversationId(conversationId);
                 return ResponseEntity.ok(response);
@@ -516,7 +518,7 @@ public class ChatProxyController {
                 }
 
                 saveExtractedPreferencesIfAny(user, response);
-                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile);
+                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile, null);
 
                 response.setConversationId(conversationId);
                 return ResponseEntity.ok(response);
@@ -539,7 +541,8 @@ public class ChatProxyController {
                         UUID conversationId,
                         AiChatDto.MessageSendResponse response,
                         WeatherPlanningForecast routePlanningWeather,
-                        UserProfileForAi profile) {
+                        UserProfileForAi profile,
+                        String userLocaleHint) {
                 try {
                         if (response != null && response.getRouteData() != null) {
                                 logRouteShape("received_from_ai", response.getRouteData());
@@ -569,7 +572,7 @@ public class ChatProxyController {
                                         response.setRouteId(savedRouteId);
                                 }
                                 String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
-                                                response.getRouteData(), profile);
+                                                response.getRouteData(), profile, userLocaleHint);
                                 if (summaryMessage != null) {
                                         response.setRouteSummaryMessage(summaryMessage);
                                         if (response.getMessageId() != null) {
@@ -624,7 +627,7 @@ public class ChatProxyController {
                         response.setRouteId(saved.getRouteId());
 
                         String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
-                                        response.getRouteData(), profile);
+                                        response.getRouteData(), profile, userMessage);
                         if (summaryMessage != null) {
                                 response.setRouteSummaryMessage(summaryMessage);
                                 if (response.getMessageId() != null) {
