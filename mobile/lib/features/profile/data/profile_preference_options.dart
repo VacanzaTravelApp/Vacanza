@@ -111,16 +111,6 @@ const List<String> optionSplurgeCategories = optionFavoriteCategories;
 const List<String> optionLanguages = [
   'en',
   'tr',
-  'de',
-  'fr',
-  'es',
-  'it',
-  'pt',
-  'ar',
-  'zh',
-  'ja',
-  'ko',
-  'ru',
 ];
 
 const List<String> optionBudgetCurrency = [

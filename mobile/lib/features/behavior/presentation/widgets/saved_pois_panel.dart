@@ -103,7 +103,7 @@ class SavedPoisPanel extends StatelessWidget {
                         height: 1,
                         color: (isDark ? cs.outline : cs.secondary).withValues(alpha: isDark ? 0.35 : 0.22),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 6),
                       Expanded(
                         child: state.isLoading
                             ? Center(
@@ -116,6 +116,7 @@ class SavedPoisPanel extends StatelessWidget {
                             : count == 0
                                 ? _EmptyState(accent: accent)
                                 : ListView.separated(
+                                    padding: EdgeInsets.zero,
                                     itemCount: count,
                                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                                     itemBuilder: (context, i) {
@@ -132,7 +133,7 @@ class SavedPoisPanel extends StatelessWidget {
                                   ),
                       ),
                       if (!state.isLoading && count > 0) ...[
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 6),
                         Text(
                           '$count place${count == 1 ? '' : 's'} saved',
                           textAlign: TextAlign.center,
