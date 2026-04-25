@@ -51,6 +51,9 @@ public class UserProfileForAi {
         String budgetCurrency;
         List<String> splurgeCategories;
 
+        // ── POI Limits ────────────────────────────────────────────
+        Integer maxDailyPois;
+
         // ── Language ──────────────────────────────────────────────
         String preferredLanguage;
         List<String> spokenLanguages;
@@ -107,6 +110,7 @@ public class UserProfileForAi {
                                                         : null)
                                         .budgetCurrency(prefs.getBudgetCurrency())
                                         .splurgeCategories(prefs.getSplurgeCategories())
+                                        .maxDailyPois(prefs.getMaxDailyPois())
                                         .preferredLanguage(prefs.getPreferredLanguage())
                                         .spokenLanguages(prefs.getSpokenLanguages());
                 }

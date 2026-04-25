@@ -97,6 +97,11 @@ public class UserPreferences {
     @Column(name = "splurge_categories", columnDefinition = "jsonb")
     private List<String> splurgeCategories;
 
+    // ── POI Limits ────────────────────────────────────────────
+
+    @Column(name = "max_daily_pois")
+    private Integer maxDailyPois;
+
     // ── Language & Communication ──────────────────────────────
 
     @Column(name = "preferred_language", length = 5)

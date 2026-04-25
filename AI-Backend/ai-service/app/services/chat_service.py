@@ -37,8 +37,8 @@ Format (respond with ONLY this JSON, nothing else):
 {
   "tool": "search_pois",
   "destination": "<city, country>",
-  "days": <number of days>,
-  "travel_style": "<art|history|food|nature|general>",
+  "days": <number of days — minimum 1, maximum 7>,
+  "travel_style": "<art|history|food|nature|general|beach|adventure|shopping>",
   "categories": ["museum", "monument", "historic_site", "church",
                  "park", "neighborhood", "restaurant", "cafe", "bar",
                  "landmark", "art_gallery", "market", "nightlife"],
@@ -48,6 +48,7 @@ Format (respond with ONLY this JSON, nothing else):
 FORBIDDEN in this turn:
 - Do NOT ask the user which city, region, or place to focus on — not in any language (e.g. never "Hangi şehir…?", "Which city…?", "Portland mı yoksa…?").
 - Do NOT output plain text, explanations, or greetings — JSON only.
+- "days" MUST be between 1 and 7. If the user requests more than 7, output 7. If the user requests 0 or negative, output 1.
 
 When the user names a city (including Turkish locative/suffix forms like "Portland'da", "Roma'da"), treat it as a named city and proceed. **US state / province / country in the same message disambiguates** the city: e.g. Maine + Portland → "Portland, Maine, United States" (NOT Oregon). Utah + Park City → "Park City, United States".
 
@@ -79,9 +80,11 @@ Trip type guidelines (minimum):
 For history trips: attraction, monument, historic_site, museum, restaurant, cafe, bar, landmark
 For art trips: attraction, museum, art_gallery, landmark, cafe, restaurant, bar
 For food-focused trips: restaurant, cafe, market, bar, fast_food, nightlife, neighborhood, attraction
-For nature trips: park, neighborhood, landmark, attraction, cafe, restaurant
-For general trips: attraction, museum, monument, park, restaurant, cafe, bar, landmark
+For nature trips: park, garden, viewpoint, neighborhood, landmark, attraction, cafe, restaurant
+For beach/coastal trips: beach, viewpoint, park, neighborhood, landmark, attraction, restaurant, cafe, bar
+For adventure/outdoor trips: park, viewpoint, attraction, landmark, neighborhood, restaurant, cafe, bar
 For shopping-focused trips or destinations with famous markets/bazaars: shopping, market, restaurant, cafe, bar, neighborhood, attraction
+For general trips: attraction, museum, monument, park, restaurant, cafe, bar, landmark
 """
 
 # Shown after TURN1_SYSTEM when user profile / AI prefs / RAG are present (tool-call turn).
@@ -108,7 +111,8 @@ TURN2_TOOL_CONTEXT_RULES = """User context (apply the profile and preferences be
 - Set day_start_local per day from trip_pace and activity (SLOW ~10:00, MODERATE ~09:00, FAST ~08:30) — NEVER earlier than 08:30. Museums/galleries/palaces open at 09:00 at the earliest — do not schedule them before that.
 - estimated_duration_min must vary by venue type (large museums 90–120, small sites 30–50, parks 40–75, quick landmarks 20–40, restaurants 50–80, cafes 20–35). Do not use 60 for every stop.
 - Keep geographic efficiency; preferences override only when choosing among nearby alternatives.
-- Trip calendar dates: read the conversation turns above (not only the last line). If the user already stated a first trip day, set trip_dates_user_specified and trip_start_date in the route JSON."""
+- Trip calendar dates: read the conversation turns above (not only the last line). If the user already stated a first trip day, set trip_dates_user_specified and trip_start_date in the route JSON.
+- If "Max POIs per day" is set in the profile: this is a HARD CAP. Each day's total waypoint count (sightseeing + dining combined) MUST NOT exceed it. Mandatory meals (1× lunch + 1× dinner) always count toward the cap. With cap=4: 2 sightseeing + lunch + dinner. With cap=5: 3 sightseeing + lunch + dinner. Never drop mandatory meals to add more sightseeing."""
 
 # Shown whenever weather payload is present. Legacy list = daily rows only; object may include "daily" only or "daily" + "day_parts".
 TURN2_WEATHER_RULES_DAILY = """Destination weather forecast (use only this data; do not invent numbers):
@@ -139,12 +143,35 @@ Available POIs from search (real coordinates and metadata):
 
 {must_visit_section}
 
-PRE-PLANNING — DO THIS BEFORE BUILDING ANY DAY:
+STEP 0 — DETECT TRIP THEME (do this FIRST, before anything else):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Step 1 — ANCHOR SIGHTS: Using your world knowledge, mentally list the top {days}×2 most iconic, must-see attractions for this destination. These are the sights every visitor talks about — famous museums, palaces, historic squares, world-class viewpoints.
-Step 2 — DISTRIBUTE EVENLY: Assign exactly 2 anchor sights to EACH day before doing any geographic clustering. Day 1 gets 2, Day 2 gets 2, Day 3 gets 2, and so on. Do NOT concentrate the famous ones into Day 1.
-Step 3 — FILL AROUND ANCHORS: For each day, find POIs from the list that are geographically close to that day's 2 anchors and fill the remaining slots. Apply geographic clustering WITHIN each day, not across days.
-Result: every day is equally exciting because it anchors on 2 iconic sights, then clusters nearby POIs around them.
+Read the user's message and travel_style. Identify ONE theme that governs ALL days:
+- beach / coastal → triggered by: "sahil", "beach", "coastal", "deniz", "kıyı", "plaj", travel_style=beach
+- history / cultural → triggered by: "tarihi", "history", "müze", "museum", travel_style=history
+- art → triggered by: "sanat", "art", "galeri", "gallery", travel_style=art
+- food → triggered by: "yemek", "food", "gastronomy", travel_style=food
+- nature / outdoor → triggered by: "doğa", "nature", "park", "hiking", travel_style=nature
+- adventure → triggered by: travel_style=adventure
+- shopping → triggered by: "alışveriş", "shopping", "bazaar", travel_style=shopping
+- general → default when no specific theme detected
+
+THEME RULES (apply the matched theme to EVERY single day — no exceptions, no drift):
+- beach: EVERY day ≥1 beach, waterfront, marina, coastal promenade, or sea-view point. NEVER select a city-centre museum or inland monument as an anchor sight.
+- history: EVERY day ≥2 historic POIs (monument, castle, ruin, museum, historic_site, palace).
+- art: EVERY day ≥1 art/cultural POI (art_gallery, museum, cultural venue).
+- food: EVERY day ≥3 food/dining stops (restaurant, market, specialty food spot).
+- nature: EVERY day ≥1 outdoor nature POI (park, garden, viewpoint, natural landmark). No day dominated by indoor venues.
+- adventure: EVERY day ≥1 active outdoor POI.
+- shopping: EVERY day ≥1 shopping/market POI (bazaar, market, shopping district).
+- general: balanced — ≥1 landmark + ≥1 dining + ≥1 local spot per day.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRE-PLANNING — DO THIS AFTER DETECTING THEME:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1 — ANCHOR SIGHTS: Using your world knowledge, list the top {days}×2 must-see attractions that MATCH THE THEME YOU DETECTED ABOVE. Beach theme → coastal/waterfront anchors only. History theme → historic monuments only. Food theme → iconic food markets or dining districts. NEVER pick city-centre museums as anchors for a beach or outdoor trip.
+Step 2 — DISTRIBUTE EVENLY: Assign exactly 2 anchor sights to EACH day. Day 1 gets 2, Day 2 gets 2, Day 3 gets 2. Do NOT concentrate the famous ones into Day 1.
+Step 3 — FILL AROUND ANCHORS: For each day, find POIs from the list geographically close to that day's anchors. Prioritise POIs that match the trip theme.
+Result: every day is equally exciting and stays on-theme.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 SIGHTSEEING stops (museum, monument, landmark, historic_site, park, neighborhood, attraction, church, mosque, palace, bridge, square, ruins, art_gallery):
@@ -207,7 +234,8 @@ Dining placement rules (STRICT):
 - CRITICAL — category field values: NEVER use compound values like "lunch restaurant" or "dinner restaurant". Use ONLY single-word categories: "restaurant" (for any dining stop), "cafe" (for any cafe/bakery), etc. The time_slot field (morning/afternoon/evening/lunch/dinner) is separate from the category field.
 
 Day duration (STRICT):
-- Each day: 6–8 waypoints total (including 2–3 dining stops + 4–5 sightseeing stops).
+- Each day: 6–8 waypoints total (including 2–3 dining stops + 4–5 sightseeing stops) — UNLESS a max POI cap applies (see below), in which case that cap overrides this range (minimum 4: 2 sightseeing + lunch + dinner).
+- MAX WAYPOINTS CAP (check BOTH sources): (1) If the user profile includes "Max POIs per day: N", enforce it. (2) If the user stated a maximum anywhere in the conversation (e.g. "max 4 POI", "günde 4 yer", "sadece 4 durak", "en fazla 5 stop"), enforce that number. Whichever source applies, it is a HARD CAP — mandatory meals count toward it, never exceed it.
 - Sum of estimated_duration_min across all waypoints in one day must be at least 420 minutes (~7 hours of activity). If your total is less, increase sightseeing durations (museums 90–120, parks 60–75, monuments 45–60).
 - Do NOT end the day before 18:00. The last waypoint should finish around 18:00–19:00 (or 20:00–21:00 if dinner is the last stop).
 - SLOW pace: end ~17:30–18:00. MODERATE: ~18:00–19:00. FAST: ~19:00–21:00.
@@ -215,11 +243,13 @@ Day duration (STRICT):
 SELF-CHECK (do this mentally before outputting each day):
   ✓ Does this day have a lunch restaurant between 12:00–14:00? If NO → add one.
   ✓ Does this day have a dinner restaurant between 18:00–21:00? If NO → add one.
-  ✓ Does this day have at least 6 waypoints? If NO → add more sights.
+  ✓ Does this day have at least 6 waypoints (or ≤ max_daily_waypoints if set)? If NO → add more sights.
   ✓ Does the day end after 18:00? If NO → extend with dinner or evening stop.
   ✓ Are ALL sightseeing stops within 3 km of each other? If NO → split distant ones to a different day.
   ✓ Does day_start_local leave enough time to reach the first sight before it opens (09:00)? If NO → adjust.
   ✓ Does this day have at least 2 iconic/landmark-level sights? If NO → add one from world knowledge (null coordinates).
+  ✓ Does EVERY day include ≥1 POI matching the theme detected in STEP 0? If NO → swap in a theme-appropriate sight.
+  ✓ Is the theme consistent across ALL days (Day 2 and Day 3 same theme as Day 1)? If NO → replace drifted stops.
 
 QUALITY BALANCE ACROSS DAYS (CRITICAL — prevents day-1 bias):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2280,6 +2310,8 @@ def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
     sl = _join_list(profile.spokenLanguages)
     if sl:
         travel.append(f"Spoken languages: {sl}")
+    if profile.maxDailyPois is not None:
+        travel.append(f"Max POIs per day: {profile.maxDailyPois} (HARD CAP — never exceed this waypoint count per day, mandatory meals count toward the cap)")
     saved = _join_list(profile.savedPoiNames)
     if saved:
         travel.append(f"Saved / favorited places (PRIORITIZE in itinerary if in destination): {saved}")
