@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { applyActionCode, confirmPasswordReset, verifyPasswordResetCode, onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
-import { Button, Input, Form, Spin, message } from "antd";
+import { Button, Input, Form, Spin } from "antd";
+import { toast } from "../../components/toast/toast";
 import { LockOutlined, CheckCircleFilled } from "@ant-design/icons";
 import "./RegisterCard.css";
 import "./EmailVerificationPage.css";
@@ -109,7 +110,7 @@ const AuthActionPage = () => {
                 setStatus("error");
                 setErrorMessage("This reset link has expired. Please request a new one.");
             } else {
-                message.error("Something went wrong. Please try again.");
+                toast.error("Something went wrong. Please try again.");
             }
         } finally {
             setResetting(false);

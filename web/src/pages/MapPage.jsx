@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, message, notification, Spin, Popover, ConfigProvider, theme } from "antd";
+import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, Spin, Popover, ConfigProvider, theme } from "antd";
+import { toast } from "../components/toast/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LogoutOutlined,
@@ -796,7 +797,7 @@ export default function MapPage() {
   const handleMarkUnavailable = useCallback(async (wp) => {
     const routeId = activeRoute?.routeId ?? activeRoute?.route_id;
     if (!routeId) {
-      message.warning("Bu rotanın kaydedilmiş bir ID'si yok. Lütfen rotayı tekrar oluşturun.");
+      toast.warning({ title: "Route not saved", message: "Please regenerate the route and try again." });
       return;
     }
     try {
@@ -814,7 +815,7 @@ export default function MapPage() {
       }
       // message.success(result.userMessage || "Rotanız güncellendi.");
     } catch {
-      message.error("Güncelleme sırasında bir hata oluştu.");
+      toast.error({ title: "Update failed", message: "Couldn't update your route. Please try again." });
     }
   }, [activeRoute]);
 
@@ -825,12 +826,7 @@ export default function MapPage() {
       const detail = await aiApi.getRoute(data.newRouteId);
       const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
       setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? data.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
-      notification.info({
-        message: "Rotanız güncellendi",
-        description: data.userMessage || "Bir veya daha fazla durak otomatik olarak güncellendi.",
-        placement: "topRight",
-        duration: 6,
-      });
+      toast.info({ title: "Route updated", message: data.userMessage || "One or more stops were automatically updated." });
     } catch {
       // silently ignore — route will update on next manual refresh
     }
@@ -888,13 +884,7 @@ export default function MapPage() {
             poiId: nearest.poiId
           });
 
-          notification.success({
-            message: 'Auto Check-in!',
-            description: `You've arrived at ${nearest.name || "a point of interest"}. +${data.xpGained || 50} XP earned!`,
-            placement: 'bottomRight',
-            icon: <CheckCircleFilled style={{ color: '#F59E0B' }} />,
-            className: 'vivid-notification'
-          });
+          toast.success({ title: 'Auto Check-in!', message: `You've arrived at ${nearest.name || "a point of interest"}. +${data.xpGained || 50} XP earned!` });
 
           queryClient.invalidateQueries(["gamification", "profile"]);
           queryClient.invalidateQueries(["user", "stats"]);
@@ -1178,7 +1168,7 @@ export default function MapPage() {
         await queryClient.invalidateQueries({ queryKey: ["feedback", "saved-pois"] });
         // message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
       } catch (e) {
-        message.error(e?.friendlyMessage || "Could not update favorites.");
+        toast.error({ title: "Couldn't update", message: e?.friendlyMessage || "Failed to update your favorites. Please try again." });
       } finally {
         setFavSendingKey(null);
       }
@@ -1389,13 +1379,7 @@ export default function MapPage() {
 
   const startFreehand = useCallback(() => {
     if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) {
-      notification.warning({
-        message: "Haritayı yakınlaştırın",
-        description:
-          "Alan çizmek için mahalle veya ilçe ölçeğine yaklaşın; şu anki zoom seviyesi çok uzak.",
-        placement: "topRight",
-        duration: 6,
-      });
+      toast.warning({ title: "Zoom in", message: "Zoom to neighbourhood level to draw an area — current zoom is too far out." });
       return;
     }
     setPolygonRouteParamsOpen(false);
@@ -1521,7 +1505,7 @@ export default function MapPage() {
   const submitPolygonRoute = useCallback(
     async (values) => {
       if (!selection?.polygon || selection.polygon.length < 3) {
-        message.warning("Please select a valid area first.");
+        toast.warning("Please select a valid area first.");
         return;
       }
       const ring = selection.polygon.map((p) => [p.lng, p.lat]);
@@ -1560,7 +1544,7 @@ export default function MapPage() {
           // if (summary) message.success(summary);
           // else message.success("Route is being displayed on the map.");
         } else {
-          message.warning("Could not retrieve route data.");
+          toast.warning({ title: "Route unavailable", message: "Couldn't load the route data. Please try again." });
         }
       } catch (e) {
         const msg =
@@ -1568,7 +1552,7 @@ export default function MapPage() {
           e?.friendlyMessage ||
           e?.message ||
           "Failed to create route.";
-        message.error(msg);
+        toast.error(msg);
       } finally {
         setPolygonRouteSubmitting(false);
       }
@@ -1581,41 +1565,29 @@ export default function MapPage() {
     setMode("SELECTION");
     setFreehandEnabled(true);
     if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) {
-      notification.warning({
-        message: "Haritayı yakınlaştırın",
-        description:
-          "Önce mahalle veya ilçe ölçeğine yaklaşın; ardından haritada alan çizebilirsiniz.",
-        placement: "topRight",
-        duration: 6,
-      });
+      toast.warning({ title: "Zoom in", message: "Zoom to neighbourhood level before drawing an area." });
       return;
     }
-    notification.info({
-      message: "Haritada alan çizin",
-      description:
-        "Sağdaki rota panelinden gün seçin; ardından üstteki turuncu banttan o günü güncelleyin.",
-      placement: "topRight",
-      duration: 8,
-    });
+    toast.info({ title: "Draw on the map", message: "Select a day from the route panel, then update it from the banner above." });
   }, [viewState.zoom]);
 
   const submitReplanDayFromPolygon = useCallback(async () => {
     if (!selection?.polygon || selection.polygon.length < 3) {
-      message.error("Please draw a valid area.");
+      toast.error("Please draw a valid area.");
       return;
     }
     const convId = mapChatConversationId || getSessionConversationId();
     if (!convId) {
-      message.error("Open a route from the chat first or select the chat associated with the route created from the map.");
+      toast.error({ title: "No active route", message: "Open a route from the chat panel first." });
       return;
     }
     if (!activeRoute?.days?.length) {
-      message.error("No route available to replan.");
+      toast.error({ title: "Nothing to replan", message: "Generate a route from the chat first." });
       return;
     }
     const td = Number(activeRoute.total_days || activeRoute.totalDays || activeRoute.days.length);
     if (!Number.isFinite(activeDay) || activeDay < 1 || activeDay > td) {
-      message.error("Please select a valid day.");
+      toast.error("Please select a valid day.");
       return;
     }
     const ring = selection.polygon.map((p) => [p.lng, p.lat]);
@@ -1643,7 +1615,7 @@ export default function MapPage() {
         // if (summary) message.success(summary);
         // else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
       } else {
-        message.warning("Could not retrieve route data.");
+        toast.warning("Could not retrieve route data.");
       }
     } catch (e) {
       const msg =
@@ -1651,7 +1623,7 @@ export default function MapPage() {
         e?.friendlyMessage ||
         e?.message ||
         "Failed to replan day.";
-      message.error(msg);
+      toast.error(msg);
     } finally {
       setReplanDaySubmitting(false);
     }
@@ -2832,7 +2804,7 @@ export default function MapPage() {
               setActiveDay(1);
               setIsChatOpen(false);
             } catch (e) {
-              message.error(e?.friendlyMessage || "Could not load route.");
+              toast.error({ title: "Couldn't load route", message: e?.friendlyMessage || "Please try again." });
             }
           }}
         />

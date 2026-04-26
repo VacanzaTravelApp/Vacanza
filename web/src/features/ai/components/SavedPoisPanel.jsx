@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSavedPois } from "../../../hooks/useSavedPois";
 import { postPoiFeedbackEvent } from "../../../api/feedbackApi";
 import { getCategoryColor } from "../../../constants/categoryColors";
+import { toast } from "../../../components/toast/toast";
 import "../styles/savedPoisPanel.css";
 
 function formatCategory(cat) {
@@ -36,7 +37,7 @@ export default function SavedPoisPanel({ onClose, onFlyTo }) {
       queryClient.invalidateQueries({ queryKey: ["feedback", "saved-pois"] });
       queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
     } catch {
-      /* silent */
+      toast.error({ title: "Couldn't remove", message: "Failed to remove this place. Please try again." });
     }
   };
 

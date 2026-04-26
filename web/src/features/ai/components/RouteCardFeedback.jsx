@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, DatePicker, Modal, message } from "antd";
+import { Button, DatePicker, Modal } from "antd";
+import { toast } from "../../../components/toast/toast";
 import {
   LikeOutlined,
   LikeFilled,
@@ -99,7 +100,7 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
       setVote(v);
       // message.success("Thanks, your route preference has been saved.");
     } catch (e) {
-      message.error(e?.friendlyMessage || "Failed to send feedback.");
+      toast.error({ title: "Feedback not sent", message: e?.friendlyMessage || "Please try again." });
     } finally {
       setSending(false);
     }
@@ -138,9 +139,9 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
     } catch (e) {
       const status = e?.response?.status;
       if (status === 409) {
-        message.warning("This route is already on that day.");
+        toast.warning({ title: "Already added", message: "This route is already scheduled for that day." });
       } else {
-        message.error(e?.friendlyMessage || "Could not add to calendar.");
+        toast.error({ title: "Calendar error", message: e?.friendlyMessage || "Couldn't add this route to your calendar." });
       }
     } finally {
       setCalendarSaving(false);

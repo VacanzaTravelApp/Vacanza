@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Modal, Button, Input, Select, ConfigProvider, Spin, message } from 'antd';
+import { Modal, Button, Input, Select, ConfigProvider, Spin } from 'antd';
+import { toast } from '../components/toast/toast';
 import { CloseOutlined, LeftOutlined, RightOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useAuth } from '../context/useAuth';
@@ -162,7 +163,7 @@ export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, 
                 /* ignore */
             }
         } catch (e) {
-            message.error(e?.friendlyMessage || 'Could not remove calendar item.');
+            toast.error({ title: "Couldn't remove", message: e?.friendlyMessage || "Failed to remove this item from the calendar." });
         }
     };
 
@@ -178,7 +179,7 @@ export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, 
             }
             // message.success('Trip removed from calendar.');
         } catch (e) {
-            message.error(e?.friendlyMessage || 'Could not remove trip from calendar.');
+            toast.error({ title: "Couldn't remove trip", message: e?.friendlyMessage || "Failed to remove this trip from your calendar." });
         }
     };
 

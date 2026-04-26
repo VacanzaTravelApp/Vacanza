@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, message } from "antd";
+import { Button } from "antd";
+import { toast } from "../../../components/toast/toast";
 import { LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../../context/useAuth";
@@ -93,7 +94,7 @@ export default function WaypointFeedback({ waypoint, storageKey }) {
       }
       // message.success("Thanks, your preference has been saved.");
     } catch (e) {
-      message.error(e?.friendlyMessage || "Failed to send feedback.");
+      toast.error({ title: "Feedback not sent", message: e?.friendlyMessage || "Please try again." });
     } finally {
       setSending(false);
     }

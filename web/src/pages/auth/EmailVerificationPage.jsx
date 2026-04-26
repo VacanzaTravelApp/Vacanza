@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Button, message, Spin } from "antd";
+import { Button, Spin } from "antd";
+import { toast } from "../../components/toast/toast";
 import { MailOutlined } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth } from "../../firebase";
@@ -57,10 +58,10 @@ const EmailVerificationPage = () => {
             setCooldown(60);
         } catch (e) {
             if (e.code === "auth/too-many-requests") {
-                message.warning("Too many attempts. Please wait a moment.");
+                toast.warning({ title: "Too many attempts", message: "Please wait a moment before trying again." });
                 setCooldown(30);
             } else {
-                message.error("Failed to send verification email.");
+                toast.error({ title: "Email not sent", message: "Couldn't send the verification email. Please try again." });
             }
         } finally {
             setResending(false);

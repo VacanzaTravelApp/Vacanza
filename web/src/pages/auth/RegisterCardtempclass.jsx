@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 // Ant Design bileşenleri, hook'ları ve mesajlar
-import { Form, Input, Button, Checkbox, Row, Col, Space, message } from 'antd';
+import { Form, Input, Button, Checkbox, Row, Col, Space } from 'antd';
+import { toast } from '../../components/toast/toast';
 import {
   UserOutlined,
   LockOutlined,
@@ -121,7 +122,7 @@ const RegisterCard = () => {
         });
       } catch (regErr) {
         console.error("Backend Profile Sync Failed:", regErr);
-        message.warning("Account created, but profile could not be fully synced. You can update it in settings.");
+        toast.warning({ title: "Almost there", message: "Account created, but your profile couldn't be fully synced. You can update it in settings." });
       }
 
       // Synchronize backend session (Spring Session sync with Firebase token)
@@ -162,7 +163,7 @@ const RegisterCard = () => {
           },
         ]);
       } else {
-        message.error("Oops! Something went wrong during registration. Please try again.");
+        toast.error({ title: "Registration failed", message: "Something went wrong. Please try again." });
       }
     } finally {
       setLoading(false);

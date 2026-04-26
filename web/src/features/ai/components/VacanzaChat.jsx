@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { aiApi } from "../../../api/aiApi";
-import { Spin, message, Tooltip } from "antd";
+import { Spin, Tooltip } from "antd";
+import { toast } from "../../../components/toast/toast";
 import {
   CloseOutlined,
   CompassOutlined,
@@ -411,7 +412,7 @@ export default function VacanzaChat({
       setTicketRowsByKey((prev) => ({ ...prev, [key]: Array.isArray(rows) ? rows : [] }));
     } catch (e) {
       console.error(e);
-      message.error("Failed to load ticket prices. Please check your connection and try again.");
+      toast.error({ title: "Prices unavailable", message: "Couldn't load ticket prices. Check your connection and try again." });
       setTicketRowsByKey((prev) => ({ ...prev, [key]: [] }));
     } finally {
       setTicketLoadingByKey((prev) => ({ ...prev, [key]: false }));
@@ -550,7 +551,7 @@ export default function VacanzaChat({
       const history = await loadMessagesForConversation(id);
     } catch (e) {
       console.error(e);
-      message.error("Failed to load messages.");
+      toast.error({ title: "Couldn't load messages", message: "Please try again." });
     } finally {
       setMessagesLoading(false);
     }
@@ -590,7 +591,7 @@ export default function VacanzaChat({
       }
     } catch (e) {
       console.error(e);
-      message.error("Failed to start chat.");
+      toast.error({ title: "Chat unavailable", message: "Couldn't start a new conversation. Please try again." });
       setLoading(false);
       return;
     }
@@ -686,7 +687,7 @@ export default function VacanzaChat({
         e?.code === "ERR_CANCELED" ||
         e?.name === "AbortError";
       if (!isAbort) {
-        message.error("We are currently busy. Please try again in a few seconds.");
+        toast.error({ title: "Too many requests", message: "Please wait a moment and try again." });
         setSendError(true);
       }
     } finally {

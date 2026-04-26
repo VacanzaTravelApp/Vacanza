@@ -9,14 +9,7 @@ import AuthActionPage from "./pages/auth/AuthActionPage";
 import MapPage from "./pages/MapPage";
 import GamificationSummary from "./gamification/GamificationSummary";
 import SessionManager from "./components/SessionManager";
-
-import { message } from "antd";
-
-message.config({
-    top: 60,
-    duration: 3,
-    maxCount: 2,
-});
+import { VacanzaToastProvider } from "./components/toast/VacanzaToast";
 
 /** Old Firebase default path; keep redirect so past emails still work. */
 function LegacyFirebaseAuthLinkRedirect() {
@@ -60,6 +53,7 @@ const App = () => {
 
     return (
         <Router>
+          <VacanzaToastProvider>
             <SessionManager>
                 <Routes>
                     <Route path="/" element={<Navigate to="/register" replace />} />
@@ -109,6 +103,7 @@ const App = () => {
                     <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>
             </SessionManager>
+          </VacanzaToastProvider>
         </Router>
     );
 };

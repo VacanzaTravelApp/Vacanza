@@ -162,7 +162,7 @@ export default function BookingSheet({ open, onClose }) {
       }
       if (scrollRef.current) scrollRef.current.scrollTop = 0;
     } catch (err) {
-      dispatch({ type: "SEARCH_ERROR", payload: { message: "Unexpected error occurred." } });
+      dispatch({ type: "SEARCH_ERROR", payload: { message: "An unexpected error occurred. Please try again." } });
     }
   };
 
