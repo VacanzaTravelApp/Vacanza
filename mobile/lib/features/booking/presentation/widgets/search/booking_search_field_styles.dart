@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 
 import 'package:mobile/core/theme/app_theme.dart';
 
-/// Tema uyumlu booking arama alanı stilleri ([VacanzaTokens] / [ColorScheme]).
 abstract final class BookingSearchFieldStyles {
+  // ── Label above fields ─────────────────────────────────────────────────────
+
   static TextStyle fieldLabel(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return TextStyle(
-      fontSize: 12.5,
+      fontSize: 12,
       fontWeight: FontWeight.w600,
-      letterSpacing: 0.2,
+      letterSpacing: 0.1,
       height: 1.2,
-      color: cs.onSurface,
+      color: cs.onSurfaceVariant,
     );
   }
+
+  // ── Dropdown value text ────────────────────────────────────────────────────
 
   static TextStyle dropdownValue(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -43,25 +46,32 @@ abstract final class BookingSearchFieldStyles {
     );
   }
 
-  /// Varsayılan (odak dışı) çerçeve — light: [ColorScheme.secondary] (coral);
-  /// dark: yumuşak [ColorScheme.outline].
+  // ── Field border ───────────────────────────────────────────────────────────
+
+  /// Neutral gray border — no coral tint so fields read cleanly inside cards.
   static Color fieldBorderInactive(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    if (isLight) return cs.secondary.withValues(alpha: 0.22);
-    // Dark mode: slightly stronger border so fields and buttons don't disappear.
-    return cs.outline.withValues(alpha: 0.55);
+    return isLight
+        ? const Color(0xFFDDE3EC)
+        : cs.outline.withValues(alpha: 0.45);
   }
 
-  /// Text field / dropdown fill — light: airy white; dark: muted surface.
+  // ── Field fill ─────────────────────────────────────────────────────────────
+
+  /// Clearly distinct from the white card background so the field area reads.
   static Color fieldFill(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    if (isLight) return context.lightGlassFieldFill;
-    return cs.surfaceContainerHighest.withValues(alpha: 0.55);
+    return isLight
+        ? const Color(0xFFF7F9FB)
+        : cs.surfaceContainerHighest.withValues(alpha: 0.55);
   }
+
+  // ── Focused border ─────────────────────────────────────────────────────────
+
+  static Color fieldBorderFocused(BuildContext context) =>
+      context.mapControlAccent;
 }
 
-/// Odak / vurgu rengi — harita ile aynı [mapControlAccent].
-Color bookingAccentColor(BuildContext context) =>
-    context.mapControlAccent;
+Color bookingAccentColor(BuildContext context) => context.mapControlAccent;
