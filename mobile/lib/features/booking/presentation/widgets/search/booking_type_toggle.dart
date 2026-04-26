@@ -33,11 +33,6 @@ class BookingTypeToggle extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: track,
-        border: Border.all(
-          color: isLight
-              ? cs.secondary.withValues(alpha: 0.22)
-              : cs.outline.withValues(alpha: 0.55),
-        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Stack(

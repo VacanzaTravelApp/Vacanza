@@ -35,7 +35,7 @@ class SortDropdown extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 4),
+          padding: const EdgeInsets.only(left: 2, bottom: 6),
           child: Text(
             'Sort by',
             style: BookingSearchFieldStyles.fieldLabel(context),
@@ -67,24 +67,26 @@ class SortDropdown extends StatelessWidget {
             filled: true,
             fillColor: BookingSearchFieldStyles.fieldFill(context),
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 14,
+              horizontal: 14,
+              vertical: 15,
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
                 color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                width: 1.2,
               ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
                 color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                width: 1.2,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: accent, width: 1.5),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: accent, width: 1.8),
             ),
           ),
           dropdownColor: cs.surface,
