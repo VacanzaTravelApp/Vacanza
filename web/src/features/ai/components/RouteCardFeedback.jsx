@@ -179,12 +179,12 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
               setCalendarDate(dayjs());
               setCalendarOpen(true);
             }}
-            aria-label="Add this route to your calendar"
+            aria-label="Export this route to your calendar"
           >
-            Add to calendar
+            Export to calendar
           </Button>
           <Modal
-            title="Add route to calendar"
+            title="Export route to calendar"
             open={calendarOpen}
             onCancel={() => setCalendarOpen(false)}
             onOk={addRouteToCalendar}

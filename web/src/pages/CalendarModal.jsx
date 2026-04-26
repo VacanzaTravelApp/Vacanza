@@ -25,7 +25,7 @@ const ROUTE_EVENT_COLOR = '#8B5CF6';
 function formatRouteDayLabel(re) {
     const td = Number(re.totalDays) || 1;
     const id = Number(re.itineraryDay) || 1;
-    if (td > 1) return `${id}/${td} · ${re.title}`;
+    if (td > 1) return `Day ${id}: ${re.title}`;
     return re.title;
 }
 
@@ -505,6 +505,19 @@ export default function CalendarModal({ open, onClose, onOpenRouteFromCalendar, 
                                             </p>
                                         ) : null}
                                         <h2 className="cal-event-detail-title">{primaryText}</h2>
+
+                                        {ev.routeId && (
+                                            <div className="cal-event-detail-stats">
+                                                <div className="cal-stat-item">
+                                                    <span className="cal-stat-val">{ev.totalDays}</span>
+                                                    <span className="cal-stat-label">Total Days</span>
+                                                </div>
+                                                <div className="cal-stat-item">
+                                                    <span className="cal-stat-val">{ev.itineraryDay}</span>
+                                                    <span className="cal-stat-label">Current Day</span>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         <div className="cal-event-detail-actions">
                                             {ev.routeId && onOpenRouteFromCalendar ? (

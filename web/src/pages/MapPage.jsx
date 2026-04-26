@@ -633,6 +633,8 @@ export default function MapPage() {
   const [favSendingKey, setFavSendingKey] = useState(null);
   /** Which viewport POI marker has the detail popover open (pin tap). */
   const [viewportPoiPopoverKey, setViewportPoiPopoverKey] = useState(null);
+  const [lastAutoCheckInId, setLastAutoCheckInId] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
 
   const [viewState, setViewState] = useState({
     longitude: 32.8597,
@@ -735,7 +737,7 @@ export default function MapPage() {
         const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
         setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? result.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
       }
-      message.success(result.userMessage || "Rotanız güncellendi.");
+      // message.success(result.userMessage || "Rotanız güncellendi.");
     } catch {
       message.error("Güncelleme sırasında bir hata oluştu.");
     }
@@ -769,6 +771,74 @@ export default function MapPage() {
   /** Sohbet–harita bağlantısı (replan gün); VacanzaChat onConversationIdChange ile güncellenir. */
   const [mapChatConversationId, setMapChatConversationId] = useState(null);
   const [replanDaySubmitting, setReplanDaySubmitting] = useState(false);
+
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Proximity Detection (50m Radius)
+  useEffect(() => {
+    if (!user || !userLocation || poisRaw.length === 0) return;
+
+    let nearest = null;
+    let minDist = Infinity;
+
+    poisRaw.forEach(p => {
+      if (!p.latitude || !p.longitude) return;
+      const dist = getDistance(userLocation.lat, userLocation.lng, p.latitude, p.longitude);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = p;
+      }
+    });
+
+    if (nearest && minDist < 50 && lastAutoCheckInId !== (nearest.poiId || nearest.name)) {
+      const targetId = nearest.poiId || nearest.name;
+      setLastAutoCheckInId(targetId);
+
+      const triggerAutoCheckIn = async () => {
+        try {
+          const { data } = await userApi.autoCheckIn({
+            latitude: userLocation.lat,
+            longitude: userLocation.lng,
+            poiId: nearest.poiId
+          });
+
+          notification.success({
+            message: 'Auto Check-in!',
+            description: `You've arrived at ${nearest.name || "a point of interest"}. +${data.xpGained || 50} XP earned!`,
+            placement: 'bottomRight',
+            icon: <CheckCircleFilled style={{ color: '#F59E0B' }} />,
+            className: 'vivid-notification'
+          });
+
+          queryClient.invalidateQueries(["gamification", "profile"]);
+          queryClient.invalidateQueries(["user", "stats"]);
+        } catch (err) { }
+      };
+      triggerAutoCheckIn();
+    }
+  }, [userLocation, poisRaw, user, lastAutoCheckInId, queryClient]);
+
+  // Watch Location
+  useEffect(() => {
+    if (!user) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      null,
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [user]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(false);
@@ -1029,7 +1099,7 @@ export default function MapPage() {
         await postPoiFeedbackEvent({ eventType, ...base });
         await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
         await queryClient.invalidateQueries({ queryKey: ["feedback", "saved-pois"] });
-        message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
+        // message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
       } catch (e) {
         message.error(e?.friendlyMessage || "Could not update favorites.");
       } finally {
@@ -1346,8 +1416,8 @@ export default function MapPage() {
             setChatConversationRefreshNonce((n) => n + 1);
           }
           const summary = res.route_summary_message || res.routeSummaryMessage;
-          if (summary) message.success(summary);
-          else message.success("Route is being displayed on the map.");
+          // if (summary) message.success(summary);
+          // else message.success("Route is being displayed on the map.");
         } else {
           message.warning("Could not retrieve route data.");
         }
@@ -1417,8 +1487,8 @@ export default function MapPage() {
         linkPolygonRouteConversation(convId);
         setChatConversationRefreshNonce((n) => n + 1);
         const summary = res.route_summary_message || res.routeSummaryMessage;
-        if (summary) message.success(summary);
-        else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
+        // if (summary) message.success(summary);
+        // else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
       } else {
         message.warning("Could not retrieve route data.");
       }

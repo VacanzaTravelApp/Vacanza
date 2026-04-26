@@ -530,13 +530,13 @@
 }
 
 .cal-event-pill--route:hover {
-    transform: translateY(-1px) scale(1.02);
-    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.35) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
 }
 
 .cal-event-pill--route .cal-event-pill-main {
     border-left: none !important;
-    padding-left: 10px !important;
+    padding: 6px 10px !important;
     color: #ffffff !important;
 }
 
@@ -1044,4 +1044,41 @@ button.cal-event-pill-main {
     border-radius: 50%;
     margin-right: 6px;
     vertical-align: middle;
+}
+
+.cal-event-detail-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.cal-stat-item {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 12px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border: 1px solid var(--cal-border);
+}
+
+.theme-day .cal-stat-item {
+    background: #fff;
+}
+
+.cal-stat-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--cal-accent);
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.cal-stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--cal-text-muted);
 }
