@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
 import 'package:ar_flutter_plugin_engine/ar_flutter_plugin.dart';
 import 'package:ar_flutter_plugin_engine/datatypes/config_planedetection.dart';
@@ -42,6 +41,7 @@ import '../../data/ar_poi_source_from_poi_search.dart';
 import '../../data/device_heading_service.dart';
 import '../../domain/models/ar_poi.dart';
 import '../../domain/services/ar_poi_source.dart';
+import '../styles/ar_poi_style.dart';
 import '../utils/ar_distance_format.dart';
 import '../widgets/ar_behind_poi_strip.dart';
 import '../widgets/ar_category_filter_sheet.dart';
@@ -56,15 +56,6 @@ class ArExplorePage extends StatefulWidget {
 
 enum _ArModeStatus { checking, cameraDenied, ready }
 
-enum _TopHudAction {
-  maxPerCategory1,
-  maxPerCategory2,
-  maxPerCategory3,
-  refreshPois,
-  toggleDebugPanel,
-  togglePlacementMode,
-}
-
 class _ArExplorePageState extends State<ArExplorePage>
     with WidgetsBindingObserver {
   static const String _poiNodeUri =
@@ -78,8 +69,6 @@ class _ArExplorePageState extends State<ArExplorePage>
 
   double _deviceHeadingDeg = 0;
   ArPoi? _selectedPoi;
-  bool _checkinLoading = false;
-  String? _checkinMessage;
 
   final LocationService _locationService = LocationService();
   final DeviceHeadingService _headingService = const DeviceHeadingService();
@@ -91,21 +80,21 @@ class _ArExplorePageState extends State<ArExplorePage>
   final Set<String> _selectedCategories = Set<String>.from(
     PoiCategories.defaults,
   );
-  bool _showDebugPanel = false;
-  double _headingOffsetDeg = 0;
+
   bool _useWorldAnchors = true;
   bool _isArViewReady = false;
   bool _isSyncingArNodes = false;
-  String? _arMessage;
-
-  int _maxPoisPerCategory = 1;
 
   StreamSubscription<double>? _headingSubscription;
   final List<ARNode> _arNodes = <ARNode>[];
   final Map<String, ArPoi> _poiByNodeName = <String, ArPoi>{};
-
-  double? _lastLocationAccuracyMeters;
   final List<String> _recentPoiIds = <String>[];
+
+  // Auto check-in
+  Position? _lastPosition;
+  String? _checkinToastMessage;
+  Color? _checkinToastColor;
+  Timer? _checkinToastTimer;
 
   @override
   void initState() {
@@ -132,19 +121,13 @@ class _ArExplorePageState extends State<ArExplorePage>
   }
 
   Future<void> _checkSupportAndPermissions() async {
-    debugPrint('[AR_MODE] init: requesting camera permission');
-
     final camStatus = await Permission.camera.request();
     if (!camStatus.isGranted) {
-      debugPrint('[AR_MODE] camera permission denied: $camStatus');
       setState(() => _status = _ArModeStatus.cameraDenied);
       return;
     }
-
     if (!mounted) return;
-    setState(() {
-      _status = _ArModeStatus.ready;
-    });
+    setState(() => _status = _ArModeStatus.ready);
     await _loadPoisForCurrentLocation();
   }
 
@@ -160,8 +143,7 @@ class _ArExplorePageState extends State<ArExplorePage>
           perm == LocationPermission.deniedForever) {
         setState(() {
           _pois = const [];
-          _poisError =
-              'Location permission is required to show nearby places in AR.';
+          _poisError = 'Location permission is required to show nearby places.';
         });
         return;
       }
@@ -175,9 +157,7 @@ class _ArExplorePageState extends State<ArExplorePage>
 
       final pos = await _locationService.getCurrentPosition();
       if (!mounted) return;
-      setState(() {
-        _lastLocationAccuracyMeters = pos.accuracy;
-      });
+      _lastPosition = pos;
 
       const radiusMeters = 600.0;
       List<ArPoi> pois;
@@ -189,9 +169,6 @@ class _ArExplorePageState extends State<ArExplorePage>
           categories: null,
           limit: 40,
         );
-        // Mapbox [MapWidget] bu ekranda kullanılmıyor: Android/iOS platform view
-        // AR kamera / ARCore ile aynı hierarchy'de üstte çizilip siyah ekrana yol açıyor.
-        // Stil katmanı POI’ları yok; backend [PoiSearchService] + ingest yeterli.
         if (!mounted) return;
         pois = await ArHybridPoiLoader.mergeNearbyAndStylePois(
           lat: pos.latitude,
@@ -200,8 +177,7 @@ class _ArExplorePageState extends State<ArExplorePage>
           nearbyDtos: dtos,
           mapProbe: null,
         );
-      } catch (e, st) {
-        debugPrint('[AR_MODE] hybrid POI load failed, fallback: $e\n$st');
+      } catch (_) {
         if (!mounted) return;
         pois = await fallbackSource.getNearbyArPois(
           lat: pos.latitude,
@@ -212,36 +188,66 @@ class _ArExplorePageState extends State<ArExplorePage>
       }
 
       final filteredPois = _applyPoiFilters(pois);
-
       if (!mounted) return;
+      setState(() => _pois = filteredPois);
 
-      setState(() {
-        _pois = filteredPois;
-      });
+      _triggerAutoCheckin(pos);
       await _syncArNodes();
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _pois = const [];
-        _poisError = 'Could not load nearby places for AR.';
+        _poisError = 'Could not load nearby places.';
       });
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingPois = false;
-        });
-      }
+      if (mounted) setState(() => _isLoadingPois = false);
     }
+  }
+
+  void _triggerAutoCheckin(Position pos) {
+    final nearbyIds = _pois
+        .where((p) => p.distanceMeters < 150)
+        .map((p) => p.id)
+        .toList();
+    if (nearbyIds.isEmpty || !mounted) return;
+    context.read<CheckinBloc>().add(TriggerAutoCheckin(
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      candidatePoiIds: nearbyIds,
+    ));
+  }
+
+  void _triggerAutoCheckinForPoi(ArPoi poi) {
+    final pos = _lastPosition;
+    if (pos == null || !mounted) return;
+    context.read<CheckinBloc>().add(TriggerAutoCheckin(
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      candidatePoiIds: [poi.id],
+    ));
+  }
+
+  void _showCheckinToast(String message) {
+    _checkinToastTimer?.cancel();
+    setState(() {
+      _checkinToastMessage = message;
+      _checkinToastColor = const Color(0xFF4ADE80);
+    });
+    _checkinToastTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      setState(() => _checkinToastMessage = null);
+    });
   }
 
   void _startHeadingUpdates() {
     _headingSubscription?.cancel();
-    _headingSubscription = _headingService.headingStream().listen((
-      double heading,
-    ) {
-      if (!mounted) return;
-      setState(() => _deviceHeadingDeg = heading);
-    }, onError: (_) {});
+    _headingSubscription = _headingService.headingStream().listen(
+      (double heading) {
+        if (!mounted) return;
+        setState(() => _deviceHeadingDeg = heading);
+      },
+      onError: (_) {},
+    );
   }
 
   void _onArViewCreated(
@@ -265,11 +271,7 @@ class _ArExplorePageState extends State<ArExplorePage>
     _arObjectManager!.onNodeTap = _onArNodeTap;
 
     if (!mounted) return;
-    setState(() {
-      _isArViewReady = true;
-      _arMessage = null;
-    });
-
+    setState(() => _isArViewReady = true);
     _syncArNodes();
   }
 
@@ -286,14 +288,12 @@ class _ArExplorePageState extends State<ArExplorePage>
   Future<void> _ensureFallbackCameraInitialized() async {
     if (_cameraController?.value.isInitialized == true) return;
     try {
-      debugPrint('[AR_MODE] initializing fallback camera (CameraX)');
       final cameras = await availableCameras();
       if (cameras.isEmpty) return;
       final backCamera = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
-
       final controller = CameraController(
         backCamera,
         ResolutionPreset.medium,
@@ -304,12 +304,8 @@ class _ArExplorePageState extends State<ArExplorePage>
         await controller.dispose();
         return;
       }
-      setState(() {
-        _cameraController = controller;
-      });
-    } catch (e) {
-      debugPrint('[AR_MODE] fallback camera initialization failed: $e');
-    }
+      setState(() => _cameraController = controller);
+    } catch (_) {}
   }
 
   void _disposeFallbackCamera() {
@@ -324,13 +320,10 @@ class _ArExplorePageState extends State<ArExplorePage>
     if (manager == null) return;
 
     _isSyncingArNodes = true;
-    final effectiveHeadingDeg = _normalizeHeadingDeg(
-      _deviceHeadingDeg + _headingOffsetDeg,
-    );
     final placements = buildArWorldPlacements(
       pois: _pois,
-      deviceHeadingDeg: effectiveHeadingDeg,
-      maxPerCategory: _maxPoisPerCategory,
+      deviceHeadingDeg: _deviceHeadingDeg,
+      maxPerCategory: 2,
     );
 
     try {
@@ -340,10 +333,8 @@ class _ArExplorePageState extends State<ArExplorePage>
 
       for (final placement in placements) {
         final nodeName = 'poi_${placement.poi.id}';
-        final scaleFactor = (26.0 / placement.renderDistanceMeters).clamp(
-          0.07,
-          0.18,
-        );
+        final scaleFactor =
+            (26.0 / placement.renderDistanceMeters).clamp(0.07, 0.18);
         final node = ARNode(
           type: NodeType.webGLB,
           uri: _poiNodeUri,
@@ -373,10 +364,7 @@ class _ArExplorePageState extends State<ArExplorePage>
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _arMessage = 'AR anchors could not be synced. Using fallback overlay.';
-        _useWorldAnchors = false;
-      });
+      setState(() => _useWorldAnchors = false);
     } finally {
       _isSyncingArNodes = false;
     }
@@ -388,15 +376,23 @@ class _ArExplorePageState extends State<ArExplorePage>
     if (first is! String) return;
     final poi = _poiByNodeName[first];
     if (poi == null || !mounted) return;
+    _onPoiTap(poi);
+  }
+
+  void _onPoiTap(ArPoi poi) {
     HapticFeedback.lightImpact();
     _recordRecentPoi(poi.id);
-    setState(() {
-      _selectedPoi = poi;
-    });
+    setState(() => _selectedPoi = poi);
+    _triggerAutoCheckinForPoi(poi);
+  }
+
+  void _closePoiSheet() {
+    setState(() => _selectedPoi = null);
   }
 
   @override
   void dispose() {
+    _checkinToastTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _headingSubscription?.cancel();
     _clearArNodes();
@@ -405,50 +401,23 @@ class _ArExplorePageState extends State<ArExplorePage>
     super.dispose();
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<CheckinBloc, CheckinState>(
       listenWhen: (prev, next) => prev.status != next.status,
       listener: (context, state) {
-        if (state.status == CheckinStatus.loading) {
-          setState(() {
-            _checkinLoading = true;
-            _checkinMessage = null;
-          });
-        } else if (state.status == CheckinStatus.newCreated) {
-          final poiName = state.response?.poiName;
-          setState(() {
-            _checkinLoading = false;
-            _checkinMessage =
-                poiName != null ? 'Checked in at $poiName' : 'Checked in!';
-          });
-        } else if (state.status == CheckinStatus.duplicate) {
-          setState(() {
-            _checkinLoading = false;
-            _checkinMessage =
-                state.response?.message ?? 'You have already checked in here.';
-          });
-        } else if (state.status == CheckinStatus.noMatch) {
-          setState(() {
-            _checkinLoading = false;
-            _checkinMessage =
-                state.response?.message ??
-                'You are too far from this place to check in.';
-          });
-        } else if (state.status == CheckinStatus.failure) {
-          setState(() {
-            _checkinLoading = false;
-            _checkinMessage =
-                state.errorMessage ?? 'Check-in failed. Please try again.';
-          });
+        if (state.status == CheckinStatus.newCreated) {
+          final name = state.response?.poiName ?? 'this place';
+          _showCheckinToast('Checked in at $name!');
         }
       },
       child: Scaffold(
-        body: SafeArea(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: _buildBody(),
-          ),
+        backgroundColor: Colors.black,
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _buildBody(),
         ),
       ),
     );
@@ -457,14 +426,12 @@ class _ArExplorePageState extends State<ArExplorePage>
   Widget _buildBody() {
     switch (_status) {
       case _ArModeStatus.checking:
-        return const _ArStatusMessage(
-          icon: Icons.hourglass_empty_rounded,
-          title: 'Preparing AR Mode…',
-          message: 'Checking device support and camera permission.',
+        return const _ArLoadingScreen(
+          message: 'Scanning surroundings…',
         );
       case _ArModeStatus.cameraDenied:
-        return _CameraDeniedMessage(
-          onBackToMap: () => Navigator.of(context).pop(),
+        return _CameraDeniedScreen(
+          onBack: () => Navigator.of(context).pop(),
         );
       case _ArModeStatus.ready:
         return _buildReadyArContent();
@@ -472,21 +439,19 @@ class _ArExplorePageState extends State<ArExplorePage>
   }
 
   Widget _buildReadyArContent() {
-    final effectiveHeadingDeg = _normalizeHeadingDeg(
-      _deviceHeadingDeg + _headingOffsetDeg,
-    );
-    final behindPois = _behindPoisForHeading(effectiveHeadingDeg);
-    final frontPois = _frontPoisForHeading(effectiveHeadingDeg);
+    final headingDeg = _deviceHeadingDeg;
+    final behindPois = _behindPoisForHeading(headingDeg);
+    final frontPois = _frontPoisForHeading(headingDeg);
 
     final worldPlacements = buildArWorldPlacements(
       pois: _pois,
-      deviceHeadingDeg: effectiveHeadingDeg,
-      maxPerCategory: _maxPoisPerCategory,
+      deviceHeadingDeg: headingDeg,
+      maxPerCategory: 2,
     );
     final positioned = layoutArPois(
       pois: frontPois,
-      deviceHeadingDeg: effectiveHeadingDeg,
-      maxPerCategory: _maxPoisPerCategory,
+      deviceHeadingDeg: headingDeg,
+      maxPerCategory: 2,
     );
 
     if (_useWorldAnchors) {
@@ -502,17 +467,12 @@ class _ArExplorePageState extends State<ArExplorePage>
             child: Stack(
               children: [
                 _buildTopHud(),
+                _buildWorldFloatingLabels(worldPlacements, frontPois),
                 _buildBottomHud(
                   behindPois: behindPois,
-                  headingDeg: effectiveHeadingDeg,
+                  headingDeg: headingDeg,
                 ),
-                if (_showDebugPanel)
-                  _buildWorldDebugPanel(
-                    placements: worldPlacements,
-                    effectiveHeadingDeg: effectiveHeadingDeg,
-                  ),
-                _buildWorldFloatingLabels(worldPlacements, frontPois),
-                if (_arMessage != null) _buildArMessage(),
+                if (_checkinToastMessage != null) _buildToastOverlay(),
               ],
             ),
           ),
@@ -521,6 +481,7 @@ class _ArExplorePageState extends State<ArExplorePage>
       );
     }
 
+    // Compass fallback
     if (_cameraController == null ||
         !_cameraController!.value.isInitialized) {
       Future.microtask(_ensureFallbackCameraInitialized);
@@ -529,46 +490,567 @@ class _ArExplorePageState extends State<ArExplorePage>
     return Stack(
       children: [
         Positioned.fill(
-          child:
-              _cameraController != null &&
-                      _cameraController!.value.isInitialized
-                  ? CameraPreview(_cameraController!)
-                  : const ColoredBox(color: Colors.black),
+          child: _cameraController != null &&
+                  _cameraController!.value.isInitialized
+              ? CameraPreview(_cameraController!)
+              : const ColoredBox(color: Colors.black),
         ),
         Positioned.fill(
           child: Stack(
             children: [
               _buildTopHud(),
-              _buildBottomHud(
-                behindPois: behindPois,
-                headingDeg: effectiveHeadingDeg,
-              ),
-              if (_showDebugPanel)
-                _buildDebugPanel(
-                  positioned: positioned,
-                  effectiveHeadingDeg: effectiveHeadingDeg,
-                ),
-              for (final p in positioned)
-                Align(
+              ...positioned.map((p) {
+                final opacity = _xFractionOpacity(p.xFraction);
+                return Align(
                   alignment: Alignment(
                     p.xFraction * 2 - 1,
                     -0.6 + p.row * 0.25,
                   ),
-                  child: GestureDetector(
-                    onTap: () => _onPoiTap(p.poi),
-                    child: ArPoiChip(
-                      poi: p.poi,
-                      scale: _distanceScaleForPoi(p.poi, frontPois),
-                      isSelected: _selectedPoi?.id == p.poi.id,
+                  child: IgnorePointer(
+                    ignoring: opacity < 0.05,
+                    child: Opacity(
+                      opacity: opacity,
+                      child: ArPoiChip(
+                        poi: p.poi,
+                        scale: _distanceScaleForPoi(p.poi, frontPois),
+                        isSelected: _selectedPoi?.id == p.poi.id,
+                        onTap: () => _onPoiTap(p.poi),
+                      ),
                     ),
                   ),
-                ),
+                );
+              }),
+              _buildBottomHud(
+                behindPois: behindPois,
+                headingDeg: headingDeg,
+              ),
+              if (_checkinToastMessage != null) _buildToastOverlay(),
             ],
           ),
         ),
         if (_selectedPoi != null) _buildPoiBottomSheet(),
       ],
     );
+  }
+
+  // ── HUD ───────────────────────────────────────────────────────────────────
+
+  Widget _buildTopHud() {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              _ArGlassButton(
+                icon: Icons.arrow_back_rounded,
+                onTap: () => Navigator.of(context).pop(),
+              ),
+              const Spacer(),
+              if (_isLoadingPois) ...[
+                const _ArSpinner(),
+                const SizedBox(width: 10),
+              ],
+              _ArGlassButton(
+                icon: Icons.tune_rounded,
+                onTap: _openCategoryFilter,
+                isActive: _selectedCategories.length <
+                    PoiCategoryCatalog.all.length,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomHud({
+    required List<ArPoi> behindPois,
+    required double headingDeg,
+  }) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: SafeArea(
+        minimum: const EdgeInsets.only(bottom: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (behindPois.isNotEmpty)
+              ArBehindPoiStrip(
+                pois: behindPois,
+                deviceHeadingDeg: headingDeg,
+                onPoiTap: _onPoiTap,
+                selectedPoiId: _selectedPoi?.id,
+              ),
+            if (_poisError != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                child: Text(
+                  _poisError!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xCCFF6B6B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToastOverlay() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final toastColor = _checkinToastColor ?? const Color(0xFF4ADE80);
+    return Align(
+      alignment: Alignment.topCenter,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 64, left: 24, right: 24),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xEE060613) : const Color(0xEEFFFFFF),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: toastColor.withValues(alpha: 0.50),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: toastColor.withValues(alpha: 0.28),
+                  blurRadius: 18,
+                ),
+                BoxShadow(
+                  color: isDark
+                      ? const Color(0x66000000)
+                      : const Color(0x22000000),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle_rounded, color: toastColor, size: 18),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _checkinToastMessage!,
+                    style: TextStyle(
+                      color: isDark
+                          ? Colors.white
+                          : const Color(0xFF111827),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── POI Detail Sheet ───────────────────────────────────────────────────────
+
+  Widget _buildPoiBottomSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final poi = _selectedPoi!;
+    final glowColor = arPoiRingColorForCategory(poi.categoryKey);
+    final icon = arPoiIconForCategory(poi.categoryKey);
+    final categoryLabel = PoiCategoryCatalog.labelForRawCategory(
+          poi.categoryKey,
+        ) ??
+        poi.categoryKey;
+    final dist = formatArDistanceMeters(
+      poi.distanceMeters,
+      useImperial: localeUsesImperial(context),
+    );
+    final recents = _recentPoisOtherThan(poi.id);
+
+    final Color sheetBg =
+        isDark ? const Color(0xF0060613) : const Color(0xF5FFFFFF);
+    final Color nameColor =
+        isDark ? Colors.white : const Color(0xFF111827);
+    final Color closeBtnBg = isDark
+        ? const Color(0x26FFFFFF)
+        : const Color(0xFFF3F4F6);
+    final Color closeBtnBorder =
+        isDark ? const Color(0x26FFFFFF) : const Color(0xFFE5E7EB);
+    final Color closeIconColor =
+        isDark ? const Color(0xCCFFFFFF) : const Color(0xFF6B7280);
+    final Color sectionLabelColor =
+        isDark ? const Color(0x66FFFFFF) : const Color(0xFF9CA3AF);
+    final Color recentTextColor =
+        isDark ? const Color(0xCCFFFFFF) : const Color(0xFF374151);
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: sheetBg,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: glowColor.withValues(alpha: isDark ? 0.28 : 0.35),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: isDark ? 0.20 : 0.14),
+                  blurRadius: 28,
+                  spreadRadius: -2,
+                ),
+                BoxShadow(
+                  color: isDark
+                      ? const Color(0x99000000)
+                      : const Color(0x22000000),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Category color accent line
+                  Container(
+                    height: 2.5,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          glowColor.withValues(alpha: 0.80),
+                          glowColor,
+                          glowColor.withValues(alpha: 0.80),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Category + close row
+                        Row(
+                          children: [
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: glowColor.withValues(alpha: 0.18),
+                                border: Border.all(
+                                  color: glowColor.withValues(alpha: 0.45),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Icon(icon, size: 12, color: glowColor),
+                            ),
+                            const SizedBox(width: 7),
+                            Text(
+                              categoryLabel.toUpperCase(),
+                              style: TextStyle(
+                                color: glowColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: _closePoiSheet,
+                              child: Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: closeBtnBg,
+                                  border: Border.all(
+                                    color: closeBtnBorder,
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 15,
+                                  color: closeIconColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        // POI name
+                        Text(
+                          poi.name,
+                          style: TextStyle(
+                            color: nameColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                            letterSpacing: -0.4,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 10),
+                        // Distance + favorite row
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: glowColor.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: glowColor.withValues(alpha: 0.30),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.place_rounded,
+                                    size: 12,
+                                    color: glowColor,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    dist,
+                                    style: TextStyle(
+                                      color: glowColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Spacer(),
+                            PoiFavoriteHeartButton(
+                              ref: FeedbackPoiRef.fromArPoi(poi),
+                              iconSize: 22,
+                              padding: EdgeInsets.zero,
+                              filledColor: const Color(0xFFFF8A95),
+                              outlineColor: isDark
+                                  ? Colors.white.withValues(alpha: 0.70)
+                                  : const Color(0xFF9CA3AF),
+                            ),
+                          ],
+                        ),
+                        // Recent POIs
+                        if (recents.isNotEmpty) ...[
+                          const SizedBox(height: 14),
+                          Text(
+                            'RECENTLY VIEWED',
+                            style: TextStyle(
+                              color: sectionLabelColor,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            height: 32,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: recents.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 6),
+                              itemBuilder: (context, i) {
+                                final r = recents[i];
+                                final rColor =
+                                    arPoiRingColorForCategory(r.categoryKey);
+                                return GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    _recordRecentPoi(r.id);
+                                    setState(() => _selectedPoi = r);
+                                    _triggerAutoCheckinForPoi(r);
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: rColor.withValues(alpha: 0.10),
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: rColor.withValues(alpha: 0.28),
+                                        width: 0.8,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      r.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: recentTextColor,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── World AR floating labels ───────────────────────────────────────────────
+
+  Widget _buildWorldFloatingLabels(
+    List<ArWorldPlacement> placements,
+    List<ArPoi> frontCohort,
+  ) {
+    if (placements.isEmpty) return const SizedBox.shrink();
+    final labels = _buildWorldLabelPositions(placements);
+    return Align(
+      alignment: Alignment.center,
+      child: Stack(
+        children: [
+          for (final label in labels)
+            Align(
+              alignment: Alignment(label.x * 2 - 1, label.yAlign),
+              child: IgnorePointer(
+                ignoring: label.opacity < 0.05,
+                child: Opacity(
+                  opacity: label.opacity,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 190),
+                    child: ArPoiChip(
+                      poi: label.placement.poi,
+                      scale: label.scale *
+                          _distanceScaleForPoi(
+                            label.placement.poi,
+                            frontCohort,
+                          ),
+                      isSelected: _selectedPoi?.id == label.placement.poi.id,
+                      onTap: () => _onPoiTap(label.placement.poi),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<_WorldLabelPosition> _buildWorldLabelPositions(
+    List<ArWorldPlacement> placements,
+  ) {
+    final placed = <_WorldLabelPosition>[];
+    const visibleFovDeg = 55.0;
+    const minXGap = 0.17;
+    const maxRows = 4;
+
+    final sorted = [...placements]
+      ..sort((a, b) => a.poi.distanceMeters.compareTo(b.poi.distanceMeters));
+    final minDistance = sorted.first.poi.distanceMeters;
+    final maxDistance = sorted.last.poi.distanceMeters;
+
+    for (final placement in sorted) {
+      final rel = placement.relativeBearingDeg;
+      final absRel = rel.abs();
+
+      // Compute fade opacity: full at ≤60°, gone at ≥82°
+      final opacity = absRel <= 60
+          ? 1.0
+          : absRel >= 82
+              ? 0.0
+              : 1.0 - (absRel - 60) / 22.0;
+
+      // Skip completely invisible chips to avoid overlap calculations
+      if (opacity <= 0) continue;
+
+      var x = (0.5 + (rel / visibleFovDeg) * 0.5).clamp(0.02, 0.98);
+      int row = 0;
+      while (row < maxRows &&
+          placed.any((p) => p.row == row && (p.x - x).abs() < minXGap)) {
+        row++;
+      }
+      if (row >= maxRows) {
+        x = (x + 0.08).clamp(0.02, 0.98);
+        row = maxRows - 1;
+      }
+      placed.add(
+        _WorldLabelPosition(
+          placement: placement,
+          x: x,
+          row: row,
+          yAlign: -0.56 + (row * 0.2),
+          scale: _relativeLabelScale(
+            placement.poi.distanceMeters,
+            minDistance,
+            maxDistance,
+          ),
+          opacity: opacity,
+        ),
+      );
+    }
+    return placed;
+  }
+
+  double _relativeLabelScale(
+    double distanceMeters,
+    double minDistanceMeters,
+    double maxDistanceMeters,
+  ) {
+    if ((maxDistanceMeters - minDistanceMeters).abs() < 0.1) return 0.9;
+    final t = ((distanceMeters - minDistanceMeters) /
+            (maxDistanceMeters - minDistanceMeters))
+        .clamp(0.0, 1.0);
+    return (1.0 - (0.38 * t)).clamp(0.58, 1.0);
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  // Fades compass-fallback chips: full opacity in center, gone near edges.
+  // xFraction 0..1 maps rel bearing -90°..+90° via layoutArPois.
+  double _xFractionOpacity(double xFraction) {
+    final d = (xFraction - 0.5).abs(); // 0 = center, 0.5 = edge
+    if (d <= 0.333) return 1.0; // within ±60°
+    if (d >= 0.456) return 0.0; // beyond ±82°
+    return 1.0 - (d - 0.333) / (0.456 - 0.333);
   }
 
   List<ArPoi> _behindPoisForHeading(double headingDeg) {
@@ -608,14 +1090,6 @@ class _ArExplorePageState extends State<ArExplorePage>
     return (1.0 - (0.42 * t)).clamp(0.55, 1.0);
   }
 
-  void _onPoiTap(ArPoi poi) {
-    HapticFeedback.lightImpact();
-    _recordRecentPoi(poi.id);
-    setState(() {
-      _selectedPoi = poi;
-    });
-  }
-
   void _recordRecentPoi(String poiId) {
     _recentPoiIds.remove(poiId);
     _recentPoiIds.insert(0, poiId);
@@ -630,9 +1104,7 @@ class _ArExplorePageState extends State<ArExplorePage>
     for (final id in _recentPoiIds) {
       if (id == currentId) continue;
       final p = byId[id];
-      if (p != null) {
-        out.add(p);
-      }
+      if (p != null) out.add(p);
       if (out.length >= 6) break;
     }
     return out;
@@ -643,9 +1115,7 @@ class _ArExplorePageState extends State<ArExplorePage>
     final m = {for (final k in keys) k: 0};
     for (final p in _pois) {
       final d = PoiCategoryCatalog.poiCategoryForRaw(p.categoryKey);
-      if (d != null) {
-        m[d.key] = (m[d.key] ?? 0) + 1;
-      }
+      if (d != null) m[d.key] = (m[d.key] ?? 0) + 1;
     }
     return m;
   }
@@ -666,541 +1136,14 @@ class _ArExplorePageState extends State<ArExplorePage>
     );
   }
 
-  void _closePoiSheet() {
-    setState(() {
-      _selectedPoi = null;
-      _checkinLoading = false;
-      _checkinMessage = null;
-    });
-  }
-
-  Widget _buildPoiBottomSheet() {
-    final poi = _selectedPoi!;
-    final useImperial = localeUsesImperial(context);
-    final dist = formatArDistanceMeters(
-      poi.distanceMeters,
-      useImperial: useImperial,
-    );
-    final recents = _recentPoisOtherThan(poi.id);
-
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Material(
-            color: Colors.black.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          poi.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      PoiFavoriteHeartButton(
-                        ref: FeedbackPoiRef.fromArPoi(poi),
-                        iconSize: 24,
-                        padding: EdgeInsets.zero,
-                        filledColor: const Color(0xFFFF8A95),
-                        outlineColor: Colors.white.withValues(alpha: 0.88),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: _closePoiSheet,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Yaklaşık $dist uzakta',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.82),
-                      fontSize: 12,
-                    ),
-                  ),
-                  if (recents.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'Son bakılanlar',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.72),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 40,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: recents.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, i) {
-                          final r = recents[i];
-                          return ActionChip(
-                            label: Text(
-                              r.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                            onPressed: () {
-                              HapticFeedback.selectionClick();
-                              _recordRecentPoi(r.id);
-                              setState(() => _selectedPoi = r);
-                            },
-                            backgroundColor: Colors.white.withValues(
-                              alpha: 0.14,
-                            ),
-                            labelStyle: const TextStyle(color: Colors.white),
-                            side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.28),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  if (_checkinMessage != null) ...[
-                    Text(
-                      _checkinMessage!,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  SizedBox(
-                    width: double.infinity,
-                    child: VacanzaGradientButton(
-                      onPressed:
-                          _checkinLoading
-                              ? null
-                              : () async {
-                                final poi = _selectedPoi;
-                                if (poi == null) return;
-
-                                debugPrint(
-                                  '[AR_CHECKIN] attempt poiId=${poi.id} name=${poi.name}',
-                                );
-
-                                setState(() {
-                                  _checkinLoading = true;
-                                  _checkinMessage = null;
-                                });
-
-                                final pos =
-                                    await _locationService.getCurrentPosition();
-
-                                if (!mounted) return;
-
-                                context.read<CheckinBloc>().add(
-                                  TriggerAutoCheckin(
-                                    latitude: pos.latitude,
-                                    longitude: pos.longitude,
-                                    candidatePoiIds: [poi.id],
-                                  ),
-                                );
-                              },
-                      label: 'Check-in yap',
-                      enabled: !_checkinLoading,
-                      loading: _checkinLoading,
-                      minHeight: 46,
-                      borderRadius: 12,
-                      horizontalPadding: 18,
-                      textStyle: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTopHud() {
-    final cs = Theme.of(context).colorScheme;
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: cs.surface.withValues(alpha: 0.78),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: cs.outline.withValues(alpha: 0.22),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                IconButton(
-                  icon: Icon(
-                    Icons.arrow_back_rounded,
-                    color: cs.onSurface,
-                    size: 22,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                const SizedBox(width: 2),
-                Expanded(
-                  child: Text(
-                    'Explore in AR',
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.35,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (_isLoadingPois)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: cs.primary,
-                      ),
-                    ),
-                  ),
-                PopupMenuButton<_TopHudAction>(
-                  tooltip: 'AR options',
-                  icon: Icon(
-                    Icons.more_vert_rounded,
-                    color: cs.onSurface,
-                    size: 22,
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
-                  ),
-                  onSelected: (action) {
-                    switch (action) {
-                      case _TopHudAction.maxPerCategory1:
-                        setState(() => _maxPoisPerCategory = 1);
-                        _syncArNodes();
-                        break;
-                      case _TopHudAction.maxPerCategory2:
-                        setState(() => _maxPoisPerCategory = 2);
-                        _syncArNodes();
-                        break;
-                      case _TopHudAction.maxPerCategory3:
-                        setState(() => _maxPoisPerCategory = 3);
-                        _syncArNodes();
-                        break;
-                      case _TopHudAction.refreshPois:
-                        _loadPoisForCurrentLocation();
-                        break;
-                      case _TopHudAction.toggleDebugPanel:
-                        setState(() => _showDebugPanel = !_showDebugPanel);
-                        break;
-                      case _TopHudAction.togglePlacementMode:
-                        setState(() {
-                          _useWorldAnchors = !_useWorldAnchors;
-                          _arMessage =
-                              _useWorldAnchors
-                                  ? 'World-anchor mode enabled.'
-                                  : 'Compass fallback mode enabled.';
-                        });
-                        if (_useWorldAnchors) {
-                          _disposeFallbackCamera();
-                          _syncArNodes();
-                        } else {
-                          _clearArNodes();
-                          _ensureFallbackCameraInitialized();
-                        }
-                        break;
-                    }
-                  },
-                  itemBuilder:
-                      (context) => [
-                        PopupMenuItem<_TopHudAction>(
-                          value: _TopHudAction.maxPerCategory1,
-                          child: Text(
-                            _maxPoisPerCategory == 1
-                                ? '✓ 1 per category'
-                                : '1 per category',
-                          ),
-                        ),
-                        PopupMenuItem<_TopHudAction>(
-                          value: _TopHudAction.maxPerCategory2,
-                          child: Text(
-                            _maxPoisPerCategory == 2
-                                ? '✓ 2 per category'
-                                : '2 per category',
-                          ),
-                        ),
-                        PopupMenuItem<_TopHudAction>(
-                          value: _TopHudAction.maxPerCategory3,
-                          child: Text(
-                            _maxPoisPerCategory == 3
-                                ? '✓ 3 per category'
-                                : '3 per category',
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        const PopupMenuItem<_TopHudAction>(
-                          value: _TopHudAction.refreshPois,
-                          child: Text('Refresh places'),
-                        ),
-                        PopupMenuItem<_TopHudAction>(
-                          value: _TopHudAction.toggleDebugPanel,
-                          child: Text(
-                            _showDebugPanel
-                                ? 'Hide debug panel'
-                                : 'Show debug panel',
-                          ),
-                        ),
-                        PopupMenuItem<_TopHudAction>(
-                          value: _TopHudAction.togglePlacementMode,
-                          child: Text(
-                            _useWorldAnchors
-                                ? 'Use compass fallback'
-                                : 'Use world anchors',
-                          ),
-                        ),
-                      ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-              if (_lastLocationAccuracyMeters != null &&
-                  _lastLocationAccuracyMeters! > 35.0) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Konum hassasiyeti düşük (±${_lastLocationAccuracyMeters!.round()} m).',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: cs.error.withValues(alpha: 0.92),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomHud({
-    required List<ArPoi> behindPois,
-    required double headingDeg,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: SafeArea(
-        minimum: const EdgeInsets.only(bottom: 8, left: 12, right: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (behindPois.isNotEmpty)
-              ArBehindPoiStrip(
-                pois: behindPois,
-                deviceHeadingDeg: headingDeg,
-                onPoiTap: _onPoiTap,
-                selectedPoiId: _selectedPoi?.id,
-              ),
-            if (_poisError != null) ...[
-              if (behindPois.isNotEmpty) const SizedBox(height: 6),
-              Text(
-                _poisError!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: cs.error,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            if (behindPois.isNotEmpty || _poisError != null)
-              const SizedBox(height: 6),
-            OutlinedButton.icon(
-              onPressed: _isLoadingPois ? null : _openCategoryFilter,
-              icon: Icon(Icons.filter_list_rounded, size: 18, color: cs.primary),
-              label: Text(
-                'Kategoriler · ${_selectedCategories.length}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: cs.onSurface,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                side: BorderSide(
-                  color: context.mapControlAccent.withValues(alpha: 0.45),
-                ),
-                backgroundColor: cs.surface.withValues(alpha: 0.82),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWorldFloatingLabels(
-    List<ArWorldPlacement> placements,
-    List<ArPoi> frontCohort,
-  ) {
-    if (placements.isEmpty) return const SizedBox.shrink();
-    final labels = _buildWorldLabelPositions(placements);
-    return Align(
-      alignment: Alignment.center,
-      child: IgnorePointer(
-        ignoring: false,
-        child: Stack(
-          children: [
-            for (final label in labels)
-              Align(
-                alignment: Alignment(label.x * 2 - 1, label.yAlign),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 190),
-                  child: GestureDetector(
-                    onTap: () => _onPoiTap(label.placement.poi),
-                    child: ArPoiChip(
-                      poi: label.placement.poi,
-                      scale: label.scale *
-                          _distanceScaleForPoi(
-                            label.placement.poi,
-                            frontCohort,
-                          ),
-                      isSelected: _selectedPoi?.id == label.placement.poi.id,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<_WorldLabelPosition> _buildWorldLabelPositions(
-    List<ArWorldPlacement> placements,
-  ) {
-    final placed = <_WorldLabelPosition>[];
-    const visibleFovDeg = 55.0;
-    const minXGap = 0.17;
-    const maxRows = 4;
-
-    // Keep labels stable and readable by favoring closer POIs first.
-    final sorted = [...placements]
-      ..sort((a, b) => a.poi.distanceMeters.compareTo(b.poi.distanceMeters));
-    final minDistance = sorted.first.poi.distanceMeters;
-    final maxDistance = sorted.last.poi.distanceMeters;
-
-    for (final placement in sorted) {
-      final rel = placement.relativeBearingDeg;
-      var x = (0.5 + (rel / visibleFovDeg) * 0.5).clamp(0.08, 0.92);
-      int row = 0;
-      while (row < maxRows &&
-          placed.any((p) => p.row == row && (p.x - x).abs() < minXGap)) {
-        row++;
-      }
-      if (row >= maxRows) {
-        // If crowded, nudge horizontally to nearest free slot.
-        x = (x + 0.08).clamp(0.08, 0.92);
-        row = maxRows - 1;
-      }
-      placed.add(
-        _WorldLabelPosition(
-          placement: placement,
-          x: x,
-          row: row,
-          yAlign: -0.56 + (row * 0.2),
-          scale: _relativeLabelScale(
-            placement.poi.distanceMeters,
-            minDistance,
-            maxDistance,
-          ),
-        ),
-      );
-    }
-    return placed;
-  }
-
-  double _relativeLabelScale(
-    double distanceMeters,
-    double minDistanceMeters,
-    double maxDistanceMeters,
-  ) {
-    if ((maxDistanceMeters - minDistanceMeters).abs() < 0.1) {
-      return 0.9;
-    }
-    final t = ((distanceMeters - minDistanceMeters) /
-            (maxDistanceMeters - minDistanceMeters))
-        .clamp(0.0, 1.0);
-    return (1.0 - (0.38 * t)).clamp(0.58, 1.0);
-  }
-
   bool _isDisplayablePoiName(String rawName) {
-    final normalized = rawName.trim().toLowerCase();
-    if (normalized.isEmpty) return false;
-    return normalized != 'unnamed' &&
-        normalized != 'null' &&
-        normalized != 'undefined' &&
-        normalized != '-';
+    final n = rawName.trim().toLowerCase();
+    if (n.isEmpty) return false;
+    return n != 'unnamed' && n != 'null' && n != 'undefined' && n != '-';
   }
 
   List<ArPoi> _applyPoiFilters(List<ArPoi> pois) {
-    if (_selectedCategories.isEmpty) {
-      return const [];
-    }
+    if (_selectedCategories.isEmpty) return const [];
 
     final clientCats = PoiClientCategoryFilter.categoriesForSearch(
       _selectedCategories.toList(),
@@ -1215,7 +1158,6 @@ class _ArExplorePageState extends State<ArExplorePage>
 
     for (final poi in pois) {
       if (!_isDisplayablePoiName(poi.name)) continue;
-
       if (!PoiCategoryCatalog.passesCategoryFilter(
         rawCategory: poi.categoryKey,
         selectedUiKeys: selectedSet,
@@ -1223,7 +1165,6 @@ class _ArExplorePageState extends State<ArExplorePage>
       )) {
         continue;
       }
-
       final dedupeKey = _buildPoiDedupeKey(poi);
       if (!seenKeys.add(dedupeKey)) continue;
       out.add(poi);
@@ -1261,346 +1202,339 @@ class _ArExplorePageState extends State<ArExplorePage>
     }
   }
 
-  Widget _buildWorldDebugPanel({
-    required List<ArWorldPlacement> placements,
-    required double effectiveHeadingDeg,
-  }) {
-    ArWorldPlacement? focus;
-    if (_selectedPoi != null) {
-      for (final p in placements) {
-        if (p.poi.id == _selectedPoi!.id) {
-          focus = p;
-          break;
-        }
-      }
-    }
-    focus ??= placements.isNotEmpty ? placements.first : null;
+}
 
-    final poiName = focus?.poi.name ?? '-';
-    final rel = focus?.relativeBearingDeg.toStringAsFixed(1) ?? '-';
-    final dist = focus?.poi.distanceMeters.toStringAsFixed(1) ?? '-';
-    final arDist = focus?.renderDistanceMeters.toStringAsFixed(1) ?? '-';
+// ── Loading Screen ─────────────────────────────────────────────────────────
 
-    return Align(
-      alignment: Alignment.topRight,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(top: 68, right: 12),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 260),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.68),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: DefaultTextStyle(
-              style: const TextStyle(color: Colors.white, fontSize: 11),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'AR World Anchor Debug',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'mode: ${_useWorldAnchors ? 'world-anchor' : 'fallback'}',
-                  ),
-                  Text('arReady: $_isArViewReady'),
-                  Text('rawHeading: ${_deviceHeadingDeg.toStringAsFixed(1)}°'),
-                  Text('effective: ${effectiveHeadingDeg.toStringAsFixed(1)}°'),
-                  Text('anchors: ${_arNodes.length}'),
-                  const SizedBox(height: 4),
-                  Text('focusPoi: $poiName'),
-                  Text('relative: $rel°'),
-                  Text('poiDistance: $dist m'),
-                  Text('renderDistance: $arDist m'),
-                ],
+class _ArLoadingScreen extends StatelessWidget {
+  final String message;
+
+  const _ArLoadingScreen({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _PulsingOrb(),
+            const SizedBox(height: 28),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Color(0x80FFFFFF),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.3,
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
-  }
-
-  Widget _buildArMessage() {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(top: 64),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              _arMessage!,
-              style: const TextStyle(color: Colors.white, fontSize: 11),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDebugPanel({
-    required List<ArPoiPositioned> positioned,
-    required double effectiveHeadingDeg,
-  }) {
-    final ArPoiPositioned? focus = _resolveDebugFocus(positioned);
-    final String poiName = focus?.poi.name ?? '-';
-    final String poiBearing =
-        focus != null ? focus.poi.bearingDegrees.toStringAsFixed(1) : '-';
-    final String relAngle =
-        focus != null
-            ? _signedRelativeAngleDeg(
-              toBearingDeg: focus.poi.bearingDegrees,
-              fromHeadingDeg: effectiveHeadingDeg,
-            ).toStringAsFixed(1)
-            : '-';
-    final String xFraction =
-        focus != null ? focus.xFraction.toStringAsFixed(3) : '-';
-
-    return Align(
-      alignment: Alignment.topRight,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(top: 68, right: 12),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 250),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.68),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: DefaultTextStyle(
-              style: const TextStyle(color: Colors.white, fontSize: 11),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'AR Debug / Calibration',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 6),
-                  Text('rawHeading: ${_deviceHeadingDeg.toStringAsFixed(1)}°'),
-                  Text('offset: ${_headingOffsetDeg.toStringAsFixed(1)}°'),
-                  Text('effective: ${effectiveHeadingDeg.toStringAsFixed(1)}°'),
-                  const SizedBox(height: 4),
-                  Text('focusPoi: $poiName'),
-                  Text('poiBearing: $poiBearing°'),
-                  Text('relative: $relAngle°'),
-                  Text('xFraction: $xFraction'),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setState(() {
-                              _headingOffsetDeg = _normalizeSigned180(
-                                _headingOffsetDeg - 2,
-                              );
-                            });
-                            _syncArNodes();
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.white54),
-                            minimumSize: const Size(0, 34),
-                            padding: EdgeInsets.zero,
-                          ),
-                          child: const Text('-2°'),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setState(() {
-                              _headingOffsetDeg = 0;
-                            });
-                            _syncArNodes();
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.white54),
-                            minimumSize: const Size(0, 34),
-                            padding: EdgeInsets.zero,
-                          ),
-                          child: const Text('Reset'),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setState(() {
-                              _headingOffsetDeg = _normalizeSigned180(
-                                _headingOffsetDeg + 2,
-                              );
-                            });
-                            _syncArNodes();
-                          },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(color: Colors.white54),
-                            minimumSize: const Size(0, 34),
-                            padding: EdgeInsets.zero,
-                          ),
-                          child: const Text('+2°'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  ArPoiPositioned? _resolveDebugFocus(List<ArPoiPositioned> positioned) {
-    if (positioned.isEmpty) return null;
-    if (_selectedPoi != null) {
-      for (final p in positioned) {
-        if (p.poi.id == _selectedPoi!.id) return p;
-      }
-    }
-    return positioned.reduce((a, b) {
-      final aDist = (a.xFraction - 0.5).abs();
-      final bDist = (b.xFraction - 0.5).abs();
-      return aDist <= bDist ? a : b;
-    });
-  }
-
-  double _normalizeHeadingDeg(double deg) {
-    final normalized = deg % 360.0;
-    return normalized < 0 ? normalized + 360.0 : normalized;
-  }
-
-  double _normalizeSigned180(double deg) {
-    var normalized = deg % 360.0;
-    if (normalized > 180.0) normalized -= 360.0;
-    if (normalized < -180.0) normalized += 360.0;
-    return normalized;
-  }
-
-  double _signedRelativeAngleDeg({
-    required double toBearingDeg,
-    required double fromHeadingDeg,
-  }) {
-    return _normalizeSigned180(toBearingDeg - fromHeadingDeg);
   }
 }
 
-class _ArStatusMessage extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
+// ── Camera Denied Screen ───────────────────────────────────────────────────
 
-  const _ArStatusMessage({
+class _CameraDeniedScreen extends StatelessWidget {
+  final VoidCallback onBack;
+
+  const _CameraDeniedScreen({required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0x1AFF6B6B),
+                  border: Border.all(
+                    color: const Color(0x66FF6B6B),
+                    width: 1.2,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33FF6B6B),
+                      blurRadius: 24,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.no_photography_rounded,
+                  size: 32,
+                  color: Color(0xCCFF6B6B),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Camera Access Required',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'AR mode needs camera permission to place points of interest in your surroundings.',
+                style: TextStyle(
+                  color: Color(0x80FFFFFF),
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Geolocator.openAppSettings(),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0x1AFFFFFF),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: const Color(0x26FFFFFF),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Open Settings',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: VacanzaGradientButton(
+                      label: 'Back to map',
+                      onPressed: onBack,
+                      enabled: true,
+                      minHeight: 46,
+                      borderRadius: 14,
+                      horizontalPadding: 16,
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shared private widgets ─────────────────────────────────────────────────
+
+class _ArGlassButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isActive;
+
+  const _ArGlassButton({
     required this.icon,
-    required this.title,
-    required this.message,
+    required this.onTap,
+    this.isActive = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 40, color: Colors.grey.shade700),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = context.mapControlAccent;
+
+    final Color bg = isDark ? const Color(0xCC060613) : const Color(0xEEFFFFFF);
+    final Color idleBorder =
+        isDark ? const Color(0x33FFFFFF) : const Color(0x33000000);
+    final Color idleIcon =
+        isDark ? Colors.white : const Color(0xFF111827);
+    final Color shadowColor =
+        isDark ? const Color(0x66000000) : const Color(0x22000000);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: bg,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isActive ? accent.withValues(alpha: 0.65) : idleBorder,
+            width: 1.0,
+          ),
+          boxShadow: [
+            if (isActive)
+              BoxShadow(
+                color: accent.withValues(alpha: 0.30),
+                blurRadius: 12,
+              ),
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
+        ),
+        child: Icon(
+          icon,
+          color: isActive ? accent : idleIcon,
+          size: 19,
         ),
       ),
     );
   }
 }
 
-class _CameraDeniedMessage extends StatelessWidget {
-  final VoidCallback onBackToMap;
-
-  const _CameraDeniedMessage({required this.onBackToMap});
+class _ArSpinner extends StatelessWidget {
+  const _ArSpinner();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.camera_alt_outlined, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              'Camera not available for AR',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Camera access is required to use AR Mode. This device or emulator may not support camera for AR, or the permission was denied.',
-              style: TextStyle(fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                OutlinedButton(
-                  onPressed: () {
-                    Geolocator.openAppSettings();
-                  },
-                  child: const Text('Open app settings'),
-                ),
-                VacanzaGradientButton(
-                  label: 'Back to map',
-                  onPressed: onBackToMap,
-                  enabled: true,
-                  minHeight: 44,
-                  borderRadius: 14,
-                  horizontalPadding: 16,
-                  textStyle: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(
+        strokeWidth: 1.8,
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.6)
+            : Colors.black.withValues(alpha: 0.5),
       ),
     );
   }
 }
+
+class _PulsingOrb extends StatefulWidget {
+  const _PulsingOrb();
+
+  @override
+  State<_PulsingOrb> createState() => _PulsingOrbState();
+}
+
+class _PulsingOrbState extends State<_PulsingOrb>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const orbColor = Color(0xFF818CF8);
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final t = _ctrl.value;
+        return SizedBox(
+          width: 120,
+          height: 120,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Outer expanding ring
+              Opacity(
+                opacity: ((1 - t) * 0.35).clamp(0.0, 0.35),
+                child: Container(
+                  width: 60 + t * 60,
+                  height: 60 + t * 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: orbColor,
+                      width: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              // Mid ring
+              Opacity(
+                opacity: ((1 - t) * 0.55).clamp(0.0, 0.55),
+                child: Container(
+                  width: 44 + t * 28,
+                  height: 44 + t * 28,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: orbColor,
+                      width: 1.0,
+                    ),
+                  ),
+                ),
+              ),
+              // Core glow
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: orbColor.withValues(alpha: 0.18),
+                  border: Border.all(
+                    color: orbColor.withValues(alpha: 0.70),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: orbColor.withValues(alpha: 0.55),
+                      blurRadius: 18,
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.explore_rounded,
+                  size: 16,
+                  color: Color(0xCCFFFFFF),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Label position helper ──────────────────────────────────────────────────
 
 class _WorldLabelPosition {
   final ArWorldPlacement placement;
@@ -1608,6 +1542,7 @@ class _WorldLabelPosition {
   final int row;
   final double yAlign;
   final double scale;
+  final double opacity;
 
   const _WorldLabelPosition({
     required this.placement,
@@ -1615,5 +1550,6 @@ class _WorldLabelPosition {
     required this.row,
     required this.yAlign,
     required this.scale,
+    required this.opacity,
   });
 }
