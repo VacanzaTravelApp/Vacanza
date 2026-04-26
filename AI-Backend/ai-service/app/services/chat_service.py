@@ -194,6 +194,7 @@ DINING stops (restaurant, fast_food, cafe, bar, pub, nightlife, market, bakery):
 - Do NOT invent or hallucinate restaurant/cafe/bar names — you do not have reliable knowledge of which specific dining venues exist.
 - If the POI list has metadata (rating, price), prefer higher-rated places that match user budget.
 - Respect opening hours; skip POIs closed on that day.
+- NO REPEATS: Each restaurant or cafe name must appear AT MOST ONCE across the ENTIRE trip. If you use a venue on Day 1, it MUST NOT appear on Day 2, 3, or any later day. Scan all planned days before choosing a venue for the current day.
 - PROXIMITY RULE (CRITICAL): Each dining stop MUST be within 2 km of the sightseeing stops scheduled on the same day. Compare coordinates before choosing — do NOT pick a restaurant or cafe from a different district or neighborhood. For lunch (slot 4), pick the nearest restaurant to the sightseeing stops in slots 2–3. For dinner (slot 8), pick the nearest restaurant to the sightseeing stops in slots 5–7. For a morning/afternoon cafe, it must be in the same neighborhood as the adjacent sightseeing stops. If no in-range option exists, pick the closest available one — never leave a meal slot empty.
 
 General:
@@ -250,6 +251,8 @@ SELF-CHECK (do this mentally before outputting each day):
   ✓ Does this day have at least 2 iconic/landmark-level sights? If NO → add one from world knowledge (null coordinates).
   ✓ Does EVERY day include ≥1 POI matching the theme detected in STEP 0? If NO → swap in a theme-appropriate sight.
   ✓ Is the theme consistent across ALL days (Day 2 and Day 3 same theme as Day 1)? If NO → replace drifted stops.
+  ✓ Are any two dining stops ADJACENT (no sightseeing stop between them)? If YES → insert a sightseeing stop between them or remove one of the dining stops.
+  ✓ Is every dining stop within 2 km of that day's sightseeing stops? Compare the lat/lon of the restaurant with the lat/lon of the sightseeing stops on the same day. If a dining stop is >2 km away from all sightseeing on that day → replace it with a closer option from the dining list.
 
 QUALITY BALANCE ACROSS DAYS (CRITICAL — prevents day-1 bias):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -343,6 +346,7 @@ WHAT YOU MUST DO
 2. Identify WHICH day(s) and WHICH waypoints need changing.
 3. Apply ONLY the requested change — keep everything else identical.
 4. Output the COMPLETE updated route JSON (all days, including unchanged ones).
+5. FROZEN DAYS RULE: Any day NOT explicitly mentioned in the user's request must be copied into the output EXACTLY as-is — same waypoints, same order, same times, same coordinates. NEVER rearrange, remove, or redistribute waypoints across days "to improve flow" or "to balance". If the user says "add day 4", days 1–3 are frozen.
 
 CONFIRMATION PATTERN (very common): The user previously asked "suggest an alternative for X" and you offered options A and B. Now the user says "I choose A" or "seçiyorum". In this case: replace X with A in the route, then output the full updated route JSON. Do NOT ask for further confirmation — just apply and output.
 
@@ -360,6 +364,7 @@ FULL DAY REGENERATION ("redo day 1", "1. günü tekrar yap", "1. günü yeniden 
 - Day ends no earlier than 18:00.
 - Set latitude: null, longitude: null for all new waypoints (app will geocode).
 - GEOCODING CRITICAL: Waypoints that cannot be geocoded will be silently removed from the route. To avoid losing stops: choose only world-famous or internationally-recognized landmarks; use the official English name with district (e.g. "Topkapi Palace, Fatih", "Blue Mosque, Sultanahmet"). Never use neighborhood-only names (e.g. "Hamamonu", "Balat") as standalone waypoints — they will fail to geocode. Prefer 6 highly-geocodable POIs over 8 risky ones.
+- STREET NAMES CANNOT GEOCODE — use a specific landmark ON or near the street: ❌ "Istiklal Street" → ✅ "Galatasaray Square, Beyoglu"; ❌ "Champs-Élysées" → ✅ "Arc de Triomphe, Paris". Always add the district to the name: "Galata Tower, Karakoy" not just "Galata Tower".
 
 PARTIAL DAY REBUILD ("keep Hagia Sophia and Blue Mosque, change the rest", "Ayasofya kalsın diğerlerini değiştir"):
 - The user explicitly names which waypoints to KEEP. Preserve those exactly (same name, times, order position).
@@ -408,6 +413,22 @@ ADD A DAY ("işim uzadı 4 gün kalacağım", "add a day", "extend to 4 days", "
 - Append new days at the end (day N+1, N+2 …).
 - Update total_days in the JSON to reflect the new total.
 - Set latitude: null, longitude: null for all new waypoints (app will geocode). GEOCODING CRITICAL: POIs that fail geocoding will be silently removed — use only internationally-recognized English names with district context.
+- FROZEN EXISTING DAYS: Copy all existing days (day 1 through day N) byte-for-byte into the output. Do NOT rearrange, remove, modify, or "redistribute" any waypoint from any existing day. Only append the new day(s) at the end.
+
+ADD A DAY WITH SPECIFIC REQUIRED PLACES ("4. gün için İstiklal ve Galata Tower oluştur", "add a day 4 with Colosseum and Trastevere", "ekstra gün ekle, Kapalıçarşı ve Eminönü olsun"):
+- The user has named specific places that MUST appear in the new day as anchor sightseeing stops.
+- REQUIRED places must appear verbatim as waypoints — do NOT substitute, omit, or swap them for something else. If the user says "Galata Tower", the waypoint name must be "Galata Tower, Karakoy" — not "Pera Museum" or any other venue.
+- Plan the entire new day around those named anchors: place them first in your planning.
+- Identify the neighborhood/district of the named anchors (e.g. İstiklal + Galata Tower → Beyoğlu/Galata district).
+- Add ALL other stops — including dining — within ~2 km of those anchors. Do NOT mix in POIs from a different neighborhood or district.
+- Apply the full dining rhythm (morning cafe → lunch → afternoon cafe → dinner), all from the same neighborhood as the anchors.
+- STREET NAMES CANNOT GEOCODE — use a specific landmark ON or near the street instead:
+  ❌ "Istiklal Street" / "Istiklal Caddesi" → ✅ "Galatasaray Square, Beyoglu" or "Cicek Pasaji, Beyoglu"
+  ❌ "Champs-Élysées" → ✅ "Arc de Triomphe, Paris" or "Grand Palais, Paris"
+  ❌ "Via del Corso" → ✅ "Piazza del Popolo, Rome"
+- Always include the district in the name for better geocoding: "Galata Tower, Karakoy" not just "Galata Tower"; "Pera Museum, Beyoglu" not just "Pera Museum".
+- Set latitude: null, longitude: null for all waypoints (app will geocode).
+- FROZEN EXISTING DAYS: Copy all existing days byte-for-byte. Do NOT touch them.
 
 REMOVE A DAY ("3. günü çıkar", "remove day 2", "2. günü sil", "trip is shorter now"):
 - Delete the specified day entirely.
@@ -929,47 +950,101 @@ async def _extract_turn3_must_visit_llm(
         return []
 
 
+def _format_single_poi(p: dict, idx: int) -> str | None:
+    name = p.get("name")
+    cat = p.get("category")
+    lat = p.get("lat")
+    lon = p.get("lon")
+    if name is None or lat is None or lon is None:
+        return None
+    sub_cats = p.get("poiCategoryIds") or []
+    cat_label = cat
+    if sub_cats:
+        useful = [s for s in sub_cats if s and s != cat]
+        if useful:
+            cat_label = f"{cat}: {', '.join(useful[:3])}"
+    parts = [f"{idx}. {name} ({cat_label}) — lat: {lat}, lon: {lon}"]
+    extras: list[str] = []
+    rating = p.get("rating")
+    if rating is not None:
+        extras.append(f"rating: {rating}")
+    price = p.get("priceLevel")
+    if price:
+        extras.append(f"price: {price}")
+    start_t = p.get("startTimeLocal")
+    end_t = p.get("endTimeLocal")
+    if start_t and end_t:
+        extras.append(f"hours: {start_t}–{end_t}")
+    elif start_t:
+        extras.append(f"opens: {start_t}")
+    closed = p.get("closedWeekdays")
+    if closed:
+        extras.append(f"closed: {', '.join(closed)}")
+    dur = p.get("estimatedDurationMin")
+    if dur:
+        extras.append(f"~{dur} min")
+    hint = _dining_time_hint(cat)
+    if hint:
+        extras.append(hint)
+    if extras:
+        parts.append(" | ".join(extras))
+    return " | ".join(parts)
+
+
 def _format_poi_list(pois: list[dict]) -> str:
+    """Format POI list with sightseeing and dining in separate sections.
+
+    Dining POIs are shuffled within quality tiers so the LLM doesn't develop
+    positional bias (always picking the first restaurant for every day).
+    Sightseeing stays relevance-sorted so anchor quality is preserved.
+    """
+    import random
+
+    sightseeing: list[dict] = []
+    dining: list[dict] = []
+    for p in pois:
+        cat = (p.get("category") or "").lower()
+        if cat in _DINING_CATS:
+            dining.append(p)
+        else:
+            sightseeing.append(p)
+
+    # Shuffle dining within rating tiers so different sessions surface different venues.
+    # Tiers: high (≥4.0), mid (3.0–3.99), low (<3.0 or no rating).
+    def tier(p: dict) -> int:
+        r = p.get("rating")
+        if r is None:
+            return 2
+        return 0 if r >= 4.0 else (1 if r >= 3.0 else 2)
+
+    high = [p for p in dining if tier(p) == 0]
+    mid  = [p for p in dining if tier(p) == 1]
+    low  = [p for p in dining if tier(p) == 2]
+    random.shuffle(high)
+    random.shuffle(mid)
+    random.shuffle(low)
+    dining_shuffled = high + mid + low
+
     lines: list[str] = []
-    for i, p in enumerate(pois, start=1):
-        name = p.get("name")
-        cat = p.get("category")
-        lat = p.get("lat")
-        lon = p.get("lon")
-        if name is None or lat is None or lon is None:
-            continue
-        sub_cats = p.get("poiCategoryIds") or []
-        cat_label = cat
-        if sub_cats:
-            useful = [s for s in sub_cats if s and s != cat]
-            if useful:
-                cat_label = f"{cat}: {', '.join(useful[:3])}"
-        parts = [f"{i}. {name} ({cat_label}) — lat: {lat}, lon: {lon}"]
-        extras: list[str] = []
-        rating = p.get("rating")
-        if rating is not None:
-            extras.append(f"rating: {rating}")
-        price = p.get("priceLevel")
-        if price:
-            extras.append(f"price: {price}")
-        start_t = p.get("startTimeLocal")
-        end_t = p.get("endTimeLocal")
-        if start_t and end_t:
-            extras.append(f"hours: {start_t}–{end_t}")
-        elif start_t:
-            extras.append(f"opens: {start_t}")
-        closed = p.get("closedWeekdays")
-        if closed:
-            extras.append(f"closed: {', '.join(closed)}")
-        dur = p.get("estimatedDurationMin")
-        if dur:
-            extras.append(f"~{dur} min")
-        hint = _dining_time_hint(cat)
-        if hint:
-            extras.append(hint)
-        if extras:
-            parts.append(" | ".join(extras))
-        lines.append(" | ".join(parts))
+
+    if sightseeing:
+        lines.append("=== SIGHTSEEING / ATTRACTIONS (use for landmark and activity stops) ===")
+        idx = 1
+        for p in sightseeing:
+            row = _format_single_poi(p, idx)
+            if row:
+                lines.append(row)
+                idx += 1
+
+    if dining_shuffled:
+        lines.append("=== DINING (restaurants, cafes, bars — pick by proximity to that day's sightseeing, NOT by list position) ===")
+        idx = 1
+        for p in dining_shuffled:
+            row = _format_single_poi(p, idx)
+            if row:
+                lines.append(row)
+                idx += 1
+
     return "\n".join(lines) if lines else "(no POIs returned)"
 
 
