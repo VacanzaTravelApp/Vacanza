@@ -1623,28 +1623,49 @@ Widget _detailActionButton(
   required ColorScheme cs,
   required _DetailAction action,
 }) {
-  final Color bg;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  final Color? solidBg;
+  final Gradient? gradient;
   final Color fg;
   final Color? borderColor;
 
   switch (action.style) {
     case _DetailActionStyle.primary:
-      bg = tokens.vividBlue;
+      solidBg = null;
+      gradient = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: isDark
+            ? [tokens.vividBlue, Color.lerp(tokens.vividBlue, Colors.white, 0.14)!]
+            : [tokens.vividBlue, Color.lerp(tokens.vividBlue, const Color(0xFF0EA5E9), 0.45)!],
+      );
       fg = Colors.white;
       borderColor = null;
     case _DetailActionStyle.muted:
-      bg = tokens.actionBarInactiveBg.withValues(alpha: 0.85);
+      solidBg = tokens.actionBarInactiveBg.withValues(alpha: 0.85);
+      gradient = null;
       fg = tokens.textMain;
       borderColor = tokens.cardBorder.withValues(alpha: 0.50);
     case _DetailActionStyle.danger:
-      bg = cs.errorContainer.withValues(alpha: 0.45);
-      fg = cs.error;
-      borderColor = cs.error.withValues(alpha: 0.35);
+      solidBg = null;
+      gradient = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: isDark
+            ? [const Color(0xFFB71C1C), const Color(0xFFE53935)]
+            : [const Color(0xFFFF3B30), const Color(0xFFFF6B6B)],
+      );
+      fg = Colors.white;
+      borderColor = null;
   }
 
-  final iconBoxColor = action.style == _DetailActionStyle.primary
-      ? Colors.white.withValues(alpha: 0.20)
-      : fg.withValues(alpha: 0.12);
+  final iconBoxColor = Colors.white.withValues(
+    alpha: action.style == _DetailActionStyle.muted ? 0.0 : 0.18,
+  );
+  final iconColor = action.style == _DetailActionStyle.muted
+      ? fg.withValues(alpha: 0.85)
+      : Colors.white;
 
   return Material(
     color: Colors.transparent,
@@ -1653,7 +1674,8 @@ Widget _detailActionButton(
       borderRadius: BorderRadius.circular(14),
       child: Ink(
         decoration: BoxDecoration(
-          color: bg,
+          color: solidBg,
+          gradient: gradient,
           borderRadius: BorderRadius.circular(14),
           border: borderColor != null
               ? Border.all(color: borderColor, width: 1.2)
@@ -1667,10 +1689,12 @@ Widget _detailActionButton(
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: iconBoxColor,
+                  color: action.style == _DetailActionStyle.muted
+                      ? fg.withValues(alpha: 0.10)
+                      : iconBoxColor,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(action.icon, size: 18, color: fg),
+                child: Icon(action.icon, size: 18, color: iconColor),
               ),
               const SizedBox(width: 12),
               Expanded(

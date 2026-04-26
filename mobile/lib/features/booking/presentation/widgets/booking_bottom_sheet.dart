@@ -212,7 +212,7 @@ class _SheetHeader extends StatelessWidget {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: cs.surfaceContainerHighest,
+                          color: chipFill,
                           borderRadius: BorderRadius.circular(100),
                         ),
                         child: Icon(
@@ -228,7 +228,7 @@ class _SheetHeader extends StatelessWidget {
                     _headerTitle(state),
                     style: TextStyle(
                       fontSize: 22,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: cs.onSurface,
                     ),
                   ),
