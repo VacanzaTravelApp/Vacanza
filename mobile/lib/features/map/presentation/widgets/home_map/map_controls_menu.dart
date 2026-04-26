@@ -108,63 +108,59 @@ class _MapControlsMenuState extends State<MapControlsMenu>
         const SizedBox(height: 12),
         IgnorePointer(
           ignoring: !widget.open,
-          child: SizeTransition(
-            sizeFactor: _fade,
-            axisAlignment: -1,
-            child: FadeTransition(
-              opacity: _fade,
-              child: SlideTransition(
-                position: _slide,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ActionIconButton(
-                      tooltip: widget.isDrawing ? 'Drawing: ON' : 'Drawing: OFF',
-                      icon: Icons.edit_rounded,
-                      isActive: widget.isDrawing,
-                      onPressed: widget.onToggleDrawing,
-                    ),
-                    const SizedBox(height: 16),
-                    ActionIconButton(
-                      tooltip: 'Saved Places',
-                      icon: Icons.favorite_rounded,
-                      onPressed: widget.onOpenSavedPlaces,
-                    ),
-                    const SizedBox(height: 16),
-                    ActionIconButton(
-                      tooltip: 'Filter POIs',
-                      icon: Icons.filter_alt_rounded,
-                      onPressed: widget.onOpenFilters,
-                    ),
-                    const SizedBox(height: 16),
-                    ActionIconButton(
-                      tooltip: 'Explore in AR',
-                      icon: Icons.view_in_ar_rounded,
-                      onPressed: widget.onOpenArMode,
-                    ),
-                    const SizedBox(height: 16),
-                    ActionIconButton(
-                      tooltip: 'Booking',
-                      icon: Icons.luggage_rounded,
-                      onPressed: widget.onOpenBooking,
-                    ),
-                    const SizedBox(height: 16),
-                    _actionWithBadge(
-                      tooltip: _basemapTooltip(widget.basemap),
-                      icon: Icons.layers_outlined,
-                      badge: widget.basemap.label,
-                      onPressed: widget.onCycleBasemap,
-                    ),
-                    const SizedBox(height: 16),
-                    _actionWithBadge(
-                      tooltip: is3D ? 'Switch to 2D' : 'Switch to 3D',
-                      icon: Icons.map_outlined,
-                      badge: widget.perspective.label,
-                      isActive: is3D,
-                      onPressed: widget.onTogglePerspective,
-                    ),
-                  ],
-                ),
+          child: FadeTransition(
+            opacity: _fade,
+            child: SlideTransition(
+              position: _slide,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ActionIconButton(
+                    tooltip: widget.isDrawing ? 'Drawing: ON' : 'Drawing: OFF',
+                    icon: Icons.edit_rounded,
+                    isActive: widget.isDrawing,
+                    onPressed: widget.onToggleDrawing,
+                  ),
+                  const SizedBox(height: 16),
+                  ActionIconButton(
+                    tooltip: 'Saved Places',
+                    icon: Icons.favorite_rounded,
+                    onPressed: widget.onOpenSavedPlaces,
+                  ),
+                  const SizedBox(height: 16),
+                  ActionIconButton(
+                    tooltip: 'Filter POIs',
+                    icon: Icons.filter_alt_rounded,
+                    onPressed: widget.onOpenFilters,
+                  ),
+                  const SizedBox(height: 16),
+                  ActionIconButton(
+                    tooltip: 'Explore in AR',
+                    icon: Icons.view_in_ar_rounded,
+                    onPressed: widget.onOpenArMode,
+                  ),
+                  const SizedBox(height: 16),
+                  ActionIconButton(
+                    tooltip: 'Booking',
+                    icon: Icons.luggage_rounded,
+                    onPressed: widget.onOpenBooking,
+                  ),
+                  const SizedBox(height: 16),
+                  _actionWithBadge(
+                    tooltip: _basemapTooltip(widget.basemap),
+                    icon: Icons.layers_outlined,
+                    badge: widget.basemap.label,
+                    onPressed: widget.onCycleBasemap,
+                  ),
+                  const SizedBox(height: 16),
+                  _actionWithBadge(
+                    tooltip: is3D ? 'Switch to 2D' : 'Switch to 3D',
+                    icon: Icons.map_outlined,
+                    badge: widget.perspective.label,
+                    isActive: is3D,
+                    onPressed: widget.onTogglePerspective,
+                  ),
+                ],
               ),
             ),
           ),
