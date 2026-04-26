@@ -5,7 +5,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'package:mobile/core/theme/vacanza_tokens.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/mapbox/map_canvas_mapbox.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/action_icon_button.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/map_controls_menu.dart';
@@ -377,10 +376,6 @@ class _RightOverlayPanelState extends State<_RightOverlayPanel>
 
   @override
   Widget build(BuildContext context) {
-    final scrim =
-        Theme.of(context).extension<VacanzaTokens>()?.overlayScrim ??
-        Colors.black.withValues(alpha: 0.10);
-
     if (!_mountedOverlay) return const SizedBox.shrink();
 
     return IgnorePointer(
@@ -388,13 +383,9 @@ class _RightOverlayPanelState extends State<_RightOverlayPanel>
       child: Stack(
         children: [
           Positioned.fill(
-            child: FadeTransition(
-              opacity: _scrimFade,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: widget.onClose,
-                child: Container(color: scrim),
-              ),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: widget.onClose,
             ),
           ),
           Positioned(
