@@ -32,6 +32,9 @@ import 'package:mobile/features/poi_search/data/models/poi_categories.dart';
 import 'package:mobile/features/poi_search/data/models/poi_category_catalog.dart';
 import 'package:mobile/features/poi_search/data/repositories/poi_search_repository_impl.dart';
 import 'package:mobile/features/poi_search/data/utils/poi_client_category_filter.dart';
+import 'package:mobile/features/poi_search/presentation/bloc/poi_search_bloc.dart';
+
+import '../../data/poi_to_ar_poi.dart';
 
 import '../../application/ar_poi_layout.dart';
 import '../../application/ar_world_transform.dart';
@@ -149,42 +152,62 @@ class _ArExplorePageState extends State<ArExplorePage>
       }
 
       if (!mounted) return;
-      final apiClient = context.read<PoiSearchApiClient>();
-      final dio = context.read<Dio>();
-      final poiRepo = PoiSearchRepositoryImpl(apiClient);
-      final ArPoiSource fallbackSource = ArPoiSourceFromPoiSearch(poiRepo);
-      final nearbyApiClient = ArNearbyPoiApiClient(dio);
-
       final pos = await _locationService.getCurrentPosition();
       if (!mounted) return;
       _lastPosition = pos;
 
-      const radiusMeters = 600.0;
       List<ArPoi> pois;
+
+      // Primary: use the map's already-merged (backend + Mapbox) POI list.
+      // AR is always opened from the map, so this data is current.
+      List<ArPoi>? mapSourcePois;
       try {
-        final dtos = await nearbyApiClient.getNearbyPois(
-          lat: pos.latitude,
-          lng: pos.longitude,
-          radiusMeters: radiusMeters,
-          categories: null,
-          limit: 40,
-        );
-        if (!mounted) return;
-        pois = await ArHybridPoiLoader.mergeNearbyAndStylePois(
-          lat: pos.latitude,
-          lng: pos.longitude,
-          radiusMeters: radiusMeters,
-          nearbyDtos: dtos,
-          mapProbe: null,
-        );
+        final mapPois = context.read<PoiSearchBloc>().state.pois;
+        if (mapPois.isNotEmpty) {
+          mapSourcePois = mapPois
+              .map((p) => poiToArPoi(p, pos.latitude, pos.longitude))
+              .toList(growable: false)
+            ..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+        }
       } catch (_) {
-        if (!mounted) return;
-        pois = await fallbackSource.getNearbyArPois(
-          lat: pos.latitude,
-          lng: pos.longitude,
-          categories: null,
-          radiusMeters: radiusMeters,
-        );
+        // PoiSearchBloc not in scope — fall through to network fetch
+      }
+
+      if (mapSourcePois != null) {
+        pois = mapSourcePois;
+      } else {
+        // Fallback: direct network fetch (bloc not available).
+        final apiClient = context.read<PoiSearchApiClient>();
+        final dio = context.read<Dio>();
+        final poiRepo = PoiSearchRepositoryImpl(apiClient);
+        final ArPoiSource fallbackSource = ArPoiSourceFromPoiSearch(poiRepo);
+        final nearbyApiClient = ArNearbyPoiApiClient(dio);
+        const radiusMeters = 600.0;
+        try {
+          final dtos = await nearbyApiClient.getNearbyPois(
+            lat: pos.latitude,
+            lng: pos.longitude,
+            radiusMeters: radiusMeters,
+            categories: null,
+            limit: 40,
+          );
+          if (!mounted) return;
+          pois = await ArHybridPoiLoader.mergeNearbyAndStylePois(
+            lat: pos.latitude,
+            lng: pos.longitude,
+            radiusMeters: radiusMeters,
+            nearbyDtos: dtos,
+            mapProbe: null,
+          );
+        } catch (_) {
+          if (!mounted) return;
+          pois = await fallbackSource.getNearbyArPois(
+            lat: pos.latitude,
+            lng: pos.longitude,
+            categories: null,
+            radiusMeters: radiusMeters,
+          );
+        }
       }
 
       final filteredPois = _applyPoiFilters(pois);
@@ -1110,21 +1133,10 @@ class _ArExplorePageState extends State<ArExplorePage>
     return out;
   }
 
-  Map<String, int> _categoryCountsForFilter() {
-    final keys = PoiCategoryCatalog.all.map((e) => e.key);
-    final m = {for (final k in keys) k: 0};
-    for (final p in _pois) {
-      final d = PoiCategoryCatalog.poiCategoryForRaw(p.categoryKey);
-      if (d != null) m[d.key] = (m[d.key] ?? 0) + 1;
-    }
-    return m;
-  }
-
   Future<void> _openCategoryFilter() async {
     await showArCategoryFilterSheet(
       context: context,
       initialSelection: Set<String>.from(_selectedCategories),
-      countsByCategory: _categoryCountsForFilter(),
       onSelectionChanged: (next) {
         setState(() {
           _selectedCategories

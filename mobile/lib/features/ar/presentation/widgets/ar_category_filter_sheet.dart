@@ -8,13 +8,11 @@ class ArCategoryFilterSheet extends StatefulWidget {
   const ArCategoryFilterSheet({
     super.key,
     required this.initialSelection,
-    required this.countsByCategory,
     required this.onSelectionChanged,
     required this.onClose,
   });
 
   final Set<String> initialSelection;
-  final Map<String, int> countsByCategory;
   final void Function(Set<String> selected) onSelectionChanged;
   final VoidCallback onClose;
 
@@ -63,7 +61,6 @@ class _ArCategoryFilterSheetState extends State<ArCategoryFilterSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final categories = ArCategoryFilterSheet._allCatalogKeys();
-    final counts = widget.countsByCategory;
 
     // Dark: glassy indigo panel. Light: clean white card.
     final bgColor = isDark ? const Color(0xF21C1C40) : Colors.white;
@@ -184,7 +181,6 @@ class _ArCategoryFilterSheetState extends State<ArCategoryFilterSheet> {
                   for (final key in categories)
                     _CategoryRow(
                       catKey: key,
-                      counts: counts,
                       selected: _selected,
                       isDark: isDark,
                       onToggle: _toggle,
@@ -245,14 +241,12 @@ class _QuickFilterPill extends StatelessWidget {
 class _CategoryRow extends StatelessWidget {
   const _CategoryRow({
     required this.catKey,
-    required this.counts,
     required this.selected,
     required this.isDark,
     required this.onToggle,
   });
 
   final String catKey;
-  final Map<String, int> counts;
   final Set<String> selected;
   final bool isDark;
   final void Function(String key) onToggle;
@@ -263,19 +257,14 @@ class _CategoryRow extends StatelessWidget {
     final glowColor = arPoiRingColorForCategory(catKey);
     final icon = arPoiIconForCategory(catKey);
     final label = def?.label ?? catKey;
-    final displayCount = counts[catKey] ?? 0;
     final isOn = selected.contains(catKey);
 
-    // Light mode: clean card rows with clear contrast
     Color rowBg;
     Color rowBorder;
     Color textColor;
     Color orbBg;
     Color orbBorder;
     Color iconColor;
-    Color badgeBg;
-    Color badgeBorder;
-    Color badgeText;
 
     if (isDark) {
       rowBg = isOn ? glowColor.withValues(alpha: 0.10) : Colors.transparent;
@@ -286,13 +275,6 @@ class _CategoryRow extends StatelessWidget {
       orbBg = glowColor.withValues(alpha: isOn ? 0.20 : 0.07);
       orbBorder = glowColor.withValues(alpha: isOn ? 0.50 : 0.20);
       iconColor = isOn ? glowColor : const Color(0x66FFFFFF);
-      badgeBg = isOn
-          ? glowColor.withValues(alpha: 0.15)
-          : const Color(0x1AFFFFFF);
-      badgeBorder = isOn
-          ? glowColor.withValues(alpha: 0.30)
-          : const Color(0x1AFFFFFF);
-      badgeText = isOn ? glowColor : const Color(0x66FFFFFF);
     } else {
       rowBg = isOn
           ? glowColor.withValues(alpha: 0.08)
@@ -304,13 +286,6 @@ class _CategoryRow extends StatelessWidget {
       orbBg = glowColor.withValues(alpha: isOn ? 0.18 : 0.10);
       orbBorder = glowColor.withValues(alpha: isOn ? 0.60 : 0.35);
       iconColor = glowColor.withValues(alpha: isOn ? 1.0 : 0.70);
-      badgeBg = isOn
-          ? glowColor.withValues(alpha: 0.12)
-          : const Color(0xFFEEEEEE);
-      badgeBorder = isOn
-          ? glowColor.withValues(alpha: 0.30)
-          : const Color(0xFFDDDDDD);
-      badgeText = isOn ? glowColor : const Color(0xFF888888);
     }
 
     return GestureDetector(
@@ -365,22 +340,6 @@ class _CategoryRow extends StatelessWidget {
                 ),
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: badgeBg,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: badgeBorder, width: 0.6),
-              ),
-              child: Text(
-                '$displayCount',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: badgeText,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -391,7 +350,6 @@ class _CategoryRow extends StatelessWidget {
 Future<void> showArCategoryFilterSheet({
   required BuildContext context,
   required Set<String> initialSelection,
-  required Map<String, int> countsByCategory,
   required void Function(Set<String> selected) onSelectionChanged,
 }) {
   final maxH = MediaQuery.sizeOf(context).height * 0.72;
@@ -410,7 +368,6 @@ Future<void> showArCategoryFilterSheet({
           height: maxH,
           child: ArCategoryFilterSheet(
             initialSelection: initialSelection,
-            countsByCategory: countsByCategory,
             onSelectionChanged: onSelectionChanged,
             onClose: () => Navigator.of(ctx).pop(),
           ),
