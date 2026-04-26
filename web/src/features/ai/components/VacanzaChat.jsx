@@ -363,7 +363,7 @@ function formatTicketPriceLine(row) {
   const ccy = row.currency || "USD";
   if (Number.isNaN(n)) return `from ${ccy}`;
   const decimals = n % 1 === 0 ? 0 : 2;
-  return `from $${n.toFixed(decimals)} ${ccy}`;
+  return `from ${n.toFixed(decimals)} ${ccy}`;
 }
 
 export default function VacanzaChat({

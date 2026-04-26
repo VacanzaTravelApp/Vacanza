@@ -579,7 +579,7 @@ class _PricingTile extends StatelessWidget {
                 border: Border.all(color: accent.withValues(alpha: 0.30)),
               ),
               child: Text(
-                'from \$${row.minPriceUsd!.toStringAsFixed(0)}',
+                'from ${row.minPriceUsd!.toStringAsFixed(0)} ${row.currency}',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
