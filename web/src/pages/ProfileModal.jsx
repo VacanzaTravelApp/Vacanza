@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
     Modal, Avatar, Typography, Tag, Spin, Progress,
     Form, Input, Select, DatePicker, InputNumber, Button,
-    Row, Col, Divider, message, Empty, Checkbox, Badge as AntBadge, ConfigProvider
+    Row, Col, Divider, Empty, Checkbox, Badge as AntBadge, ConfigProvider
 } from "antd";
 import {
     TrophyOutlined,
@@ -856,7 +856,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
         },
         onError: (err) => {
             setOptimisticPhotoUrl(null); // Revert on error
-            message.error(err?.friendlyMessage || "Failed to upload photo");
+            toast.error({ title: "Upload failed", message: err?.friendlyMessage || "Couldn't upload your photo. Please try again." });
         }
     });
 
@@ -873,7 +873,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
         },
         onError: (err) => {
             setOptimisticPhotoUrl(null);
-            message.error(err?.friendlyMessage || "Failed to remove photo");
+            toast.error({ title: "Couldn't remove photo", message: err?.friendlyMessage || "Please try again." });
         }
     });
 
@@ -894,7 +894,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
             setView('MAIN');
         },
         onError: (err) => {
-            message.error(err?.friendlyMessage || "Failed to update profile");
+            toast.error({ title: "Update failed", message: err?.friendlyMessage || "Couldn't save your profile changes. Please try again." });
         }
     });
 

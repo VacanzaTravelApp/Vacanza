@@ -8,7 +8,8 @@ import HotelPickerSheet from "./HotelPickerSheet";
 import HotelIcon from "./icons/HotelIcon";
 import { aiApi } from "../../../api/aiApi";
 import { createTripCalendarEvent, exportRouteICS } from "../../../api/tripCalendarApi";
-import { message, Tooltip } from "antd";
+import { Tooltip } from "antd";
+import { toast } from "../../../components/toast/toast";
 import { Rnd } from "react-rnd";
 import "../styles/routePanel.css";
 
@@ -162,7 +163,7 @@ export default function RoutePanel({
       window.dispatchEvent(new CustomEvent("vacanza-trip-calendar-changed"));
     } catch (err) {
       console.error("Export error", err);
-      message.error("Failed to export to calendar.");
+      toast.error({ title: "Export failed", message: "Couldn't export to calendar. Please try again." });
     } finally {
       setExporting(false);
     }
