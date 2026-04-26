@@ -3,6 +3,7 @@ package com.vacanza.backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.vacanza.backend.dto.response.UserPreferencesResponseDTO;
 import com.vacanza.backend.dto.response.WaypointPricing;
 import com.vacanza.backend.dto.response.WaypointPricingStatus;
 import com.vacanza.backend.entity.AiRoute;
@@ -51,6 +52,8 @@ public class ViatorPricingService {
     private final AiRouteService aiRouteService;
     private final ObjectMapper objectMapper;
     private final ViatorWaypointPriceService viatorWaypointPriceService;
+    private final UserPreferencesService userPreferencesService;
+    private final ExchangeRateService exchangeRateService;
 
     /**
      * @return empty if the route does not exist for this user (ownership); otherwise a list of
@@ -69,6 +72,10 @@ public class ViatorPricingService {
             log.debug("[VIATOR-PRICING] cache hit for route {}", routeId);
             return Optional.of(cached);
         }
+        String targetCurrency = userPreferencesService.getPreferencesByUser(user)
+                .map(UserPreferencesResponseDTO::getBudgetCurrency)
+                .filter(StringUtils::hasText)
+                .orElse(null);
         AiRoute route = routeOpt.get();
         AiChatDto.RouteData routeData;
         try {
@@ -84,7 +91,7 @@ public class ViatorPricingService {
         List<CompletableFuture<WaypointPricing>> futures = new ArrayList<>();
         for (WaypointRef ref : waypoints) {
             CompletableFuture<WaypointPricing> f = CompletableFuture
-                    .supplyAsync(() -> priceWaypoint(ref), ForkJoinPool.commonPool())
+                    .supplyAsync(() -> priceWaypoint(ref, targetCurrency), ForkJoinPool.commonPool())
                     .orTimeout(17, TimeUnit.SECONDS)
                     .exceptionally(ex -> fallback(ref, ex));
             futures.add(f);
@@ -95,7 +102,7 @@ public class ViatorPricingService {
         return Optional.of(result);
     }
 
-    private WaypointPricing priceWaypoint(WaypointRef ref) {
+    private WaypointPricing priceWaypoint(WaypointRef ref, String targetCurrency) {
         AiChatDto.RouteWaypoint wp = ref.wp();
         String name = wp.getName();
         if (!StringUtils.hasText(name)) {
@@ -104,14 +111,26 @@ public class ViatorPricingService {
         String trimmed = name.trim();
         ViatorWaypointPrice vp = viatorWaypointPriceService.getPrice(trimmed, wp.getCategory(), "USD");
         boolean found = vp.hasPrice();
-        BigDecimal minUsd = vp.minPrice();
+        BigDecimal displayPrice = vp.minPrice();
+        String displayCurrency = vp.currency();
+        if (found && displayPrice != null && StringUtils.hasText(targetCurrency)
+                && StringUtils.hasText(displayCurrency)
+                && !targetCurrency.equalsIgnoreCase(displayCurrency)) {
+            try {
+                displayPrice = exchangeRateService.convert(displayPrice, displayCurrency, targetCurrency);
+                displayCurrency = targetCurrency.toUpperCase();
+            } catch (Exception e) {
+                log.warn("[VIATOR-PRICING] currency conversion {}->{} failed for '{}': {}",
+                        displayCurrency, targetCurrency, trimmed, e.getMessage());
+            }
+        }
         WaypointPricingStatus status = found ? WaypointPricingStatus.FOUND : WaypointPricingStatus.NO_MATCH;
         return new WaypointPricing(
                 trimmed,
                 ref.day(),
                 wp.getOrder(),
-                minUsd,
-                vp.currency(),
+                displayPrice,
+                displayCurrency,
                 vp.productUrl(),
                 vp.productTitle(),
                 found,
