@@ -192,8 +192,13 @@ class _SheetHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           BlocBuilder<BookingCubit, BookingState>(
-            buildWhen: (prev, next) =>
-                prev.runtimeType != next.runtimeType,
+            buildWhen: (prev, next) {
+              if (prev.runtimeType != next.runtimeType) return true;
+              if (prev is BookingSearch && next is BookingSearch) {
+                return prev.type != next.type;
+              }
+              return false;
+            },
             builder: (context, state) {
               final showBack = state is! BookingSearch;
               return Row(
@@ -259,7 +264,8 @@ class _SheetHeader extends StatelessWidget {
 
   String _headerTitle(BookingState state) {
     return switch (state) {
-      BookingSearch() => 'Book',
+      BookingSearch(:final type) =>
+        type == BookingType.hotels ? 'Book Hotels' : 'Book Flights',
       BookingLoading() => 'Searching…',
       BookingHotelResults() => 'Hotels',
       BookingFlightResults() => 'Flights',
