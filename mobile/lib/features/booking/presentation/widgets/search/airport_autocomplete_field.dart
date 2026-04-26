@@ -204,7 +204,7 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 4),
+                  padding: const EdgeInsets.only(left: 2, bottom: 6),
                   child: Text(
                     widget.label,
                     style: BookingSearchFieldStyles.fieldLabel(context),
@@ -216,49 +216,54 @@ class _AirportAutocompleteFieldState extends State<AirportAutocompleteField>
                   scrollPadding: bookingFieldScrollPadding(context),
                   textCapitalization: TextCapitalization.sentences,
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: cs.onSurface,
                   ),
                   decoration: InputDecoration(
                     hintText: widget.placeholder,
                     hintStyle: TextStyle(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.85),
+                      fontSize: 13,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.60),
                       fontWeight: FontWeight.w400,
                     ),
-                    prefixIcon: Icon(
-                      widget.icon,
-                      size: 20,
-                      color: cs.onSurfaceVariant,
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(left: 14, right: 10),
+                      child: Icon(
+                        widget.icon,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
+                    prefixIconConstraints:
+                        const BoxConstraints(minWidth: 0, minHeight: 0),
                     filled: true,
                     fillColor: BookingSearchFieldStyles.fieldFill(context),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 14,
+                      vertical: 15,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
                         color: BookingSearchFieldStyles.fieldBorderInactive(
                           context,
                         ),
+                        width: 1.2,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
                         color: BookingSearchFieldStyles.fieldBorderInactive(
                           context,
                         ),
+                        width: 1.2,
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: accent,
-                        width: 1.5,
-                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: accent, width: 1.8),
                     ),
                   ),
                 ),

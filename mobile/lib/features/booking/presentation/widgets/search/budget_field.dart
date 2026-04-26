@@ -60,7 +60,7 @@ class BudgetField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 4),
+          padding: const EdgeInsets.only(left: 2, bottom: 6),
           child: Text(label, style: BookingSearchFieldStyles.fieldLabel(context)),
         ),
         Row(
@@ -85,13 +85,13 @@ class BudgetField extends StatelessWidget {
                   decoration: InputDecoration(
                     hintText: '120',
                     hintStyle: TextStyle(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.75),
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.60),
                       fontWeight: FontWeight.w400,
-                      fontSize: 12,
+                      fontSize: 13,
                     ),
                     prefixIcon: symbol != null
                         ? Padding(
-                            padding: const EdgeInsets.only(left: 10, right: 2),
+                            padding: const EdgeInsets.only(left: 14, right: 8),
                             child: Align(
                               widthFactor: 1,
                               alignment: Alignment.centerLeft,
@@ -106,7 +106,7 @@ class BudgetField extends StatelessWidget {
                             ),
                           )
                         : Padding(
-                            padding: const EdgeInsets.only(left: 10, right: 2),
+                            padding: const EdgeInsets.only(left: 14, right: 10),
                             child: Icon(
                               Icons.payments_outlined,
                               size: 18,
@@ -114,7 +114,7 @@ class BudgetField extends StatelessWidget {
                             ),
                           ),
                     prefixIconConstraints: const BoxConstraints(
-                      minWidth: 32,
+                      minWidth: 0,
                       minHeight: 0,
                     ),
                     filled: true,
@@ -127,26 +127,28 @@ class BudgetField extends StatelessWidget {
                       bottom: 14,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
                         color: BookingSearchFieldStyles.fieldBorderInactive(
                           context,
                         ),
+                        width: 1.2,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
                         color: BookingSearchFieldStyles.fieldBorderInactive(
                           context,
                         ),
+                        width: 1.2,
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(
                         color: accent,
-                        width: 1.5,
+                        width: 1.8,
                       ),
                     ),
                   ),
@@ -201,14 +203,15 @@ class _CompactCurrencyPicker extends StatelessWidget {
       height: BudgetField._fieldHeight,
       child: Material(
         color: BookingSearchFieldStyles.fieldFill(context),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
           padding: const EdgeInsets.only(left: 8, right: 4),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: BookingSearchFieldStyles.fieldBorderInactive(context),
+              width: 1.2,
             ),
           ),
           child: DropdownButton<String>(
