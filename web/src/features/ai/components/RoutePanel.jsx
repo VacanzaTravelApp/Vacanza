@@ -260,7 +260,7 @@ export default function RoutePanel({
             <div className="route-panel-destination">{route.destination}</div>
           </div>
           <div className="route-panel-badges">
-            <Tooltip title={alreadyExported ? "Already in your calendar" : "Export to your Calendar (Apple, Google, etc.)"}>
+            <Tooltip title={alreadyExported ? "This route is already in your calendar" : "Export this trip to your calendar (.ics)"}>
               <Button
                 size="small"
                 icon={<CalendarOutlined />}
@@ -269,7 +269,7 @@ export default function RoutePanel({
                 onClick={handleExportCalendar}
                 className={`route-panel-export-btn ${alreadyExported ? "route-panel-export-btn--done" : ""}`}
               >
-                {alreadyExported ? "EXPORTED" : "EXPORT"}
+                {alreadyExported ? "EXPORTED TO CALENDAR" : "EXPORT TO CALENDAR"}
               </Button>
             </Tooltip>
             <span className="route-panel-days-badge">{totalDays} days</span>

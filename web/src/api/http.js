@@ -22,6 +22,11 @@ http.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // FormData gönderirken axios'un boundary eklemesi için Content-Type'ı temizliyoruz
+    if (config.data instanceof FormData) {
+      delete config.headers["Content-Type"];
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
