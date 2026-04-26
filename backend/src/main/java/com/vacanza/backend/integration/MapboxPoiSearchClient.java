@@ -433,14 +433,26 @@ public class MapboxPoiSearchClient {
         if (placeName == null || suggestionName == null) return -1;
         String pn = placeName.toLowerCase(Locale.ROOT).trim();
         String sn = suggestionName.toLowerCase(Locale.ROOT).trim();
-        // Full containment
-        if (sn.contains(pn) || pn.contains(sn)) return 2;
+
+        // Search name contains suggestion → strong match (e.g. "Blue Mosque, Istanbul" ⊃ "Blue Mosque")
+        if (pn.contains(sn)) return 2;
+
+        // Suggestion contains search name → only accept if extra words are trivial (e.g. "The ")
+        // Prevents: "Alanya Beach" matching "Alanya Beach Hotel / Bar / Resort" as score 2
+        if (sn.contains(pn)) {
+            String extra = sn.replace(pn, "").trim();
+            String[] extraWords = extra.isEmpty() ? new String[0] : extra.split("[\\s,\\-/.']+");
+            boolean trivialExtra = extraWords.length == 0
+                    || (extraWords.length == 1 && extraWords[0].length() <= 3);
+            return trivialExtra ? 2 : 0;
+        }
+
         // Word-level overlap
         String[] pWords = pn.split("[\\s,\\-/.']+");
         String[] sWords = sn.split("[\\s,\\-/.']+");
         java.util.List<String> sigWords = new java.util.ArrayList<>();
         for (String w : pWords) { if (w.length() > 3) sigWords.add(w); }
-        if (sigWords.isEmpty()) return sn.contains(pn) ? 1 : -1;
+        if (sigWords.isEmpty()) return -1;
         int matched = 0;
         for (String pw : sigWords) {
             for (String sw : sWords) {

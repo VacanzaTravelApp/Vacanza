@@ -37,8 +37,8 @@ Format (respond with ONLY this JSON, nothing else):
 {
   "tool": "search_pois",
   "destination": "<city, country>",
-  "days": <number of days>,
-  "travel_style": "<art|history|food|nature|general>",
+  "days": <number of days — minimum 1, maximum 7>,
+  "travel_style": "<art|history|food|nature|general|beach|adventure|shopping>",
   "categories": ["museum", "monument", "historic_site", "church",
                  "park", "neighborhood", "restaurant", "cafe", "bar",
                  "landmark", "art_gallery", "market", "nightlife"],
@@ -48,6 +48,7 @@ Format (respond with ONLY this JSON, nothing else):
 FORBIDDEN in this turn:
 - Do NOT ask the user which city, region, or place to focus on — not in any language (e.g. never "Hangi şehir…?", "Which city…?", "Portland mı yoksa…?").
 - Do NOT output plain text, explanations, or greetings — JSON only.
+- "days" MUST be between 1 and 7. If the user requests more than 7, output 7. If the user requests 0 or negative, output 1.
 
 When the user names a city (including Turkish locative/suffix forms like "Portland'da", "Roma'da"), treat it as a named city and proceed. **US state / province / country in the same message disambiguates** the city: e.g. Maine + Portland → "Portland, Maine, United States" (NOT Oregon). Utah + Park City → "Park City, United States".
 
@@ -79,9 +80,11 @@ Trip type guidelines (minimum):
 For history trips: attraction, monument, historic_site, museum, restaurant, cafe, bar, landmark
 For art trips: attraction, museum, art_gallery, landmark, cafe, restaurant, bar
 For food-focused trips: restaurant, cafe, market, bar, fast_food, nightlife, neighborhood, attraction
-For nature trips: park, neighborhood, landmark, attraction, cafe, restaurant
-For general trips: attraction, museum, monument, park, restaurant, cafe, bar, landmark
+For nature trips: park, garden, viewpoint, neighborhood, landmark, attraction, cafe, restaurant
+For beach/coastal trips: beach, viewpoint, park, neighborhood, landmark, attraction, restaurant, cafe, bar
+For adventure/outdoor trips: park, viewpoint, attraction, landmark, neighborhood, restaurant, cafe, bar
 For shopping-focused trips or destinations with famous markets/bazaars: shopping, market, restaurant, cafe, bar, neighborhood, attraction
+For general trips: attraction, museum, monument, park, restaurant, cafe, bar, landmark
 """
 
 # Shown after TURN1_SYSTEM when user profile / AI prefs / RAG are present (tool-call turn).
@@ -108,7 +111,8 @@ TURN2_TOOL_CONTEXT_RULES = """User context (apply the profile and preferences be
 - Set day_start_local per day from trip_pace and activity (SLOW ~10:00, MODERATE ~09:00, FAST ~08:30) — NEVER earlier than 08:30. Museums/galleries/palaces open at 09:00 at the earliest — do not schedule them before that.
 - estimated_duration_min must vary by venue type (large museums 90–120, small sites 30–50, parks 40–75, quick landmarks 20–40, restaurants 50–80, cafes 20–35). Do not use 60 for every stop.
 - Keep geographic efficiency; preferences override only when choosing among nearby alternatives.
-- Trip calendar dates: read the conversation turns above (not only the last line). If the user already stated a first trip day, set trip_dates_user_specified and trip_start_date in the route JSON."""
+- Trip calendar dates: read the conversation turns above (not only the last line). If the user already stated a first trip day, set trip_dates_user_specified and trip_start_date in the route JSON.
+- If "Max POIs per day" is set in the profile: this is a HARD CAP. Each day's total waypoint count (sightseeing + dining combined) MUST NOT exceed it. Mandatory meals (1× lunch + 1× dinner) always count toward the cap. With cap=4: 2 sightseeing + lunch + dinner. With cap=5: 3 sightseeing + lunch + dinner. Never drop mandatory meals to add more sightseeing."""
 
 # Shown whenever weather payload is present. Legacy list = daily rows only; object may include "daily" only or "daily" + "day_parts".
 TURN2_WEATHER_RULES_DAILY = """Destination weather forecast (use only this data; do not invent numbers):
@@ -139,12 +143,35 @@ Available POIs from search (real coordinates and metadata):
 
 {must_visit_section}
 
-PRE-PLANNING — DO THIS BEFORE BUILDING ANY DAY:
+STEP 0 — DETECT TRIP THEME (do this FIRST, before anything else):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Step 1 — ANCHOR SIGHTS: Using your world knowledge, mentally list the top {days}×2 most iconic, must-see attractions for this destination. These are the sights every visitor talks about — famous museums, palaces, historic squares, world-class viewpoints.
-Step 2 — DISTRIBUTE EVENLY: Assign exactly 2 anchor sights to EACH day before doing any geographic clustering. Day 1 gets 2, Day 2 gets 2, Day 3 gets 2, and so on. Do NOT concentrate the famous ones into Day 1.
-Step 3 — FILL AROUND ANCHORS: For each day, find POIs from the list that are geographically close to that day's 2 anchors and fill the remaining slots. Apply geographic clustering WITHIN each day, not across days.
-Result: every day is equally exciting because it anchors on 2 iconic sights, then clusters nearby POIs around them.
+Read the user's message and travel_style. Identify ONE theme that governs ALL days:
+- beach / coastal → triggered by: "sahil", "beach", "coastal", "deniz", "kıyı", "plaj", travel_style=beach
+- history / cultural → triggered by: "tarihi", "history", "müze", "museum", travel_style=history
+- art → triggered by: "sanat", "art", "galeri", "gallery", travel_style=art
+- food → triggered by: "yemek", "food", "gastronomy", travel_style=food
+- nature / outdoor → triggered by: "doğa", "nature", "park", "hiking", travel_style=nature
+- adventure → triggered by: travel_style=adventure
+- shopping → triggered by: "alışveriş", "shopping", "bazaar", travel_style=shopping
+- general → default when no specific theme detected
+
+THEME RULES (apply the matched theme to EVERY single day — no exceptions, no drift):
+- beach: EVERY day ≥1 beach, waterfront, marina, coastal promenade, or sea-view point. NEVER select a city-centre museum or inland monument as an anchor sight.
+- history: EVERY day ≥2 historic POIs (monument, castle, ruin, museum, historic_site, palace).
+- art: EVERY day ≥1 art/cultural POI (art_gallery, museum, cultural venue).
+- food: EVERY day ≥3 food/dining stops (restaurant, market, specialty food spot).
+- nature: EVERY day ≥1 outdoor nature POI (park, garden, viewpoint, natural landmark). No day dominated by indoor venues.
+- adventure: EVERY day ≥1 active outdoor POI.
+- shopping: EVERY day ≥1 shopping/market POI (bazaar, market, shopping district).
+- general: balanced — ≥1 landmark + ≥1 dining + ≥1 local spot per day.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRE-PLANNING — DO THIS AFTER DETECTING THEME:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1 — ANCHOR SIGHTS: Using your world knowledge, list the top {days}×2 must-see attractions that MATCH THE THEME YOU DETECTED ABOVE. Beach theme → coastal/waterfront anchors only. History theme → historic monuments only. Food theme → iconic food markets or dining districts. NEVER pick city-centre museums as anchors for a beach or outdoor trip.
+Step 2 — DISTRIBUTE EVENLY: Assign exactly 2 anchor sights to EACH day. Day 1 gets 2, Day 2 gets 2, Day 3 gets 2. Do NOT concentrate the famous ones into Day 1.
+Step 3 — FILL AROUND ANCHORS: For each day, find POIs from the list geographically close to that day's anchors. Prioritise POIs that match the trip theme.
+Result: every day is equally exciting and stays on-theme.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 SIGHTSEEING stops (museum, monument, landmark, historic_site, park, neighborhood, attraction, church, mosque, palace, bridge, square, ruins, art_gallery):
@@ -167,6 +194,7 @@ DINING stops (restaurant, fast_food, cafe, bar, pub, nightlife, market, bakery):
 - Do NOT invent or hallucinate restaurant/cafe/bar names — you do not have reliable knowledge of which specific dining venues exist.
 - If the POI list has metadata (rating, price), prefer higher-rated places that match user budget.
 - Respect opening hours; skip POIs closed on that day.
+- NO REPEATS: Each restaurant or cafe name must appear AT MOST ONCE across the ENTIRE trip. If you use a venue on Day 1, it MUST NOT appear on Day 2, 3, or any later day. Scan all planned days before choosing a venue for the current day.
 - PROXIMITY RULE (CRITICAL): Each dining stop MUST be within 2 km of the sightseeing stops scheduled on the same day. Compare coordinates before choosing — do NOT pick a restaurant or cafe from a different district or neighborhood. For lunch (slot 4), pick the nearest restaurant to the sightseeing stops in slots 2–3. For dinner (slot 8), pick the nearest restaurant to the sightseeing stops in slots 5–7. For a morning/afternoon cafe, it must be in the same neighborhood as the adjacent sightseeing stops. If no in-range option exists, pick the closest available one — never leave a meal slot empty.
 
 General:
@@ -207,7 +235,8 @@ Dining placement rules (STRICT):
 - CRITICAL — category field values: NEVER use compound values like "lunch restaurant" or "dinner restaurant". Use ONLY single-word categories: "restaurant" (for any dining stop), "cafe" (for any cafe/bakery), etc. The time_slot field (morning/afternoon/evening/lunch/dinner) is separate from the category field.
 
 Day duration (STRICT):
-- Each day: 6–8 waypoints total (including 2–3 dining stops + 4–5 sightseeing stops).
+- Each day: 6–8 waypoints total (including 2–3 dining stops + 4–5 sightseeing stops) — UNLESS a max POI cap applies (see below), in which case that cap overrides this range (minimum 4: 2 sightseeing + lunch + dinner).
+- MAX WAYPOINTS CAP (check BOTH sources): (1) If the user profile includes "Max POIs per day: N", enforce it. (2) If the user stated a maximum anywhere in the conversation (e.g. "max 4 POI", "günde 4 yer", "sadece 4 durak", "en fazla 5 stop"), enforce that number. Whichever source applies, it is a HARD CAP — mandatory meals count toward it, never exceed it.
 - Sum of estimated_duration_min across all waypoints in one day must be at least 420 minutes (~7 hours of activity). If your total is less, increase sightseeing durations (museums 90–120, parks 60–75, monuments 45–60).
 - Do NOT end the day before 18:00. The last waypoint should finish around 18:00–19:00 (or 20:00–21:00 if dinner is the last stop).
 - SLOW pace: end ~17:30–18:00. MODERATE: ~18:00–19:00. FAST: ~19:00–21:00.
@@ -215,11 +244,15 @@ Day duration (STRICT):
 SELF-CHECK (do this mentally before outputting each day):
   ✓ Does this day have a lunch restaurant between 12:00–14:00? If NO → add one.
   ✓ Does this day have a dinner restaurant between 18:00–21:00? If NO → add one.
-  ✓ Does this day have at least 6 waypoints? If NO → add more sights.
+  ✓ Does this day have at least 6 waypoints (or ≤ max_daily_waypoints if set)? If NO → add more sights.
   ✓ Does the day end after 18:00? If NO → extend with dinner or evening stop.
   ✓ Are ALL sightseeing stops within 3 km of each other? If NO → split distant ones to a different day.
   ✓ Does day_start_local leave enough time to reach the first sight before it opens (09:00)? If NO → adjust.
   ✓ Does this day have at least 2 iconic/landmark-level sights? If NO → add one from world knowledge (null coordinates).
+  ✓ Does EVERY day include ≥1 POI matching the theme detected in STEP 0? If NO → swap in a theme-appropriate sight.
+  ✓ Is the theme consistent across ALL days (Day 2 and Day 3 same theme as Day 1)? If NO → replace drifted stops.
+  ✓ Are any two dining stops ADJACENT (no sightseeing stop between them)? If YES → insert a sightseeing stop between them or remove one of the dining stops.
+  ✓ Is every dining stop within 2 km of that day's sightseeing stops? Compare the lat/lon of the restaurant with the lat/lon of the sightseeing stops on the same day. If a dining stop is >2 km away from all sightseeing on that day → replace it with a closer option from the dining list.
 
 QUALITY BALANCE ACROSS DAYS (CRITICAL — prevents day-1 bias):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -313,6 +346,7 @@ WHAT YOU MUST DO
 2. Identify WHICH day(s) and WHICH waypoints need changing.
 3. Apply ONLY the requested change — keep everything else identical.
 4. Output the COMPLETE updated route JSON (all days, including unchanged ones).
+5. FROZEN DAYS RULE: Any day NOT explicitly mentioned in the user's request must be copied into the output EXACTLY as-is — same waypoints, same order, same times, same coordinates. NEVER rearrange, remove, or redistribute waypoints across days "to improve flow" or "to balance". If the user says "add day 4", days 1–3 are frozen.
 
 CONFIRMATION PATTERN (very common): The user previously asked "suggest an alternative for X" and you offered options A and B. Now the user says "I choose A" or "seçiyorum". In this case: replace X with A in the route, then output the full updated route JSON. Do NOT ask for further confirmation — just apply and output.
 
@@ -330,6 +364,7 @@ FULL DAY REGENERATION ("redo day 1", "1. günü tekrar yap", "1. günü yeniden 
 - Day ends no earlier than 18:00.
 - Set latitude: null, longitude: null for all new waypoints (app will geocode).
 - GEOCODING CRITICAL: Waypoints that cannot be geocoded will be silently removed from the route. To avoid losing stops: choose only world-famous or internationally-recognized landmarks; use the official English name with district (e.g. "Topkapi Palace, Fatih", "Blue Mosque, Sultanahmet"). Never use neighborhood-only names (e.g. "Hamamonu", "Balat") as standalone waypoints — they will fail to geocode. Prefer 6 highly-geocodable POIs over 8 risky ones.
+- STREET NAMES CANNOT GEOCODE — use a specific landmark ON or near the street: ❌ "Istiklal Street" → ✅ "Galatasaray Square, Beyoglu"; ❌ "Champs-Élysées" → ✅ "Arc de Triomphe, Paris". Always add the district to the name: "Galata Tower, Karakoy" not just "Galata Tower".
 
 PARTIAL DAY REBUILD ("keep Hagia Sophia and Blue Mosque, change the rest", "Ayasofya kalsın diğerlerini değiştir"):
 - The user explicitly names which waypoints to KEEP. Preserve those exactly (same name, times, order position).
@@ -378,6 +413,22 @@ ADD A DAY ("işim uzadı 4 gün kalacağım", "add a day", "extend to 4 days", "
 - Append new days at the end (day N+1, N+2 …).
 - Update total_days in the JSON to reflect the new total.
 - Set latitude: null, longitude: null for all new waypoints (app will geocode). GEOCODING CRITICAL: POIs that fail geocoding will be silently removed — use only internationally-recognized English names with district context.
+- FROZEN EXISTING DAYS: Copy all existing days (day 1 through day N) byte-for-byte into the output. Do NOT rearrange, remove, modify, or "redistribute" any waypoint from any existing day. Only append the new day(s) at the end.
+
+ADD A DAY WITH SPECIFIC REQUIRED PLACES ("4. gün için İstiklal ve Galata Tower oluştur", "add a day 4 with Colosseum and Trastevere", "ekstra gün ekle, Kapalıçarşı ve Eminönü olsun"):
+- The user has named specific places that MUST appear in the new day as anchor sightseeing stops.
+- REQUIRED places must appear verbatim as waypoints — do NOT substitute, omit, or swap them for something else. If the user says "Galata Tower", the waypoint name must be "Galata Tower, Karakoy" — not "Pera Museum" or any other venue.
+- Plan the entire new day around those named anchors: place them first in your planning.
+- Identify the neighborhood/district of the named anchors (e.g. İstiklal + Galata Tower → Beyoğlu/Galata district).
+- Add ALL other stops — including dining — within ~2 km of those anchors. Do NOT mix in POIs from a different neighborhood or district.
+- Apply the full dining rhythm (morning cafe → lunch → afternoon cafe → dinner), all from the same neighborhood as the anchors.
+- STREET NAMES CANNOT GEOCODE — use a specific landmark ON or near the street instead:
+  ❌ "Istiklal Street" / "Istiklal Caddesi" → ✅ "Galatasaray Square, Beyoglu" or "Cicek Pasaji, Beyoglu"
+  ❌ "Champs-Élysées" → ✅ "Arc de Triomphe, Paris" or "Grand Palais, Paris"
+  ❌ "Via del Corso" → ✅ "Piazza del Popolo, Rome"
+- Always include the district in the name for better geocoding: "Galata Tower, Karakoy" not just "Galata Tower"; "Pera Museum, Beyoglu" not just "Pera Museum".
+- Set latitude: null, longitude: null for all waypoints (app will geocode).
+- FROZEN EXISTING DAYS: Copy all existing days byte-for-byte. Do NOT touch them.
 
 REMOVE A DAY ("3. günü çıkar", "remove day 2", "2. günü sil", "trip is shorter now"):
 - Delete the specified day entirely.
@@ -899,47 +950,101 @@ async def _extract_turn3_must_visit_llm(
         return []
 
 
+def _format_single_poi(p: dict, idx: int) -> str | None:
+    name = p.get("name")
+    cat = p.get("category")
+    lat = p.get("lat")
+    lon = p.get("lon")
+    if name is None or lat is None or lon is None:
+        return None
+    sub_cats = p.get("poiCategoryIds") or []
+    cat_label = cat
+    if sub_cats:
+        useful = [s for s in sub_cats if s and s != cat]
+        if useful:
+            cat_label = f"{cat}: {', '.join(useful[:3])}"
+    parts = [f"{idx}. {name} ({cat_label}) — lat: {lat}, lon: {lon}"]
+    extras: list[str] = []
+    rating = p.get("rating")
+    if rating is not None:
+        extras.append(f"rating: {rating}")
+    price = p.get("priceLevel")
+    if price:
+        extras.append(f"price: {price}")
+    start_t = p.get("startTimeLocal")
+    end_t = p.get("endTimeLocal")
+    if start_t and end_t:
+        extras.append(f"hours: {start_t}–{end_t}")
+    elif start_t:
+        extras.append(f"opens: {start_t}")
+    closed = p.get("closedWeekdays")
+    if closed:
+        extras.append(f"closed: {', '.join(closed)}")
+    dur = p.get("estimatedDurationMin")
+    if dur:
+        extras.append(f"~{dur} min")
+    hint = _dining_time_hint(cat)
+    if hint:
+        extras.append(hint)
+    if extras:
+        parts.append(" | ".join(extras))
+    return " | ".join(parts)
+
+
 def _format_poi_list(pois: list[dict]) -> str:
+    """Format POI list with sightseeing and dining in separate sections.
+
+    Dining POIs are shuffled within quality tiers so the LLM doesn't develop
+    positional bias (always picking the first restaurant for every day).
+    Sightseeing stays relevance-sorted so anchor quality is preserved.
+    """
+    import random
+
+    sightseeing: list[dict] = []
+    dining: list[dict] = []
+    for p in pois:
+        cat = (p.get("category") or "").lower()
+        if cat in _DINING_CATS:
+            dining.append(p)
+        else:
+            sightseeing.append(p)
+
+    # Shuffle dining within rating tiers so different sessions surface different venues.
+    # Tiers: high (≥4.0), mid (3.0–3.99), low (<3.0 or no rating).
+    def tier(p: dict) -> int:
+        r = p.get("rating")
+        if r is None:
+            return 2
+        return 0 if r >= 4.0 else (1 if r >= 3.0 else 2)
+
+    high = [p for p in dining if tier(p) == 0]
+    mid  = [p for p in dining if tier(p) == 1]
+    low  = [p for p in dining if tier(p) == 2]
+    random.shuffle(high)
+    random.shuffle(mid)
+    random.shuffle(low)
+    dining_shuffled = high + mid + low
+
     lines: list[str] = []
-    for i, p in enumerate(pois, start=1):
-        name = p.get("name")
-        cat = p.get("category")
-        lat = p.get("lat")
-        lon = p.get("lon")
-        if name is None or lat is None or lon is None:
-            continue
-        sub_cats = p.get("poiCategoryIds") or []
-        cat_label = cat
-        if sub_cats:
-            useful = [s for s in sub_cats if s and s != cat]
-            if useful:
-                cat_label = f"{cat}: {', '.join(useful[:3])}"
-        parts = [f"{i}. {name} ({cat_label}) — lat: {lat}, lon: {lon}"]
-        extras: list[str] = []
-        rating = p.get("rating")
-        if rating is not None:
-            extras.append(f"rating: {rating}")
-        price = p.get("priceLevel")
-        if price:
-            extras.append(f"price: {price}")
-        start_t = p.get("startTimeLocal")
-        end_t = p.get("endTimeLocal")
-        if start_t and end_t:
-            extras.append(f"hours: {start_t}–{end_t}")
-        elif start_t:
-            extras.append(f"opens: {start_t}")
-        closed = p.get("closedWeekdays")
-        if closed:
-            extras.append(f"closed: {', '.join(closed)}")
-        dur = p.get("estimatedDurationMin")
-        if dur:
-            extras.append(f"~{dur} min")
-        hint = _dining_time_hint(cat)
-        if hint:
-            extras.append(hint)
-        if extras:
-            parts.append(" | ".join(extras))
-        lines.append(" | ".join(parts))
+
+    if sightseeing:
+        lines.append("=== SIGHTSEEING / ATTRACTIONS (use for landmark and activity stops) ===")
+        idx = 1
+        for p in sightseeing:
+            row = _format_single_poi(p, idx)
+            if row:
+                lines.append(row)
+                idx += 1
+
+    if dining_shuffled:
+        lines.append("=== DINING (restaurants, cafes, bars — pick by proximity to that day's sightseeing, NOT by list position) ===")
+        idx = 1
+        for p in dining_shuffled:
+            row = _format_single_poi(p, idx)
+            if row:
+                lines.append(row)
+                idx += 1
+
     return "\n".join(lines) if lines else "(no POIs returned)"
 
 
@@ -2280,6 +2385,8 @@ def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
     sl = _join_list(profile.spokenLanguages)
     if sl:
         travel.append(f"Spoken languages: {sl}")
+    if profile.maxDailyPois is not None:
+        travel.append(f"Max POIs per day: {profile.maxDailyPois} (HARD CAP — never exceed this waypoint count per day, mandatory meals count toward the cap)")
     saved = _join_list(profile.savedPoiNames)
     if saved:
         travel.append(f"Saved / favorited places (PRIORITIZE in itinerary if in destination): {saved}")

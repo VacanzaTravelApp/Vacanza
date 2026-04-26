@@ -59,6 +59,9 @@ class UserProfileForAi(BaseModel):
     preferredLanguage: str | None = None
     spokenLanguages: list[str] | None = None
 
+    # POI limits
+    maxDailyPois: int | None = None
+
     # Favorited / saved POIs (injected by Java backend from user_interactions table)
     savedPoiNames: list[str] | None = None
 
