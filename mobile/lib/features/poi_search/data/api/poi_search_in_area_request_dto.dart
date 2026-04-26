@@ -33,7 +33,7 @@ class PoiSearchInAreaRequestDto {
   }) : limit = _normalizeLimit(limit);
 
   static int _normalizeLimit(int? limit) {
-    final v = (limit == null || limit <= 0) ? 200 : limit;
+    final v = (limit == null || limit <= 0) ? 400 : limit;
     return v > 500 ? 500 : v; // FE enforce max 500
   }
 

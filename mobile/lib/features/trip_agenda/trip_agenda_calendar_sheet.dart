@@ -6,7 +6,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:mobile/core/navigation/route_open_requests.dart';
 import 'package:mobile/core/theme/vacanza_tokens.dart';
-import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
 import 'package:mobile/features/ai/presentation/cubit/active_route_cubit.dart';
 import 'package:mobile/features/trip_calendar/data/api/trip_calendar_api_client.dart';
 import 'package:mobile/features/trip_calendar/services/ics_export_service.dart';
@@ -14,23 +13,29 @@ import 'package:mobile/features/trip_calendar/services/ics_export_service.dart';
 import 'trip_agenda_event.dart';
 
 const _kMonthNames = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
 const _kWeekdayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-/// Theme-aware colors for Trip Agenda (light / dark).
+// Stable per-trip color palette — same order as web.
+const _kTripColors = [
+  Color(0xFF8B5CF6),
+  Color(0xFF3B82F6),
+  Color(0xFF10B981),
+  Color(0xFFF59E0B),
+  Color(0xFFEC4899),
+  Color(0xFF06B6D4),
+  Color(0xFFEF4444),
+  Color(0xFF84CC16),
+];
+
+Color _tripColor(String routeId) {
+  final hash = routeId.codeUnits.fold(0, (acc, c) => acc ^ c);
+  return _kTripColors[hash.abs() % _kTripColors.length];
+}
+
 @immutable
 class _TripPalette {
   const _TripPalette({
@@ -115,16 +120,9 @@ class _TripPalette {
       gridDivider: isDark
           ? Colors.white.withValues(alpha: 0.04)
           : const Color(0xFFF8FAFC),
-      // Bugün hücresi: gece modunda tema mavi (vividBlue); gündüzde hafif mavi tint.
-      todayCell: isDark
-          ? vb.withValues(alpha: 0.14)
-          : vb.withValues(alpha: 0.10),
-      // Seçili aralık: gündüzde okunaklı açık mavi zemin; gece yarı saydam mavi.
-      selectedCell: isDark
-          ? vb.withValues(alpha: 0.24)
-          : const Color(0xFFDBEAFE),
+      todayCell: isDark ? vb.withValues(alpha: 0.14) : vb.withValues(alpha: 0.10),
+      selectedCell: isDark ? vb.withValues(alpha: 0.24) : const Color(0xFFDBEAFE),
       rangeAccent: vb,
-      // Bugün sayı rozeti: gece tema mavisi; gündüz klasik vurgu (kırmızı).
       todayBadge: isDark ? vb : const Color(0xFFEF4444),
       dayNum: t.textSub,
       scrim: t.overlayScrim,
@@ -172,7 +170,6 @@ List<_Cell> _buildCells(int year, int month) {
   return cells;
 }
 
-/// Trip Agenda — same behavior as web CalendarModal.
 class TripAgendaCalendarSheet extends StatefulWidget {
   final void Function(String routeId)? onOpenRouteFromCalendar;
 
@@ -202,7 +199,6 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
   String _newCategory = 'Activity';
   bool _calendarExporting = false;
 
-  /// Form overlay: fade + scale (smooth giriş/çıkış).
   late AnimationController _sheetAnim;
   late Animation<double> _sheetFade;
   late Animation<double> _sheetScale;
@@ -216,30 +212,33 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
       context: context,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final p = _TripPalette.of(ctx);
-        return _detailSheet(
-          ctx,
-          palette: p,
-          title: ev.title,
-          subtitle:
-              ev.endDay != null ? '${ev.day}–${ev.endDay} ${_kMonthNames[_month - 1]} $_year' : '${ev.day} ${_kMonthNames[_month - 1]} $_year',
-          actions: [
-            _DetailAction.danger(
-              label: 'Remove note',
-              onTap: () {
-                final idx = _events.indexOf(ev);
-                if (idx >= 0) _removeEventAt(idx);
-                Navigator.pop(ctx);
-              },
-            ),
-          ],
-        );
-      },
+      builder: (ctx) => _detailSheet(
+        ctx,
+        palette: _TripPalette.of(ctx),
+        color: ev.color,
+        title: ev.title,
+        subtitle: ev.endDay != null
+            ? '${ev.day}–${ev.endDay} ${_kMonthNames[_month - 1]} $_year'
+            : '${ev.day} ${_kMonthNames[_month - 1]} $_year',
+        destination: null,
+        dayBadge: null,
+        actions: [
+          _DetailAction.danger(
+            icon: Icons.delete_outline_rounded,
+            label: 'Remove note',
+            onTap: () {
+              final idx = _events.indexOf(ev);
+              if (idx >= 0) _removeEventAt(idx);
+              Navigator.pop(ctx);
+            },
+          ),
+        ],
+      ),
     );
   }
 
   Future<void> _openRemoteDetail(TripCalendarEventRow ev) async {
+    final color = _tripColor(ev.routeId);
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -249,30 +248,32 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
         final dateStr =
             '${_kMonthNames[_month - 1]} ${ev.eventDate.day}, $_year';
         final multi = ev.totalDays > 1;
-        final label =
+        final dayBadge =
             multi ? 'Day ${ev.itineraryDay} of ${ev.totalDays}' : null;
         final computedStart = ev.eventDate.subtract(
           Duration(days: (ev.itineraryDay - 1).clamp(0, 3650)),
         );
+
         return _detailSheet(
           ctx,
           palette: p,
+          color: color,
           title: ev.title,
-          subtitle: [dateStr, label].whereType<String>().join(' • '),
+          subtitle: dateStr,
+          destination: ev.destination,
+          dayBadge: dayBadge,
           actions: [
             _DetailAction.primary(
+              icon: Icons.map_rounded,
               label: 'Open on map',
               onTap: () async {
                 Navigator.pop(ctx);
-                RouteOpenRequests.requestOpen(
-                  ev.routeId,
-                  day: ev.itineraryDay,
-                );
-                // Close overlays and return to the map screen.
+                RouteOpenRequests.requestOpen(ev.routeId, day: ev.itineraryDay);
                 Navigator.of(context).popUntil((r) => r.isFirst);
               },
             ),
             _DetailAction.muted(
+              icon: Icons.calendar_today_rounded,
               label: 'Add to phone calendar',
               onTap: () async {
                 Navigator.pop(ctx);
@@ -282,39 +283,37 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                   final today = DateTime.now();
                   final picked = await showDatePicker(
                     context: context,
-                    initialDate:
-                        computedStart.isBefore(today) ? today : computedStart,
+                    initialDate: computedStart.isBefore(today)
+                        ? today
+                        : computedStart,
                     firstDate: DateTime(today.year - 1),
                     lastDate: DateTime(today.year + 5),
                     helpText: 'Select first trip day',
                   );
                   if (!context.mounted) return;
                   if (picked == null) return;
-                  await context.read<IcsExportService>().registerAndOpenRouteIcs(
-                    routeId: ev.routeId,
-                    eventDate: picked,
-                  );
+                  await context
+                      .read<IcsExportService>()
+                      .registerAndOpenRouteIcs(
+                        routeId: ev.routeId,
+                        eventDate: picked,
+                      );
                 } catch (e) {
                   if (!context.mounted) return;
-                  if (IcsExportService.isConflict409(e)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('This route is already on that day.'),
-                      ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Could not export calendar file.'),
-                      ),
-                    );
-                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(IcsExportService.isConflict409(e)
+                          ? 'This route is already on that day.'
+                          : 'Could not export calendar file.'),
+                    ),
+                  );
                 } finally {
                   if (mounted) setState(() => _calendarExporting = false);
                 }
               },
             ),
             _DetailAction.danger(
+              icon: Icons.remove_circle_outline_rounded,
               label: 'Remove this day',
               onTap: () async {
                 Navigator.pop(ctx);
@@ -327,14 +326,14 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Could not remove calendar item.'),
-                    ),
+                        content: Text('Could not remove calendar item.')),
                   );
                 }
               },
             ),
             if (multi)
-              _DetailAction.muted(
+              _DetailAction.danger(
+                icon: Icons.delete_sweep_rounded,
                 label: 'Remove all ${ev.totalDays} days',
                 onTap: () async {
                   Navigator.pop(ctx);
@@ -345,14 +344,15 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                     await _loadRemoteEvents();
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Trip removed from calendar.')),
+                      const SnackBar(
+                          content: Text('Trip removed from calendar.')),
                     );
                   } catch (_) {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Could not remove trip from calendar.'),
-                      ),
+                          content:
+                              Text('Could not remove trip from calendar.')),
                     );
                   }
                 },
@@ -367,7 +367,8 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
     setState(() => _remoteLoading = true);
     try {
       final api = context.read<TripCalendarApiClient>();
-      final rows = await api.listTripCalendarEvents(year: _year, month: _month);
+      final rows =
+          await api.listTripCalendarEvents(year: _year, month: _month);
       if (!mounted) return;
       setState(() => _remoteEvents = rows);
     } catch (_) {
@@ -396,8 +397,6 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
     _sheetScale = Tween<double>(begin: 0.94, end: 1.0).animate(
       CurvedAnimation(parent: _sheetAnim, curve: Curves.easeOutCubic),
     );
-
-    // Web parity: load server-side trip-calendar events for this month.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_loadRemoteEvents());
@@ -427,22 +426,18 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
     if (!cur) return false;
     final rmin = _rangeMin();
     final rmax = _rangeMax();
-    if (rmin != null && rmax != null) {
-      return d >= rmin && d <= rmax;
-    }
+    if (rmin != null && rmax != null) return d >= rmin && d <= rmax;
     return false;
   }
 
-  List<TripAgendaEvent> _eventsForDay(int d) {
-    return _events.where((e) => e.coversDay(d, _month, _year)).toList();
-  }
+  List<TripAgendaEvent> _eventsForDay(int d) =>
+      _events.where((e) => e.coversDay(d, _month, _year)).toList();
 
-  List<TripCalendarEventRow> _remoteEventsForDay(int d) {
-    return _remoteEvents.where((re) {
-      final dt = re.eventDate;
-      return dt.year == _year && dt.month == _month && dt.day == d;
-    }).toList();
-  }
+  List<TripCalendarEventRow> _remoteEventsForDay(int d) =>
+      _remoteEvents.where((re) {
+        final dt = re.eventDate;
+        return dt.year == _year && dt.month == _month && dt.day == d;
+      }).toList();
 
   void _resetSelection() {
     if (_showForm) {
@@ -488,9 +483,7 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
         _newCategory = 'Activity';
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _showForm) {
-          _sheetAnim.forward(from: 0);
-        }
+        if (mounted && _showForm) _sheetAnim.forward(from: 0);
       });
     }
   }
@@ -504,16 +497,14 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
     await _sheetAnim.reverse();
     if (!mounted) return;
     setState(() {
-      _events.add(
-        TripAgendaEvent(
-          title: title,
-          category: _newCategory,
-          day: s,
-          endDay: en != s ? en : null,
-          month: _month,
-          year: _year,
-        ),
-      );
+      _events.add(TripAgendaEvent(
+        title: title,
+        category: _newCategory,
+        day: s,
+        endDay: en != s ? en : null,
+        month: _month,
+        year: _year,
+      ));
       _selectStart = null;
       _selectEnd = null;
       _showForm = false;
@@ -521,11 +512,7 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
     });
   }
 
-  void _removeEventAt(int index) {
-    setState(() {
-      _events.removeAt(index);
-    });
-  }
+  void _removeEventAt(int index) => setState(() => _events.removeAt(index));
 
   Future<void> _goToday() async {
     if (_showForm) await _dismissFormOverlay();
@@ -574,7 +561,6 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
 
   DateTime _cellDate(int day) => DateTime(_year, _month, day);
 
-  /// Bugünün tarihinden önceki günler (aynı ay içinde seçim için kapalı).
   bool _isPastDay(int day, bool cur) {
     if (!cur) return false;
     final n = DateTime.now();
@@ -586,10 +572,12 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
   Widget build(BuildContext context) {
     final p = _TripPalette.of(context);
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final cells = _buildCells(_year, _month);
     final rmin = _rangeMin();
     final rmax = _rangeMax();
+
     final dynamic activeRouteState = () {
       try {
         return context.read<ActiveRouteCubit>().state;
@@ -599,48 +587,46 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
     }();
     final String? routeId = activeRouteState?.routeId as String?;
     final route = activeRouteState?.route;
-    final tripStart =
-        IcsExportService.tryParseIsoDate(route?.tripStartDate);
+    final tripStart = IcsExportService.tryParseIsoDate(route?.tripStartDate);
 
     Future<DateTime?> pickDate({required DateTime initial}) async {
       final today = DateTime.now();
-      final d = await showDatePicker(
+      return showDatePicker(
         context: context,
         initialDate: initial.isBefore(today) ? today : initial,
         firstDate: DateTime(today.year - 1),
         lastDate: DateTime(today.year + 5),
         helpText: 'Select first trip day',
       );
-      return d;
     }
 
     Future<void> exportActiveRoute() async {
-      if (routeId == null) return;
-      if (_calendarExporting) return;
+      if (routeId == null || _calendarExporting) return;
       setState(() => _calendarExporting = true);
       try {
         final initial = tripStart ?? DateTime.now();
         final chosen = await pickDate(initial: initial);
+        if (!context.mounted) return;
         if (chosen == null) return;
         await context.read<IcsExportService>().registerAndOpenRouteIcs(
-          routeId: routeId,
-          eventDate: chosen,
-        );
+              routeId: routeId,
+              eventDate: chosen,
+            );
       } catch (e) {
         if (!context.mounted) return;
-        if (IcsExportService.isConflict409(e)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This route is already on that day.')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not export calendar file.')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(IcsExportService.isConflict409(e)
+                ? 'This route is already on that day.'
+                : 'Could not export calendar file.'),
+          ),
+        );
       } finally {
         if (mounted) setState(() => _calendarExporting = false);
       }
     }
+
+    final exportEnabled = routeId != null && !_calendarExporting;
 
     return Material(
       color: p.surface,
@@ -654,6 +640,7 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // ── Drag handle ──
                 Center(
                   child: Container(
                     width: 40,
@@ -664,14 +651,15 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
+                // ── Header row ──
                 Row(
                   children: [
                     Expanded(
                       child: RichText(
                         text: TextSpan(
                           style: TextStyle(
-                            fontSize: 26,
+                            fontSize: 24,
                             fontWeight: FontWeight.w300,
                             color: p.textMain,
                             height: 1.1,
@@ -681,121 +669,73 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                             TextSpan(
                               text: ' $_year',
                               style: TextStyle(
-                                color: p.textMain.withValues(alpha: 0.35),
-                              ),
+                                  color: p.textMain.withValues(alpha: 0.35)),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    if (_selectStart != null)
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          backgroundColor: p.cancelBg,
-                          foregroundColor: p.cancelFg,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        onPressed: _resetSelection,
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    if (_selectStart != null) const SizedBox(width: 6),
-                    if (_remoteLoading) ...[
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                    if (_selectStart != null) ...[
+                      _headerChip(
+                        label: 'Cancel',
+                        icon: Icons.close_rounded,
+                        bg: p.cancelBg,
+                        fg: p.cancelFg,
+                        onTap: _resetSelection,
                       ),
                       const SizedBox(width: 6),
                     ],
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        backgroundColor: p.navBtn,
-                        foregroundColor: p.navIcon,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                    if (_remoteLoading) ...[
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: p.rangeAccent),
                       ),
-                      onPressed:
-                          routeId == null || _calendarExporting
-                              ? null
-                              : () => unawaited(exportActiveRoute()),
-                      child:
-                          _calendarExporting
-                              ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                              : Text(
-                                'Export',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 11,
-                                  color: routeId == null
-                                      ? p.textMuted.withValues(alpha: 0.5)
-                                      : p.navIcon,
-                                ),
-                              ),
+                      const SizedBox(width: 8),
+                    ],
+                    // Export button
+                    _headerChip(
+                      label: _calendarExporting ? '' : 'Export',
+                      icon: Icons.ios_share_rounded,
+                      bg: exportEnabled
+                          ? p.rangeAccent.withValues(alpha: isDark ? 0.22 : 0.12)
+                          : p.navBtn,
+                      fg: exportEnabled ? p.rangeAccent : p.textMuted.withValues(alpha: 0.45),
+                      onTap: _calendarExporting
+                          ? null
+                          : () {
+                              if (routeId == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        'Open a trip on the map first to export it.'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                                return;
+                              }
+                              unawaited(exportActiveRoute());
+                            },
+                      loading: _calendarExporting,
                     ),
                     const SizedBox(width: 6),
-                    _navIconBtn(
-                      p: p,
-                      icon: Icons.chevron_left_rounded,
-                      onPressed: () => unawaited(_prevMonth()),
+                    _navIconBtn(p: p, icon: Icons.chevron_left_rounded,
+                        onPressed: () => unawaited(_prevMonth())),
+                    const SizedBox(width: 4),
+                    _headerChip(
+                      label: 'Today',
+                      icon: Icons.today_rounded,
+                      bg: p.navBtn,
+                      fg: p.navIcon,
+                      onTap: () => unawaited(_goToday()),
                     ),
-                    const SizedBox(width: 6),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        backgroundColor: p.navBtn,
-                        foregroundColor: p.navIcon,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () => unawaited(_goToday()),
-                      child: Text(
-                        'Today',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                          color: p.navIcon,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    _navIconBtn(
-                      p: p,
-                      icon: Icons.chevron_right_rounded,
-                      onPressed: () => unawaited(_nextMonth()),
-                    ),
+                    const SizedBox(width: 4),
+                    _navIconBtn(p: p, icon: Icons.chevron_right_rounded,
+                        onPressed: () => unawaited(_nextMonth())),
                   ],
                 ),
+                // ── Range hint ──
                 AnimatedSize(
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
@@ -805,13 +745,11 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                           key: const ValueKey('rangeHint'),
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 10),
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
+                                  horizontal: 14, vertical: 8),
                               decoration: BoxDecoration(
                                 color: p.hintBg,
                                 borderRadius: BorderRadius.circular(10),
@@ -830,26 +768,26 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                         )
                       : const SizedBox(width: double.infinity),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
+                // ── Weekday headers ──
                 Row(
                   children: _kWeekdayHeaders
-                      .map(
-                        (d) => Expanded(
-                          child: Text(
-                            d,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: p.textMuted,
-                              letterSpacing: 0.8,
+                      .map((d) => Expanded(
+                            child: Text(
+                              d,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: p.textMuted,
+                                letterSpacing: 0.8,
+                              ),
                             ),
-                          ),
-                        ),
-                      )
+                          ))
                       .toList(),
                 ),
                 const SizedBox(height: 2),
+                // ── Calendar grid ──
                 SizedBox(
                   height: _gridHeight,
                   child: GridView.builder(
@@ -865,23 +803,19 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                       final evts = c.isCurrentMonth
                           ? _eventsForDay(c.day)
                           : <TripAgendaEvent>[];
-                      final inRange = c.isCurrentMonth &&
-                          _isInRange(c.day, c.isCurrentMonth);
-                      final isRStart = c.isCurrentMonth &&
-                          rmin != null &&
-                          c.day == rmin;
-                      final isREnd = c.isCurrentMonth &&
-                          rmax != null &&
-                          c.day == rmax;
+                      final inRange =
+                          c.isCurrentMonth && _isInRange(c.day, c.isCurrentMonth);
+                      final isRStart =
+                          c.isCurrentMonth && rmin != null && c.day == rmin;
+                      final isREnd =
+                          c.isCurrentMonth && rmax != null && c.day == rmax;
                       final today = _isToday(c.day, c.isCurrentMonth);
                       final past = _isPastDay(c.day, c.isCurrentMonth);
-                      final showRangeEndBorder = isREnd;
 
                       return GestureDetector(
-                        onTap:
-                            past
-                                ? null
-                                : () => _onCellTap(c.day, c.isCurrentMonth),
+                        onTap: past
+                            ? null
+                            : () => _onCellTap(c.day, c.isCurrentMonth),
                         behavior: HitTestBehavior.opaque,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -896,25 +830,21 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                                         : null)),
                             border: Border(
                               top: BorderSide(color: p.gridBorder),
-                              right: showRangeEndBorder
+                              right: isREnd
                                   ? BorderSide(
-                                      color: p.rangeAccent,
-                                      width: 3,
-                                    )
+                                      color: p.rangeAccent, width: 3)
                                   : (idx % 7 == 6
                                       ? BorderSide.none
                                       : BorderSide(color: p.gridDivider)),
                               bottom: BorderSide(color: p.gridBorder),
                               left: isRStart
                                   ? BorderSide(
-                                      color: p.rangeAccent,
-                                      width: 3,
-                                    )
+                                      color: p.rangeAccent, width: 3)
                                   : BorderSide.none,
                             ),
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
+                            padding: const EdgeInsets.all(4),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
@@ -933,23 +863,18 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                                       child: Text(
                                         '${c.day}',
                                         style: TextStyle(
-                                          fontSize: today && c.isCurrentMonth
-                                              ? 11
-                                              : 12,
+                                          fontSize:
+                                              today && c.isCurrentMonth ? 11 : 12,
                                           fontWeight: today && c.isCurrentMonth
                                               ? FontWeight.w700
                                               : FontWeight.w500,
                                           color: c.isCurrentMonth
                                               ? (past
-                                                  ? p.textMuted.withValues(
-                                                      alpha: 0.45,
-                                                    )
+                                                  ? p.textMuted.withValues(alpha: 0.45)
                                                   : (today
                                                       ? Colors.white
                                                       : p.dayNum))
-                                              : p.textMuted.withValues(
-                                                  alpha: 0.35,
-                                                ),
+                                              : p.textMuted.withValues(alpha: 0.35),
                                         ),
                                       ),
                                     ),
@@ -957,13 +882,10 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                                     if (c.isCurrentMonth &&
                                         _selectStart == null &&
                                         !past)
-                                      Icon(
-                                        Icons.add_rounded,
-                                        size: 11,
-                                        color: p.textMuted.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                      ),
+                                      Icon(Icons.add_rounded,
+                                          size: 11,
+                                          color: p.textMuted
+                                              .withValues(alpha: 0.5)),
                                   ],
                                 ),
                                 const SizedBox(height: 2),
@@ -971,12 +893,11 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                                   child: c.isCurrentMonth
                                       ? _EventChips(
                                           events: evts,
-                                          remoteEvents: _remoteEventsForDay(
-                                            c.day,
-                                          ),
+                                          remoteEvents:
+                                              _remoteEventsForDay(c.day),
                                           muted: p.textMuted,
-                                          onTapRemote: (re) =>
-                                              unawaited(_openRemoteDetail(re)),
+                                          onTapRemote: (re) => unawaited(
+                                              _openRemoteDetail(re)),
                                           onTapLocal: (le) =>
                                               unawaited(_openLocalDetail(le)),
                                         )
@@ -992,6 +913,7 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                 ),
               ],
             ),
+            // ── Add event form overlay ──
             if (_showForm && rmin != null && rmax != null)
               Positioned.fill(
                 child: FadeTransition(
@@ -1010,21 +932,18 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
                           alignment: Alignment.center,
                           child: Padding(
                             padding: EdgeInsets.only(
-                              left: 12,
-                              right: 12,
-                              bottom: bottomInset,
-                            ),
+                                left: 12, right: 12, bottom: bottomInset),
                             child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 400),
+                              constraints:
+                                  const BoxConstraints(maxWidth: 400),
                               child: Material(
                                 color: p.surface,
                                 elevation: 12,
                                 shadowColor: p.popupShadow,
                                 borderRadius: BorderRadius.circular(16),
                                 child: Theme(
-                                  data: Theme.of(context).copyWith(
-                                    canvasColor: p.surface,
-                                  ),
+                                  data: Theme.of(context)
+                                      .copyWith(canvasColor: p.surface),
                                   child: GestureDetector(
                                     onTap: () {},
                                     behavior: HitTestBehavior.deferToChild,
@@ -1062,26 +981,70 @@ class _TripAgendaCalendarSheetState extends State<TripAgendaCalendarSheet>
     );
   }
 
+  Widget _headerChip({
+    required String label,
+    required IconData icon,
+    required Color bg,
+    required Color fg,
+    required VoidCallback? onTap,
+    bool loading = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: loading
+            ? SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 13, color: fg),
+                  if (label.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: fg,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+      ),
+    );
+  }
+
   Widget _navIconBtn({
     required _TripPalette p,
     required IconData icon,
     required VoidCallback onPressed,
   }) {
-    return SizedBox(
-      width: 30,
-      height: 30,
-      child: Material(
-        color: p.navBtn,
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: p.navBtn,
           borderRadius: BorderRadius.circular(8),
-          onTap: onPressed,
-          child: Icon(icon, size: 16, color: p.navIcon),
         ),
+        child: Icon(icon, size: 16, color: p.navIcon),
       ),
     );
   }
 }
+
+// ── Event chips in calendar cells ────────────────────────────────────────────
 
 class _EventChips extends StatelessWidget {
   const _EventChips({
@@ -1100,23 +1063,46 @@ class _EventChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final local = events;
-    final remote = remoteEvents;
-    final combinedCount = remote.length + local.length;
+    final combinedCount = remoteEvents.length + events.length;
+    final chips = <Widget>[];
 
-    List<Widget> chips = [];
-    for (final re in remote.take(2)) {
-      chips.add(
-        GestureDetector(
-          onTap: onTapRemote == null ? null : () => onTapRemote!(re),
+    for (final re in remoteEvents.take(2)) {
+      chips.add(GestureDetector(
+        onTap: onTapRemote == null ? null : () => onTapRemote!(re),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          decoration: BoxDecoration(
+            color: _tripColor(re.routeId),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            _formatRemoteLabel(re),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ));
+      if (chips.length >= 2) break;
+    }
+
+    if (chips.length < 2) {
+      for (final le in events.take(2 - chips.length)) {
+        chips.add(GestureDetector(
+          onTap: onTapLocal == null ? null : () => onTapLocal!(le),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFF8B5CF6), // web ROUTE_EVENT_COLOR
+              color: le.color,
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              _formatRemoteLabel(re),
+              le.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -1127,35 +1113,7 @@ class _EventChips extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      );
-      if (chips.length >= 2) break;
-    }
-    if (chips.length < 2) {
-      for (final le in local.take(2 - chips.length)) {
-        chips.add(
-          GestureDetector(
-            onTap: onTapLocal == null ? null : () => onTapLocal!(le),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: le.color,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                le.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  height: 1.35,
-                ),
-              ),
-            ),
-          ),
-        );
+        ));
       }
     }
 
@@ -1163,10 +1121,7 @@ class _EventChips extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final chip in chips)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 2),
-            child: chip,
-          ),
+          Padding(padding: const EdgeInsets.only(bottom: 2), child: chip),
         if (combinedCount > 2)
           Text(
             '+${combinedCount - 2}',
@@ -1188,6 +1143,8 @@ class _EventChips extends StatelessWidget {
     return re.title;
   }
 }
+
+// ── Add event panel ───────────────────────────────────────────────────────────
 
 class _AddEventPanel extends StatefulWidget {
   const _AddEventPanel({
@@ -1245,195 +1202,153 @@ class _AddEventPanelState extends State<_AddEventPanel> {
   Widget build(BuildContext context) {
     final p = widget.palette;
     final scheme = widget.colorScheme;
-    final onSurface = scheme.onSurface;
-
     final header = widget.rangeMin != widget.rangeMax
         ? '${widget.rangeMin} – ${widget.rangeMax} ${widget.monthName}'
         : '${widget.rangeMin} ${widget.monthName}';
-
     final canAdd = widget.titleController.text.trim().isNotEmpty;
 
-    return GestureDetector(
-      onTap: () {},
-      behavior: HitTestBehavior.deferToChild,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    header,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: p.textMain,
-                    ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  header,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: p.textMain,
                   ),
-                ),
-                IconButton(
-                  icon: Icon(
-                    Icons.close_rounded,
-                    color: p.textMuted,
-                    size: 20,
-                  ),
-                  onPressed: widget.onCloseForm,
-                  padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
-              ],
-            ),
-            Divider(height: 20, color: p.gridBorder),
-            for (final e in widget.events.asMap().entries)
-              if (e.value.day == widget.rangeMin &&
-                  e.value.month == widget.month &&
-                  e.value.year == widget.year)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: p.rowBg,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: e.value.color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text.rich(
-                            TextSpan(
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: p.textMain,
-                              ),
-                              children: [
-                                TextSpan(text: e.value.title),
-                                if (e.value.endDay != null)
-                                  TextSpan(
-                                    text:
-                                        ' (${e.value.day}–${e.value.endDay})',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: p.textMuted,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => widget.onRemoveAt(e.key),
-                          child: Icon(
-                            Icons.delete_outline_rounded,
-                            size: 18,
-                            color: p.textMuted.withValues(alpha: 0.85),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: widget.titleController,
-              style: TextStyle(
-                fontSize: 13,
-                color: onSurface,
-              ),
-              cursorColor: scheme.primary,
-              decoration: InputDecoration(
-                hintText: 'Event name...',
-                filled: true,
-                fillColor: p.inputFill,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                    color: p.inputBorder,
-                    width: 1.5,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                    color: p.inputFocusedBorder,
-                    width: 1.5,
-                  ),
-                ),
-                hintStyle: TextStyle(
-                  color: p.textMuted.withValues(alpha: 0.85),
                 ),
               ),
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) {
-                if (canAdd) widget.onAdd();
-              },
-            ),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Theme(
-                    data: Theme.of(context).copyWith(
-                      canvasColor: p.surface,
-                    ),
-                    child: InputDecorator(
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        filled: true,
-                        fillColor: p.inputFill,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(
-                            color: p.inputBorder,
-                            width: 1.5,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(
-                            color: p.inputBorder,
-                            width: 1.5,
-                          ),
+              GestureDetector(
+                onTap: widget.onCloseForm,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: p.navBtn,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.close_rounded, size: 16, color: p.textMuted),
+                ),
+              ),
+            ],
+          ),
+          Divider(height: 16, color: p.gridBorder),
+          for (final e in widget.events.asMap().entries)
+            if (e.value.day == widget.rangeMin &&
+                e.value.month == widget.month &&
+                e.value.year == widget.year)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: p.rowBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: e.value.color,
+                          shape: BoxShape.circle,
                         ),
                       ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: widget.newCategory,
-                          isExpanded: true,
-                          dropdownColor: p.surface,
-                          icon: Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 20,
-                            color: p.textMuted,
-                          ),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: onSurface,
-                          ),
-                          items: TripAgendaCategories.keys
-                              .map(
-                                (k) => DropdownMenuItem(
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text.rich(TextSpan(
+                          style: TextStyle(fontSize: 12, color: p.textMain),
+                          children: [
+                            TextSpan(text: e.value.title),
+                            if (e.value.endDay != null)
+                              TextSpan(
+                                text: ' (${e.value.day}–${e.value.endDay})',
+                                style: TextStyle(fontSize: 10, color: p.textMuted),
+                              ),
+                          ],
+                        )),
+                      ),
+                      GestureDetector(
+                        onTap: () => widget.onRemoveAt(e.key),
+                        child: Icon(Icons.delete_outline_rounded,
+                            size: 18, color: p.textMuted.withValues(alpha: 0.85)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: widget.titleController,
+            style: TextStyle(fontSize: 13, color: scheme.onSurface),
+            cursorColor: scheme.primary,
+            decoration: InputDecoration(
+              hintText: 'Event name...',
+              filled: true,
+              fillColor: p.inputFill,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: p.inputBorder, width: 1.5),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    BorderSide(color: p.inputFocusedBorder, width: 1.5),
+              ),
+              hintStyle:
+                  TextStyle(color: p.textMuted.withValues(alpha: 0.85)),
+            ),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) {
+              if (canAdd) widget.onAdd();
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Theme(
+                  data: Theme.of(context).copyWith(canvasColor: p.surface),
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      filled: true,
+                      fillColor: p.inputFill,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            BorderSide(color: p.inputBorder, width: 1.5),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            BorderSide(color: p.inputBorder, width: 1.5),
+                      ),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: widget.newCategory,
+                        isExpanded: true,
+                        dropdownColor: p.surface,
+                        icon: Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 20, color: p.textMuted),
+                        style: TextStyle(
+                            fontSize: 12, color: scheme.onSurface),
+                        items: TripAgendaCategories.keys
+                            .map((k) => DropdownMenuItem(
                                   value: k,
                                   child: Row(
                                     children: [
@@ -1441,64 +1356,61 @@ class _AddEventPanelState extends State<_AddEventPanel> {
                                         width: 8,
                                         height: 8,
                                         decoration: BoxDecoration(
-                                          color:
-                                              TripAgendaCategories.colorForKey(
-                                                  k),
+                                          color: TripAgendaCategories
+                                              .colorForKey(k),
                                           shape: BoxShape.circle,
                                         ),
                                       ),
                                       const SizedBox(width: 6),
-                                      Text(
-                                        k,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: onSurface,
-                                        ),
-                                      ),
+                                      Text(k,
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: scheme.onSurface)),
                                     ],
                                   ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) widget.onCategoryChanged(v);
-                          },
-                        ),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) widget.onCategoryChanged(v);
+                        },
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                TextButton(
-                  style: TextButton.styleFrom(
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 44,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
                     backgroundColor: p.addButtonBg,
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: p.addButtonDisabledBg,
                     disabledForegroundColor: p.addButtonDisabledFg,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
+                        horizontal: 16, vertical: 0),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
+                    elevation: 0,
                   ),
                   onPressed: canAdd ? widget.onAdd : null,
-                  child: const Text(
-                    'Add',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-                  ),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('Add',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 12)),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Opens Trip Agenda bottom sheet (web CalendarModal equivalent).
+// ── Show helper ───────────────────────────────────────────────────────────────
+
 Future<void> showTripAgendaCalendar(
   BuildContext context, {
   void Function(String routeId)? onOpenRouteFromCalendar,
@@ -1508,96 +1420,197 @@ Future<void> showTripAgendaCalendar(
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      return DraggableScrollableSheet(
-        initialChildSize: 0.94,
-        minChildSize: 0.55,
-        maxChildSize: 0.94,
-        expand: false,
-        builder: (context, scrollController) {
-          return SingleChildScrollView(
-            controller: scrollController,
-            child: TripAgendaCalendarSheet(
-              onOpenRouteFromCalendar: onOpenRouteFromCalendar,
-            ),
-          );
-        },
-      );
-    },
+    builder: (ctx) => DraggableScrollableSheet(
+      initialChildSize: 0.94,
+      minChildSize: 0.55,
+      maxChildSize: 0.94,
+      expand: false,
+      builder: (context, scrollController) => SingleChildScrollView(
+        controller: scrollController,
+        child: TripAgendaCalendarSheet(
+          onOpenRouteFromCalendar: onOpenRouteFromCalendar,
+        ),
+      ),
+    ),
   );
 }
 
+// ── Detail action model ───────────────────────────────────────────────────────
+
 class _DetailAction {
+  final IconData icon;
   final String label;
   final VoidCallback onTap;
   final _DetailActionStyle style;
 
   const _DetailAction({
+    required this.icon,
     required this.label,
     required this.onTap,
     required this.style,
   });
 
   factory _DetailAction.primary({
+    required IconData icon,
     required String label,
     required VoidCallback onTap,
-  }) => _DetailAction(label: label, onTap: onTap, style: _DetailActionStyle.primary);
+  }) => _DetailAction(icon: icon, label: label, onTap: onTap, style: _DetailActionStyle.primary);
 
   factory _DetailAction.muted({
+    required IconData icon,
     required String label,
     required VoidCallback onTap,
-  }) => _DetailAction(label: label, onTap: onTap, style: _DetailActionStyle.muted);
+  }) => _DetailAction(icon: icon, label: label, onTap: onTap, style: _DetailActionStyle.muted);
 
   factory _DetailAction.danger({
+    required IconData icon,
     required String label,
     required VoidCallback onTap,
-  }) => _DetailAction(label: label, onTap: onTap, style: _DetailActionStyle.danger);
+  }) => _DetailAction(icon: icon, label: label, onTap: onTap, style: _DetailActionStyle.danger);
 }
 
 enum _DetailActionStyle { primary, muted, danger }
 
+// ── Detail bottom sheet ───────────────────────────────────────────────────────
+
 Widget _detailSheet(
   BuildContext context, {
   required _TripPalette palette,
+  required Color color,
   required String title,
   required String subtitle,
+  required String? destination,
+  required String? dayBadge,
   required List<_DetailAction> actions,
 }) {
+  final tokens = Theme.of(context).extension<VacanzaTokens>() ?? VacanzaTokens.light;
+  final cs = Theme.of(context).colorScheme;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
   return Padding(
     padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
     child: Material(
       color: palette.surface,
-      borderRadius: BorderRadius.circular(18),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: palette.textMuted.withValues(alpha: 0.9),
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Colored accent strip
+          Container(
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+          ),
+          // Drag handle
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 2),
+            child: Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: palette.textMuted.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(100),
+                ),
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: palette.textMain,
-              ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Date + day badge row
+                Row(
+                  children: [
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                    if (dayBadge != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: isDark ? 0.22 : 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                              color: color.withValues(alpha: 0.30)),
+                        ),
+                        child: Text(
+                          dayBadge,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Trip title
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: palette.textMain,
+                    height: 1.2,
+                  ),
+                ),
+                // Destination
+                if (destination != null && destination.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.place_rounded,
+                          size: 14, color: palette.textMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        destination,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: palette.textMuted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Divider(
+                    height: 1,
+                    color: tokens.cardBorder.withValues(alpha: 0.45)),
+                const SizedBox(height: 12),
+                // Action buttons
+                for (int i = 0; i < actions.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 6),
+                  _detailActionButton(
+                    context,
+                    palette: palette,
+                    tokens: tokens,
+                    cs: cs,
+                    action: actions[i],
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 12),
-            for (final a in actions) ...[
-              _detailActionButton(context, palette: palette, action: a),
-              const SizedBox(height: 8),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );
@@ -1606,65 +1619,104 @@ Widget _detailSheet(
 Widget _detailActionButton(
   BuildContext context, {
   required _TripPalette palette,
+  required VacanzaTokens tokens,
+  required ColorScheme cs,
   required _DetailAction action,
 }) {
-  final theme = Theme.of(context);
-  final tokens = theme.extension<VacanzaTokens>() ?? VacanzaTokens.light;
-  final cs = theme.colorScheme;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  final Color? solidBg;
+  final Gradient? gradient;
+  final Color fg;
+  final Color? borderColor;
 
   switch (action.style) {
     case _DetailActionStyle.primary:
-      return VacanzaGradientButton(
-        label: action.label,
-        onPressed: action.onTap,
-        minHeight: 46,
-        borderRadius: 16,
-        horizontalPadding: 16,
-        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+      solidBg = null;
+      gradient = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: isDark
+            ? [tokens.vividBlue, Color.lerp(tokens.vividBlue, Colors.white, 0.14)!]
+            : [tokens.vividBlue, Color.lerp(tokens.vividBlue, const Color(0xFF0EA5E9), 0.45)!],
       );
+      fg = Colors.white;
+      borderColor = null;
     case _DetailActionStyle.muted:
-      return SizedBox(
-        height: 46,
-        child: OutlinedButton(
-          onPressed: action.onTap,
-          style: OutlinedButton.styleFrom(
-            backgroundColor: tokens.actionBarInactiveBg.withValues(alpha: 0.88),
-            foregroundColor: tokens.textMain,
-            side: BorderSide(
-              color: tokens.cardBorder.withValues(alpha: 0.55),
-              width: 1.2,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          child: Text(
-            action.label,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-          ),
-        ),
-      );
+      solidBg = tokens.actionBarInactiveBg.withValues(alpha: 0.85);
+      gradient = null;
+      fg = tokens.textMain;
+      borderColor = tokens.cardBorder.withValues(alpha: 0.50);
     case _DetailActionStyle.danger:
-      return SizedBox(
-        height: 46,
-        child: OutlinedButton(
-          onPressed: action.onTap,
-          style: OutlinedButton.styleFrom(
-            backgroundColor: cs.errorContainer.withValues(alpha: 0.65),
-            foregroundColor: cs.error,
-            side: BorderSide(
-              color: cs.error.withValues(alpha: 0.55),
-              width: 1.2,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          child: Text(
-            action.label,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+      solidBg = null;
+      gradient = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: isDark
+            ? [const Color(0xFFB71C1C), const Color(0xFFE53935)]
+            : [const Color(0xFFFF3B30), const Color(0xFFFF6B6B)],
+      );
+      fg = Colors.white;
+      borderColor = null;
+  }
+
+  final iconBoxColor = Colors.white.withValues(
+    alpha: action.style == _DetailActionStyle.muted ? 0.0 : 0.18,
+  );
+  final iconColor = action.style == _DetailActionStyle.muted
+      ? fg.withValues(alpha: 0.85)
+      : Colors.white;
+
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: action.onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: solidBg,
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(14),
+          border: borderColor != null
+              ? Border.all(color: borderColor, width: 1.2)
+              : null,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: action.style == _DetailActionStyle.muted
+                      ? fg.withValues(alpha: 0.10)
+                      : iconBoxColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(action.icon, size: 18, color: iconColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  action.label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: fg.withValues(alpha: 0.50),
+              ),
+            ],
           ),
         ),
-      );
-  }
+      ),
+    ),
+  );
 }

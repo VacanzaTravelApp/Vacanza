@@ -266,7 +266,7 @@ class AreaResultsSheet extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Daha fazla kategori yükleniyor…',
+                          'Loading more categories…',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: t.textSub,
