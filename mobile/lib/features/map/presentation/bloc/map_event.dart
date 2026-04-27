@@ -20,6 +20,12 @@ class SetDrawingEnabled extends MapEvent {
   SetDrawingEnabled(this.enabled);
 }
 
+/// Mevcut kamera zoom'u alan çizimi için yeterli mi (web [PoiMapConfig] ile aynı eşik).
+class AreaDrawZoomOkChanged extends MapEvent {
+  const AreaDrawZoomOkChanged(this.ok);
+  final bool ok;
+}
+
 /// Harita taban stilini döngüsel değiştirir: streets → dark → satellite.
 class CycleBasemapPressed extends MapEvent {
   const CycleBasemapPressed();
