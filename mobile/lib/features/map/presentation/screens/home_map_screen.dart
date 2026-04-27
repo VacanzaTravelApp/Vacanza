@@ -9,6 +9,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'package:mobile/core/navigation/route_open_requests.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/favorite_poi_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/saved_pois_cubit.dart';
@@ -275,7 +276,58 @@ class _HomeMapViewState extends State<_HomeMapView>
     setState(() => _savedPlacesOpen = false);
   }
 
-  /// Closes results (and filters), then shows the two-step wizard + loading.
+  void _showRouteLoadingMessage(BuildContext context) {
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    final tokens = context.vacanzaTokens;
+    final accent = context.mapControlAccent;
+    final isLight = theme.brightness == Brightness.light;
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        duration: const Duration(seconds: 3),
+        backgroundColor: isLight
+            ? tokens.cardBg.withValues(alpha: 0.96)
+            : theme.colorScheme.surface.withValues(alpha: 0.94),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: tokens.cardBorder.withValues(
+              alpha: isLight ? 0.22 : 0.55,
+            ),
+          ),
+        ),
+        elevation: 10,
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                color: accent,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Vacanza is building your route…',
+                style: TextStyle(
+                  color: tokens.textMain,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Closes results (and filters), then shows the route wizard.
   void _beginCreateRouteFromArea() {
     if (!mounted) return;
     setState(() {
@@ -323,64 +375,28 @@ class _HomeMapViewState extends State<_HomeMapView>
     final options = await showCreateRouteFromAreaOptionsSheet(context);
     if (!mounted) return;
     if (options == null) {
-      // User dismissed the Plan a Route popup → clear the drawn area too.
       context.read<MapBloc>().add(SetDrawingEnabled(false));
       context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
       context.read<PoiSearchBloc>().add(const poi.AreaCleared());
       return;
     }
 
-    // Rota isteği başlarken çizimi ve poligon overlay’ini kaldır (koordinatlar zaten [coords]’ta).
     context.read<MapBloc>().add(SetDrawingEnabled(false));
     context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
     context.read<PoiSearchBloc>().add(const poi.AreaCleared());
 
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      useRootNavigator: true,
-      builder: (dialogCtx) {
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            content: Row(
-              children: [
-                const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(strokeWidth: 2.6),
-                ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Text(
-                    'Creating your route…',
-                    style: Theme.of(dialogCtx).textTheme.bodyLarge,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    try {
-      await context.read<ActiveRouteCubit>().createFromPolygon(
+    // Fire and forget — user continues using the app while AI builds the route.
+    // BlocListener on ActiveRouteStatus.ready shows the snackbar + opens the sheet.
+    unawaited(
+      context.read<ActiveRouteCubit>().createFromPolygon(
         coordinates: coords,
         totalDays: options.totalDays,
         travelStyle: options.travelStyle,
         categories: null,
         includeFavorites: options.includeFavorites,
         poiIds: poiIds.isEmpty ? null : poiIds,
-      );
-    } finally {
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-    }
+      ),
+    );
   }
 
   @override
@@ -973,38 +989,45 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ===== Mini route pill =====
             showRouteMiniPill:
-                activeRouteState.status == ActiveRouteStatus.ready &&
-                activeRouteState.route != null &&
-                !activeRouteState.showRouteOnMap &&
-                !_filtersOpen &&
-                !_resultsOpen &&
-                !state.isDrawing,
+                !_filtersOpen && !_resultsOpen && !state.isDrawing &&
+                (
+                  (activeRouteState.status == ActiveRouteStatus.loading && !_routeOpen) ||
+                  (activeRouteState.status == ActiveRouteStatus.ready &&
+                      activeRouteState.route != null &&
+                      !activeRouteState.showRouteOnMap)
+                ),
             routeMiniPill:
-                activeRouteState.status == ActiveRouteStatus.ready &&
-                        activeRouteState.route != null &&
-                        !activeRouteState.showRouteOnMap
-                    ? RouteMiniPill(
-                      day: activeRouteState.activeDay,
-                          onOpen: () {
-                            if (!mounted) return;
-                            context
-                                .read<PoiSearchBloc>()
-                                .add(const poi.HidePoiMarkers());
-                            context.read<ActiveRouteCubit>().showRouteOnMapAgain();
-                            setState(() => _routeOpen = true);
-                          },
-                      onClear: () {
-                        context.read<ActiveRouteCubit>().reset();
-                        context
-                            .read<PoiSearchBloc>()
-                            .add(const poi.ShowPoiMarkers());
-                        context
-                            .read<MapBloc>()
-                            .add(const RefreshViewportRequested());
-                        if (mounted) setState(() => _routeOpen = false);
-                      },
-                    )
-                    : null,
+                activeRouteState.status == ActiveRouteStatus.loading && !_routeOpen
+                    ? RouteLoadingPill(
+                        onTap: () => _showRouteLoadingMessage(context),
+                      )
+                    : activeRouteState.status == ActiveRouteStatus.ready &&
+                            activeRouteState.route != null &&
+                            !activeRouteState.showRouteOnMap
+                        ? RouteMiniPill(
+                            day: activeRouteState.activeDay,
+                            onOpen: () {
+                              if (!mounted) return;
+                              context
+                                  .read<PoiSearchBloc>()
+                                  .add(const poi.HidePoiMarkers());
+                              context
+                                  .read<ActiveRouteCubit>()
+                                  .showRouteOnMapAgain();
+                              setState(() => _routeOpen = true);
+                            },
+                            onClear: () {
+                              context.read<ActiveRouteCubit>().reset();
+                              context
+                                  .read<PoiSearchBloc>()
+                                  .add(const poi.ShowPoiMarkers());
+                              context
+                                  .read<MapBloc>()
+                                  .add(const RefreshViewportRequested());
+                              if (mounted) setState(() => _routeOpen = false);
+                            },
+                          )
+                        : null,
 
             // ===== Blur preview sadece polygon sonrası filter açıldıysa =====
             showResultsBlurUnderFilters: _filtersFromUserSelection,
