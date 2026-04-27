@@ -1601,6 +1601,16 @@ a,
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85)) !important;
 }
 
+.vivid-create-route-btn-loading {
+    opacity: 0.55 !important;
+    cursor: not-allowed !important;
+}
+
+.vivid-create-route-btn-loading:hover {
+    transform: none !important;
+    filter: none !important;
+}
+
 /* Modal Dropdown Refinement */
 .route-plan-modal .ant-select-selector {
     display: flex !important;

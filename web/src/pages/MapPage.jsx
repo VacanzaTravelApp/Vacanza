@@ -1330,6 +1330,7 @@ export default function MapPage() {
 
     debounceRef.current = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      if (activeRoute) return;
       const map = mapRef.current?.getMap?.();
       if (map && map.getZoom() < 12) {
         setPoisRaw([]);
@@ -1338,7 +1339,7 @@ export default function MapPage() {
       const bbox = getViewportBbox();
       if (bbox) fetchPois({ selectionType: "BBOX", bbox });
     }, 500);
-  }, [mode, fetchPois, getViewportBbox]);
+  }, [mode, activeRoute, fetchPois, getViewportBbox]);
 
   useEffect(() => {
     return () => {
@@ -1352,6 +1353,7 @@ export default function MapPage() {
 
     const t = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      if (activeRoute) return;
       const map = mapRef.current?.getMap?.();
       if (map && map.getZoom() < 12) {
         setPoisRaw([]);
@@ -1362,12 +1364,13 @@ export default function MapPage() {
     }, 600);
 
     return () => clearTimeout(t);
-  }, [MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
+  }, [MAPBOX_TOKEN, user, mode, activeRoute, getViewportBbox, fetchPois]);
 
   // Kategori değişince (VIEWPORT’ta) refetch
   useEffect(() => {
     if (!MAPBOX_TOKEN || !user) return;
     if (mode !== "VIEWPORT") return;
+    if (activeRoute) return;
 
     const map = mapRef.current?.getMap?.();
     if (map && map.getZoom() < 12) {
@@ -1376,7 +1379,7 @@ export default function MapPage() {
     }
     const bbox = getViewportBbox();
     if (bbox) fetchPois({ selectionType: "BBOX", bbox });
-  }, [selectedBackendCats, MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
+  }, [selectedBackendCats, MAPBOX_TOKEN, user, mode, activeRoute, getViewportBbox, fetchPois]);
 
   const startFreehand = useCallback(() => {
     if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) {
@@ -1541,6 +1544,7 @@ export default function MapPage() {
           setIsChatOpen(false);
           setSelection({ mode: null, polygon: [] });
           setMode("VIEWPORT");
+          setPoisRaw([]);
           const convId = res.conversation_id || res.conversationId;
           if (convId) {
             linkPolygonRouteConversation(convId);
@@ -1736,6 +1740,9 @@ export default function MapPage() {
   // POI'ler: polygon içi filtre + UI filtre
   // Combined POI list (Backend + Mapbox Discoveries)
   const pois = useMemo(() => {
+    // Hide all POI markers while a route is active.
+    if (activeRoute) return [];
+
     // 1. Performance Rule: Hide POIs at low zoom levels to prevent clutter
     // Drawn-area mode: still show markers so POIs appear while browsing results.
     const polygonSelection = mode === "SELECTION" && selection?.mode === "polygon" && selection.polygon.length >= 3;
@@ -1780,7 +1787,7 @@ export default function MapPage() {
 
     // 2. Performance Rule: Cap at 1000 POIs to prevent memory bloating
     return out.slice(0, 1000);
-  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom, USE_MAPBOX_AREA_POI_SEARCH]);
+  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom, USE_MAPBOX_AREA_POI_SEARCH, activeRoute]);
 
   const canShowResultsPanel = useMemo(() => {
     return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
@@ -2065,7 +2072,8 @@ export default function MapPage() {
   const isDrawAreaSession = freehandEnabled && selection?.mode !== "polygon";
   const drawAreaZoomTooLow = viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW;
   const drawAreaZoomTooHigh = viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW;
-  const showDrawZoomGate = isDrawAreaSession && (drawAreaZoomTooLow || drawAreaZoomTooHigh);
+  const drawAreaZoomOk = !drawAreaZoomTooLow && !drawAreaZoomTooHigh;
+  const showDrawZoomGate = isDrawAreaSession && drawAreaZoomTooLow;
 
   return (
     <div className={`vivid-map-page ${themeClass} ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -2396,13 +2404,9 @@ export default function MapPage() {
         {showDrawZoomGate ? (
           <div className="map-draw-zoom-gate" aria-live="polite">
             <div className="map-draw-zoom-gate__hint glass-panel">
-              <div className="map-draw-zoom-gate__title">
-                {drawAreaZoomTooHigh ? "Zoom out to draw" : "Zoom in to draw"}
-              </div>
+              <div className="map-draw-zoom-gate__title">Zoom in to draw</div>
               <p className="map-draw-zoom-gate__text">
-                {drawAreaZoomTooHigh
-                  ? "You're too zoomed in — zoom out a bit to select a meaningful area."
-                  : "This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area."}
+                This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area.
               </p>
             </div>
           </div>
@@ -2452,13 +2456,15 @@ export default function MapPage() {
               title={
                 drawAreaZoomTooLow
                   ? "Zoom in closer — draw area works at neighborhood scale"
+                  : drawAreaZoomTooHigh
+                  ? "Zoom out a bit — you're too close to draw a useful area"
                   : "Draw Area"
               }
               placement="left"
             >
               <button
                 type="button"
-                className={`sub-fab vivid-interactive${drawAreaZoomTooLow ? " sub-fab--muted" : ""}`}
+                className={`sub-fab vivid-interactive${!drawAreaZoomOk ? " sub-fab--muted" : ""}`}
                 onClick={() => {
                   startFreehand();
                   setFabExpanded(false);
@@ -2537,8 +2543,14 @@ export default function MapPage() {
                   <Button
                     type="primary"
                     shape="round"
-                    onClick={openPolygonRouteParams}
-                    className="vivid-create-route-btn-glass"
+                    onClick={() => {
+                      if (poiLoading || poiStreamLoading) {
+                        toast.warning({ title: "Please wait", message: "All places in the area must finish loading before creating a route." });
+                        return;
+                      }
+                      openPolygonRouteParams();
+                    }}
+                    className={`vivid-create-route-btn-glass${poiLoading || poiStreamLoading ? " vivid-create-route-btn-loading" : ""}`}
                   >
                     Create AI Route
                   </Button>
@@ -2752,7 +2764,7 @@ export default function MapPage() {
             route={activeRoute}
             activeDay={activeDay}
             onDayChange={setActiveDay}
-            onClose={() => { setActiveRoute(null); setRouteViewActive(false); }}
+            onClose={() => { setActiveRoute(null); setRouteViewActive(false); scheduleViewportFetch(); }}
             onWaypointClick={handleWaypointClick}
             onMarkUnavailable={handleMarkUnavailable}
             onRouteUpdate={setActiveRoute}
@@ -2774,6 +2786,7 @@ export default function MapPage() {
             setActiveDay(1);
             setRouteViewActive(true);
             setIsChatOpen(false);
+            setPoisRaw([]);
           }}
         />
         <ProfileModal
