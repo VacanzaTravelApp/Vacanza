@@ -178,7 +178,8 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
         title: BlocBuilder<ChatCubit, ChatState>(
           builder: (context, state) {
             final String title;
-            if (state is ChatLoaded && (state.conversationId ?? '').isNotEmpty) {
+            if (state is ChatLoaded &&
+                (state.conversationId ?? '').isNotEmpty) {
               // v1: backend doesn't expose titles on mobile yet.
               title = 'Vacanza AI';
             } else {
@@ -204,13 +205,15 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? const Color(0xFF2DD4A8)
-                            : const Color(0xFF34D399),
+                        color:
+                            Theme.of(context).brightness == Brightness.light
+                                ? const Color(0xFF2DD4A8)
+                                : const Color(0xFF34D399),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: (Theme.of(context).brightness == Brightness.light
+                            color: (Theme.of(context).brightness ==
+                                        Brightness.light
                                     ? const Color(0xFF2DD4A8)
                                     : const Color(0xFF34D399))
                                 .withValues(alpha: 0.55),
@@ -235,9 +238,10 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
             );
           },
         ),
-        backgroundColor: Theme.of(context).brightness == Brightness.light
-            ? context.lightGlassPanelColor
-            : cs.surface,
+        backgroundColor:
+            Theme.of(context).brightness == Brightness.light
+                ? context.lightGlassPanelColor
+                : cs.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0.5,
         bottom: PreferredSize(
@@ -245,9 +249,7 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
           child: Container(
             height: 2,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: t.accentGradient,
-              ),
+              gradient: LinearGradient(colors: t.accentGradient),
             ),
           ),
         ),
@@ -346,6 +348,21 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                       ),
                     );
                   }
+                  if (state.retryableError != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(state.retryableError!),
+                        duration: const Duration(seconds: 6),
+                        behavior: SnackBarBehavior.floating,
+                        action: SnackBarAction(
+                          label: 'Retry',
+                          onPressed: () {
+                            context.read<ChatCubit>().retryLastMessage();
+                          },
+                        ),
+                      ),
+                    );
+                  }
                   // Start / stop tip rotation based on sending state
                   if (state.isSending) {
                     _startTipRotation(_lastSentText ?? '');
@@ -427,6 +444,18 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                           onDismiss:
                               () => context.read<ChatCubit>().clearLastError(),
                         ),
+                      if (state.retryableError != null && !state.isSending)
+                        _ChatRetryBar(
+                          message: state.retryableError!,
+                          onRetry:
+                              () =>
+                                  context.read<ChatCubit>().retryLastMessage(),
+                          onDismiss:
+                              () =>
+                                  context
+                                      .read<ChatCubit>()
+                                      .clearRetryableError(),
+                        ),
                       Expanded(
                         child: Stack(
                           children: [
@@ -450,13 +479,15 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                                 final canShowRouteCard =
                                     isAssistant && message.routeData != null;
                                 // Has a previous route card? → This one is an edit.
-                                final isRouteEdit = canShowRouteCard &&
+                                final isRouteEdit =
+                                    canShowRouteCard &&
                                     state.messages
                                         .take(i)
                                         .any((m) => m.routeData != null);
 
                                 return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     ChatMessageBubble(
                                       message: message,
@@ -473,7 +504,9 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                                         onDrawAreaOnMap: () {
                                           Navigator.of(context).pop(
                                             const ChatScreenNavResult(
-                                              response: MessageSendResponse(content: ''),
+                                              response: MessageSendResponse(
+                                                content: '',
+                                              ),
                                               startDrawAreaOnMap: true,
                                             ),
                                           );
@@ -551,11 +584,13 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
             builder: (context, state) {
               final canSend = state is ChatLoaded && !state.isSending;
               // Check whether any route exists to switch between plan / edit chips
-              final hasExistingRoute = state is ChatLoaded &&
+              final hasExistingRoute =
+                  state is ChatLoaded &&
                   state.messages.any((m) => m.routeData != null);
-              final lastRouteMsg = state is ChatLoaded
-                  ? _lastWhere(state.messages, (m) => m.routeData != null)
-                  : null;
+              final lastRouteMsg =
+                  state is ChatLoaded
+                      ? _lastWhere(state.messages, (m) => m.routeData != null)
+                      : null;
               final totalDays =
                   lastRouteMsg?.routeData?.totalDays ??
                   lastRouteMsg?.routeData?.days.length ??
@@ -595,7 +630,8 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                     label: 'Slower pace',
                     onTap: () {
                       if (!canSend) return;
-                      _lastSentText = 'Change the pace to slow for the whole trip';
+                      _lastSentText =
+                          'Change the pace to slow for the whole trip';
                       context.read<ChatCubit>().sendMessage(_lastSentText!);
                     },
                   ),
@@ -622,7 +658,8 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                     label: '4-day Antalya',
                     onTap: () {
                       if (!canSend) return;
-                      _lastSentText = 'Create a 4-day Antalya vacation plan for me.';
+                      _lastSentText =
+                          'Create a 4-day Antalya vacation plan for me.';
                       context.read<ChatCubit>().sendMessage(_lastSentText!);
                     },
                   ),
@@ -632,8 +669,11 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
               return ChatInputBar(
                 controller: _controller,
                 enabled: canSend,
+                isSending: state is ChatLoaded && state.isSending,
+                onStop: () => context.read<ChatCubit>().stopSending(),
                 quickActions: quickActions,
-                quickActionsLabel: hasExistingRoute ? 'Edit route:' : 'Plan a route:',
+                quickActionsLabel:
+                    hasExistingRoute ? 'Edit route:' : 'Plan a route:',
                 onSend: () {
                   final text = _controller.text.trim();
                   if (text.isEmpty) return;
@@ -706,7 +746,11 @@ class _JumpToLatestButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: const [
-                Icon(Icons.arrow_downward_rounded, size: 18, color: Colors.white),
+                Icon(
+                  Icons.arrow_downward_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
                 SizedBox(width: 8),
                 Text(
                   'Latest',
@@ -725,3 +769,81 @@ class _JumpToLatestButton extends StatelessWidget {
   }
 }
 
+class _ChatRetryBar extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  final VoidCallback onDismiss;
+
+  const _ChatRetryBar({
+    required this.message,
+    required this.onRetry,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
+    final cs = Theme.of(context).colorScheme;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color:
+            isLight
+                ? const Color(0xFFFFFBEB)
+                : cs.surfaceContainerHighest.withValues(alpha: 0.50),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color:
+              isLight
+                  ? const Color(0xFFF59E0B).withValues(alpha: 0.35)
+                  : t.cardBorder.withValues(alpha: 0.70),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 20,
+            color: isLight ? const Color(0xFFD97706) : t.vividBlue,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: t.textMain,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 17),
+            label: const Text('Retry'),
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              foregroundColor: t.vividBlue,
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close_rounded, size: 18),
+            color: t.textSub,
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Dismiss',
+          ),
+        ],
+      ),
+    );
+  }
+}

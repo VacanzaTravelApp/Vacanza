@@ -98,12 +98,14 @@ class ChatApiClient {
   /// AI can take 30–60s; use longer receiveTimeout.
   Future<MessageSendResponse> sendMessage(
     String conversationId,
-    String content,
-  ) async {
+    String content, {
+    CancelToken? cancelToken,
+  }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/chat/conversations/$conversationId/messages',
       data: {'content': content},
       options: Options(receiveTimeout: const Duration(seconds: 90)),
+      cancelToken: cancelToken,
     );
     final data = response.data;
     if (data == null) {

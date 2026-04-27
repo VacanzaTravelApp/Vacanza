@@ -21,12 +21,21 @@ class ChatLoaded extends ChatState {
   final bool isSending;
   final String? error;
 
+  /// The text of the last message that failed to send (used for retry).
+  final String? lastFailedMessage;
+
+  /// Non-null when a send failed and the user can retry inline.
+  /// Distinct from [error] which is used for fatal/conversation-level errors.
+  final String? retryableError;
+
   const ChatLoaded({
     required this.messages,
     this.conversationId,
     this.lastResponse,
     this.isSending = false,
     this.error,
+    this.lastFailedMessage,
+    this.retryableError,
   });
 }
 
