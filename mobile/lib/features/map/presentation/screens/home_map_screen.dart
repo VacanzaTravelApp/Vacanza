@@ -53,6 +53,7 @@ import '../../../ai/presentation/cubit/active_route_cubit.dart';
 import '../../../ai/presentation/cubit/active_route_state.dart';
 import '../../../ai/data/api/ai_route_api_client.dart';
 import '../../../chat/data/api/chat_api_client.dart';
+import '../widgets/home_map/map_draw_area_zoom_hint_dialog.dart';
 import '../widgets/home_map/route/route_bottom_sheet.dart';
 import '../widgets/home_map/route/route_mini_pill.dart';
 import '../../../trip_agenda/trip_agenda_calendar_sheet.dart';
@@ -751,6 +752,7 @@ class _HomeMapViewState extends State<_HomeMapView>
             basemap: state.basemap,
             perspective: state.perspective,
             isDrawing: state.isDrawing,
+            areaDrawZoomOk: state.areaDrawZoomOk,
             onCycleBasemap:
                 () => context.read<MapBloc>().add(const CycleBasemapPressed()),
             onTogglePerspective:
@@ -760,18 +762,22 @@ class _HomeMapViewState extends State<_HomeMapView>
             onRecenter:
                 () => context.read<MapBloc>().add(const RecenterPressed()),
             onToggleDrawing: () {
-              final isDrawingNow = context.read<MapBloc>().state.isDrawing;
-
-              if (isDrawingNow) {
+              final mapBloc = context.read<MapBloc>();
+              final s = mapBloc.state;
+              if (s.isDrawing) {
                 // Sadece çizim modunu kapat. Alan/POI reseti yalnızca sonuç sheet kapatma
                 // veya geçerli bir poligon tamamlandığında (MapDrawingOverlay) yapılır;
                 // aksi halde hiç çizmeden kapatınca gereksiz viewport yenilemesi olur.
-                context.read<MapBloc>().add(SetDrawingEnabled(false));
+                mapBloc.add(SetDrawingEnabled(false));
                 if (_filtersOpen) _closeFilters();
                 return;
               }
-
-              context.read<MapBloc>().add(SetDrawingEnabled(true));
+              if (!s.areaDrawZoomOk) {
+                if (!context.mounted) return;
+                unawaited(showMapDrawAreaZoomHint(context));
+                return;
+              }
+              mapBloc.add(SetDrawingEnabled(true));
             },
 
             // ✅ manual filter tuşu -> blur preview OFF
