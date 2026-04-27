@@ -20,6 +20,7 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     on<FlyToPoiRequested>(_onFlyToPoi);
     on<ToggleDrawingPressed>(_onToggleDrawingPressed);
     on<SetDrawingEnabled>(_onSetDrawingEnabled);
+    on<AreaDrawZoomOkChanged>(_onAreaDrawZoomOkChanged);
     on<SyncBasemapToAppTheme>(_onSyncBasemapToAppTheme);
     on<FitRouteBoundsRequested>(_onFitRouteBounds);
     on<RefreshViewportRequested>(_onRefreshViewport);
@@ -105,6 +106,15 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     if (state.isDrawing == event.enabled) return;
     emit(state.copyWith(isDrawing: event.enabled));
     log('[MapBloc] SetDrawingEnabled -> isDrawing=${event.enabled}');
+  }
+
+  void _onAreaDrawZoomOkChanged(
+    AreaDrawZoomOkChanged event,
+    Emitter<MapState> emit,
+  ) {
+    if (state.areaDrawZoomOk == event.ok) return;
+    emit(state.copyWith(areaDrawZoomOk: event.ok));
+    log('[MapBloc] AreaDrawZoomOkChanged -> areaDrawZoomOk=${event.ok}');
   }
 
   void _onSyncBasemapToAppTheme(

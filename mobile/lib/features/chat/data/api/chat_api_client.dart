@@ -18,6 +18,7 @@ class ChatApiClient {
     String? travelStyle,
     List<String>? categories,
     bool? includeFavorites,
+    List<String>? poiIds,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/chat/routes/from-polygon',
@@ -27,6 +28,7 @@ class ChatApiClient {
         if (travelStyle != null) 'travelStyle': travelStyle,
         if (categories != null) 'categories': categories,
         if (includeFavorites != null) 'includeFavorites': includeFavorites,
+        if (poiIds != null && poiIds.isNotEmpty) 'poiIds': poiIds,
       },
       options: Options(receiveTimeout: const Duration(seconds: 90)),
     );

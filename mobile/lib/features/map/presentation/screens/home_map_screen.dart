@@ -30,6 +30,7 @@ import '../../../gamification/presentation/cubit/gamification_cubit.dart';
 import '../../../poi_search/data/api/poi_search_api_client.dart';
 import '../../../poi_search/data/models/area_source.dart';
 import '../../../poi_search/data/models/selected_area.dart';
+import '../../../poi_search/data/utils/polygon_contains.dart';
 import '../../../poi_search/data/repositories/composite_poi_search_repository.dart';
 import '../../../poi_search/data/repositories/poi_search_repository.dart';
 import '../../../poi_search/data/repositories/poi_search_repository_impl.dart';
@@ -52,6 +53,7 @@ import '../../../ai/presentation/cubit/active_route_cubit.dart';
 import '../../../ai/presentation/cubit/active_route_state.dart';
 import '../../../ai/data/api/ai_route_api_client.dart';
 import '../../../chat/data/api/chat_api_client.dart';
+import '../widgets/home_map/map_draw_area_zoom_hint_dialog.dart';
 import '../widgets/home_map/route/route_bottom_sheet.dart';
 import '../widgets/home_map/route/route_mini_pill.dart';
 import '../../../trip_agenda/trip_agenda_calendar_sheet.dart';
@@ -306,6 +308,18 @@ class _HomeMapViewState extends State<_HomeMapView>
         .map((p) => <double>[p.lng, p.lat])
         .toList(growable: false);
 
+    // Collect IDs of loaded POIs that fall inside the drawn polygon so the
+    // backend only routes through places the user selected visually.
+    final allPois = context.read<PoiSearchBloc>().state.pois;
+    final poisInsidePolygon = allPois.where((p) {
+      return pointInsidePolygonLatLng(
+        lat: p.latitude,
+        lng: p.longitude,
+        polygonLatLng: poly.points,
+      );
+    }).toList(growable: false);
+    final poiIds = poisInsidePolygon.map((p) => p.poiId).toList(growable: false);
+
     final options = await showCreateRouteFromAreaOptionsSheet(context);
     if (!mounted) return;
     if (options == null) {
@@ -360,6 +374,7 @@ class _HomeMapViewState extends State<_HomeMapView>
         travelStyle: options.travelStyle,
         categories: null,
         includeFavorites: options.includeFavorites,
+        poiIds: poiIds.isEmpty ? null : poiIds,
       );
     } finally {
       if (mounted) {
@@ -737,6 +752,7 @@ class _HomeMapViewState extends State<_HomeMapView>
             basemap: state.basemap,
             perspective: state.perspective,
             isDrawing: state.isDrawing,
+            areaDrawZoomOk: state.areaDrawZoomOk,
             onCycleBasemap:
                 () => context.read<MapBloc>().add(const CycleBasemapPressed()),
             onTogglePerspective:
@@ -746,18 +762,22 @@ class _HomeMapViewState extends State<_HomeMapView>
             onRecenter:
                 () => context.read<MapBloc>().add(const RecenterPressed()),
             onToggleDrawing: () {
-              final isDrawingNow = context.read<MapBloc>().state.isDrawing;
-
-              if (isDrawingNow) {
+              final mapBloc = context.read<MapBloc>();
+              final s = mapBloc.state;
+              if (s.isDrawing) {
                 // Sadece çizim modunu kapat. Alan/POI reseti yalnızca sonuç sheet kapatma
                 // veya geçerli bir poligon tamamlandığında (MapDrawingOverlay) yapılır;
                 // aksi halde hiç çizmeden kapatınca gereksiz viewport yenilemesi olur.
-                context.read<MapBloc>().add(SetDrawingEnabled(false));
+                mapBloc.add(SetDrawingEnabled(false));
                 if (_filtersOpen) _closeFilters();
                 return;
               }
-
-              context.read<MapBloc>().add(SetDrawingEnabled(true));
+              if (!s.areaDrawZoomOk) {
+                if (!context.mounted) return;
+                unawaited(showMapDrawAreaZoomHint(context));
+                return;
+              }
+              mapBloc.add(SetDrawingEnabled(true));
             },
 
             // ✅ manual filter tuşu -> blur preview OFF
@@ -769,13 +789,17 @@ class _HomeMapViewState extends State<_HomeMapView>
             // UC1.11 — Explore in AR entry point
             onOpenArMode: () {
               _dismissUserSelectionIfAny();
+              final checkinBloc = context.read<CheckinBloc>();
+              final poiSearchBloc = context.read<PoiSearchBloc>();
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder:
-                      (_) => BlocProvider.value(
-                        value: context.read<CheckinBloc>(),
-                        child: const ArExplorePage(),
-                      ),
+                  builder: (_) => MultiBlocProvider(
+                    providers: [
+                      BlocProvider.value(value: checkinBloc),
+                      BlocProvider.value(value: poiSearchBloc),
+                    ],
+                    child: const ArExplorePage(),
+                  ),
                 ),
               );
             },
