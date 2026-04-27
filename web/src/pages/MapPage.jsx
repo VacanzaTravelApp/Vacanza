@@ -2072,7 +2072,8 @@ export default function MapPage() {
   const isDrawAreaSession = freehandEnabled && selection?.mode !== "polygon";
   const drawAreaZoomTooLow = viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW;
   const drawAreaZoomTooHigh = viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW;
-  const showDrawZoomGate = isDrawAreaSession && (drawAreaZoomTooLow || drawAreaZoomTooHigh);
+  const drawAreaZoomOk = !drawAreaZoomTooLow && !drawAreaZoomTooHigh;
+  const showDrawZoomGate = isDrawAreaSession && drawAreaZoomTooLow;
 
   return (
     <div className={`vivid-map-page ${themeClass} ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -2403,13 +2404,9 @@ export default function MapPage() {
         {showDrawZoomGate ? (
           <div className="map-draw-zoom-gate" aria-live="polite">
             <div className="map-draw-zoom-gate__hint glass-panel">
-              <div className="map-draw-zoom-gate__title">
-                {drawAreaZoomTooHigh ? "Zoom out to draw" : "Zoom in to draw"}
-              </div>
+              <div className="map-draw-zoom-gate__title">Zoom in to draw</div>
               <p className="map-draw-zoom-gate__text">
-                {drawAreaZoomTooHigh
-                  ? "You're too zoomed in — zoom out a bit to select a meaningful area."
-                  : "This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area."}
+                This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area.
               </p>
             </div>
           </div>
@@ -2459,13 +2456,15 @@ export default function MapPage() {
               title={
                 drawAreaZoomTooLow
                   ? "Zoom in closer — draw area works at neighborhood scale"
+                  : drawAreaZoomTooHigh
+                  ? "Zoom out a bit — you're too close to draw a useful area"
                   : "Draw Area"
               }
               placement="left"
             >
               <button
                 type="button"
-                className={`sub-fab vivid-interactive${drawAreaZoomTooLow ? " sub-fab--muted" : ""}`}
+                className={`sub-fab vivid-interactive${!drawAreaZoomOk ? " sub-fab--muted" : ""}`}
                 onClick={() => {
                   startFreehand();
                   setFabExpanded(false);
