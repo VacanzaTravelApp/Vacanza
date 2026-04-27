@@ -46,10 +46,10 @@ public final class PolygonRouteGeometry {
             }
         }
         if (ring.size() < 3) {
-            throw new IllegalArgumentException("polygon must have at least 3 distinct points");
+            throw new IllegalArgumentException("Your selection needs at least 3 points to form an area.");
         }
         if (ring.size() > MAX_VERTICES) {
-            throw new IllegalArgumentException("too many vertices (max " + MAX_VERTICES + ")");
+            throw new IllegalArgumentException("Your selection is too detailed. Try drawing a simpler shape.");
         }
         return ring;
     }

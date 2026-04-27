@@ -165,11 +165,12 @@ const RESULTS_PANEL_APPROX_HEIGHT_DESKTOP = 320;
 const FILTER_PANEL_APPROX_WIDTH_DESKTOP = 320;
 
 /**
- * Minimum zoom to start/finish draw-area (Mapbox: higher = more zoomed in).
- * ~12 still fits a big metro in one view; ~13 pushes “district / neighborhood” scale and
- * makes whole-city one-shot outlines awkward. Backend still enforces max polygon footprint.
+ * Zoom bounds for draw-area mode.
+ * MIN: ~13 pushes “district / neighborhood” scale; whole-city outlines become awkward below this.
+ * MAX: ~18 is street level — selections this tight are too small to be useful.
  */
 const MIN_ZOOM_FOR_AREA_DRAW = 13;
+const MAX_ZOOM_FOR_AREA_DRAW = 18;
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
@@ -804,7 +805,7 @@ export default function MapPage() {
       const result = await aiApi.adjustRoute(routeId, {
         triggerType: "USER_REPORTED",
         severity: "HIGH",
-        reason: `${wp.name} kapalı veya ulaşılamaz`,
+        reason: `${wp.name} is closed or unavailable`,
         affectedPoiName: wp.name,
         affectedDay: wp.day,
       });
@@ -1382,6 +1383,10 @@ export default function MapPage() {
       toast.warning({ title: "Zoom in", message: "Zoom to neighbourhood level to draw an area — current zoom is too far out." });
       return;
     }
+    if (viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW) {
+      toast.warning({ title: "Zoom out", message: "You're too zoomed in — zoom out a bit to draw a meaningful area." });
+      return;
+    }
     setPolygonRouteParamsOpen(false);
     setPolygonRouteBannerDismissed(false);
     setMode("SELECTION");
@@ -1435,6 +1440,7 @@ export default function MapPage() {
     (e) => {
       if (!freehandEnabled) return;
       if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) return;
+      if (viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW) return;
       drawingRef.current.isDown = true;
       drawingRef.current.points = [{ lng: e.lngLat.lng, lat: e.lngLat.lat }];
       setPreviewLine({
@@ -1450,6 +1456,7 @@ export default function MapPage() {
     (e) => {
       if (!freehandEnabled || !drawingRef.current.isDown) return;
       if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) return;
+      if (viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW) return;
       drawingRef.current.points.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
       setPreviewLine({
         type: "Feature",
@@ -1566,6 +1573,10 @@ export default function MapPage() {
     setFreehandEnabled(true);
     if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) {
       toast.warning({ title: "Zoom in", message: "Zoom to neighbourhood level before drawing an area." });
+      return;
+    }
+    if (viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW) {
+      toast.warning({ title: "Zoom out", message: "You're too zoomed in — zoom out a bit to draw a meaningful area." });
       return;
     }
     toast.info({ title: "Draw on the map", message: "Select a day from the route panel, then update it from the banner above." });
@@ -2053,7 +2064,8 @@ export default function MapPage() {
 
   const isDrawAreaSession = freehandEnabled && selection?.mode !== "polygon";
   const drawAreaZoomTooLow = viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW;
-  const showDrawZoomGate = isDrawAreaSession && drawAreaZoomTooLow;
+  const drawAreaZoomTooHigh = viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW;
+  const showDrawZoomGate = isDrawAreaSession && (drawAreaZoomTooLow || drawAreaZoomTooHigh);
 
   return (
     <div className={`vivid-map-page ${themeClass} ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -2384,9 +2396,13 @@ export default function MapPage() {
         {showDrawZoomGate ? (
           <div className="map-draw-zoom-gate" aria-live="polite">
             <div className="map-draw-zoom-gate__hint glass-panel">
-              <div className="map-draw-zoom-gate__title">Zoom in to draw</div>
+              <div className="map-draw-zoom-gate__title">
+                {drawAreaZoomTooHigh ? "Zoom out to draw" : "Zoom in to draw"}
+              </div>
               <p className="map-draw-zoom-gate__text">
-                This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area.
+                {drawAreaZoomTooHigh
+                  ? "You're too zoomed in — zoom out a bit to select a meaningful area."
+                  : "This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area."}
               </p>
             </div>
           </div>
