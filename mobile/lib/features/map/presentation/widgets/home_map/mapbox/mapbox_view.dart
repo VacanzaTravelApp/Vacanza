@@ -29,6 +29,7 @@ class MapboxView extends StatefulWidget {
   final void Function(BboxArea bbox) onViewportBbox;
 
   final VoidCallback? onMapIdle;
+  final VoidCallback? onCameraChange;
 
   const MapboxView({
     super.key,
@@ -38,6 +39,7 @@ class MapboxView extends StatefulWidget {
     required this.onMapCreated,
     required this.onViewportBbox,
     this.onMapIdle,
+    this.onCameraChange,
   });
 
   @override
@@ -75,6 +77,7 @@ class _MapboxViewState extends State<MapboxView> {
         },
         onCameraChangeListener: (_) {
           if (_map == null) return;
+          widget.onCameraChange?.call();
           _scheduleViewportBbox();
         },
       ),
