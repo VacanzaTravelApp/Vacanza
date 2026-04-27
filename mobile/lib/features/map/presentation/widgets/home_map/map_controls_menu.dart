@@ -16,6 +16,7 @@ class MapControlsMenu extends StatefulWidget {
     required this.basemap,
     required this.perspective,
     required this.isDrawing,
+    required this.areaDrawZoomOk,
     required this.onToggleDrawing,
     required this.onOpenSavedPlaces,
     required this.onOpenFilters,
@@ -32,6 +33,7 @@ class MapControlsMenu extends StatefulWidget {
   final MapBasemap basemap;
   final MapPerspective perspective;
   final bool isDrawing;
+  final bool areaDrawZoomOk;
 
   final VoidCallback onToggleDrawing;
   final VoidCallback onOpenSavedPlaces;
@@ -95,6 +97,10 @@ class _MapControlsMenuState extends State<MapControlsMenu>
   @override
   Widget build(BuildContext context) {
     final is3D = widget.perspective == MapPerspective.mode3D;
+    final canEnterDraw = widget.isDrawing || widget.areaDrawZoomOk;
+    final drawTooltip = !widget.isDrawing && !widget.areaDrawZoomOk
+        ? 'Zoom in first — tap to learn more'
+        : (widget.isDrawing ? 'Drawing: ON' : 'Drawing: OFF');
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -116,9 +122,10 @@ class _MapControlsMenuState extends State<MapControlsMenu>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ActionIconButton(
-                    tooltip: widget.isDrawing ? 'Drawing: ON' : 'Drawing: OFF',
+                    tooltip: drawTooltip,
                     icon: Icons.edit_rounded,
                     isActive: widget.isDrawing,
+                    enabled: canEnterDraw,
                     onPressed: widget.onToggleDrawing,
                   ),
                   const SizedBox(height: 16),

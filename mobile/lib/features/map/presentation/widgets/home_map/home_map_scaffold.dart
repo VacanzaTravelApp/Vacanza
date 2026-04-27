@@ -22,6 +22,7 @@ class HomeMapScaffold extends StatelessWidget {
   final MapBasemap basemap;
   final MapPerspective perspective;
   final bool isDrawing;
+  final bool areaDrawZoomOk;
 
   final VoidCallback onCycleBasemap;
   final VoidCallback onTogglePerspective;
@@ -82,6 +83,7 @@ class HomeMapScaffold extends StatelessWidget {
     required this.basemap,
     required this.perspective,
     required this.isDrawing,
+    required this.areaDrawZoomOk,
     required this.onCycleBasemap,
     required this.onTogglePerspective,
     required this.onRecenter,
@@ -200,6 +202,7 @@ class HomeMapScaffold extends StatelessWidget {
               basemap: basemap,
               perspective: perspective,
               isDrawing: isDrawing,
+              areaDrawZoomOk: areaDrawZoomOk,
               onToggleDrawing: onToggleDrawing,
               onOpenSavedPlaces: onOpenSavedPlaces,
               onOpenFilters: onOpenFilters,
