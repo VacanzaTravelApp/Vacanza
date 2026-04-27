@@ -2543,8 +2543,14 @@ export default function MapPage() {
                   <Button
                     type="primary"
                     shape="round"
-                    onClick={openPolygonRouteParams}
-                    className="vivid-create-route-btn-glass"
+                    onClick={() => {
+                      if (poiLoading || poiStreamLoading) {
+                        toast.warning({ title: "Please wait", message: "All places in the area must finish loading before creating a route." });
+                        return;
+                      }
+                      openPolygonRouteParams();
+                    }}
+                    className={`vivid-create-route-btn-glass${poiLoading || poiStreamLoading ? " vivid-create-route-btn-loading" : ""}`}
                   >
                     Create AI Route
                   </Button>
