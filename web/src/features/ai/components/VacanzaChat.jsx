@@ -669,6 +669,8 @@ export default function VacanzaChat({
         }
         if (!routeData && wasRouteRequest && !aiAskedFollowUp) {
           console.warn("[VacanzaChat] Rota isteği gönderildi ama route_data gelmedi:", response);
+          isPolling = true;
+          startPollingForRoute(activeConvId, sentAtMs);
         }
         const routeSummaryMessage = response.route_summary_message ?? response.routeSummaryMessage;
         const displayText =
