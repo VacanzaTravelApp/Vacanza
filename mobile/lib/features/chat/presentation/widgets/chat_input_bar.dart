@@ -311,6 +311,16 @@ class _ChatQuickActionsRow extends StatelessWidget {
   const _ChatQuickActionsRow({required this.actions, this.label});
 
   @override
+  Widget build(BuildContext context) => _PillRow(actions: actions, label: label);
+}
+
+class _PillRow extends StatelessWidget {
+  final List<ChatQuickAction> actions;
+  final String? label;
+
+  const _PillRow({required this.actions, this.label});
+
+  @override
   Widget build(BuildContext context) {
     final t = context.vacanzaTokens;
     final cs = Theme.of(context).colorScheme;
@@ -323,7 +333,6 @@ class _ChatQuickActionsRow extends StatelessWidget {
         itemCount: totalItems,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
-          // First item is the label when provided
           if (label != null && i == 0) {
             return Center(
               child: Padding(

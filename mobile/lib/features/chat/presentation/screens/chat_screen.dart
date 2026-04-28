@@ -333,36 +333,6 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
               },
               listener: (context, state) {
                 if (state is ChatLoaded) {
-                  if (state.error != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(state.error!),
-                        duration: const Duration(seconds: 8),
-                        behavior: SnackBarBehavior.floating,
-                        action: SnackBarAction(
-                          label: 'OK',
-                          onPressed: () {
-                            context.read<ChatCubit>().clearLastError();
-                          },
-                        ),
-                      ),
-                    );
-                  }
-                  if (state.retryableError != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(state.retryableError!),
-                        duration: const Duration(seconds: 6),
-                        behavior: SnackBarBehavior.floating,
-                        action: SnackBarAction(
-                          label: 'Retry',
-                          onPressed: () {
-                            context.read<ChatCubit>().retryLastMessage();
-                          },
-                        ),
-                      ),
-                    );
-                  }
                   // Start / stop tip rotation based on sending state
                   if (state.isSending) {
                     _startTipRotation(_lastSentText ?? '');
@@ -639,10 +609,18 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
               } else {
                 quickActions = [
                   ChatQuickAction(
-                    label: '3-day Istanbul',
+                    label: '3-day New York',
                     onTap: () {
                       if (!canSend) return;
-                      _lastSentText = 'Plan a 3-day trip to Istanbul.';
+                      _lastSentText = 'Plan a 3-day trip to New York.';
+                      context.read<ChatCubit>().sendMessage(_lastSentText!);
+                    },
+                  ),
+                  ChatQuickAction(
+                    label: '3-day San Francisco',
+                    onTap: () {
+                      if (!canSend) return;
+                      _lastSentText = 'Plan a 3-day trip to San Francisco.';
                       context.read<ChatCubit>().sendMessage(_lastSentText!);
                     },
                   ),
@@ -651,15 +629,6 @@ class _ChatScreenViewState extends State<_ChatScreenView> {
                     onTap: () {
                       if (!canSend) return;
                       _lastSentText = 'Plan a 2-day trip to Rome.';
-                      context.read<ChatCubit>().sendMessage(_lastSentText!);
-                    },
-                  ),
-                  ChatQuickAction(
-                    label: '4-day Antalya',
-                    onTap: () {
-                      if (!canSend) return;
-                      _lastSentText =
-                          'Create a 4-day Antalya vacation plan for me.';
                       context.read<ChatCubit>().sendMessage(_lastSentText!);
                     },
                   ),
