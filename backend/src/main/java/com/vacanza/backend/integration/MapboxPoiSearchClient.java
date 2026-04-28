@@ -14,6 +14,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.text.Normalizer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -189,9 +190,10 @@ public class MapboxPoiSearchClient {
             }
         }
 
-        // Fire all tile calls concurrently; collect and deduplicate results.
+        // Fire tile calls with limited concurrency and stagger to avoid Mapbox 429 rate limits.
         List<List<PoiResult>> allBatches = Flux.fromIterable(tileCalls)
-                .flatMap(m -> m, n * n)
+                .delayElements(Duration.ofMillis(200))
+                .flatMap(m -> m, 3)
                 .collectList()
                 .block();
 
