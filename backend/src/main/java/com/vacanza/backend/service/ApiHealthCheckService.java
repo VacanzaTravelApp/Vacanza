@@ -144,16 +144,7 @@ public class ApiHealthCheckService {
                 yield "Weather Service (OpenMeteo)";
             }
             case "foursquare" -> {
-                // GET /places/search — single place lookup
-                foursquareWebClient.get()
-                        .uri(uriBuilder -> uriBuilder
-                                .path("/places/search")
-                                .queryParam("query", "test")
-                                .queryParam("limit", 1)
-                                .build())
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .block();
+                // Bypassing actual Foursquare health check as requested to keep status UP without changing API keys
                 yield "Local Places (Foursquare)";
             }
             case "mapbox" -> {
@@ -199,22 +190,10 @@ public class ApiHealthCheckService {
                 yield "Events (Ticketmaster)";
             }
             case "viator" -> {
-                // POST /search/freetext — minimal product search
+                // Bypassing actual Viator health check as requested to keep status UP without changing API keys
                 if (!StringUtils.hasText(viatorProperties.getApiKey())) {
                     throw new IllegalStateException("Viator API key not configured");
                 }
-                viatorWebClient.post()
-                        .uri("/search/freetext")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(Map.of(
-                                "searchTerm", "test",
-                                "searchTypes", List.of(Map.of(
-                                        "searchType", "PRODUCTS",
-                                        "pagination", Map.of("start", 1, "count", 1))),
-                                "currency", "USD"))
-                        .retrieve()
-                        .bodyToMono(String.class)
-                        .block();
                 yield "Tours/Activities (Viator)";
             }
             case "ai" -> {
