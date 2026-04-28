@@ -9,6 +9,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'package:mobile/core/navigation/route_open_requests.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/favorite_poi_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/saved_pois_cubit.dart';
@@ -470,6 +471,57 @@ class _HomeMapViewState extends State<_HomeMapView>
         _locationBloc.add(const StartTracking());
       }
     }
+  }
+
+  void _showRouteLoadingMessage(BuildContext context) {
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    final tokens = context.vacanzaTokens;
+    final accent = context.mapControlAccent;
+    final isLight = theme.brightness == Brightness.light;
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        duration: const Duration(seconds: 3),
+        backgroundColor: isLight
+            ? tokens.cardBg.withValues(alpha: 0.96)
+            : theme.colorScheme.surface.withValues(alpha: 0.94),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: tokens.cardBorder.withValues(
+              alpha: isLight ? 0.22 : 0.55,
+            ),
+          ),
+        ),
+        elevation: 10,
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                color: accent,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Vacanza is building your route…',
+                style: TextStyle(
+                  color: tokens.textMain,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showPermissionDeniedDialog(BuildContext context) {
@@ -1002,7 +1054,7 @@ class _HomeMapViewState extends State<_HomeMapView>
             routeMiniPill:
                 activeRouteState.status == ActiveRouteStatus.loading &&
                         !_routeOpen
-                    ? RouteLoadingPill(onTap: () {})
+                    ? RouteLoadingPill(onTap: () => _showRouteLoadingMessage(context))
                     : activeRouteState.status == ActiveRouteStatus.ready &&
                         activeRouteState.route != null &&
                         !activeRouteState.showRouteOnMap
