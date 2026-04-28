@@ -768,6 +768,7 @@ class _HomeMapViewState extends State<_HomeMapView>
             perspective: state.perspective,
             isDrawing: state.isDrawing,
             areaDrawZoomOk: state.areaDrawZoomOk,
+            areaDrawZoomTooHigh: state.areaDrawZoomTooHigh,
             onCycleBasemap:
                 () => context.read<MapBloc>().add(const CycleBasemapPressed()),
             onTogglePerspective:
@@ -789,7 +790,10 @@ class _HomeMapViewState extends State<_HomeMapView>
               }
               if (!s.areaDrawZoomOk) {
                 if (!context.mounted) return;
-                unawaited(showMapDrawAreaZoomHint(context));
+                unawaited(showMapDrawAreaZoomHint(
+                  context,
+                  tooHigh: s.areaDrawZoomTooHigh,
+                ));
                 return;
               }
               mapBloc.add(SetDrawingEnabled(true));
