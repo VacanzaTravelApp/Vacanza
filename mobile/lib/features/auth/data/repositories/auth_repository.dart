@@ -143,6 +143,11 @@ class AuthRepository {
       return res;
     } on fb.FirebaseAuthException catch (e) {
       switch (e.code) {
+        case 'network-request-failed':
+        case 'network-error':
+          throw const AuthFailure(
+            'No internet connection. Please check your connection and try again.',
+          );
         case 'email-already-in-use':
           throw const AuthFailure('This email address is already registered.');
         case 'invalid-email':
@@ -186,6 +191,11 @@ class AuthRepository {
     } on fb.FirebaseAuthException catch (e) {
       final code = e.code.toLowerCase();
       switch (code) {
+        case 'network-request-failed':
+        case 'network-error':
+          throw const AuthFailure(
+            'No internet connection. Please check your connection and try again.',
+          );
         case 'invalid-credential':
         case 'invalid-login-credentials':
           throw const AuthFailure('Incorrect email or password.');
