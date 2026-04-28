@@ -1,11 +1,12 @@
 import React from "react";
-import { Row, Col, Card, Typography, Table, Tag, Space, Spin, Tooltip, Statistic, Progress } from "antd";
+import { Row, Col, Card, Typography, Table, Tag, Space, Spin, Tooltip, Statistic, Progress, Grid } from "antd";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie } from "recharts";
 import { UserOutlined, GlobalOutlined, RocketOutlined, DollarOutlined, LoadingOutlined, RiseOutlined } from "@ant-design/icons";
 import useFetch from "../hooks/useFetch";
 import { motion } from "framer-motion";
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const THEME = {
     primary: '#FF6B6B',
@@ -35,6 +36,8 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const Analytics = () => {
+    const screens = useBreakpoint();
+    const isMobile = !screens.md;
     const { data, loading } = useFetch('/admin/analytics');
 
     if (loading && !data) return (
@@ -76,7 +79,7 @@ const Analytics = () => {
     ];
 
     return (
-        <div className="dashboard-container" style={{ padding: '0 24px 24px' }}>
+        <div className="dashboard-container" style={{ padding: isMobile ? '0' : '0 24px 24px', overflowX: 'hidden' }}>
             <Row gutter={[24, 24]}>
                 <Col span={24}>
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
@@ -110,7 +113,7 @@ const Analytics = () => {
                 </Col>
 
                 <Col span={24}>
-                    <Card className="glass-card" bordered={false} styles={{ body: { background: THEME.navy, borderRadius: '24px', padding: '20px 32px' } }}>
+                    <Card className="glass-card dashboard-section-card" variant="borderless" styles={{ body: { background: THEME.navy, borderRadius: '24px', padding: isMobile ? '20px' : '20px 32px' } }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 24 }}>
                             <div>
                                 <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 4 }}>Total Registered Users</Text>
@@ -125,8 +128,8 @@ const Analytics = () => {
                 </Col>
 
                 <Col span={24}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>User Growth Trend</span>}>
-                        <div style={{ height: 320, width: '100%', marginTop: 16 }}>
+                    <Card className="glass-card dashboard-section-card" variant="borderless" title={<span style={{ fontSize: 20 }}>User Growth Trend</span>}>
+                        <div className="responsive-chart" style={{ height: isMobile ? 240 : 320, width: '100%', marginTop: 16 }}>
                             <ResponsiveContainer>
                                 <AreaChart data={data?.growthTrajectory || []} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                     <defs>

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Form, Input, Button, Card, Typography, message, Layout, Space } from "antd";
-import { LockOutlined, UserOutlined, ArrowRightOutlined } from "@ant-design/icons";
+import { Form, Input, Button, Card, Typography, message, Layout, Grid } from "antd";
+import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { authApi } from "../api/userApi";
@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
+const { useBreakpoint } = Grid;
 
 const THEME = {
     navy: '#1A2332',
@@ -19,7 +20,8 @@ const THEME = {
 };
 
 export default function Login() {
-    const navigate = useNavigate();
+    const screens = useBreakpoint();
+    const isMobile = !screens.md;
     const [loading, setLoading] = useState(false);
 
     const onFinish = async ({ email, password }) => {
@@ -39,7 +41,6 @@ export default function Login() {
                 return;
             }
 
-            message.success("Authentication verified. Establishing secure administrative session...");
             // We don't navigate manually anymore. 
             // AuthProvider will detect the login and App.jsx will redirect once authenticated.
         } catch (error) {
@@ -66,7 +67,7 @@ export default function Login() {
     };
 
     return (
-        <Layout style={{ minHeight: "100vh", background: THEME.navy, overflow: 'hidden', position: 'relative' }}>
+        <Layout style={{ minHeight: "100vh", background: THEME.navy, overflowX: 'hidden', position: 'relative' }}>
             {/* Background Pattern */}
             <div style={{
                 position: 'absolute', width: '100%', height: '100%',
@@ -75,28 +76,29 @@ export default function Login() {
                 backgroundSize: '40px 40px'
             }} />
 
-            <Content style={{ display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1 }}>
+            <Content style={{ display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1, padding: isMobile ? 16 : 24 }}>
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
+                    style={{ width: '100%', maxWidth: 440 }}
                 >
                     <Card
-                        bordered={false}
+                        variant="borderless"
                         style={{
-                            width: 440,
+                            width: '100%',
                             borderRadius: 32,
                             boxShadow: "0 40px 100px rgba(0,0,0,0.4)",
                             background: THEME.glass,
-                            padding: '24px'
+                            padding: isMobile ? '12px' : '24px'
                         }}
                     >
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
-                            <img src="/logo.svg" alt="Logo" style={{ width: 100, height: 100, objectFit: 'contain', marginBottom: 16 }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: isMobile ? 24 : 32 }}>
+                            <img src="/logo.svg" alt="Logo" style={{ width: isMobile ? 84 : 100, height: isMobile ? 84 : 100, objectFit: 'contain', marginBottom: 16 }} />
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{
                                     color: THEME.navy,
-                                    fontSize: '28px',
+                                    fontSize: isMobile ? '24px' : '28px',
                                     fontWeight: 800,
                                     letterSpacing: '4px',
                                     fontFamily: "'DM Sans', sans-serif"
@@ -104,7 +106,7 @@ export default function Login() {
                                     VACANZA
                                 </div>
                                 <div style={{
-                                    color: THEME.primary,
+                                    color: THEME.coral,
                                     fontSize: '12px',
                                     fontWeight: 700,
                                     letterSpacing: '3px',
