@@ -21,6 +21,12 @@ body {
   color: var(--vivid-navy);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 h1,
@@ -67,6 +73,45 @@ code,
   max-width: 1800px;
   margin: 0 auto;
   transition: padding 0.3s ease;
+  width: 100%;
+  min-width: 0;
+}
+
+.dashboard-section-card .ant-card-body,
+.dashboard-section-card .ant-card-head {
+  min-width: 0;
+}
+
+.responsive-table {
+  width: 100%;
+  min-width: 0;
+}
+
+.responsive-table .ant-table-wrapper {
+  width: 100%;
+}
+
+.responsive-chart {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-container {
+    padding: 24px 28px;
+  }
+
+  .glass-card:hover {
+    transform: none;
+  }
+
+  .ant-card-head {
+    padding: 0 20px !important;
+  }
+
+  .ant-card-body {
+    padding: 20px !important;
+  }
 }
 
 /* Responsive Infrastructure Matrix */
@@ -91,9 +136,29 @@ code,
   .ant-table-wrapper {
     overflow-x: auto;
   }
+
+  .ant-card-head {
+    padding: 0 16px !important;
+  }
+
+  .ant-card-body {
+    padding: 16px !important;
+  }
+
+  .ant-card-head-title {
+    white-space: normal !important;
+  }
+
+  .ant-statistic {
+    width: 100%;
+  }
 }
 
 @media (max-width: 480px) {
+  .dashboard-container {
+    padding: 12px 14px;
+  }
+
   .gradient-text {
     font-size: 32px !important;
   }
@@ -104,6 +169,10 @@ code,
 
   .ant-statistic-content-value {
     font-size: 32px !important;
+  }
+
+  .ant-btn {
+    min-height: 40px;
   }
 }
 
@@ -188,4 +257,5 @@ code,
   font-size: 18px !important;
   font-weight: 700 !important;
   color: var(--vivid-navy) !important;
+  min-width: 0;
 }

@@ -1,11 +1,12 @@
 import React from "react";
-import { Table, Tag, Card, Button, Input, Space, message, Typography, Avatar, Tooltip, Row, Col } from "antd";
+import { Table, Tag, Card, Button, Input, Space, message, Typography, Avatar, Tooltip, Row, Col, Grid } from "antd";
 import { SearchOutlined, UserOutlined, RocketFilled, VerifiedOutlined, SafetyCertificateFilled } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { userApi } from "../api/userApi";
 import { motion } from "framer-motion";
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const THEME = {
     primary: '#6366f1',
@@ -18,6 +19,8 @@ const THEME = {
 };
 
 export default function UserManagement() {
+    const screens = useBreakpoint();
+    const isMobile = !screens.md;
     const [searchText, setSearchText] = React.useState("");
     const [manualEmail, setManualEmail] = React.useState("");
 
@@ -34,7 +37,7 @@ export default function UserManagement() {
         try {
             message.loading({ content: "Elevating user privileges...", key: "promote", duration: 0 });
             await userApi.promoteUserToAdmin(email);
-            message.success({ content: `User ${email} promoted to ADMIN successfully!`, key: "promote" });
+            message.destroy("promote");
             refetch();
             setManualEmail("");
         } catch (error) {
@@ -56,7 +59,7 @@ export default function UserManagement() {
             title: "Identity",
             key: "identity",
             width: 250,
-            fixed: 'left',
+            fixed: isMobile ? undefined : 'left',
             render: (_, record) => (
                 <Space size="middle">
                     <div style={{
@@ -197,31 +200,33 @@ export default function UserManagement() {
             <Row gutter={[24, 24]}>
                 <Col xs={24} xl={24}>
                     <Card
-                        bordered={false}
-                        className="glass-card"
+                        variant="borderless"
+                        className="glass-card dashboard-section-card"
                         styles={{ body: { padding: "clamp(12px, 2vw, 24px)" } }}
                         title={
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', flexWrap: 'wrap', gap: 16 }}>
                                 <span style={{ fontSize: 18, color: THEME.navy }}>Unified Identity Table</span>
                                 <Input
                                     placeholder="Search users..."
                                     prefix={<SearchOutlined style={{ color: THEME.subtext }} />}
                                     value={searchText}
                                     onChange={e => setSearchText(e.target.value)}
-                                    style={{ width: 'clamp(200px, 100%, 300px)', borderRadius: '10px' }}
+                                    style={{ width: isMobile ? '100%' : 'clamp(200px, 100%, 300px)', borderRadius: '10px' }}
                                 />
                             </div>
                         }
                     >
-                        <Table
-                            columns={columns}
-                            dataSource={filteredUsers}
-                            loading={isLoading}
-                            rowKey={(record) => record.user?.userId || record.user?.email}
-                            pagination={{ pageSize: 8, showSizeChanger: false, size: 'small' }}
-                            style={{ overflow: 'hidden' }}
-                            scroll={{ x: 700 }}
-                        />
+                        <div className="responsive-table">
+                            <Table
+                                columns={columns}
+                                dataSource={filteredUsers}
+                                loading={isLoading}
+                                rowKey={(record) => record.user?.userId || record.user?.email}
+                                pagination={{ pageSize: 8, showSizeChanger: false, size: 'small' }}
+                                style={{ overflow: 'hidden' }}
+                                scroll={{ x: 820 }}
+                            />
+                        </div>
                     </Card>
                 </Col>
             </Row>

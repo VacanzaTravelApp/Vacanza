@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Layout, Menu, Button, Typography, Avatar, Dropdown, Space, Badge, message, Grid } from "antd";
 import {
     UserOutlined,
@@ -35,10 +35,23 @@ const SIDEBAR_DARK = '#1A2332'; // Web App Navy
 export default function AdminLayout() {
     const screens = useBreakpoint();
     const isMobile = !screens.md;
+    const isTablet = !!screens.md && !screens.lg;
     const [collapsed, setCollapsed] = useState(false);
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+
+    useEffect(() => {
+        if (isMobile) {
+            setCollapsed(true);
+        }
+    }, [isMobile]);
+
+    useEffect(() => {
+        if (isMobile) {
+            setCollapsed(true);
+        }
+    }, [isMobile, location.pathname]);
 
     const menuItems = [
         { key: "/", icon: <DashboardOutlined style={{ fontSize: 18 }} />, label: "Home Console" },
@@ -50,7 +63,6 @@ export default function AdminLayout() {
     const handleLogout = async () => {
         try {
             await logout();
-            message.success("Session terminated accurately.");
         } catch (error) {
             message.error("Security protocols blocked disconnect.");
         }
@@ -68,7 +80,7 @@ export default function AdminLayout() {
     };
 
     return (
-        <Layout style={{ minHeight: "100vh", background: '#f8faff' }}>
+        <Layout style={{ minHeight: "100vh", background: '#f8faff', overflowX: 'hidden' }}>
             <Sider
                 trigger={null}
                 collapsible
@@ -78,13 +90,14 @@ export default function AdminLayout() {
                 onCollapse={(c) => setCollapsed(c)}
                 width={280}
                 style={{
-                    position: 'sticky',
+                    position: isMobile ? 'fixed' : 'sticky',
                     top: 0,
                     height: '100vh',
                     left: 0,
                     zIndex: 100,
                     background: THEME.navy,
-                    boxShadow: '12px 0 40px rgba(26, 35, 50, 0.12)'
+                    boxShadow: '12px 0 40px rgba(26, 35, 50, 0.12)',
+                    overflow: 'auto'
                 }}
             >
                 <div
@@ -138,7 +151,7 @@ export default function AdminLayout() {
                     theme="dark"
                     mode="inline"
                     selectedKeys={[location.pathname]}
-                    style={{ background: 'transparent', border: 'none', padding: '0 16px' }}
+                    style={{ background: 'transparent', border: 'none', padding: isMobile ? '0 12px 24px' : '0 16px 24px' }}
                     items={menuItems.map(item => ({
                         ...item,
                         style: {
@@ -151,7 +164,19 @@ export default function AdminLayout() {
                 />
             </Sider>
 
-            <Layout>
+            {isMobile && !collapsed && (
+                <div
+                    onClick={() => setCollapsed(true)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(26, 35, 50, 0.38)',
+                        zIndex: 95
+                    }}
+                />
+            )}
+
+            <Layout style={{ minWidth: 0, overflowX: 'hidden' }}>
                 <Header style={{
                     padding: isMobile ? '0 16px' : '0 40px',
                     background: THEME.glass,
@@ -163,15 +188,30 @@ export default function AdminLayout() {
                     borderBottom: `1px solid ${THEME.border}`,
                     zIndex: 90,
                     position: 'sticky',
-                    top: 0
+                    top: 0,
+                    gap: 12
                 }}>
-                    <Button
-                        type="text"
-                        icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                        onClick={() => setCollapsed(!collapsed)}
-                        style={{ fontSize: "18px", width: 44, height: 44, borderRadius: '12px', color: THEME.navy, background: 'rgba(26, 35, 50, 0.04)' }}
-                    />
-                    <Space size="large">
+                    <Space size={isMobile ? "middle" : "large"} style={{ minWidth: 0 }}>
+                        <Button
+                            type="text"
+                            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                            onClick={() => setCollapsed(!collapsed)}
+                            style={{ fontSize: "18px", width: 44, height: 44, borderRadius: '12px', color: THEME.navy, background: 'rgba(26, 35, 50, 0.04)', flexShrink: 0 }}
+                        />
+                        {(isMobile || isTablet) && (
+                            <div style={{ minWidth: 0 }}>
+                                <Text strong style={{ display: 'block', color: THEME.navy, fontSize: isMobile ? 15 : 16, lineHeight: 1.1 }}>
+                                    {menuItems.find(item => item.key === location.pathname)?.label || "Admin Console"}
+                                </Text>
+                                {!isMobile && (
+                                    <Text style={{ fontSize: 11, color: THEME.subtext, textTransform: 'uppercase', fontWeight: 700, letterSpacing: 1 }}>
+                                        Vacanza Admin
+                                    </Text>
+                                )}
+                            </div>
+                        )}
+                    </Space>
+                    <Space size="large" style={{ flexShrink: 0 }}>
                         <Dropdown menu={userMenuItems} placement="bottomRight" arrow>
                             <Space style={{ cursor: "pointer", padding: isMobile ? '4px' : '8px 16px', borderRadius: 16, background: 'rgba(26, 35, 50, 0.04)' }}>
                                 <Avatar shape="square" src={user?.photoURL} icon={<UserOutlined />} style={{ background: THEME.coral, borderRadius: 10 }} />
@@ -186,7 +226,7 @@ export default function AdminLayout() {
                     </Space>
                 </Header>
 
-                <Content>
+                <Content style={{ minWidth: 0, overflowX: 'hidden' }}>
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={location.pathname}
@@ -200,7 +240,7 @@ export default function AdminLayout() {
                     </AnimatePresence>
                 </Content>
 
-                <Footer style={{ textAlign: "center", background: 'transparent', padding: '32px' }}>
+                <Footer style={{ textAlign: "center", background: 'transparent', padding: isMobile ? '20px 16px 28px' : '32px' }}>
                     <Text style={{ fontSize: 11, color: THEME.subtext, fontWeight: 600, opacity: 0.6 }}>
                         VACANZA INFRASTRUCTURE • v1.0.0-PROD • © 2026
                     </Text>
