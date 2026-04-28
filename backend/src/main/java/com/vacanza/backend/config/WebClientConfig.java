@@ -105,6 +105,23 @@ public class WebClientConfig {
     }
 
     @Bean
+    @Qualifier("ticketmasterEuWebClient")
+    public WebClient ticketmasterEuWebClient(TicketmasterProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        return WebClient.builder()
+                .baseUrl(props.getEuBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(apiMetricsAndLogFilter("Ticketmaster EU API", "[TICKETMASTER-EU]"))
+                .build();
+    }
+
+    @Bean
     @Qualifier("openMeteoWebClient")
     public WebClient openMeteoWebClient(OpenMeteoProperties props) {
         HttpClient httpClient = HttpClient.create()
