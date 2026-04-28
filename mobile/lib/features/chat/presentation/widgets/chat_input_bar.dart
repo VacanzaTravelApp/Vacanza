@@ -163,121 +163,119 @@ class _SendButton extends StatelessWidget {
     const size = 46.0;
     final radius = BorderRadius.circular(17);
 
+    // ── Send button colours ──────────────────────────────────────────────────
+    final sendHi = Color.lerp(accent, Colors.white, isLight ? 0.20 : 0.14)!;
+
+    // ── Stop button colours — glass surface, coral icon, no heavy gradient ──
+    final coral = t.vividCoral;
+    final stopBg = isLight
+        ? context.lightGlassPanelColor
+        : cs.surface.withValues(alpha: 0.92);
+    final stopBorder = coral.withValues(alpha: isLight ? 0.45 : 0.38);
+    final stopIconColor = coral;
+
+    // ── Disabled colours ────────────────────────────────────────────────────
+    final bgDisabled = isLight
+        ? context.lightGlassFieldFill
+        : cs.surfaceContainerHighest.withValues(alpha: 0.46);
+    final iconDisabled = t.textSub.withValues(alpha: isLight ? 0.50 : 0.60);
+
     final bool isActive = isSending || enabled;
-    final stopAccent = t.vividCoral;
-    final stopAccentHi =
-        Color.lerp(
-          stopAccent,
-          isLight ? t.vividAmber : Colors.white,
-          isLight ? 0.18 : 0.12,
-        )!;
-    final sendAccentHi =
-        Color.lerp(accent, Colors.white, isLight ? 0.20 : 0.14)!;
 
-    final Color bgDisabled =
-        isLight
-            ? context.lightGlassFieldFill
-            : cs.surfaceContainerHighest.withValues(alpha: 0.46);
-    final Color iconDisabled =
-        isLight
-            ? t.textSub.withValues(alpha: 0.55)
-            : t.textSub.withValues(alpha: 0.65);
-    final Color border =
-        isActive
-            ? Colors.white.withValues(alpha: isLight ? 0.18 : 0.10)
-            : t.cardBorder.withValues(alpha: isLight ? 0.55 : 0.42);
-
-    final List<Color>? gradientColors =
-        isSending
-            ? [stopAccent, stopAccentHi]
-            : (enabled ? [accent, sendAccentHi] : null);
-
-    final List<BoxShadow>? shadows =
-        isActive
-            ? [
-              BoxShadow(
-                color: (isSending ? stopAccent : accent).withValues(
-                  alpha: isLight ? 0.22 : 0.28,
-                ),
-                blurRadius: isSending ? 18 : 16,
-                offset: const Offset(0, 7),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isLight ? 0.10 : 0.32),
-                blurRadius: 20,
-                offset: const Offset(0, 12),
-              ),
-            ]
-            : null;
+    BoxDecoration buildDecoration() {
+      if (isSending) {
+        return BoxDecoration(
+          borderRadius: radius,
+          color: stopBg,
+          border: Border.all(color: stopBorder, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: coral.withValues(alpha: isLight ? 0.14 : 0.10),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isLight ? 0.06 : 0.28),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        );
+      }
+      if (enabled) {
+        return BoxDecoration(
+          borderRadius: radius,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [accent, sendHi],
+          ),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: isLight ? 0.18 : 0.10),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: isLight ? 0.22 : 0.28),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isLight ? 0.10 : 0.32),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        );
+      }
+      return BoxDecoration(
+        borderRadius: radius,
+        color: bgDisabled,
+        border: Border.all(
+          color: t.cardBorder.withValues(alpha: isLight ? 0.50 : 0.38),
+        ),
+      );
+    }
 
     return Tooltip(
       message: isSending ? 'Stop generating' : 'Send message',
-      child: Semantics(
-        button: true,
-        enabled: isActive,
-        label: isSending ? 'Stop generating' : 'Send message',
-        child: AnimatedScale(
-          scale: isSending ? 1.02 : 1,
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          child: AnimatedOpacity(
-            opacity: isActive ? 1 : 0.72,
-            duration: const Duration(milliseconds: 140),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: radius,
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                borderRadius: radius,
-                onTap: isSending ? onStop : (enabled ? onTap : null),
-                splashColor: Colors.white.withValues(alpha: 0.16),
-                highlightColor: Colors.white.withValues(alpha: 0.07),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  width: size,
-                  height: size,
-                  decoration: BoxDecoration(
-                    borderRadius: radius,
-                    color: isActive ? null : bgDisabled,
-                    gradient:
-                        gradientColors != null
-                            ? LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: gradientColors,
-                            )
-                            : null,
-                    border: Border.all(color: border),
-                    boxShadow: shadows,
+      child: AnimatedOpacity(
+        opacity: isActive ? 1 : 0.65,
+        duration: const Duration(milliseconds: 150),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: radius,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: isSending ? onStop : (enabled ? onTap : null),
+            splashColor: (isSending ? coral : accent).withValues(alpha: 0.14),
+            highlightColor: (isSending ? coral : accent).withValues(alpha: 0.06),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              width: size,
+              height: size,
+              decoration: buildDecoration(),
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  switchInCurve: Curves.easeOutBack,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => ScaleTransition(
+                    scale: animation,
+                    child: FadeTransition(opacity: animation, child: child),
                   ),
-                  child: Center(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 180),
-                      switchInCurve: Curves.easeOutBack,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder:
-                          (child, animation) => ScaleTransition(
-                            scale: animation,
-                            child: FadeTransition(
-                              opacity: animation,
-                              child: child,
-                            ),
-                          ),
-                      child:
-                          isSending
-                              ? _StopGlyph(
-                                key: const ValueKey('stop'),
-                                color: Colors.white,
-                              )
-                              : Icon(
-                                Icons.send_rounded,
-                                key: const ValueKey('send'),
-                                color: isActive ? Colors.white : iconDisabled,
-                                size: 20,
-                              ),
-                    ),
-                  ),
+                  child: isSending
+                      ? _StopGlyph(
+                          key: const ValueKey('stop'),
+                          color: stopIconColor,
+                        )
+                      : Icon(
+                          Icons.send_rounded,
+                          key: const ValueKey('send'),
+                          color: enabled ? Colors.white : iconDisabled,
+                          size: 20,
+                        ),
                 ),
               ),
             ),
@@ -296,8 +294,8 @@ class _StopGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 12,
-      height: 12,
+      width: 11,
+      height: 11,
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(3),
