@@ -390,10 +390,13 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     try {
       final z = (await map.getCameraState()).zoom;
       if (!mounted) return;
-      final ok = z >= PoiMapConfig.minZoomForAreaDraw;
+      final ok = z >= PoiMapConfig.minZoomForAreaDraw &&
+          z <= PoiMapConfig.maxZoomForAreaDraw;
+      final tooHigh = z > PoiMapConfig.maxZoomForAreaDraw;
       final bloc = context.read<MapBloc>();
-      if (bloc.state.areaDrawZoomOk != ok) {
-        bloc.add(AreaDrawZoomOkChanged(ok));
+      if (bloc.state.areaDrawZoomOk != ok ||
+          bloc.state.areaDrawZoomTooHigh != tooHigh) {
+        bloc.add(AreaDrawZoomOkChanged(ok: ok, tooHigh: tooHigh));
       }
     } catch (e) {
       log('[MapCanvas] _syncAreaDrawZoomFromCamera failed: $e');
