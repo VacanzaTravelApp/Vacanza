@@ -84,30 +84,107 @@ class RouteSheetWeather extends StatelessWidget {
             ),
           ),
         if (route.weatherDayParts.isNotEmpty) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
-            'Day parts — outdoor',
+            'Outdoor Conditions',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: tokens.textSub,
             ),
           ),
-          const SizedBox(height: 4),
-          ...route.weatherDayParts
-              .take(3)
-              .map(
-                (d) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text(
-                    '${_d(d.date)} — m:${d.morning?.avoidOutdoor == true ? 'caution' : 'ok'} '
-                    'a:${d.afternoon?.avoidOutdoor == true ? 'caution' : 'ok'} '
-                    'e:${d.evening?.avoidOutdoor == true ? 'caution' : 'ok'}',
-                    style: TextStyle(fontSize: 11.5, color: tokens.textSub),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 96,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: route.weatherDayParts.length.clamp(0, 5),
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final d = route.weatherDayParts[i];
+                return Container(
+                  width: 96,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: tokens.pillSurface.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: tokens.cardBorder),
                   ),
-                ),
-              ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _d(d.date),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: tokens.textMain,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _SlotRow(
+                        icon: Icons.wb_twilight_rounded,
+                        label: 'Morning',
+                        avoid: d.morning?.avoidOutdoor == true,
+                      ),
+                      const SizedBox(height: 4),
+                      _SlotRow(
+                        icon: Icons.wb_sunny_rounded,
+                        label: 'Afternoon',
+                        avoid: d.afternoon?.avoidOutdoor == true,
+                      ),
+                      const SizedBox(height: 4),
+                      _SlotRow(
+                        icon: Icons.mode_night_rounded,
+                        label: 'Evening',
+                        avoid: d.evening?.avoidOutdoor == true,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         ],
+      ],
+    );
+  }
+}
+
+class _SlotRow extends StatelessWidget {
+  const _SlotRow({
+    required this.icon,
+    required this.label,
+    required this.avoid,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool avoid;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.vacanzaTokens;
+    const okColor = Color(0xFF22C55E);
+    const cautionColor = Color(0xFFF59E0B);
+    final color = avoid ? cautionColor : okColor;
+
+    return Row(
+      children: [
+        Icon(icon, size: 10, color: tokens.textSub),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 9.5, color: tokens.textSub),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Icon(
+          avoid ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+          size: 11,
+          color: color,
+        ),
       ],
     );
   }

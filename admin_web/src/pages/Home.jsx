@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Card, Row, Col, Statistic, Alert, Typography, Timeline, Progress, Button, Space, Tag, Spin } from "antd";
+import { Card, Row, Col, Statistic, Alert, Typography, Timeline, Progress, Button, Space, Tag, Spin, Grid } from "antd";
 import {
     ThunderboltOutlined, SyncOutlined, ArrowRightOutlined, GlobalOutlined, SecurityScanOutlined,
     LineChartOutlined, CheckCircleFilled, HistoryOutlined, RocketOutlined, CloudServerOutlined,
@@ -11,6 +11,7 @@ import http from "../api/http";
 import dayjs from "dayjs";
 
 const { Title, Paragraph, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const THEME = {
     primary: '#FF6B6B',
@@ -21,6 +22,8 @@ const THEME = {
 };
 
 export default function Home() {
+    const screens = useBreakpoint();
+    const isMobile = !screens.md;
     const navigate = useNavigate();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -73,7 +76,7 @@ export default function Home() {
             initial="hidden"
             animate="show"
             className="dashboard-container"
-            style={{ padding: "12px" }}
+            style={{ padding: isMobile ? "12px 0 0" : "12px 0" }}
         >
             {/* Status Alert */}
             <motion.div variants={item}>
@@ -107,28 +110,28 @@ export default function Home() {
             </motion.div>
 
             {/* Welcome Header */}
-            <motion.div variants={item} style={{ marginBottom: 40, marginTop: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+            <motion.div variants={item} style={{ marginBottom: isMobile ? 28 : 40, marginTop: isMobile ? 8 : 20 }}>
+                <div style={{ display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? 16 : 24, flexWrap: 'wrap' }}>
                     <div
                         onClick={() => window.location.reload()}
                         style={{
-                            width: 120,
-                            height: 120,
+                            width: isMobile ? 88 : 120,
+                            height: isMobile ? 88 : 120,
                             display: 'flex',
                             justifyContent: 'center',
                             alignItems: 'center',
                             cursor: 'pointer'
                         }}>
-                        <img src="/logo.svg" alt="Logo" style={{ width: 120, height: 120, objectFit: 'contain' }} />
+                        <img src="/logo.svg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     </div>
-                    <div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
                         <Title
                             className="gradient-text"
                             style={{
                                 margin: 0,
                                 letterSpacing: -1.5,
                                 fontWeight: 900,
-                                fontSize: '36px',
+                                fontSize: isMobile ? '30px' : '36px',
                                 fontFamily: "'Fraunces', serif"
                             }}
                         >
@@ -136,10 +139,11 @@ export default function Home() {
                         </Title>
                         <Text
                             style={{
-                                fontSize: '18px',
+                                fontSize: isMobile ? '15px' : '18px',
                                 color: '#5A6B7A',
                                 fontWeight: 500,
-                                fontFamily: "'DM Sans', sans-serif"
+                                fontFamily: "'DM Sans', sans-serif",
+                                display: 'block'
                             }}
                         >
                             Overview of system health, active users, and application performance.
@@ -158,7 +162,7 @@ export default function Home() {
                                     className="glass-card"
                                     onClick={() => navigate('/monitoring')}
                                     style={{ borderRadius: 24, height: '100%', border: '1px solid rgba(26, 35, 50, 0.08)' }}
-                                    styles={{ body: { padding: '36px' } }}
+                                    styles={{ body: { padding: isMobile ? '24px' : '36px' } }}
                                 >
                                     <div style={{
                                         width: 52,
@@ -187,7 +191,7 @@ export default function Home() {
                                     </Title>
                                     <Paragraph
                                         style={{
-                                            height: 52,
+                                            minHeight: isMobile ? 'auto' : 52,
                                             fontSize: '15px',
                                             color: '#5A6B7A',
                                             fontFamily: "'DM Sans', sans-serif"
@@ -195,8 +199,8 @@ export default function Home() {
                                     >
                                         Monitor the performance and health of the required APIs and external services.
                                     </Paragraph>
-                                    <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Button type="primary" style={{ background: THEME.warning, border: 'none', borderRadius: 10, fontWeight: 700, height: '40px' }}>
+                                    <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                                        <Button type="primary" style={{ background: THEME.warning, border: 'none', borderRadius: 10, fontWeight: 700, height: '40px', minWidth: isMobile ? '100%' : 'auto' }}>
                                             Launch Console
                                         </Button>
                                         <ArrowRightOutlined style={{ color: THEME.warning }} />
@@ -212,7 +216,7 @@ export default function Home() {
                                     className="glass-card"
                                     onClick={() => navigate('/analytics')}
                                     style={{ borderRadius: 24, height: '100%', border: '1px solid rgba(26, 35, 50, 0.08)' }}
-                                    bodyStyle={{ padding: '36px' }}
+                                    bodyStyle={{ padding: isMobile ? '24px' : '36px' }}
                                 >
                                     <div style={{
                                         width: 52,
@@ -241,7 +245,7 @@ export default function Home() {
                                     </Title>
                                     <Paragraph
                                         style={{
-                                            height: 52,
+                                            minHeight: isMobile ? 'auto' : 52,
                                             fontSize: '15px',
                                             color: '#5A6B7A',
                                             fontFamily: "'DM Sans', sans-serif"
@@ -249,8 +253,8 @@ export default function Home() {
                                     >
                                         Review new user registrations and track the overall growth of the platform.
                                     </Paragraph>
-                                    <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Button type="primary" style={{ background: THEME.primary, border: 'none', borderRadius: 10, fontWeight: 700, height: '40px' }}>
+                                    <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                                        <Button type="primary" style={{ background: THEME.primary, border: 'none', borderRadius: 10, fontWeight: 700, height: '40px', minWidth: isMobile ? '100%' : 'auto' }}>
                                             Open Insights
                                         </Button>
                                         <ArrowRightOutlined style={{ color: THEME.primary }} />
@@ -268,9 +272,9 @@ export default function Home() {
                                     <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 800 }}>Operational Overview</span>
                                 </Space>
                             }
-                            className="glass-card"
+                            className="glass-card dashboard-section-card"
                             variant="borderless"
-                            styles={{ body: { padding: '36px' } }}
+                            styles={{ body: { padding: isMobile ? '24px' : '36px' } }}
                         >
                             <Row gutter={[32, 24]}>
                                 <Col xs={24} sm={12}>
@@ -306,10 +310,10 @@ export default function Home() {
                     <motion.div variants={item} style={{ height: '100%' }}>
                         <Card
                             title={<Space><NotificationOutlined style={{ color: THEME.primary }} /> Recent System Events</Space>}
-                            className="glass-card"
-                            bordered={false}
+                            className="glass-card dashboard-section-card"
+                            variant="borderless"
                             style={{ height: '100%' }}
-                            bodyStyle={{ padding: '24px 24px 32px' }}
+                            bodyStyle={{ padding: isMobile ? '20px 16px 24px' : '24px 24px 32px' }}
                         >
                             <Timeline
                                 style={{ marginTop: 12 }}
@@ -320,7 +324,7 @@ export default function Home() {
                                             <CheckCircleFilled style={{ fontSize: 14 }} />,
                                     children: (
                                         <div style={{ marginBottom: 16 }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                                                 <Text strong style={{ fontSize: 13, display: 'block' }}>{log.message}</Text>
                                             </div>
                                             <Tag bordered={false} style={{ marginTop: 6, fontSize: 10, background: 'rgba(0,0,0,0.03)' }}>

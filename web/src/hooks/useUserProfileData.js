@@ -3,7 +3,7 @@ import { userApi } from "../api/userApi";
 import { auth } from "../firebase";
 import { useEffect, useState } from "react";
 
-function useAuthReady() {
+export function useAuthReady() {
     const [userReady, setUserReady] = useState(false);
     useEffect(() => {
         const unsub = auth.onAuthStateChanged((user) => {

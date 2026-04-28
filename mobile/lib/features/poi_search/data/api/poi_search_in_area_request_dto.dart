@@ -20,16 +20,20 @@ class PoiSearchInAreaRequestDto {
   final int limit;
   final PoiSort? sort;
 
+  /// Backend Mapbox tiled alan araması + SSE (`/pois/search-in-area/stream`).
+  final bool mapboxAreaSearch;
+
   PoiSearchInAreaRequestDto({
     required this.area,
     this.categories,
     this.page = 0,
     int? limit,
     this.sort,
+    this.mapboxAreaSearch = false,
   }) : limit = _normalizeLimit(limit);
 
   static int _normalizeLimit(int? limit) {
-    final v = (limit == null || limit <= 0) ? 200 : limit;
+    final v = (limit == null || limit <= 0) ? 400 : limit;
     return v > 500 ? 500 : v; // FE enforce max 500
   }
 
@@ -40,6 +44,10 @@ class PoiSearchInAreaRequestDto {
     };
 
     if (sort != null) map["sort"] = sort!.toJson();
+
+    if (mapboxAreaSearch) {
+      map["mapboxAreaSearch"] = true;
+    }
 
     // guide: gönderilmez/boş ise filtre yok
     if (categories != null && categories!.isNotEmpty) {

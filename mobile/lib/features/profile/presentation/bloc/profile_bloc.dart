@@ -89,7 +89,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         if (!isClosed) {
           emit(state.copyWith(
             profile: previous,
-            profileUpdateError: e.toString(),
+            profileUpdateError: 'Could not save your profile. Please try again.',
           ));
         }
       }
@@ -211,7 +211,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           emit(state.copyWith(
             preferences: previous,
             clearPreferences: previous == null,
-            preferencesUpdateError: e.toString(),
+            preferencesUpdateError: 'Could not save your preferences. Please try again.',
           ));
         }
         dev.log(
@@ -244,7 +244,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       if (!isClosed) {
         emit(state.copyWith(
           isProfilePhotoBusy: false,
-          profileUpdateError: e.toString(),
+          profileUpdateError: 'Could not upload profile photo. Please try again.',
         ));
       }
       return;
@@ -269,7 +269,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       if (!isClosed) {
         emit(state.copyWith(
           isProfilePhotoBusy: false,
-          profileUpdateError: e.toString(),
+          profileUpdateError: 'Could not remove profile photo. Please try again.',
         ));
       }
       return;
@@ -405,7 +405,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         if (!isClosed) {
           final errors =
               Map<ProfileSection, String>.from(state.sectionErrors)
-                ..[ProfileSection.profile] = e.toString();
+                ..[ProfileSection.profile] = 'Could not load profile. Please try again.';
           emit(state.copyWith(
             profileStatus: LoadStatus.failure,
             clearProfilePhotoBytes: true,
@@ -434,7 +434,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         if (!isClosed) {
           final errors =
               Map<ProfileSection, String>.from(state.sectionErrors)
-                ..[ProfileSection.preferences] = e.toString();
+                ..[ProfileSection.preferences] = 'Could not load preferences. Please try again.';
           emit(state.copyWith(
             preferencesStatus: LoadStatus.failure,
             sectionErrors: errors,
@@ -462,7 +462,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         if (!isClosed) {
           final errors =
               Map<ProfileSection, String>.from(state.sectionErrors)
-                ..[ProfileSection.stats] = e.toString();
+                ..[ProfileSection.stats] = 'Could not load stats. Please try again.';
           emit(state.copyWith(
             statsStatus: LoadStatus.failure,
             sectionErrors: errors,
@@ -490,7 +490,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         if (!isClosed) {
           final errors =
               Map<ProfileSection, String>.from(state.sectionErrors)
-                ..[ProfileSection.checkIns] = e.toString();
+                ..[ProfileSection.checkIns] = 'Could not load check-ins. Please try again.';
           emit(state.copyWith(
             checkInsStatus: LoadStatus.failure,
             sectionErrors: errors,

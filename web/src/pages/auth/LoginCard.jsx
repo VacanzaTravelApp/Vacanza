@@ -1,7 +1,9 @@
 // src/pages/auth/LoginCard.jsx
 
 import React, { useState } from "react";
-import { Form, Input, Button, message, Modal } from "antd";
+import { Form, Input, Button, Modal } from "antd";
+import { toast } from "../../components/toast/toast";
+import { getErrorNotificationMessage } from "../../utils/notifications";
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import "./RegisterCard.css";
 import { useNavigate } from "react-router-dom";
@@ -10,8 +12,6 @@ import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../../firebase";
 
-// API
-import { authApi } from "../../api/userApi";
 
 const LoginCard = () => {
   const navigate = useNavigate();
@@ -25,17 +25,7 @@ const LoginCard = () => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      console.log("Firebase login successful.");
-      try {
-        await authApi.login();
-        console.log("Backend sync successful.");
-      } catch (syncError) {
-        // If it's a real auth failure (401/403), re-throw to outer catch
-        if (syncError.response?.status === 401 || syncError.response?.status === 403) {
-          throw syncError;
-        }
-        console.warn("Backend sync skipped:", syncError.message);
-      }
+      // AuthProvider's onAuthStateChanged handles backend sync and shows errors if it fails
       navigate("/map");
     } catch (error) {
       console.error("Firebase login error:", error);
@@ -59,9 +49,9 @@ const LoginCard = () => {
           },
         ]);
       } else if (error?.code === "auth/too-many-requests") {
-        message.error("Too many failed attempts. Please try again later or reset your password.");
+        toast.error({ title: "Too many attempts", message: "Please wait a while or reset your password." });
       } else {
-        message.error(error.friendlyMessage || "Login failed. Please try again.");
+        toast.error({ title: "Login failed", message: getErrorNotificationMessage(error, "Please try again.") });
       }
     } finally {
       setLoading(false);
@@ -70,14 +60,14 @@ const LoginCard = () => {
 
   const handlePasswordReset = async () => {
     if (!resetEmail) {
-      message.warning("Please enter your email address.");
+      toast.warning("Please enter your email address.");
       return;
     }
 
     setResetLoading(true);
     try {
       await sendPasswordResetEmail(auth, resetEmail);
-      message.success("A password reset link has been sent to your email!");
+      // message.success("A password reset link has been sent to your email!");
       setIsResetModalOpen(false);
       setResetEmail("");
     } catch (error) {
@@ -85,7 +75,7 @@ const LoginCard = () => {
       let msg = "Could not send reset email. Please try again.";
       if (error?.code === "auth/invalid-email") msg = "Please enter a valid email address.";
       if (error?.code === "auth/user-not-found") msg = "No account found with this email.";
-      message.error(msg);
+      toast.error({ title: "Reset failed", message: msg });
     } finally {
       setResetLoading(false);
     }

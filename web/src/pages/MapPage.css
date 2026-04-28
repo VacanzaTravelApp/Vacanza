@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Instrument+Serif:ital@0;1&family=Unica+One&display=swap');
 
 :root {
     --vivid-navy: #1A2332;
@@ -23,23 +23,31 @@
     --text-main: var(--vivid-navy);
     --text-sub: var(--vivid-navy-light);
     --vivid-blue: var(--vivid-teal);
-    
+
     /* Primary dynamic theme coloring */
     --theme-primary: var(--vivid-coral);
     --theme-primary-rgb: 255, 107, 107;
-    
+
     /* Button Theme Support */
     --btn-main-bg: var(--vivid-coral);
     --btn-main-text: #ffffff;
     --btn-main-shadow: rgba(255, 107, 107, 0.3);
-    
+
     --btn-sub-bg: rgba(255, 107, 107, 0.08);
     --btn-sub-border: rgba(255, 107, 107, 0.15);
     --btn-sub-text: var(--vivid-coral);
 }
 
 /* Enforce font consistency globally for Ant Design components */
-body, .ant-modal, .ant-picker, .ant-select, .ant-btn, .ant-input, .ant-menu, .ant-tooltip, .ant-popover {
+body,
+.ant-modal,
+.ant-picker,
+.ant-select,
+.ant-btn,
+.ant-input,
+.ant-menu,
+.ant-tooltip,
+.ant-popover {
     font-family: var(--font-sans) !important;
 }
 
@@ -122,7 +130,7 @@ a,
     --text-sub: #94A3B8;
     --vivid-blue: #38BDF8;
     --glass-border: var(--card-border);
-    
+
     /* Primary dynamic theme coloring */
     --theme-primary: #38BDF8;
     --theme-primary-rgb: 56, 189, 248;
@@ -134,7 +142,7 @@ a,
     --btn-main-bg: #1e293b;
     --btn-main-text: #f8fafc;
     --btn-main-shadow: rgba(0, 0, 0, 0.4);
-    
+
     --btn-sub-bg: rgba(30, 41, 59, 0.8);
     --btn-sub-border: rgba(148, 163, 184, 0.15);
     --btn-sub-text: #cbd5e1;
@@ -282,6 +290,51 @@ a,
     height: 100%;
 }
 
+/* Draw-area: zoom too low — non-blocking dim + hint (pointer-events none so user can still zoom/pan) */
+.map-draw-zoom-gate {
+    position: absolute;
+    inset: 0;
+    z-index: 900;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.28);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+.map-draw-zoom-gate__hint {
+    pointer-events: none;
+    max-width: 340px;
+    padding: 20px 22px;
+    text-align: center;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.14);
+}
+
+.map-draw-zoom-gate__title {
+    font-weight: 800;
+    font-size: 17px;
+    margin-bottom: 8px;
+    color: var(--text-main);
+}
+
+.map-draw-zoom-gate__text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-sub);
+}
+
+.theme-night .map-draw-zoom-gate {
+    background: rgba(2, 6, 23, 0.5);
+}
+
+.vivid-fab-group .sub-fab--muted {
+    opacity: 0.55;
+}
+
 /* Custom Premium Topbar */
 .vivid-map-header {
     display: flex;
@@ -377,11 +430,11 @@ a,
 }
 
 .brand-name {
-    font-family: var(--font-display);
+    font-family: 'Unica One', var(--font-display);
     font-size: 22px;
-    font-weight: 700;
+    font-weight: 400;
     color: var(--text-main);
-    letter-spacing: -0.5px;
+    letter-spacing: 0.5px;
 }
 
 .local-time-badge {
@@ -519,13 +572,22 @@ a,
 }
 
 .brand-logo {
-    font-family: var(--font-display);
+    font-family: 'Unica One', var(--font-display);
     font-size: 28px;
-    font-weight: 800;
+    font-weight: 400;
     color: var(--theme-primary);
-    letter-spacing: -1.5px;
+    letter-spacing: 0.5px;
     margin-left: 0;
-    font-variation-settings: 'SOFT' 80, 'WONK' 1;
+}
+
+/* Sidebar section heading — NOT brand text, intentionally uses display font not Unica One */
+.sidebar-title {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-main);
+    letter-spacing: -0.5px;
+    margin-left: 0;
 }
 
 /* 2. Sidebar Refinement (Auth-style) */
@@ -722,7 +784,7 @@ a,
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    border: 1px solid rgba(0,0,0,0.05);
+    border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .vivid-ai-sticky-pill:hover {
@@ -1531,7 +1593,7 @@ a,
 /* Whitish/Glass Create AI Route button in Results Panel */
 .vivid-create-route-btn-glass {
     background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%) !important;
-    border: 1px solid rgba(0,0,0,0.05) !important;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
     color: #1a1a1a !important;
     font-weight: 700 !important;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
@@ -1545,6 +1607,16 @@ a,
 
 .theme-night .vivid-create-route-btn-glass {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85)) !important;
+}
+
+.vivid-create-route-btn-loading {
+    opacity: 0.55 !important;
+    cursor: not-allowed !important;
+}
+
+.vivid-create-route-btn-loading:hover {
+    transform: none !important;
+    filter: none !important;
 }
 
 /* Modal Dropdown Refinement */
@@ -1586,4 +1658,71 @@ a,
     background: #ffffff !important;
     border: 1px solid rgba(0, 0, 0, 0.08) !important;
     box-shadow: 0 32px 80px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Custom Location Button (Injected into +/- Group) */
+.custom-locate-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-bottom: 1px solid var(--card-border, rgba(0, 0, 0, 0.06)) !important;
+    color: var(--text-main, #333) !important;
+    /* Matches +/- color */
+}
+
+.custom-locate-btn:hover {
+    background: rgba(var(--vivid-coral-rgb, 255, 107, 107), 0.08) !important;
+}
+
+.custom-locate-btn svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s ease;
+}
+
+.custom-locate-btn:hover svg {
+    transform: scale(1.05);
+}
+
+
+/* User Location Dot with Pulse */
+.vivid-user-location-dot {
+    position: relative;
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vivid-user-location-inner {
+    width: 12px;
+    height: 12px;
+    background: #4285F4;
+    border: 2px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+    z-index: 2;
+}
+
+.vivid-user-location-pulse {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    background: rgba(66, 133, 244, 0.28);
+    border-radius: 50%;
+    z-index: 1;
+    animation: vivid-location-pulse 2s infinite ease-out;
+}
+
+@keyframes vivid-location-pulse {
+    0% {
+        transform: scale(0.5);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
 }

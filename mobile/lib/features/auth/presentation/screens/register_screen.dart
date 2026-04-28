@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 // BLoC yönetimi için gerekli importlar
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 // Tema dosyaları (renkler, text stilleri, arkaplan animasyonu)
 import 'package:mobile/core/theme/app_text_styles.dart';
@@ -21,7 +22,6 @@ import 'package:mobile/features/auth/presentation/bloc/register_event.dart';
 // Login ekranı (altta “Already have an account?” yazısı için)
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
 import 'package:mobile/features/auth/presentation/screens/auth_gate.dart';
-
 
 /// ------------------------------------------------------------
 ///                      REGISTER SCREEN
@@ -51,9 +51,9 @@ class RegisterScreen extends StatelessWidget {
     final accent = context.authAccent;
 
     // Başlık yazısı stilini temadan çekiyoruz.
-    final titleStyle = AppTextStyles.titleLarge(context).copyWith(
-      color: tokens.textMain,
-    );
+    final titleStyle = AppTextStyles.titleLarge(
+      context,
+    ).copyWith(color: tokens.textMain);
 
     // Orta boyutlu metin stilleri (açıklama ve CTA için)
     final bodyMedium = AppTextStyles.bodyMedium(context);
@@ -69,7 +69,7 @@ class RegisterScreen extends StatelessWidget {
         ///  BLoC LISTENER → RegisterBloc değişikliklerini dinliyoruz.
         ///
         ///  Burada UI mantığı var:
-        ///    - SUCCESS olduğunda snackbar + AuthGate yönlendirme
+        ///    - SUCCESS olduğunda AuthGate yönlendirme
         ///    - FAILURE olduğunda navigation yapılmaz (form kendi hata gösterir)
         ///
         ///  NOT: BLoC içinde navigation YAPMIYORUZ → UI katmanı sorumludur.
@@ -83,27 +83,15 @@ class RegisterScreen extends StatelessWidget {
             // SUCCESS DURUMU
             // -------------------------------------------
             if (state.isSuccess) {
-              // 1) Kullanıcıya başarı mesajı
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Registration successful! Welcome to Vacanza.'),
-                  behavior: SnackBarBehavior.floating,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-
-              // 2) SUCCESS state sadece bir kez çalışsın diye
+              // 1) SUCCESS state sadece bir kez çalışsın diye
               //    RegisterReset event'i gönderiyoruz.
               context.read<RegisterBloc>().add(const RegisterReset());
 
-              // 3) Snackbar görünür olsun diye küçük gecikme
-              Future.delayed(const Duration(milliseconds: 300), () {
-                if (!context.mounted) return;
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AuthGate()),
-                );
-              });
+              // 2) AuthGate `emailVerified` ile VerifyEmail veya haritaya yönlendirir.
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const AuthGate()),
+              );
             }
 
             // FAILURE durumda burada bir şey yapmıyoruz.
@@ -177,21 +165,24 @@ class RegisterScreen extends StatelessWidget {
                             const TextSpan(text: 'Create Your '),
                             TextSpan(
                               text: 'Vacanza ',
-                              style: TextStyle(
-                                foreground: Paint()
-                                  ..shader = LinearGradient(
-                                    colors: [
-                                      accent,
-                                      Color.lerp(
+                              style: GoogleFonts.unicaOne(
+                                textStyle: TextStyle(
+                                  foreground:
+                                      Paint()
+                                        ..shader = LinearGradient(
+                                          colors: [
                                             accent,
-                                            Colors.white,
-                                            isLight ? 0.08 : 0.18,
-                                          ) ??
-                                          accent,
-                                    ],
-                                  ).createShader(
-                                    const Rect.fromLTWH(0, 0, 160, 32),
-                                  ),
+                                            Color.lerp(
+                                                  accent,
+                                                  Colors.white,
+                                                  isLight ? 0.08 : 0.18,
+                                                ) ??
+                                                accent,
+                                          ],
+                                        ).createShader(
+                                          const Rect.fromLTWH(0, 0, 160, 32),
+                                        ),
+                                ),
                               ),
                             ),
                             const TextSpan(text: 'Account'),

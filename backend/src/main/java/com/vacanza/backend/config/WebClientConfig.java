@@ -105,6 +105,23 @@ public class WebClientConfig {
     }
 
     @Bean
+    @Qualifier("ticketmasterEuWebClient")
+    public WebClient ticketmasterEuWebClient(TicketmasterProperties props) {
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) props.getConnectTimeout().toMillis())
+                .responseTimeout(props.getReadTimeout());
+
+        return WebClient.builder()
+                .baseUrl(props.getEuBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
+                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
+                .defaultHeader(HttpHeaders.USER_AGENT, "vacanza-backend")
+                .filter(apiMetricsAndLogFilter("Ticketmaster EU API", "[TICKETMASTER-EU]"))
+                .build();
+    }
+
+    @Bean
     @Qualifier("openMeteoWebClient")
     public WebClient openMeteoWebClient(OpenMeteoProperties props) {
         HttpClient httpClient = HttpClient.create()
@@ -188,10 +205,11 @@ public class WebClientConfig {
                             if (code >= 500 || code == 429) {
                                 apiMetricsCollector.recordError(apiName);
                             } else {
-                                // 4xx is usually client error, we still count as success response structurally or count as error?
-                                // Usually 4xx is considered user error, but for monitoring external endpoints, often both are errors.
-                                // Let's log it as an error to track failed external attempts overall.
-                                apiMetricsCollector.recordError(apiName);
+                                // 4xx hataları yetkisiz (401) veya eksik istek (400) anlamına gelir.
+                                // Sunucunun fiziksel olarak ayakta olduğunu kanıtladığı için bunu bir çökme (error) 
+                                // olarak değil, başarılı bir ağ bağlantısı olarak saymalıyız. 
+                                // Böylece yanlış API şifresi Overall System Integrity puanını düşürmez.
+                                apiMetricsCollector.recordCall(apiName, duration);
                             }
                         } else {
                             apiMetricsCollector.recordCall(apiName, duration);

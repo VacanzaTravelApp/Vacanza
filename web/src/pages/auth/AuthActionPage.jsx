@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { applyActionCode, confirmPasswordReset, verifyPasswordResetCode, onAuthStateChanged } from "firebase/auth";
 import { auth } from "../../firebase";
-import { Button, Input, Form, Spin, message } from "antd";
+import { Button, Input, Form, Spin } from "antd";
+import { toast } from "../../components/toast/toast";
 import { LockOutlined, CheckCircleFilled } from "@ant-design/icons";
 import "./RegisterCard.css";
 import "./EmailVerificationPage.css";
@@ -44,7 +45,6 @@ const AuthActionPage = () => {
     );
 
     const handleVerifyResetCode = useCallback(async (code) => {
-        // Dev mode: skip Firebase verification for local testing
         if (import.meta.env.DEV && code.startsWith("test")) {
             setResetEmail("test@vacanza.app");
             setStatus("resetPassword");
@@ -93,14 +93,12 @@ const AuthActionPage = () => {
         }
         setResetting(true);
         try {
-            // Dev mode: skip actual Firebase call for local testing
             if (import.meta.env.DEV && oobCode.startsWith("test")) {
                 await new Promise(r => setTimeout(r, 800));
             } else {
                 await confirmPasswordReset(auth, oobCode, values.password);
             }
             setStatus("resetSuccess");
-            message.success("Password updated successfully!");
         } catch (error) {
             console.error("Password reset error:", error);
             if (error.code === "auth/weak-password") {
@@ -109,7 +107,7 @@ const AuthActionPage = () => {
                 setStatus("error");
                 setErrorMessage("This reset link has expired. Please request a new one.");
             } else {
-                message.error("Something went wrong. Please try again.");
+                toast.error("Something went wrong. Please try again.");
             }
         } finally {
             setResetting(false);

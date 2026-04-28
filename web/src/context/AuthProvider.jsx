@@ -3,6 +3,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { authApi } from "../api/userApi";
 import { AuthContext } from "./AuthContext";
+import { toast } from "../components/toast/toast";
 
 export default function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
@@ -28,8 +29,8 @@ export default function AuthProvider({ children }) {
 
         setAuthDto(res.data);
       } catch (error) {
-        // Backend ile konuşamazsa Firebase oturumunu da sonlandır (Skip etme)
         console.error("Auth sync failed, backend connection required:", error);
+        toast.error({ title: "Signed out", message: "Server is unreachable. Please log in again." });
         setAuthDto(null);
 
         try {

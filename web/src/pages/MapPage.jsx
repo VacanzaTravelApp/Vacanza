@@ -1,29 +1,29 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, message, notification, Spin, Popover, ConfigProvider, theme } from "antd";
+import { Button, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, Spin, Popover, ConfigProvider, theme } from "antd";
+import { toast } from "../components/toast/toast";
+import { getErrorNotificationMessage, pickEnglishNotificationMessage } from "../utils/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  LogoutOutlined,
   GlobalOutlined,
-  HeatMapOutlined,
-  InfoCircleOutlined,
   CalendarOutlined,
   SunOutlined,
   MoonOutlined,
   UserOutlined,
   CompassOutlined,
   CloseOutlined,
-  ControlOutlined,
   HeartOutlined,
   HeartFilled,
+  AimOutlined,
 } from "@ant-design/icons";
 import { FiFilter } from "react-icons/fi";
 import defaultAvatar from "../assets/default-avatar.png";
 import { useNavigate } from "react-router-dom";
+import webIcon from "../web-icon.svg";
 
-import Map, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
+import MapGL, { NavigationControl, Marker, Source, Layer } from "react-map-gl";
 
 import { auth } from "../firebase";
-import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
 import { useUserProfile } from "../hooks/useUserProfileData";
 import { useProfilePhoto } from "../hooks/useProfilePhoto";
@@ -47,16 +47,6 @@ import { buildMapPoiFeedbackPayload, deriveMapPoiFavorited } from "../features/a
 import "./MapPage.css";
 
 
-
-const { Header, Content, Footer } = Layout;
-
-const INITIAL_VIEW_STATE = {
-  longitude: 32.8200,
-  latitude: 39.8950,
-  zoom: 11.5,
-  bearing: 0,
-  pitch: 0,
-};
 
 const STYLES = [
   "mapbox://styles/mapbox/streets-v12",          // 0: Day (Streets)
@@ -159,8 +149,15 @@ const SettingsIcon = () => (
 );
 
 // Results panel haritayı kapatmasın diye padding hesabında kullanıyoruz
-const RESULTS_PANEL_APPROX_HEIGHT_DESKTOP = 320;
 const FILTER_PANEL_APPROX_WIDTH_DESKTOP = 320;
+
+/**
+ * Zoom bounds for draw-area mode.
+ * MIN: ~13 pushes “district / neighborhood” scale; whole-city outlines become awkward below this.
+ * MAX: ~18 is street level — selections this tight are too small to be useful.
+ */
+const MIN_ZOOM_FOR_AREA_DRAW = 13;
+const MAX_ZOOM_FOR_AREA_DRAW = 18;
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
@@ -172,9 +169,6 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
-function normalizeCategory(raw) {
-  return String(raw || "").trim().toLowerCase();
-}
 
 /** Map filter keys → backend /chat/routes/from-polygon category strings (MapboxPoiSearchClient). */
 const UI_KEY_TO_BACKEND_CATEGORY = {
@@ -246,13 +240,13 @@ const UI_CATEGORIES = [
     key: "monuments",
     label: "Culture",
     aliases: [
-      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre", 
-      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture", 
-      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema", 
-      "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish", 
-      "religious_buddhist", "mosque", "church", "temple", "synagogue", "buddhist_temple", 
-      "place_of_worship.muslim", "place_of_worship.christian", "place_of_worship.jewish", 
-      "place_of_worship.buddhist", "landmark", "historic", "attraction", 
+      "monument", "memorial", "castle", "fort", "place_of_worship", "tomb", "theatre",
+      "art_gallery", "gallery", "historic_site", "public_artwork", "outdoor_sculpture",
+      "concert_hall", "music_venue", "arts_center", "studio", "movie_theater", "cinema",
+      "theater", "opera_house", "religious_christian", "religious_muslim", "religious_jewish",
+      "religious_buddhist", "mosque", "church", "temple", "synagogue", "buddhist_temple",
+      "place_of_worship.muslim", "place_of_worship.christian", "place_of_worship.jewish",
+      "place_of_worship.buddhist", "landmark", "historic", "attraction",
       "tourist_attraction", "sightseeing", "cultural_center", "place_of_interest",
       "religious", "spiritual", "mosques", "churches", "temples", "synagogues", "historic_place",
       "cathedral", "chapel", "shrine", "monastic", "abbey", "priory", "historical_landmark",
@@ -363,17 +357,17 @@ const UI_CATEGORIES = [
     key: "others",
     label: "Services",
     aliases: [
-      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy", 
-      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist", 
-      "veterinarian", "police_station", "fire_station", "government_offices", "library", 
-      "school", "university", "college", "community_center", "mosque", "church", 
-      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners", 
-      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio", 
-      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course", 
-      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio", 
-      "recording_studio", "television_studio", "radio_studio", "design_studio", 
-      "coworking_space", "event_space", "conference_center", "offices", "factory", 
-      "warehouse", "storage", "services", "it", "consulting", "advertising_agency", 
+      "poi", "office", "educational", "healthcare", "public", "bank", "atm", "pharmacy",
+      "hospital", "clinic", "post_office", "medical_clinic", "doctors_office", "dentist",
+      "veterinarian", "police_station", "fire_station", "government_offices", "library",
+      "school", "university", "college", "community_center", "mosque", "church",
+      "temple", "synagogue", "buddhist_temple", "cemetery", "laundry", "dry_cleaners",
+      "salon", "hairdresser", "barber", "spa", "gym", "fitness_center", "yoga_studio",
+      "pilates_studio", "sports_club", "swimming_pool", "tennis_courts", "golf_course",
+      "bowling_alley", "arcade", "laser_tag", "billiards", "karaoke", "dance_studio",
+      "recording_studio", "television_studio", "radio_studio", "design_studio",
+      "coworking_space", "event_space", "conference_center", "offices", "factory",
+      "warehouse", "storage", "services", "it", "consulting", "advertising_agency",
       "chiropractor", "physiotherapist", "alternative_healthcare", "assisted_living_facility"
     ],
     icon: <GlobalOutlined />,
@@ -410,13 +404,13 @@ function poiIconByCategory(poi) {
   }
 
   // Handle both single strings, arrays, or comma-separated strings
-  const rawCatsArray = Array.isArray(category) 
-    ? category 
+  const rawCatsArray = Array.isArray(category)
+    ? category
     : String(category).split(',').map(s => s.trim());
-    
+
   // Split by both comma AND dot to handle Mapbox dot-notation subcategories
   const normCats = rawCatsArray.flatMap(c => c.toLowerCase().trim().split('.')).filter(Boolean);
-  
+
   // Also keep the full strings for exact matching
   rawCatsArray.forEach(c => normCats.push(c.toLowerCase().trim()));
 
@@ -454,7 +448,7 @@ function getSafePoiTitle(p) {
 
   if (hasValidName) return rawName;
 
-  const label = labelByCategory(p?.category);
+  const label = labelByCategory(p);
   if (label) return label;
 
   const cat = (p?.category && String(p.category).trim()) || "";
@@ -476,7 +470,7 @@ function getMapPoiRowKey(p) {
 }
 
 function isPointInsidePolygon(lat, lng, polygonLatLng) {
-  if (!polygonLatLng || polygonLatLng.length < 3) return false;
+  if (!polygonLatLng || polygonLatLng.length < 3) return true;
   let inside = false;
   for (let i = 0, j = polygonLatLng.length - 1; i < polygonLatLng.length; j = i++) {
     const xi = polygonLatLng[i].lng,
@@ -488,6 +482,68 @@ function isPointInsidePolygon(lat, lng, polygonLatLng) {
     if (intersect) inside = !inside;
   }
   return inside;
+}
+
+function mergePoiListsByStableKey(prev, incoming) {
+  const m = new Map();
+  for (const x of prev) {
+    m.set(getMapPoiRowKey(x), x);
+  }
+  for (const x of incoming) {
+    m.set(getMapPoiRowKey(x), x);
+  }
+  return Array.from(m.values());
+}
+
+/** POST + SSE (Spring SseEmitter): frames separated by blank line, each with a {@code data:} JSON line. */
+async function consumeMapboxPoiSearchStream(url, body, { signal, onChunk, onDone }) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(t || `HTTP ${res.status}`);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body");
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    // Spring may use \n\n or \r\n\r\n between SSE events
+    while (true) {
+      const sepRn = buf.indexOf("\r\n\r\n");
+      const sepN = buf.indexOf("\n\n");
+      if (sepRn === -1 && sepN === -1) break;
+      const sep = sepRn === -1 ? sepN : sepN === -1 ? sepRn : Math.min(sepRn, sepN);
+      const rawEvent = buf.slice(0, sep).trim();
+      buf = buf.slice(sep + (buf[sep] === "\r" ? 4 : 2));
+      const lines = rawEvent.split(/\r?\n/).filter(Boolean);
+      let dataStr = null;
+      for (const line of lines) {
+        if (line.startsWith("data:")) {
+          dataStr = line.slice(5).trim();
+        }
+      }
+      if (!dataStr) continue;
+      let payload;
+      try {
+        payload = JSON.parse(dataStr);
+      } catch {
+        continue;
+      }
+      if (payload.type === "chunk") onChunk?.(payload);
+      if (payload.type === "done") onDone?.(payload);
+    }
+  }
 }
 
 function polygonToBbox(poly) {
@@ -524,15 +580,14 @@ function ensureMapbox3D(map, enabled) {
   // Force globe projection EARLY and ALWAYS
   try {
     map.setProjection("globe");
-  } catch (e) {
+  } catch {
     // ignore
   }
 
   if (!enabled) {
     try {
       map.setTerrain(null);
-      // eslint-disable-next-line no-unused-vars
-    } catch (e) {
+    } catch {
       // ignore
     }
     safeRemoveLayer(SKY_LAYER_ID);
@@ -552,8 +607,7 @@ function ensureMapbox3D(map, enabled) {
 
   try {
     map.setTerrain({ source: DEM_SOURCE_ID, exaggeration: 1.2 });
-    // eslint-disable-next-line no-unused-vars
-  } catch (e) {
+  } catch {
     // ignore
   }
 
@@ -568,8 +622,7 @@ function ensureMapbox3D(map, enabled) {
           "sky-atmosphere-sun-intensity": 8,
         },
       });
-      // eslint-disable-next-line no-unused-vars
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
@@ -597,8 +650,7 @@ function ensureMapbox3D(map, enabled) {
         },
         beforeId
       );
-      // eslint-disable-next-line no-unused-vars
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
@@ -609,8 +661,7 @@ function ensureMapbox3D(map, enabled) {
       "space-color": "#000000",
       "star-intensity": 0.0,
     });
-    // eslint-disable-next-line no-unused-vars
-  } catch (e) {
+  } catch {
     // ignore
   }
 }
@@ -620,9 +671,8 @@ export default function MapPage() {
   const mapRef = useRef(null);
   const isMobile = useIsMobile(768);
   const { data: profile } = useUserProfile();
-  const { profilePhotoUrl } = useProfilePhoto(profile);
-  const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
-    useGamificationProfile();
+  const { profilePhotoUrl } = useProfilePhoto();
+  const { data: gamification } = useGamificationProfile();
 
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -632,6 +682,8 @@ export default function MapPage() {
   const [favSendingKey, setFavSendingKey] = useState(null);
   /** Which viewport POI marker has the detail popover open (pin tap). */
   const [viewportPoiPopoverKey, setViewportPoiPopoverKey] = useState(null);
+  const [lastAutoCheckInId, setLastAutoCheckInId] = useState(null);
+  const [userLocation, setUserLocation] = useState(null);
 
   const [viewState, setViewState] = useState({
     longitude: 32.8597,
@@ -678,11 +730,17 @@ export default function MapPage() {
 
   const [freehandEnabled, setFreehandEnabled] = useState(false);
   const drawingRef = useRef({ isDown: false, points: [] });
+  const poiStreamAbortRef = useRef(null);
+  /** First non-empty Mapbox stream chunk picks the results tab once per draw. */
+  const streamAutoTabLockedRef = useRef(false);
+  const resultsTabsScrollRef = useRef(null);
 
   const [previewLine, setPreviewLine] = useState(null);
 
   const [poisRaw, setPoisRaw] = useState([]);
   const [poiLoading, setPoiLoading] = useState(false);
+  /** Mapbox SSE still fetching more category chunks — show tab-row hint. */
+  const [poiStreamLoading, setPoiStreamLoading] = useState(false);
 
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -718,14 +776,14 @@ export default function MapPage() {
   const handleMarkUnavailable = useCallback(async (wp) => {
     const routeId = activeRoute?.routeId ?? activeRoute?.route_id;
     if (!routeId) {
-      message.warning("Bu rotanın kaydedilmiş bir ID'si yok. Lütfen rotayı tekrar oluşturun.");
+      toast.warning({ title: "Route not saved", message: "Please regenerate the route and try again." });
       return;
     }
     try {
       const result = await aiApi.adjustRoute(routeId, {
         triggerType: "USER_REPORTED",
         severity: "HIGH",
-        reason: `${wp.name} kapalı veya ulaşılamaz`,
+        reason: `${wp.name} is closed or unavailable`,
         affectedPoiName: wp.name,
         affectedDay: wp.day,
       });
@@ -734,9 +792,9 @@ export default function MapPage() {
         const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
         setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? result.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
       }
-      message.success(result.userMessage || "Rotanız güncellendi.");
+      // message.success(result.userMessage || "Rotanız güncellendi.");
     } catch {
-      message.error("Güncelleme sırasında bir hata oluştu.");
+      toast.error({ title: "Update failed", message: "Couldn't update your route. Please try again." });
     }
   }, [activeRoute]);
 
@@ -747,11 +805,12 @@ export default function MapPage() {
       const detail = await aiApi.getRoute(data.newRouteId);
       const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
       setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? data.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
-      notification.info({
-        message: "Rotanız güncellendi",
-        description: data.userMessage || "Bir veya daha fazla durak otomatik olarak güncellendi.",
-        placement: "topRight",
-        duration: 6,
+      toast.info({
+        title: "Route updated",
+        message: pickEnglishNotificationMessage(
+          data.userMessage,
+          "One or more stops were automatically updated."
+        ),
       });
     } catch {
       // silently ignore — route will update on next manual refresh
@@ -767,7 +826,147 @@ export default function MapPage() {
   const [chatConversationRefreshNonce, setChatConversationRefreshNonce] = useState(0);
   /** Sohbet–harita bağlantısı (replan gün); VacanzaChat onConversationIdChange ile güncellenir. */
   const [mapChatConversationId, setMapChatConversationId] = useState(null);
-  const [replanDaySubmitting, setReplanDaySubmitting] = useState(false);
+  const [, setReplanDaySubmitting] = useState(false);
+
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Proximity Detection (50m Radius)
+  useEffect(() => {
+    if (!user || !userLocation || poisRaw.length === 0) return;
+
+    let nearest = null;
+    let minDist = Infinity;
+
+    poisRaw.forEach(p => {
+      if (!p.latitude || !p.longitude) return;
+      const dist = getDistance(userLocation.lat, userLocation.lng, p.latitude, p.longitude);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = p;
+      }
+    });
+
+    if (nearest && minDist < 50 && lastAutoCheckInId !== (nearest.poiId || nearest.name)) {
+      const targetId = nearest.poiId || nearest.name;
+      setLastAutoCheckInId(targetId);
+
+      const triggerAutoCheckIn = async () => {
+        try {
+          const { data } = await http.post("/checkins/auto", {
+            latitude: userLocation.lat,
+            longitude: userLocation.lng,
+            poiId: nearest.poiId,
+          });
+
+          toast.success({ title: 'Auto Check-in!', message: `You've arrived at ${nearest.name || "a point of interest"}. +${data.xpGained || 50} XP earned!` });
+
+          queryClient.invalidateQueries(["gamification", "profile"]);
+          queryClient.invalidateQueries(["user", "stats"]);
+        } catch (err) {
+          console.error("[MapPage] Auto check-in failed:", err);
+        }
+      };
+      triggerAutoCheckIn();
+    }
+  }, [userLocation, poisRaw, user, lastAutoCheckInId, queryClient]);
+
+  // Watch Location
+  useEffect(() => {
+    if (!user) return;
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      null,
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [user]);
+
+  const locateBtnRef = useRef(null);
+  const userLocRef = useRef(null);
+  useEffect(() => {
+    userLocRef.current = userLocation;
+  }, [userLocation]);
+
+  const handleLocateUser = useCallback(() => {
+    console.log("Locate user clicked", userLocRef.current);
+    const loc = userLocRef.current;
+    const map = mapRef.current;
+    if (!map) {
+      console.warn("Map ref is null");
+      return;
+    }
+
+    if (loc) {
+      map.flyTo({
+        center: [loc.lng, loc.lat],
+        zoom: 16,
+        duration: 1200
+      });
+    } else {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        map.flyTo({
+          center: [pos.coords.longitude, pos.coords.latitude],
+          zoom: 16,
+          duration: 1200
+        });
+      }, (err) => {
+        console.error("Geolocation error:", err);
+      }, { enableHighAccuracy: true });
+    }
+  }, []);
+
+  // Set the click handler once or whenever the button is injected
+  useEffect(() => {
+    if (locateBtnRef.current) {
+      locateBtnRef.current.onclick = handleLocateUser;
+    }
+  }, [handleLocateUser]);
+
+  // Inject custom "My Location" button into Mapbox +/- control group for perfect alignment
+  useEffect(() => {
+    const injectBtn = () => {
+      const ctrlGroup = document.querySelector('.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-group');
+      if (ctrlGroup && !ctrlGroup.querySelector('#custom-locate-btn')) {
+        // Remove old one if it's floating detached for some reason
+        const oldBtn = document.getElementById('custom-locate-btn');
+        if (oldBtn) oldBtn.remove();
+
+        const btn = document.createElement('button');
+        btn.id = 'custom-locate-btn';
+        btn.className = 'mapboxgl-ctrl-icon custom-locate-btn';
+        btn.type = 'button';
+        btn.title = 'My Location';
+        btn.innerHTML = `
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display: block; pointer-events: none;">
+            <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+          </svg>
+        `;
+        btn.onclick = handleLocateUser;
+        locateBtnRef.current = btn;
+        // Prepend to put it above +
+        ctrlGroup.prepend(btn);
+      }
+    };
+
+    const timer = setInterval(injectBtn, 500);
+    return () => {
+      clearInterval(timer);
+      const btn = document.getElementById('custom-locate-btn');
+      if (btn) btn.remove();
+      locateBtnRef.current = null;
+    };
+  }, [handleLocateUser]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(false);
@@ -804,9 +1003,8 @@ export default function MapPage() {
   };
 
   const themeClass = isDarkMode ? "theme-night" : "theme-day";
-  const mapStyleIndex = isDarkMode ? 1 : 0;
 
-  const [formattedTime, setFormattedTime] = useState("");
+  const [, setFormattedTime] = useState("");
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -828,7 +1026,7 @@ export default function MapPage() {
       if (bookingOpen) setBookingOpen(false);
       if (fabExpanded) setFabExpanded(false);
     }
-  }, [resultsOpen]); // Only react when resultsOpen changes
+  }, [resultsOpen, filterOpen, isChatOpen, bookingOpen, fabExpanded]);
 
   useEffect(() => {
     if (filterOpen) {
@@ -836,7 +1034,7 @@ export default function MapPage() {
       if (isChatOpen) setIsChatOpen(false);
       if (bookingOpen) setBookingOpen(false);
     }
-  }, [filterOpen]);
+  }, [filterOpen, resultsOpen, isChatOpen, bookingOpen]);
 
   useEffect(() => {
     if (isChatOpen) {
@@ -844,7 +1042,7 @@ export default function MapPage() {
       if (resultsOpen) setResultsOpen(false);
       if (bookingOpen) setBookingOpen(false);
     }
-  }, [isChatOpen]);
+  }, [isChatOpen, filterOpen, resultsOpen, bookingOpen]);
 
   useEffect(() => {
     if (bookingOpen) {
@@ -853,7 +1051,7 @@ export default function MapPage() {
       if (resultsOpen) setResultsOpen(false);
       if (fabExpanded) setFabExpanded(false);
     }
-  }, [bookingOpen]);
+  }, [bookingOpen, filterOpen, isChatOpen, resultsOpen, fabExpanded]);
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -863,9 +1061,11 @@ export default function MapPage() {
       if (resultsOpen) setResultsOpen(false);
       if (fabExpanded) setFabExpanded(false);
     }
-  }, [sidebarOpen]);
+  }, [sidebarOpen, filterOpen, isChatOpen, bookingOpen, resultsOpen, fabExpanded]);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+  /** When true, drawn-area POI search uses Mapbox Search Box (tiled) via backend instead of DB-first. */
+  const USE_MAPBOX_AREA_POI_SEARCH = import.meta.env.VITE_USE_MAPBOX_AREA_POI_SEARCH === "true";
   const mapStyle = useMemo(() => STYLES[styleIndex], [styleIndex]);
 
   const selectedBackendCats = useMemo(() => {
@@ -1028,9 +1228,12 @@ export default function MapPage() {
         await postPoiFeedbackEvent({ eventType, ...base });
         await queryClient.invalidateQueries({ queryKey: ["feedback", "affinity"] });
         await queryClient.invalidateQueries({ queryKey: ["feedback", "saved-pois"] });
-        message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
+        // message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
       } catch (e) {
-        message.error(e?.friendlyMessage || "Could not update favorites.");
+        toast.error({
+          title: "Couldn't update",
+          message: getErrorNotificationMessage(e, "Failed to update your favorites. Please try again."),
+        });
       } finally {
         setFavSendingKey(null);
       }
@@ -1094,42 +1297,93 @@ export default function MapPage() {
 
   const fetchPois = useCallback(
     async ({ selectionType, bbox, polygon, categoriesOverride }) => {
+      poiStreamAbortRef.current?.abort();
+      const ac = new AbortController();
+      poiStreamAbortRef.current = ac;
+
+      const useStream = USE_MAPBOX_AREA_POI_SEARCH && selectionType === "POLYGON";
+      const body = {
+        selectionType,
+        bbox: selectionType === "BBOX" ? bbox : null,
+        polygon: selectionType === "POLYGON" ? polygon : null,
+        categories: categoriesOverride !== undefined ? categoriesOverride : selectedBackendCats,
+        page: 0,
+        limit: 400,
+        sort: "RATING_DESC",
+        mapboxAreaSearch: USE_MAPBOX_AREA_POI_SEARCH && selectionType === "POLYGON",
+      };
+
       try {
         setPoiLoading(true);
-
-        const body = {
-          selectionType,
-          bbox: selectionType === "BBOX" ? bbox : null,
-          polygon: selectionType === "POLYGON" ? polygon : null,
-          categories: categoriesOverride !== undefined ? categoriesOverride : selectedBackendCats,
-          page: 0,
-          limit: 200,
-          sort: "RATING_DESC",
-        };
-        const res = await fetch("/pois/search-in-area", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-
-
-        if (!res.ok) {
-          setPoisRaw([]);
-          return;
+        if (useStream) {
+          setPoiStreamLoading(true);
+        } else {
+          setPoiStreamLoading(false);
         }
 
-        const data = await res.json();
-        setPoisRaw(Array.isArray(data?.pois) ? data.pois : []);
+        if (useStream) {
+          setPoisRaw([]);
+          streamAutoTabLockedRef.current = false;
+          await consumeMapboxPoiSearchStream("/pois/search-in-area/stream", body, {
+            signal: ac.signal,
+            onChunk: (payload) => {
+              const n = payload.pois?.length ?? 0;
+              setPoisRaw((prev) => mergePoiListsByStableKey(prev, payload.pois || []));
+              if (
+                n > 0 &&
+                !streamAutoTabLockedRef.current &&
+                payload.uiCategory &&
+                UI_CATEGORIES.some((c) => c.key === payload.uiCategory)
+              ) {
+                streamAutoTabLockedRef.current = true;
+                setResultsTab(payload.uiCategory);
+              }
+              if (n > 0) setPoiLoading(false);
+            },
+            onDone: () => setPoiLoading(false),
+          });
+        } else {
+          const res = await fetch("/pois/search-in-area", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+            signal: ac.signal,
+          });
+
+          if (!res.ok) {
+            setPoisRaw([]);
+            return;
+          }
+
+          const data = await res.json();
+          const list = Array.isArray(data?.pois) ? data.pois : [];
+          setPoisRaw(list);
+          if (
+            selectionType === "POLYGON" &&
+            list.length > 0 &&
+            !streamAutoTabLockedRef.current
+          ) {
+            const icon = poiIconByCategory(list[0]);
+            if (icon?.uiKey) {
+              streamAutoTabLockedRef.current = true;
+              setResultsTab(icon.uiKey);
+            }
+          }
+        }
       } catch (e) {
+        if (e?.name === "AbortError") return;
         console.error(e);
-        setPoisRaw([]);
+        if (!useStream) setPoisRaw([]);
       } finally {
         setPoiLoading(false);
+        if (useStream) {
+          setPoiStreamLoading(false);
+        }
       }
     },
-    [selectedBackendCats]
+    [selectedBackendCats, USE_MAPBOX_AREA_POI_SEARCH]
   );
 
   // Debounce viewport fetch
@@ -1140,6 +1394,7 @@ export default function MapPage() {
 
     debounceRef.current = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      if (activeRoute) return;
       const map = mapRef.current?.getMap?.();
       if (map && map.getZoom() < 12) {
         setPoisRaw([]);
@@ -1148,7 +1403,7 @@ export default function MapPage() {
       const bbox = getViewportBbox();
       if (bbox) fetchPois({ selectionType: "BBOX", bbox });
     }, 500);
-  }, [mode, fetchPois, getViewportBbox]);
+  }, [mode, activeRoute, fetchPois, getViewportBbox]);
 
   useEffect(() => {
     return () => {
@@ -1162,6 +1417,7 @@ export default function MapPage() {
 
     const t = setTimeout(() => {
       if (mode !== "VIEWPORT") return;
+      if (activeRoute) return;
       const map = mapRef.current?.getMap?.();
       if (map && map.getZoom() < 12) {
         setPoisRaw([]);
@@ -1172,12 +1428,13 @@ export default function MapPage() {
     }, 600);
 
     return () => clearTimeout(t);
-  }, [MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
+  }, [MAPBOX_TOKEN, user, mode, activeRoute, getViewportBbox, fetchPois]);
 
   // Kategori değişince (VIEWPORT’ta) refetch
   useEffect(() => {
     if (!MAPBOX_TOKEN || !user) return;
     if (mode !== "VIEWPORT") return;
+    if (activeRoute) return;
 
     const map = mapRef.current?.getMap?.();
     if (map && map.getZoom() < 12) {
@@ -1186,9 +1443,17 @@ export default function MapPage() {
     }
     const bbox = getViewportBbox();
     if (bbox) fetchPois({ selectionType: "BBOX", bbox });
-  }, [selectedBackendCats, MAPBOX_TOKEN, user, mode, getViewportBbox, fetchPois]);
+  }, [selectedBackendCats, MAPBOX_TOKEN, user, mode, activeRoute, getViewportBbox, fetchPois]);
 
   const startFreehand = useCallback(() => {
+    if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) {
+      toast.warning({ title: "Zoom in", message: "Zoom to neighbourhood level to draw an area — current zoom is too far out." });
+      return;
+    }
+    if (viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW) {
+      toast.warning({ title: "Zoom out", message: "You're too zoomed in — zoom out a bit to draw a meaningful area." });
+      return;
+    }
     setPolygonRouteParamsOpen(false);
     setPolygonRouteBannerDismissed(false);
     setMode("SELECTION");
@@ -1199,7 +1464,7 @@ export default function MapPage() {
     drawingRef.current = { isDown: false, points: [] };
     setPreviewLine(null);
     setSelection({ mode: null, polygon: [] });
-  }, []);
+  }, [viewState.zoom]);
 
   const clearSelectionOnly = useCallback(async () => {
     setPolygonRouteParamsOpen(false);
@@ -1210,6 +1475,8 @@ export default function MapPage() {
     setMode("VIEWPORT");
     setResultsOpen(false);
     setResultsTab("all");
+    streamAutoTabLockedRef.current = false;
+    setPoiStreamLoading(false);
 
     const bbox = getViewportBbox();
     if (bbox) {
@@ -1235,10 +1502,13 @@ export default function MapPage() {
     handleSelectAllFilters();
     await clearSelectionOnly();
   }, [handleSelectAllFilters, clearSelectionOnly]);
+  void handleResetFilters;
 
   const onMouseDownFreehand = useCallback(
     (e) => {
       if (!freehandEnabled) return;
+      if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) return;
+      if (viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW) return;
       drawingRef.current.isDown = true;
       drawingRef.current.points = [{ lng: e.lngLat.lng, lat: e.lngLat.lat }];
       setPreviewLine({
@@ -1247,12 +1517,14 @@ export default function MapPage() {
         geometry: { type: "LineString", coordinates: [[e.lngLat.lng, e.lngLat.lat]] },
       });
     },
-    [freehandEnabled]
+    [freehandEnabled, viewState.zoom]
   );
 
   const onMouseMoveFreehand = useCallback(
     (e) => {
       if (!freehandEnabled || !drawingRef.current.isDown) return;
+      if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) return;
+      if (viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW) return;
       drawingRef.current.points.push({ lng: e.lngLat.lng, lat: e.lngLat.lat });
       setPreviewLine({
         type: "Feature",
@@ -1260,7 +1532,7 @@ export default function MapPage() {
         geometry: { type: "LineString", coordinates: drawingRef.current.points.map((p) => [p.lng, p.lat]) },
       });
     },
-    [freehandEnabled]
+    [freehandEnabled, viewState.zoom]
   );
 
   const onMouseUpFreehand = useCallback(async () => {
@@ -1285,11 +1557,10 @@ export default function MapPage() {
     const poly = pts.map((p) => ({ lat: p.lat, lng: p.lng }));
     setSelection({ mode: "polygon", polygon: poly });
 
-    await fetchPois({ selectionType: "POLYGON", polygon: poly });
-
-    // Crucial: The useEffect will handle closing others when resultsOpen becomes true
     setResultsOpen(true);
     setResultsTab("all");
+    streamAutoTabLockedRef.current = false;
+    void fetchPois({ selectionType: "POLYGON", polygon: poly });
 
     if (user) {
       setPolygonRouteBannerDismissed(false);
@@ -1309,7 +1580,10 @@ export default function MapPage() {
   const submitPolygonRoute = useCallback(
     async (values) => {
       if (!selection?.polygon || selection.polygon.length < 3) {
-        message.warning("Please select a valid area first.");
+        toast.warning({
+          title: "Invalid area",
+          message: "Please select a valid area first.",
+        });
         return;
       }
       const ring = selection.polygon.map((p) => [p.lng, p.lat]);
@@ -1338,25 +1612,22 @@ export default function MapPage() {
           setIsChatOpen(false);
           setSelection({ mode: null, polygon: [] });
           setMode("VIEWPORT");
+          setPoisRaw([]);
           const convId = res.conversation_id || res.conversationId;
           if (convId) {
             linkPolygonRouteConversation(convId);
             setMapChatConversationId(String(convId));
             setChatConversationRefreshNonce((n) => n + 1);
           }
-          const summary = res.route_summary_message || res.routeSummaryMessage;
-          if (summary) message.success(summary);
-          else message.success("Route is being displayed on the map.");
+          // const summary = res.route_summary_message || res.routeSummaryMessage;
+          // if (summary) message.success(summary);
+          // else message.success("Route is being displayed on the map.");
         } else {
-          message.warning("Could not retrieve route data.");
+          toast.warning({ title: "Route unavailable", message: "Couldn't load the route data. Please try again." });
         }
       } catch (e) {
-        const msg =
-          e?.response?.data?.message ||
-          e?.friendlyMessage ||
-          e?.message ||
-          "Failed to create route.";
-        message.error(msg);
+        const msg = getErrorNotificationMessage(e, "Failed to create route.");
+        toast.error(msg);
       } finally {
         setPolygonRouteSubmitting(false);
       }
@@ -1368,30 +1639,40 @@ export default function MapPage() {
     setIsChatOpen(false);
     setMode("SELECTION");
     setFreehandEnabled(true);
-    message.info({
-      content:
-        "Draw an area on the map → select a day from the route panel on the right → update that day from the orange banner at the top.",
-      duration: 8,
-    });
-  }, []);
+    if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) {
+      toast.warning({ title: "Zoom in", message: "Zoom to neighbourhood level before drawing an area." });
+      return;
+    }
+    if (viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW) {
+      toast.warning({ title: "Zoom out", message: "You're too zoomed in — zoom out a bit to draw a meaningful area." });
+      return;
+    }
+    toast.info({ title: "Draw on the map", message: "Select a day from the route panel, then update it from the banner above." });
+  }, [viewState.zoom]);
 
   const submitReplanDayFromPolygon = useCallback(async () => {
     if (!selection?.polygon || selection.polygon.length < 3) {
-      message.error("Please draw a valid area.");
+      toast.error({
+        title: "Invalid area",
+        message: "Please draw a valid area.",
+      });
       return;
     }
     const convId = mapChatConversationId || getSessionConversationId();
     if (!convId) {
-      message.error("Open a route from the chat first or select the chat associated with the route created from the map.");
+      toast.error({ title: "No active route", message: "Open a route from the chat panel first." });
       return;
     }
     if (!activeRoute?.days?.length) {
-      message.error("No route available to replan.");
+      toast.error({ title: "Nothing to replan", message: "Generate a route from the chat first." });
       return;
     }
     const td = Number(activeRoute.total_days || activeRoute.totalDays || activeRoute.days.length);
     if (!Number.isFinite(activeDay) || activeDay < 1 || activeDay > td) {
-      message.error("Please select a valid day.");
+      toast.error({
+        title: "Invalid day",
+        message: "Please select a valid day.",
+      });
       return;
     }
     const ring = selection.polygon.map((p) => [p.lng, p.lat]);
@@ -1415,26 +1696,26 @@ export default function MapPage() {
         setIsChatOpen(true);
         linkPolygonRouteConversation(convId);
         setChatConversationRefreshNonce((n) => n + 1);
-        const summary = res.route_summary_message || res.routeSummaryMessage;
-        if (summary) message.success(summary);
-        else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
+        // const summary = res.route_summary_message || res.routeSummaryMessage;
+        // if (summary) message.success(summary);
+        // else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
       } else {
-        message.warning("Could not retrieve route data.");
+        toast.warning({
+          title: "Route unavailable",
+          message: "Could not retrieve route data.",
+        });
       }
     } catch (e) {
-      const msg =
-        e?.response?.data?.message ||
-        e?.friendlyMessage ||
-        e?.message ||
-        "Failed to replan day.";
-      message.error(msg);
+      const msg = getErrorNotificationMessage(e, "Failed to replan day.");
+      toast.error(msg);
     } finally {
       setReplanDaySubmitting(false);
     }
   }, [selection, mapChatConversationId, activeRoute, activeDay, selectedBackendCats]);
+  void submitReplanDayFromPolygon;
 
   /** Band kapatıldı + sonuç paneli kapalıyken küçük yedek CTA */
-  const showCompactPolygonRouteCta = useMemo(
+  const SHOW_COMPACT_POLYGON_ROUTE_CTA = useMemo(
     () =>
       Boolean(
         user &&
@@ -1448,7 +1729,7 @@ export default function MapPage() {
   );
 
   /** Rota açıkken çizilen alanla tek günü yeniden planlama (sohbet + kayıtlı rota gerekir). */
-  const showReplanDayBanner = useMemo(
+  const SHOW_REPLAN_DAY_BANNER = useMemo(
     () =>
       Boolean(
         user &&
@@ -1484,7 +1765,7 @@ export default function MapPage() {
       try {
         map.setProjection("globe");
         map.setFog({ "horizon-blend": 0.1, "space-color": "#000000", "star-intensity": 0.0 });
-      } catch (err) {
+      } catch {
         // ignore
       }
 
@@ -1492,7 +1773,9 @@ export default function MapPage() {
       setTimeout(() => {
         try {
           if (map) map.setProjection("globe");
-        } catch (e) { }
+        } catch {
+          // ignore
+        }
       }, 500);
     }
   }, [is3D]);
@@ -1511,7 +1794,7 @@ export default function MapPage() {
           "space-color": "#000000",
           "star-intensity": 0.1,
         });
-      } catch (err) {
+      } catch {
         // ignore
       }
 
@@ -1521,7 +1804,9 @@ export default function MapPage() {
           if (map) {
             map.setProjection({ name: "globe" });
           }
-        } catch (e) { }
+        } catch {
+          // ignore
+        }
       }, 300);
     }
   }, [is3D]);
@@ -1529,26 +1814,36 @@ export default function MapPage() {
   // POI'ler: polygon içi filtre + UI filtre
   // Combined POI list (Backend + Mapbox Discoveries)
   const pois = useMemo(() => {
+    // Hide all POI markers while a route is active.
+    if (activeRoute) return [];
+
     // 1. Performance Rule: Hide POIs at low zoom levels to prevent clutter
-    if (viewState.zoom <= 10) return [];
+    // Drawn-area mode: still show markers so POIs appear while browsing results.
+    const polygonSelection = mode === "SELECTION" && selection?.mode === "polygon" && selection.polygon.length >= 3;
+    if (viewState.zoom <= 10 && !polygonSelection) return [];
 
     const all = [...poisRaw];
     const poiCoords = new Set(poisRaw.map(p => `${p.latitude?.toFixed(4)},${p.longitude?.toFixed(4)}`));
 
-    mapboxPois.forEach(mbp => {
-      const coordKey = `${mbp.location.lat.toFixed(4)},${mbp.location.lng.toFixed(4)}`;
-      if (!poiCoords.has(coordKey)) {
-        all.push({
-          poiId: mbp.id,
-          latitude: mbp.location.lat,
-          longitude: mbp.location.lng,
-          name: mbp.name,
-          category: mbp.category,
-          source: 'mapbox'
-        });
-        poiCoords.add(coordKey);
-      }
-    });
+    const skipStylePoiMerge =
+      USE_MAPBOX_AREA_POI_SEARCH && mode === "SELECTION" && selection?.mode === "polygon";
+
+    if (!skipStylePoiMerge) {
+      mapboxPois.forEach(mbp => {
+        const coordKey = `${mbp.location.lat.toFixed(4)},${mbp.location.lng.toFixed(4)}`;
+        if (!poiCoords.has(coordKey)) {
+          all.push({
+            poiId: mbp.id,
+            latitude: mbp.location.lat,
+            longitude: mbp.location.lng,
+            name: mbp.name,
+            category: mbp.category,
+            source: 'mapbox'
+          });
+          poiCoords.add(coordKey);
+        }
+      });
+    }
 
     let list = all;
 
@@ -1566,7 +1861,7 @@ export default function MapPage() {
 
     // 2. Performance Rule: Cap at 1000 POIs to prevent memory bloating
     return out.slice(0, 1000);
-  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom]);
+  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom, USE_MAPBOX_AREA_POI_SEARCH, activeRoute]);
 
   const canShowResultsPanel = useMemo(() => {
     return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
@@ -1594,12 +1889,20 @@ export default function MapPage() {
   }, [pois, canShowResultsPanel]);
 
   useEffect(() => {
-    if (resultsTab !== "all" && resultsCategories.length > 0) {
-      if (!resultsCategories.find((c) => c.key === resultsTab)) {
-        setResultsTab("all");
-      }
+    if (resultsTab === "all") return;
+    if (resultsCategories.length === 0) return;
+    if (!resultsCategories.find((c) => c.key === resultsTab)) {
+      setResultsTab("all");
     }
   }, [resultsCategories, resultsTab]);
+
+  useEffect(() => {
+    if (!canShowResultsPanel || !resultsTabsScrollRef.current) return;
+    const tabEl = resultsTabsScrollRef.current.querySelector(`[data-results-tab="${resultsTab}"]`);
+    if (tabEl && typeof tabEl.scrollIntoView === "function") {
+      tabEl.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    }
+  }, [resultsTab, canShowResultsPanel, resultsCategories.length]);
 
   // Normalize waypoint coords: backend may send latitude/longitude (camelCase); ensure numeric and consistent order
   const activeWaypoints = useMemo(() => {
@@ -1715,7 +2018,6 @@ export default function MapPage() {
         // Debug: see raw Mapbox-based geometry and inputs in browser console
         // so we can tune routing later if needed.
         // Not spamming: only logs when a route is actually fetched.
-        // eslint-disable-next-line no-console
         console.log("[Vacanza][RouteGeometry] request", body, "response", res?.data);
 
         const coords = res?.data?.coordinates;
@@ -1783,7 +2085,6 @@ export default function MapPage() {
     }
   }, [activeWaypoints]);
 
-  // ✅ Results panel açılınca: polygon panel altında kalmasın diye fitBounds + padding
   useEffect(() => {
     if (!canShowResultsPanel) return;
 
@@ -1793,7 +2094,7 @@ export default function MapPage() {
     const bbox = polygonToBbox(selection.polygon);
     if (!bbox) return;
 
-    const bottomPad = isMobile ? 320 : 360; 
+    const bottomPad = isMobile ? 320 : 360;
     // If filter is open, push the polygon to the left slightly to avoid overlap
     const rightPad = isMobile ? 16 : filterOpen ? (FILTER_PANEL_APPROX_WIDTH_DESKTOP + 80) : 100;
 
@@ -1824,22 +2125,13 @@ export default function MapPage() {
   if (loadingAuth || !user) return null;
 
   // ---------- Responsive sizes ----------
-  const headerHeight = isMobile ? 54 : 64;
-  const contentPadding = isMobile ? 0 : 24;
-  const mapContainerRadius = isMobile ? 0 : 12;
-  const mapContainerHeight = isMobile ? `calc(100vh - ${headerHeight}px)` : `calc(100vh - ${headerHeight + contentPadding * 2}px)`;
-
-  const fabSize = isMobile ? 44 : 48;
-  const fabGap = isMobile ? 8 : 10;
-
-  const filterPanelWidth = isMobile ? "min(92vw, 360px)" : 280;
-  const filterPanelTop = isMobile ? headerHeight + 10 : 28;
-  const filterPanelRight = isMobile ? 12 : 78;
-
-  const resultsWidth = isMobile ? "calc(100% - 24px)" : "min(760px, calc(100% - 48px))";
-  const resultsBottom = isMobile ? 12 : 18;
   const resultsMaxHeight = isMobile ? 220 : 240;
 
+  const isDrawAreaSession = freehandEnabled && selection?.mode !== "polygon";
+  const drawAreaZoomTooLow = viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW;
+  const drawAreaZoomTooHigh = viewState.zoom > MAX_ZOOM_FOR_AREA_DRAW;
+  const drawAreaZoomOk = !drawAreaZoomTooLow && !drawAreaZoomTooHigh;
+  const showDrawZoomGate = isDrawAreaSession && drawAreaZoomTooLow;
 
   return (
     <div className={`vivid-map-page ${themeClass} ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -1847,12 +2139,13 @@ export default function MapPage() {
       {/* 1. Header (TOPBAR) */}
       <header className={`vivid-map-header ${themeClass}`}>
         <div className="header-left">
-          <div 
-            className="brand-logo vivid-brand" 
-            style={{ cursor: 'pointer' }} 
+          <div
+            className="brand-logo vivid-brand"
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
             onClick={() => window.location.reload()}
           >
-            Vacanza
+            <img src={webIcon} alt="Vacanza" style={{ width: 44, height: 44, display: 'block' }} />
+            <span style={{ lineHeight: 1 }}>Vacanza</span>
           </div>
         </div>
         <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1897,7 +2190,7 @@ export default function MapPage() {
       <div className="vivid-sidebar-overlay" onClick={(e) => { e.stopPropagation(); setSidebarOpen(false); }} />
       <aside className="vivid-sidebar">
         <div className="sidebar-header" style={{ marginBottom: 24 }}>
-          <span className="brand-logo" style={{ marginLeft: 0, fontSize: 24 }}>Settings</span>
+          <span className="sidebar-title">Settings</span>
         </div>
 
         <div className="sidebar-user-section">
@@ -1941,7 +2234,7 @@ export default function MapPage() {
 
       {/* 3. Main Content (MAP) */}
       <main className={`map-layout-content ${viewState.zoom >= 20 ? "zoom-at-max" : viewState.zoom <= 1.5 ? "zoom-at-min" : ""}`}>
-        <Map
+        <MapGL
           ref={mapRef}
           {...viewState}
           padding={mapPadding}
@@ -1962,11 +2255,21 @@ export default function MapPage() {
           dragPan={!freehandEnabled}
           cursor={freehandEnabled ? "crosshair" : "grab"}
           attributionControl={false}
-          minZoom={1.5}
+          minZoom={isDrawAreaSession ? MIN_ZOOM_FOR_AREA_DRAW : 1.5}
           maxZoom={20}
         >
           <NavigationControl position="bottom-left" showCompass={false} />
-          <GeolocateControl position="bottom-left" />
+          {/* Custom "My Location" button — GeolocateControl doesn't work with controlled viewState */}
+
+          {userLocation && (
+            <Marker latitude={userLocation.lat} longitude={userLocation.lng} anchor="center">
+              <div style={{
+                width: 16, height: 16, borderRadius: '50%',
+                background: '#4285F4', border: '3px solid #fff',
+                boxShadow: '0 0 8px rgba(66,133,244,0.6)',
+              }} />
+            </Marker>
+          )}
 
           <Source id="selection-src" type="geojson" data={selectionGeoJSON}>
             <Layer {...selectionFillLayer} />
@@ -2164,21 +2467,46 @@ export default function MapPage() {
               </Marker>
             );
           })}
-        </Map>
+
+          {/* Location dot with pulse */}
+          {userLocation && (
+            <Marker latitude={userLocation.lat} longitude={userLocation.lng} anchor="center">
+              <div className="vivid-user-location-dot">
+                <div className="vivid-user-location-pulse" />
+                <div className="vivid-user-location-inner" />
+              </div>
+            </Marker>
+          )}
+        </MapGL>
+
+        {
+          showDrawZoomGate ? (
+            <div className="map-draw-zoom-gate" aria-live="polite">
+              <div className="map-draw-zoom-gate__hint glass-panel">
+                <div className="map-draw-zoom-gate__title">Zoom in to draw</div>
+                <p className="map-draw-zoom-gate__text">
+                  This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area.
+                </p>
+              </div>
+            </div>
+          ) : null
+        }
 
         {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel and chat are closed */}
-        {!canShowResultsPanel && !isChatOpen && (
-          <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
-            setFilterOpen(false);
-            setFabExpanded(false);
-            setIsChatOpen(true);
-          }}>
-            <div className="pill-content">
-              <CompassOutlined className="pill-icon" />
-              <span className="pill-text">Ask Vacanza AI</span>
-            </div>
-          </button>
-        )}
+        {
+          !canShowResultsPanel && !isChatOpen && (
+            <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
+              setFilterOpen(false);
+              setFabExpanded(false);
+              setIsChatOpen(true);
+            }}>
+              <div className="pill-content">
+                <CompassOutlined className="pill-icon" />
+                <span className="pill-text">Ask Vacanza AI</span>
+              </div>
+            </button>
+          )
+        }
 
         {/* 5. Unified Action FAB (RIGHT) */}
         <div className="vivid-fab-group">
@@ -2206,8 +2534,24 @@ export default function MapPage() {
                 <FiFilter style={{ fontSize: 20 }} />
               </button>
             </Tooltip>
-            <Tooltip title="Draw Area" placement="left">
-              <button className="sub-fab vivid-interactive" onClick={() => { startFreehand(); setFabExpanded(false); }}>
+            <Tooltip
+              title={
+                drawAreaZoomTooLow
+                  ? "Zoom in closer — draw area works at neighborhood scale"
+                  : drawAreaZoomTooHigh
+                    ? "Zoom out a bit — you're too close to draw a useful area"
+                    : "Draw Area"
+              }
+              placement="left"
+            >
+              <button
+                type="button"
+                className={`sub-fab vivid-interactive${!drawAreaZoomOk ? " sub-fab--muted" : ""}`}
+                onClick={() => {
+                  startFreehand();
+                  setFabExpanded(false);
+                }}
+              >
                 <PencilIcon />
               </button>
             </Tooltip>
@@ -2225,163 +2569,211 @@ export default function MapPage() {
         </div>
 
         {/* Saved Places Panel */}
-        {savedPoisOpen && (
-          <SavedPoisPanel
-            onClose={() => setSavedPoisOpen(false)}
-            onFlyTo={(lat, lng) => {
-              const map = mapRef.current?.getMap?.();
-              if (map) {
-                map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 });
-              }
-            }}
-          />
-        )}
+        {
+          savedPoisOpen && (
+            <SavedPoisPanel
+              onClose={() => setSavedPoisOpen(false)}
+              onFlyTo={(lat, lng) => {
+                const map = mapRef.current?.getMap?.();
+                if (map) {
+                  map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 });
+                }
+              }}
+            />
+          )
+        }
 
         {/* 5. Filter Panel (Glass) */}
-        {filterOpen && (
-          <div className="glass-panel filter-panel">
-            <div className="filter-header">
-              <span className="filter-title">Filter Places</span>
-              <div className="filter-header-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <Button size="small" type="link" onClick={handleSelectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>All</Button>
-                <div style={{ height: 12, width: 1, background: "rgba(0,0,0,0.1)" }} />
-                <Button size="small" type="link" onClick={handleDeselectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>None</Button>
-                <Button type="text" size="small" icon={<CloseOutlined />} onClick={() => setFilterOpen(false)} style={{ marginLeft: 4 }} />
-              </div>
-            </div>
-            <div className="filter-body">
-              {UI_CATEGORIES.map((c) => (
-                <div key={c.key} className="cat-pill vivid-interactive" onClick={() => setSelectedCats(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
-                  style={{
-                    background: selectedCats[c.key] ? c.pill : "rgba(var(--vivid-navy-rgb, 26,35,50), 0.05)",
-                    border: selectedCats[c.key] ? `2.5px solid ${c.ring}` : "1.5px solid rgba(255,255,255,0.08)",
-                    opacity: selectedCats[c.key] ? 1 : 0.6
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div className="cat-pill-icon" style={{ color: selectedCats[c.key] ? c.ring : "var(--text-sub)" }}>{c.icon}</div>
-                    <span className="cat-pill-label">{c.label}</span>
-                  </div>
+        {
+          filterOpen && (
+            <div className="glass-panel filter-panel">
+              <div className="filter-header">
+                <span className="filter-title">Filter Places</span>
+                <div className="filter-header-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <Button size="small" type="link" onClick={handleSelectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>All</Button>
+                  <div style={{ height: 12, width: 1, background: "rgba(0,0,0,0.1)" }} />
+                  <Button size="small" type="link" onClick={handleDeselectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>None</Button>
+                  <Button type="text" size="small" icon={<CloseOutlined />} onClick={clearSelectionOnly} style={{ marginLeft: 4 }} />
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 6. Results Sheet (Glass) */}
-        {canShowResultsPanel && (
-          <div className="glass-panel results-sheet">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 18 }}>Discover Local Gems</div>
-                <div style={{ fontSize: 13, color: "var(--text-sub)" }}>{resultsPois.length} curated spots found</div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {user && !activeRoute && (
-                  <Button 
-                    type="primary" 
-                    shape="round" 
-                    onClick={openPolygonRouteParams} 
-                    className="vivid-create-route-btn-glass"
-                  >
-                    Create AI Route
-                  </Button>
-                )}
-                <Button type="text" icon={<CloseOutlined />} onClick={clearSelectionOnly} />
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 12 }}>
-              {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...resultsCategories].map(t => {
-                const active = resultsTab === t.key;
-                return (
-                  <button key={t.key} onClick={() => setResultsTab(t.key)}
+              <div className="filter-body">
+                {UI_CATEGORIES.map((c) => (
+                  <div key={c.key} className="cat-pill vivid-interactive" onClick={() => setSelectedCats(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
                     style={{
-                      flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
-                      border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
-                      background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
-                      color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
+                      background: selectedCats[c.key] ? c.pill : "rgba(var(--vivid-navy-rgb, 26,35,50), 0.05)",
+                      border: selectedCats[c.key] ? `2.5px solid ${c.ring}` : "1.5px solid rgba(255,255,255,0.08)",
+                      opacity: selectedCats[c.key] ? 1 : 0.6
                     }}
                   >
-                    {t.icon || <GlobalOutlined />} {t.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div style={{ height: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4, display: "flex", flexDirection: "column" }}>
-              {poiLoading ? (
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, opacity: 0.8 }}>
-                  <Spin size="large" />
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sub)" }}>Finding nearby gems...</div>
-                </div>
-              ) : resultsPois.length > 0 ? (
-                resultsPois.map((p) => {
-                  const favRowKey = getMapPoiRowKey(p);
-                  const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
-                  return (
-                  <div key={favRowKey} style={{
-                    display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
-                    borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
-                    marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
-                    backdropFilter: "blur(4px)",
-                    flexShrink: 0
-                  }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 14,
-                      background: "rgba(255,255,255,0.05)",
-                      display: "grid", placeItems: "center",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      border: "1px solid rgba(255,255,255,0.1)"
-                    }}>
-                      <div style={{
-                        color: poiIconByCategory(p)?.ring,
-                        fontSize: 20,
-                        filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
-                      }}>
-                        {poiIconByCategory(p)?.icon}
-                      </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <div className="cat-pill-icon" style={{ color: selectedCats[c.key] ? c.ring : "var(--text-sub)" }}>{c.icon}</div>
+                      <span className="cat-pill-label">{c.label}</span>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
-                      <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p)}</div>
-                    </div>
-                    {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
-                      <Tooltip title={mapPoiFavored ? "Remove favorite" : "Favorite"}>
-                        <button
-                          type="button"
-                          className={`map-poi-fav-hit map-poi-fav-hit--in-sheet${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
-                          aria-label={mapPoiFavored ? "Remove favorite" : "Add favorite"}
-                          aria-pressed={mapPoiFavored}
-                          disabled={favSendingKey === favRowKey}
-                          onClick={() => toggleMapPoiFavorite(p)}
-                        >
-                          {favSendingKey === favRowKey ? (
-                            <Spin size="small" className="map-poi-fav-hit__spin" />
-                          ) : (
-                            <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
-                              {mapPoiFavored ? (
-                                <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
-                              ) : (
-                                <HeartOutlined className="map-poi-fav-hit__heart" />
-                              )}
-                            </span>
-                          )}
-                        </button>
-                      </Tooltip>
-                    ) : null}
                   </div>
-                  );
-                })
-              ) : (
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
-                  <GlobalOutlined style={{ fontSize: 32, marginBottom: 12 }} />
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>No results in this area</div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
+
+        {/* 6. Results Sheet (Glass) */}
+        {
+          canShowResultsPanel && (
+            <div className="glass-panel results-sheet">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 18 }}>Discover Local Gems</div>
+                  <div style={{ fontSize: 13, color: "var(--text-sub)" }}>{resultsPois.length} curated spots found</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {user && !activeRoute && (
+                    <Button
+                      type="primary"
+                      shape="round"
+                      onClick={() => {
+                        if (poiLoading || poiStreamLoading) {
+                          toast.warning({ title: "Please wait", message: "All places in the area must finish loading before creating a route." });
+                          return;
+                        }
+                        openPolygonRouteParams();
+                      }}
+                      className={`vivid-create-route-btn-glass${poiLoading || poiStreamLoading ? " vivid-create-route-btn-loading" : ""}`}
+                    >
+                      Create AI Route
+                    </Button>
+                  )}
+                  <Button type="text" icon={<CloseOutlined />} onClick={clearSelectionOnly} />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  marginBottom: 4,
+                }}
+              >
+                <div
+                  ref={resultsTabsScrollRef}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    gap: 10,
+                    overflowX: "auto",
+                    paddingBottom: 12,
+                  }}
+                >
+                  {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...resultsCategories].map(t => {
+                    const active = resultsTab === t.key;
+                    return (
+                      <button key={t.key} type="button" data-results-tab={t.key} onClick={() => setResultsTab(t.key)}
+                        style={{
+                          flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
+                          border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
+                          background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
+                          color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
+                        }}
+                      >
+                        {t.icon || <GlobalOutlined />} {t.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {poiStreamLoading ? (
+                  <div
+                    style={{
+                      flex: "0 0 auto",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      paddingBottom: 12,
+                    }}
+                    title="More place categories are still loading"
+                  >
+                    <Spin size="small" />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-sub)", whiteSpace: "nowrap" }}>
+                      Loading more…
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              <div style={{ height: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4, display: "flex", flexDirection: "column" }}>
+                {poiLoading ? (
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, opacity: 0.8 }}>
+                    <Spin size="large" />
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sub)" }}>Finding nearby gems...</div>
+                  </div>
+                ) : resultsPois.length > 0 ? (
+                  resultsPois.map((p) => {
+                    const favRowKey = getMapPoiRowKey(p);
+                    const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
+                    return (
+                      <div key={favRowKey} style={{
+                        display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
+                        borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
+                        marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
+                        backdropFilter: "blur(4px)",
+                        flexShrink: 0
+                      }}>
+                        <div style={{
+                          width: 48, height: 48, borderRadius: 14,
+                          background: "rgba(255,255,255,0.05)",
+                          display: "grid", placeItems: "center",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          border: "1px solid rgba(255,255,255,0.1)"
+                        }}>
+                          <div style={{
+                            color: poiIconByCategory(p)?.ring,
+                            fontSize: 20,
+                            filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                          }}>
+                            {poiIconByCategory(p)?.icon}
+                          </div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
+                          <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p)}</div>
+                        </div>
+                        {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
+                          <Tooltip title={mapPoiFavored ? "Remove favorite" : "Favorite"}>
+                            <button
+                              type="button"
+                              className={`map-poi-fav-hit map-poi-fav-hit--in-sheet${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
+                              aria-label={mapPoiFavored ? "Remove favorite" : "Add favorite"}
+                              aria-pressed={mapPoiFavored}
+                              disabled={favSendingKey === favRowKey}
+                              onClick={() => toggleMapPoiFavorite(p)}
+                            >
+                              {favSendingKey === favRowKey ? (
+                                <Spin size="small" className="map-poi-fav-hit__spin" />
+                              ) : (
+                                <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
+                                  {mapPoiFavored ? (
+                                    <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
+                                  ) : (
+                                    <HeartOutlined className="map-poi-fav-hit__heart" />
+                                  )}
+                                </span>
+                              )}
+                            </button>
+                          </Tooltip>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
+                    <GlobalOutlined style={{ fontSize: 32, marginBottom: 12 }} />
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>No results in this area</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        }
 
         <ConfigProvider
           theme={{
@@ -2392,11 +2784,11 @@ export default function MapPage() {
             }
           }}
         >
-          <Modal 
-            title={<div className="vivid-modal-title">Plan a Route</div>} 
-            open={polygonRouteParamsOpen} 
-            onCancel={() => setPolygonRouteParamsOpen(false)} 
-            footer={null} 
+          <Modal
+            title={<div className="vivid-modal-title">Plan a Route</div>}
+            open={polygonRouteParamsOpen}
+            onCancel={() => setPolygonRouteParamsOpen(false)}
+            footer={null}
             maskClosable={false}
             zIndex={1150}
             className={`vivid-premium-modal route-plan-modal ${themeClass}`}
@@ -2437,11 +2829,11 @@ export default function MapPage() {
                   <Switch />
                 </Form.Item>
                 <Button
-                  type="primary" 
-                  block 
-                  size="large" 
-                  htmlType="submit" 
-                  loading={polygonRouteSubmitting} 
+                  type="primary"
+                  block
+                  size="large"
+                  htmlType="submit"
+                  loading={polygonRouteSubmitting}
                   className="vivid-create-route-btn"
                   style={{ marginTop: 12 }}
                 >
@@ -2455,17 +2847,19 @@ export default function MapPage() {
         <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
 
         {/* 7. Itinerary/Route Card (RoutePanel) - RESTORED */}
-        {activeRoute && (
-          <RoutePanel
-            route={activeRoute}
-            activeDay={activeDay}
-            onDayChange={setActiveDay}
-            onClose={() => { setActiveRoute(null); setRouteViewActive(false); }}
-            onWaypointClick={handleWaypointClick}
-            onMarkUnavailable={handleMarkUnavailable}
-            onRouteUpdate={setActiveRoute}
-          />
-        )}
+        {
+          activeRoute && (
+            <RoutePanel
+              route={activeRoute}
+              activeDay={activeDay}
+              onDayChange={setActiveDay}
+              onClose={() => { setActiveRoute(null); setRouteViewActive(false); scheduleViewportFetch(); }}
+              onWaypointClick={handleWaypointClick}
+              onMarkUnavailable={handleMarkUnavailable}
+              onRouteUpdate={setActiveRoute}
+            />
+          )
+        }
 
         <VacanzaChat
           isOpen={isChatOpen}
@@ -2482,6 +2876,7 @@ export default function MapPage() {
             setActiveDay(1);
             setRouteViewActive(true);
             setIsChatOpen(false);
+            setPoisRaw([]);
           }}
         />
         <ProfileModal
@@ -2528,11 +2923,14 @@ export default function MapPage() {
               setActiveDay(1);
               setIsChatOpen(false);
             } catch (e) {
-              message.error(e?.friendlyMessage || "Could not load route.");
+              toast.error({
+                title: "Couldn't load route",
+                message: getErrorNotificationMessage(e, "Please try again."),
+              });
             }
           }}
         />
-      </main>
-    </div>
+      </main >
+    </div >
   );
 }

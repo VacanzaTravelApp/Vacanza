@@ -109,6 +109,48 @@
   color: var(--vc-text);
 }
 
+.route-panel-export-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background: var(--vc-primary) !important;
+  color: #fff !important;
+  border-radius: 8px !important;
+  font-size: 11px !important;
+  font-weight: 750 !important;
+  padding: 4px 12px !important;
+  height: 28px !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2) !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.route-panel-export-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(56, 189, 248, 0.3) !important;
+}
+
+.route-panel-export-btn:active {
+  transform: scale(0.96);
+}
+
+.route-panel-export-btn--done {
+  background: var(--vc-feedback-bg) !important;
+  color: var(--vc-text-secondary) !important;
+  box-shadow: none !important;
+  cursor: default !important;
+  opacity: 0.8;
+}
+
+.route-panel-export-btn--done:hover {
+  transform: none !important;
+  filter: none !important;
+}
+
 .route-panel-close {
   color: var(--vc-text) !important;
   width: 32px !important;
@@ -205,7 +247,8 @@
 .route-panel-weather-temps {
   font-size: 13px;
   font-weight: 800;
-  color: var(--vc-text); /* Use main text color for visibility */
+  color: var(--vc-text);
+  /* Use main text color for visibility */
   text-transform: uppercase;
   margin-bottom: 2px;
 }
@@ -595,6 +638,7 @@
   font-weight: 600;
   line-height: 1.4;
 }
+
 /* ═══ Hotel Section ═══ */
 .route-panel-hotel-section {
   padding: 14px 20px;
@@ -750,6 +794,7 @@
   color: var(--vc-text-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 1;
+  line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -846,14 +891,17 @@
   background: #9CA3AF !important;
   border-color: #9CA3AF !important;
 }
+
 .route-panel-waypoint-unavailable .route-panel-waypoint-line {
   background: #9CA3AF !important;
   opacity: 0.4;
 }
+
 .route-panel-waypoint-unavailable .route-panel-waypoint-name {
   text-decoration: line-through;
   opacity: 0.5;
 }
+
 .route-panel-waypoint-unavailable .route-panel-waypoint-clock,
 .route-panel-waypoint-unavailable .route-panel-waypoint-desc {
   opacity: 0.45;
@@ -890,10 +938,12 @@
   transition: border-color 0.15s, color 0.15s;
   line-height: 1.4;
 }
+
 .route-panel-mark-closed-btn:hover:not(:disabled) {
   border-color: #EF4444;
   color: #EF4444;
 }
+
 .route-panel-mark-closed-btn:disabled {
   opacity: 0.55;
   cursor: wait;

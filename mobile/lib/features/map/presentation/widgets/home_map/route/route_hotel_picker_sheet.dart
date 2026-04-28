@@ -3,6 +3,8 @@ import 'dart:ui';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
@@ -15,16 +17,24 @@ class RouteHotelPickerSheet extends StatefulWidget {
   final String routeId;
   final String? defaultDestination;
 
+  /// Initial map viewport — first POI of the route if available.
+  final double? initialLat;
+  final double? initialLon;
+
   const RouteHotelPickerSheet({
     super.key,
     required this.routeId,
     this.defaultDestination,
+    this.initialLat,
+    this.initialLon,
   });
 
   static Future<void> show(
     BuildContext context, {
     required String routeId,
     String? defaultDestination,
+    double? initialLat,
+    double? initialLon,
   }) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -33,6 +43,8 @@ class RouteHotelPickerSheet extends StatefulWidget {
       builder: (ctx) => RouteHotelPickerSheet(
         routeId: routeId,
         defaultDestination: defaultDestination,
+        initialLat: initialLat,
+        initialLon: initialLon,
       ),
     );
   }
@@ -83,9 +95,9 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
   double? _pinLat;
   double? _pinLon;
 
-  double _viewportLat = 48.8566;
-  double _viewportLon = 2.3522;
-  double _viewportZoom = 3.5;
+  late double _viewportLat;
+  late double _viewportLon;
+  late double _viewportZoom;
 
   bool _pinPlaced = false;
 
@@ -100,9 +112,19 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
     _nameCtrl.addListener(() => setState(() {}));
     _addressCtrl.addListener(_onAddressChanged);
 
-    final dest = widget.defaultDestination;
-    if (dest != null && dest.isNotEmpty) {
-      _geocodeForViewport(dest);
+    // First POI coordinates take priority — no geocoding round-trip needed.
+    if (widget.initialLat != null && widget.initialLon != null) {
+      _viewportLat = widget.initialLat!;
+      _viewportLon = widget.initialLon!;
+      _viewportZoom = 12.0;
+    } else {
+      _viewportLat = 48.8566;
+      _viewportLon = 2.3522;
+      _viewportZoom = 3.5;
+      final dest = widget.defaultDestination;
+      if (dest != null && dest.isNotEmpty) {
+        _geocodeForViewport(dest);
+      }
     }
   }
 
@@ -325,7 +347,9 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final maxSheetHeight = size.height * 0.92;
     final cs = Theme.of(context).colorScheme;
     final t = context.vacanzaTokens;
     final isLight = Theme.of(context).brightness == Brightness.light;
@@ -379,12 +403,16 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
             ),
             child: SafeArea(
               top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxSheetHeight),
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                     // Handle
                     Center(
                       child: Container(
@@ -524,6 +552,12 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
                                   isLight
                                       ? MapboxConfig.styleStandard
                                       : MapboxConfig.styleDark,
+                              // Compete with parent scroll/sheet: map only receives unclaimed drags if null.
+                              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                                Factory<OneSequenceGestureRecognizer>(
+                                  () => EagerGestureRecognizer(),
+                                ),
+                              },
                               onMapCreated: (map) async {
                                 _mapController = map;
                                 _pinManager = await map.annotations
@@ -590,7 +624,8 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
                         ),
                       ),
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

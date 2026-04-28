@@ -134,29 +134,35 @@ class AuthRepository {
 
       if (!res.success) {
         throw AuthFailure(
-          res.message.isNotEmpty ? res.message : 'Register sync başarısız.',
+          res.message.isNotEmpty
+              ? res.message
+              : 'Could not complete registration. Please try again.',
         );
       }
 
       return res;
     } on fb.FirebaseAuthException catch (e) {
       switch (e.code) {
+        case 'network-request-failed':
+        case 'network-error':
+          throw const AuthFailure(
+            'No internet connection. Please check your connection and try again.',
+          );
         case 'email-already-in-use':
-          throw const AuthFailure('Bu email adresi zaten kayıtlı.');
+          throw const AuthFailure('This email address is already registered.');
         case 'invalid-email':
-          throw const AuthFailure('Geçersiz email adresi.');
+          throw const AuthFailure('The email address is not valid.');
         case 'weak-password':
-          throw const AuthFailure('Şifre çok zayıf.');
+          throw const AuthFailure('The password is too weak. Use at least 6 characters.');
         default:
-          throw AuthFailure('Firebase register hatası: ${e.code}');
+          throw const AuthFailure('Registration failed. Please try again.');
       }
     } on DioException catch (e) {
-      final message = extractBackendMessage(e);
-      throw AuthFailure(message);
+      throw AuthFailure(extractBackendMessage(e));
     } on AuthFailure {
       rethrow;
     } catch (_) {
-      throw const AuthFailure('Register sırasında beklenmeyen hata oluştu.');
+      throw const AuthFailure('Something went wrong. Please try again.');
     }
   }
 
@@ -178,36 +184,34 @@ class AuthRepository {
       final auth = await _apiClient.loginSync(firebaseIdToken: firebaseIdToken);
 
       if (auth.userId.isEmpty) {
-        throw const AuthFailure('Backend authentication başarısız.');
+        throw const AuthFailure('Authentication failed. Please sign in again.');
       }
 
       return auth;
     } on fb.FirebaseAuthException catch (e) {
       final code = e.code.toLowerCase();
       switch (code) {
+        case 'network-request-failed':
+        case 'network-error':
+          throw const AuthFailure(
+            'No internet connection. Please check your connection and try again.',
+          );
         case 'invalid-credential':
         case 'invalid-login-credentials':
-          throw const AuthFailure('Email veya şifre hatalı.');
+          throw const AuthFailure('Incorrect email or password.');
         case 'invalid-email':
-          throw const AuthFailure('Geçersiz email formatı.');
+          throw const AuthFailure('Enter a valid email address.');
         case 'too-many-requests':
-          throw const AuthFailure('Çok fazla deneme. Sonra tekrar dene.');
+          throw const AuthFailure('Too many attempts. Please try again later.');
         default:
-          throw const AuthFailure('Giriş yapılamadı. Bilgileri kontrol et.');
+          throw const AuthFailure('Sign in failed. Please check your credentials.');
       }
     } on DioException catch (e) {
-      final status = e.response?.statusCode;
-      final message = extractBackendMessage(e);
-
-      if (status == 401) {
-        throw const AuthFailure('Session expired. Please login again.');
-      }
-
-      throw AuthFailure(message);
+      throw AuthFailure(extractBackendMessage(e));
     } on AuthFailure {
       rethrow;
     } catch (_) {
-      throw const AuthFailure('Login sırasında beklenmeyen hata oluştu.');
+      throw const AuthFailure('Something went wrong. Please try again.');
     }
   }
 
@@ -237,12 +241,11 @@ class AuthRepository {
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (status == 401) {
-        throw const AuthFailure('Session expired.');
+        throw const AuthFailure('Session expired. Please sign in again.');
       }
-      final message = extractBackendMessage(e);
-      throw AuthFailure(message);
+      throw AuthFailure(extractBackendMessage(e));
     } catch (_) {
-      throw const AuthFailure('Session restore sırasında hata oluştu.');
+      throw const AuthFailure('Session expired. Please sign in again.');
     }
   }
 }

@@ -22,6 +22,11 @@ http.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // FormData gönderirken axios'un boundary eklemesi için Content-Type'ı temizliyoruz
+    if (config.data instanceof FormData) {
+      delete config.headers["Content-Type"];
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -72,6 +77,9 @@ http.interceptors.response.use(
       error.friendlyMessage = message || "Invalid request. Please check your input.";
     } else if (status === 409) {
       error.friendlyMessage = message || "This action conflicts with existing data.";
+    } else if (status >= 500 || !status) {
+      console.error("Server or Network error:", error);
+      error.friendlyMessage = "We are performing a quick maintenance. Please try again in a few minutes.";
     }
 
     return Promise.reject(error);

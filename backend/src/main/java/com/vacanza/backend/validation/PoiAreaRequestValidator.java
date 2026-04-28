@@ -1,10 +1,12 @@
 package com.vacanza.backend.validation;
 
 import com.vacanza.backend.dto.request.PoiSearchInAreaRequestDTO;
+import com.vacanza.backend.util.PolygonRouteGeometry;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -29,6 +31,10 @@ public class PoiAreaRequestValidator {
             validateBbox(req.getBbox());
         } else {
             validatePolygon(req.getPolygon());
+        }
+
+        if (Boolean.TRUE.equals(req.getMapboxAreaSearch())) {
+            validateMapboxSearchFootprint(req);
         }
     }
 
@@ -65,6 +71,25 @@ public class PoiAreaRequestValidator {
         require(lat != null && lng != null, HttpStatus.BAD_REQUEST, "LAT_LNG_REQUIRED", "lat/lng cannot be null");
         require(lat >= -90 && lat <= 90, HttpStatus.UNPROCESSABLE_ENTITY, "LAT_OUT_OF_RANGE", "lat must be between -90 and 90");
         require(lng >= -180 && lng <= 180, HttpStatus.UNPROCESSABLE_ENTITY, "LNG_OUT_OF_RANGE", "lng must be between -180 and 180");
+    }
+
+    private void validateMapboxSearchFootprint(PoiSearchInAreaRequestDTO req) {
+        double km2;
+        if (req.getSelectionType() == PoiSearchInAreaRequestDTO.SelectionType.BBOX) {
+            PoiSearchInAreaRequestDTO.Bbox b = req.getBbox();
+            km2 = PolygonRouteGeometry.bboxAreaKm2(
+                    b.getMinLng(), b.getMinLat(), b.getMaxLng(), b.getMaxLat());
+        } else {
+            List<double[]> ring = new ArrayList<>();
+            for (PoiSearchInAreaRequestDTO.LatLng p : req.getPolygon()) {
+                ring.add(new double[] { p.getLng(), p.getLat() });
+            }
+            km2 = PolygonRouteGeometry.bboxAreaKm2(ring);
+        }
+        require(Double.isFinite(km2) && km2 <= PolygonRouteGeometry.MAX_BBOX_AREA_KM2,
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                "MAPBOX_SEARCH_AREA_TOO_LARGE",
+                "mapbox area search requires bbox footprint <= " + (int) PolygonRouteGeometry.MAX_BBOX_AREA_KM2 + " km²");
     }
 
     private void require(boolean condition, HttpStatus status, String code, String message) {

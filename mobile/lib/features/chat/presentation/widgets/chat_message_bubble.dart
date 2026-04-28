@@ -79,14 +79,6 @@ class ChatMessageBubble extends StatelessWidget {
     Future<void> copy() async {
       HapticFeedback.selectionClick();
       await Clipboard.setData(ClipboardData(text: message.content));
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Copied'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     }
 
     return Padding(
@@ -112,10 +104,7 @@ class ChatMessageBubble extends StatelessWidget {
                 ],
               ),
               child: Container(
-                padding:
-                    !isUser
-                        ? const EdgeInsets.all(1.2)
-                        : EdgeInsets.zero,
+                padding: !isUser ? const EdgeInsets.all(1.2) : EdgeInsets.zero,
                 decoration: BoxDecoration(
                   borderRadius: bubbleRadius,
                   gradient: !isUser ? assistantOutlineGradient : null,
@@ -145,35 +134,37 @@ class ChatMessageBubble extends StatelessWidget {
                             ),
                   ),
                   child: Column(
-                crossAxisAlignment:
-                    isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text.rich(
-                    TextSpan(
-                      children: _parseBoldSpans(
-                        message.content,
-                        style: baseTextStyle,
-                        boldStyle: boldTextStyle,
+                    crossAxisAlignment:
+                        isUser
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          children: _parseBoldSpans(
+                            message.content,
+                            style: baseTextStyle,
+                            boldStyle: boldTextStyle,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  if ((timestampLabel ?? '').trim().isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      timestampLabel!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color:
-                            isUser
-                                ? Colors.white.withValues(alpha: 0.75)
-                                : t.textSub.withValues(alpha: 0.75),
-                        height: 1,
-                      ),
-                    ),
-                  ],
-                ],
+                      if ((timestampLabel ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          timestampLabel!,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color:
+                                isUser
+                                    ? Colors.white.withValues(alpha: 0.75)
+                                    : t.textSub.withValues(alpha: 0.75),
+                            height: 1,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -184,4 +175,3 @@ class ChatMessageBubble extends StatelessWidget {
     );
   }
 }
-

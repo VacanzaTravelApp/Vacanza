@@ -1,12 +1,9 @@
-/* Same layout rhythm as LoginCard / RegisterCard */
-
 .verify-email-actions {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-/* Matches header-subtext / login-redirect tone — not bright “success green” */
 .verify-email-inline-success {
   margin-top: 16px;
   padding: 10px 12px;
@@ -38,7 +35,6 @@
   font-style: normal;
 }
 
-/* Resend on cooldown: faded primary (matches card, not loud disabled gray) */
 .register-card .verify-email-resend-btn.ant-btn-primary.ant-btn-disabled,
 .register-card .verify-email-resend-btn.ant-btn-primary:disabled {
   opacity: 0.42 !important;

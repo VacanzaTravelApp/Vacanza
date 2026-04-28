@@ -67,6 +67,7 @@ public class UserPreferencesService {
                     .dailyBudget(req.getDailyBudget())
                     .budgetCurrency(req.getBudgetCurrency())
                     .splurgeCategories(req.getSplurgeCategories())
+                    .maxDailyPois(req.getMaxDailyPois())
                     .preferredLanguage(req.getPreferredLanguage())
                     .spokenLanguages(req.getSpokenLanguages())
                     .build();
@@ -107,6 +108,9 @@ public class UserPreferencesService {
         if (req.getSplurgeCategories() != null)
             prefs.setSplurgeCategories(req.getSplurgeCategories());
 
+        if (req.getMaxDailyPois() != null)
+            prefs.setMaxDailyPois(req.getMaxDailyPois());
+
         if (req.getPreferredLanguage() != null)
             prefs.setPreferredLanguage(req.getPreferredLanguage());
         if (req.getSpokenLanguages() != null)
@@ -133,6 +137,7 @@ public class UserPreferencesService {
                 .dailyBudget(prefs.getDailyBudget())
                 .budgetCurrency(prefs.getBudgetCurrency())
                 .splurgeCategories(prefs.getSplurgeCategories())
+                .maxDailyPois(prefs.getMaxDailyPois())
                 .preferredLanguage(prefs.getPreferredLanguage())
                 .spokenLanguages(prefs.getSpokenLanguages())
                 .createdAt(prefs.getCreatedAt())

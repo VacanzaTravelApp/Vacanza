@@ -37,6 +37,9 @@ public class UserPreferencesRequestDTO {
     private String budgetCurrency;
     private List<String> splurgeCategories;
 
+    // POI Limits
+    private Integer maxDailyPois;
+
     // Language & Communication
     private String preferredLanguage;
     private List<String> spokenLanguages;

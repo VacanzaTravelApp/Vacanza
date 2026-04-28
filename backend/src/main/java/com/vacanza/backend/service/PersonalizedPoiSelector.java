@@ -16,9 +16,11 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Single entry for post-search POI personalization: enrich → avoid (DROP) → score → constraints → diversity → LLM cap.
@@ -48,12 +50,38 @@ public class PersonalizedPoiSelector {
         List<PoiResult> afterAvoid = filterAvoidDrop(enriched, profile);
         PoiFeedbackContext feedback = userFeedbackService.buildContext(p.userId());
         List<PoiResult> scored = listScoringService.scoreSortAndFilter(afterAvoid, profile, feedback);
-        List<PoiResult> constrained = constraintFilter.apply(scored, profile, ctx);
+        List<PoiResult> jittered = applyDiningVarietyJitter(scored);
+        List<PoiResult> constrained = constraintFilter.apply(jittered, profile, ctx);
         List<PoiResult> diversified = diversitySelector.diversify(constrained);
         int cap = Math.max(1, p.maxForLlm() != null ? p.maxForLlm() : diversityProperties.getTargetCount());
         List<PoiResult> out = truncate(diversified, cap);
 
         logAndMetrics(out);
+        return out;
+    }
+
+    /**
+     * Adds a random ± jitter to FOOD-family scores so different sessions surface different restaurants.
+     * Jitter magnitude keeps quality ordering intact between venues with meaningfully different ratings.
+     */
+    private List<PoiResult> applyDiningVarietyJitter(List<PoiResult> scored) {
+        double jitter = scoringProperties.getDiningVarietyJitter();
+        if (jitter <= 0 || scored == null || scored.isEmpty()) {
+            return scored == null ? List.of() : scored;
+        }
+        ThreadLocalRandom rng = ThreadLocalRandom.current();
+        boolean any = false;
+        for (PoiResult poi : scored) {
+            if (PoiCategoryFamily.FOOD == poi.getCategoryFamily() && poi.getRelevanceScore() != null) {
+                poi.setRelevanceScore(poi.getRelevanceScore() + rng.nextDouble(-jitter, jitter));
+                any = true;
+            }
+        }
+        if (!any) {
+            return scored;
+        }
+        List<PoiResult> out = new ArrayList<>(scored);
+        out.sort(Comparator.comparingDouble((PoiResult x) -> x.getRelevanceScore() != null ? x.getRelevanceScore() : 0.0).reversed());
         return out;
     }
 

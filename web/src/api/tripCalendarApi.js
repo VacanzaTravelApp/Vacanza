@@ -29,3 +29,14 @@ export async function deleteTripCalendarEvent(eventId) {
 export async function deleteTripCalendarEventsByRoute(routeId) {
   await http.delete(`/users/me/trip-calendar/events/by-route/${routeId}`);
 }
+
+/**
+ * Exports a registered route as an .ics file.
+ * Requires the route to be registered via createTripCalendarEvent first.
+ */
+export async function exportRouteICS(routeId) {
+  const { data } = await http.get(`/users/me/trip-calendar/export/route/${routeId}`, {
+    responseType: "blob",
+  });
+  return data;
+}

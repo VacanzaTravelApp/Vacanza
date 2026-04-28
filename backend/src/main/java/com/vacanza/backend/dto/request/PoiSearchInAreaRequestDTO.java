@@ -31,6 +31,12 @@ public class PoiSearchInAreaRequestDTO {
     // optional sort
     private SortType sort;
 
+    /**
+     * When true, POIs are loaded from Mapbox Search Box (tiled category search within the area)
+     * instead of the local DB. Intended for web drawn polygons where exhaustive coverage matters.
+     */
+    private Boolean mapboxAreaSearch;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

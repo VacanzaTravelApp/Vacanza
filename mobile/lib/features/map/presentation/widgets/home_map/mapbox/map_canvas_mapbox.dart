@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mb;
 
 import '../../../../../poi_search/data/models/area_source.dart';
+import '../../../../../poi_search/data/models/area_query_context.dart';
 import '../../../../../poi_search/data/models/selected_area.dart';
 import '../../../../../poi_search/presentation/bloc/area_query_bloc.dart';
 import '../../../../../poi_search/presentation/bloc/area_query_event.dart'
@@ -32,6 +33,8 @@ import '../markers/poi_markers_listener.dart';
 import '../markers/route_markers_controller.dart';
 import 'mapbox_view.dart';
 import 'package:mobile/core/config/mapbox_config.dart';
+import 'package:mobile/core/config/poi_map_config.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 import '../../../../../poi_search/data/services/style_poi_discovery_binding.dart';
 import 'package:mobile/features/ai/presentation/cubit/active_route_cubit.dart';
 import 'package:mobile/features/ai/presentation/cubit/active_route_state.dart';
@@ -58,7 +61,6 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   bool _suspendViewportUpdates = false;
   Timer? _resumeTimer;
 
-  int _selectionRebuildTick = 0;
   int _markerControllerKey = 0;
 
   /// Son senkronlanan uygulama parlaklığı (tema değişince harita basemap güncellenir).
@@ -69,6 +71,9 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
   /// Yarışan GET/POST directions yanıtlarını yok say.
   int _directionsEpoch = 0;
+
+  /// Camera zoom eşiği: [PoiMapConfig.minZoomForAreaDraw] (durum [MapBloc.areaDrawZoomOk]’ta).
+  Timer? _zoomGateDebounce;
 
   static String _styleUriForBasemap(MapBasemap basemap) {
     return switch (basemap) {
@@ -129,11 +134,201 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   @override
   void dispose() {
     _resumeTimer?.cancel();
+    _zoomGateDebounce?.cancel();
     _styleBinding?.detachMap();
     unawaited(_poiMarkers?.dispose());
     unawaited(_routeMarkers?.dispose());
     unawaited(_routeLineMgr?.deleteAll());
     super.dispose();
+  }
+
+  // ── Selection polygon (Mapbox style layers; geo-anchored like web) ───────
+  static const String _selPolySourceId = 'vacanza-selection-poly';
+  static const String _selLineSourceId = 'vacanza-selection-line';
+  static const String _selFillLayerId = 'vacanza-sel-fill';
+  static const String _selOutlineLayerId = 'vacanza-sel-outline';
+
+  Future<void> _syncSelectionPolygonToStyle(AreaQueryContext ctx) async {
+    final map = _map;
+    if (map == null) return;
+
+    // Capture theme-derived colors synchronously (avoid async BuildContext gaps).
+    final base = context.mapControlAccent;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    final isActive =
+        ctx.areaSource == AreaSource.userSelection && ctx.area is PolygonArea;
+    final poly = isActive ? (ctx.area as PolygonArea) : null;
+
+    await _ensureSelectionLayers(map);
+    await _applySelectionLayerStyle(map, base: base, isLight: isLight);
+    await _setSelectionGeoJson(map, poly);
+  }
+
+  Future<void> _ensureSelectionLayers(mb.MapboxMap map) async {
+    // Sources
+    try {
+      final polyExists = await map.style.styleSourceExists(_selPolySourceId);
+      if (!polyExists) {
+        final src = mb.GeoJsonSource(id: _selPolySourceId);
+        await map.style.addSource(src);
+      }
+      final lineExists = await map.style.styleSourceExists(_selLineSourceId);
+      if (!lineExists) {
+        // line-gradient requires per-segment line metrics in the source.
+        final src = mb.GeoJsonSource(id: _selLineSourceId, lineMetrics: true);
+        await map.style.addSource(src);
+      }
+    } catch (_) {
+      // If the SDK doesn't have styleSourceExists, try to add and ignore errors.
+      try {
+        final src = mb.GeoJsonSource(id: _selPolySourceId);
+        await map.style.addSource(src);
+      } catch (_) {}
+      try {
+        final src = mb.GeoJsonSource(id: _selLineSourceId, lineMetrics: true);
+        await map.style.addSource(src);
+      } catch (_) {}
+    }
+
+    // Fill layer
+    final fillExists = await map.style.styleLayerExists(_selFillLayerId);
+    if (!fillExists) {
+      final layer =
+          mb.FillLayer(id: _selFillLayerId, sourceId: _selPolySourceId);
+      await map.style.addLayer(layer);
+    }
+
+    // Outline layer
+    final outlineExists = await map.style.styleLayerExists(_selOutlineLayerId);
+    if (!outlineExists) {
+      final layer =
+          mb.LineLayer(id: _selOutlineLayerId, sourceId: _selLineSourceId);
+      layer.lineCap = mb.LineCap.ROUND;
+      layer.lineJoin = mb.LineJoin.ROUND;
+      layer.lineWidth = 4.0;
+      layer.lineOpacity = 1.0;
+      // Must be transparent when using `line-gradient`.
+      layer.lineColor = const Color(0x00000000).toARGB32();
+      await map.style.addLayer(layer);
+    }
+  }
+
+  Future<void> _applySelectionLayerStyle(
+    mb.MapboxMap map, {
+    required Color base,
+    required bool isLight,
+  }) async {
+    String hexRgb(Color c) {
+      final v = c.toARGB32() & 0x00FFFFFF;
+      return '#${v.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+    }
+
+    int ch(Color c, String comp) {
+      final v = switch (comp) {
+        'r' => c.r,
+        'g' => c.g,
+        'b' => c.b,
+        _ => c.r,
+      };
+      return (v * 255.0).round().clamp(0, 255);
+    }
+
+    // Fill: translucent accent (match web's ~0.08 feel, but using app accent colors).
+    final fillA = isLight ? 0.10 : 0.12;
+    final fillBase = base.withValues(alpha: fillA);
+    final fill =
+        'rgba(${ch(fillBase, 'r')}, ${ch(fillBase, 'g')}, ${ch(fillBase, 'b')}, ${fillBase.a})';
+
+    await map.style.setStyleLayerProperty(_selFillLayerId, 'fill-color', fill);
+    // Keep alpha only in the color; avoid stacking opacity to prevent hue shifts.
+    await map.style.setStyleLayerProperty(_selFillLayerId, 'fill-opacity', 1.0);
+
+    // Outline: use the same multi-color palette as FreehandPainter so the
+    // selection polygon matches the look of the live drawing stroke.
+    final t = context.vacanzaTokens;
+    final gradColors = isLight
+        ? <Color>[
+            t.vividCoral,
+            t.vividAmber,
+            const Color(0xFFFF8C42),
+            const Color(0xFFFFAB91),
+            const Color(0xFFF472B6),
+          ]
+        : <Color>[
+            const Color(0xFF1E3A8A),
+            const Color(0xFF2563EB),
+            t.vividBlue,
+            const Color(0xFF4F46E5),
+            const Color(0xFF7C3AED),
+          ];
+
+    final gradStops = List<double>.generate(
+      gradColors.length,
+      (i) => i / (gradColors.length - 1),
+    );
+
+    final gradExpression = <Object>[
+      'interpolate',
+      ['linear'],
+      ['line-progress'],
+      for (int i = 0; i < gradColors.length; i++) ...[
+        gradStops[i],
+        hexRgb(gradColors[i]),
+      ],
+    ];
+
+    final layer = await map.style.getLayer(_selOutlineLayerId);
+    if (layer is mb.LineLayer) {
+      layer.lineCap = mb.LineCap.ROUND;
+      layer.lineJoin = mb.LineJoin.ROUND;
+      layer.lineWidth = 4.0;
+      layer.lineOpacity = 1.0;
+      layer.lineColor = const Color(0x00000000).toARGB32();
+      layer.lineGradientExpression = gradExpression;
+      await map.style.updateLayer(layer);
+    }
+  }
+
+  Future<void> _setSelectionGeoJson(
+    mb.MapboxMap map,
+    PolygonArea? polygon,
+  ) async {
+    final polyFeatures = <Object>[];
+    final lineFeatures = <Object>[];
+    if (polygon != null && polygon.points.length >= 3) {
+      final ring = [
+        for (final p in polygon.points) [p.lng, p.lat],
+        [polygon.points.first.lng, polygon.points.first.lat],
+      ];
+      polyFeatures.add({
+        'type': 'Feature',
+        'properties': <String, Object?>{},
+        'geometry': {
+          'type': 'Polygon',
+          'coordinates': [ring],
+        },
+      });
+
+      // Web: outline is a dedicated LineString source/layer.
+      lineFeatures.add({
+        'type': 'Feature',
+        'properties': <String, Object?>{},
+        'geometry': {
+          'type': 'LineString',
+          'coordinates': ring,
+        },
+      });
+    }
+
+    await map.style.setStyleSourceProperty(_selPolySourceId, 'data', {
+      'type': 'FeatureCollection',
+      'features': polyFeatures,
+    });
+    await map.style.setStyleSourceProperty(_selLineSourceId, 'data', {
+      'type': 'FeatureCollection',
+      'features': lineFeatures,
+    });
   }
 
   void _onPoiMarkerTapped(Poi poi) {
@@ -189,6 +384,25 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     }
   }
 
+  Future<void> _syncAreaDrawZoomFromCamera() async {
+    final map = _map;
+    if (map == null) return;
+    try {
+      final z = (await map.getCameraState()).zoom;
+      if (!mounted) return;
+      final ok = z >= PoiMapConfig.minZoomForAreaDraw &&
+          z <= PoiMapConfig.maxZoomForAreaDraw;
+      final tooHigh = z > PoiMapConfig.maxZoomForAreaDraw;
+      final bloc = context.read<MapBloc>();
+      if (bloc.state.areaDrawZoomOk != ok ||
+          bloc.state.areaDrawZoomTooHigh != tooHigh) {
+        bloc.add(AreaDrawZoomOkChanged(ok: ok, tooHigh: tooHigh));
+      }
+    } catch (e) {
+      log('[MapCanvas] _syncAreaDrawZoomFromCamera failed: $e');
+    }
+  }
+
   // ── Native location puck (minimal settings) ───────────────────────
 
   Future<void> _enableLocationPuck(mb.MapboxMap map) async {
@@ -212,18 +426,11 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
   @override
   Widget build(BuildContext context) {
     final bool isDrawing = context.select((MapBloc b) => b.state.isDrawing);
+    final bool areaDrawZoomOk =
+        context.select((MapBloc b) => b.state.areaDrawZoomOk);
 
     final LocationState locState = context.watch<LocationBloc>().state;
     final bool showMap = _locationAllowsMap(locState);
-
-    final AreaQueryState areaState = context.watch<AreaQueryBloc>().state;
-    final areaCtx = areaState.context;
-
-    final PolygonArea? activeSelectionPolygon =
-        (areaCtx.areaSource == AreaSource.userSelection &&
-                areaCtx.area is PolygonArea)
-            ? (areaCtx.area as PolygonArea)
-            : null;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -235,6 +442,14 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
 
         return MultiBlocListener(
           listeners: [
+            BlocListener<MapBloc, MapState>(
+              listenWhen: (prev, next) => prev.isDrawing != next.isDrawing,
+              listener: (context, state) {
+                if (state.isDrawing) {
+                  unawaited(_syncAreaDrawZoomFromCamera());
+                }
+              },
+            ),
             // ── Basemap / perspective (web: STYLES × is3D) ────────────
             BlocListener<MapBloc, MapState>(
               listenWhen:
@@ -326,12 +541,24 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                   await routeMarkers.init();
                   _routeMarkers = routeMarkers;
                   unawaited(_applyActiveRouteToMap());
+
+                  // Re-apply selection polygon layers after style reload.
+                  final areaCtx = context.read<AreaQueryBloc>().state.context;
+                  unawaited(_syncSelectionPolygonToStyle(areaCtx));
                 }
 
                 // Re-enable puck after style change
                 if (mounted) {
                   await _enableLocationPuck(map);
                 }
+              },
+            ),
+
+            // ── User selection polygon: render as Mapbox layers ───────────
+            BlocListener<AreaQueryBloc, AreaQueryState>(
+              listenWhen: (prev, next) => prev.context != next.context,
+              listener: (context, state) {
+                unawaited(_syncSelectionPolygonToStyle(state.context));
               },
             ),
 
@@ -412,7 +639,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                   '[MapCanvas] FlyToPoi lat=$lat lng=$lng zoom=${state.flyToPoiZoom}',
                 );
                 // Longer suspend than default: route sheet taps + camera fly used to
-                // thrash viewport-driven POI reloads and relayout (sheet felt like it “collapsed”).
+                // thrash viewport-driven POI reloads and relayout (sheet felt like it "collapsed").
                 _suspendViewportFor(ms: 1400);
 
                 await map.flyTo(
@@ -517,7 +744,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                     children: [
                       Positioned.fill(
                         child: MapboxView(
-                          ignoreGestures: isDrawing,
+                          ignoreGestures: isDrawing && areaDrawZoomOk,
                           cameraOptions: _cameraForLocation(locState),
                           mapWidgetKey: ValueKey(
                             'map-${locState.latitude != null && locState.longitude != null ? 'gps' : 'nogps'}-${locState.status}',
@@ -525,17 +752,14 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                           onMapCreated: _onMapCreated,
                           onMapIdle: () {
                             if (_map == null) return;
-                            if (isDrawing) return;
-
-                            final ctx =
-                                context.read<AreaQueryBloc>().state.context;
-                            if (ctx.areaSource != AreaSource.userSelection) {
-                              return;
-                            }
-                            if (ctx.area is! PolygonArea) return;
-
-                            if (!mounted) return;
-                            setState(() => _selectionRebuildTick++);
+                            unawaited(_syncAreaDrawZoomFromCamera());
+                          },
+                          onCameraChange: () {
+                            _zoomGateDebounce?.cancel();
+                            _zoomGateDebounce = Timer(
+                              const Duration(milliseconds: 150),
+                              _syncAreaDrawZoomFromCamera,
+                            );
                           },
                           onViewportBbox: (bbox) {
                             if (_suspendViewportUpdates) return;
@@ -561,8 +785,10 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                       MapDrawingOverlay(
                         isDrawing: isDrawing,
                         map: _map,
-                        activeSelectionPolygon: activeSelectionPolygon,
-                        rebuildTick: _selectionRebuildTick,
+                        allowDrawingGestures: areaDrawZoomOk,
+                        // Selection polygon is rendered as a Mapbox layer (geo anchored).
+                        activeSelectionPolygon: null,
+                        rebuildTick: 0,
                         onPolygonFinished: (polygon) {
                           context.read<AreaQueryBloc>().add(
                             aq.UserSelectionChanged(polygon),
@@ -570,6 +796,7 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
                           context.read<MapBloc>().add(SetDrawingEnabled(false));
                         },
                       ),
+
                     ],
                   ),
         );
@@ -795,6 +1022,9 @@ class _MapCanvasMapboxState extends State<MapCanvasMapbox> {
     // Native location puck AFTER annotation manager is fully set up.
     await _enableLocationPuck(mapboxMap);
 
+    if (mounted) {
+      unawaited(_syncAreaDrawZoomFromCamera());
+    }
     log('[MapCanvas] Initialization complete');
   }
 

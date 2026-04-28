@@ -10,9 +10,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.text.Normalizer;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,6 +33,9 @@ import java.util.Map;
 @Slf4j
 @Component
 public class MapboxPoiSearchClient {
+
+    /** Search Box category endpoint caps per-request results (see Mapbox docs). */
+    public static final int CATEGORY_SEARCH_MAX_LIMIT = 10;
 
     private final WebClient webClient;
 
@@ -67,7 +74,16 @@ public class MapboxPoiSearchClient {
             Map.entry("zoo", "zoo"),
             Map.entry("aquarium", "aquarium"),
             Map.entry("garden", "park"),
-            Map.entry("winery", "winery")
+            Map.entry("winery", "winery"),
+            Map.entry("amusement_park", "amusement_park"),
+            Map.entry("theme_park", "amusement_park"),
+            Map.entry("observation_deck", "tourist_attraction"),
+            Map.entry("scenic_lookout", "tourist_attraction"),
+            Map.entry("bridge", "landmark"),
+            Map.entry("tower", "landmark"),
+            Map.entry("stadium", "stadium"),
+            Map.entry("amphitheater", "historic_site"),
+            Map.entry("national_park", "park")
     );
 
     public MapboxPoiSearchClient(@Qualifier("mapboxGeocodingWebClient") WebClient webClient) {
@@ -135,7 +151,7 @@ public class MapboxPoiSearchClient {
                 .uri(uriBuilder -> uriBuilder
                         .path("/search/searchbox/v1/category/{category}")
                         .queryParam("bbox", minLon + "," + minLat + "," + maxLon + "," + maxLat)
-                        .queryParam("limit", 20)
+                        .queryParam("limit", CATEGORY_SEARCH_MAX_LIMIT)
                         .queryParam("language", "en")
                         .build(mapboxCategory))
                 .retrieve()
@@ -148,6 +164,59 @@ public class MapboxPoiSearchClient {
                             .toList();
                 })
                 .onErrorResume(e -> Mono.just(List.of()));
+    }
+
+    /**
+     * Category search split over an N×N bbox grid so each cell can return up to
+     * {@link #CATEGORY_SEARCH_MAX_LIMIT} POIs (Mapbox does not paginate category search).
+     */
+    public List<PoiResult> searchByCategoryTiled(String category,
+            double minLon, double minLat, double maxLon, double maxLat, int gridN) {
+        int n = Math.max(1, Math.min(gridN, 8));
+        double dLon = (maxLon - minLon) / n;
+        double dLat = (maxLat - minLat) / n;
+        if (dLon <= 0 || dLat <= 0) {
+            return List.of();
+        }
+
+        List<Mono<List<PoiResult>>> tileCalls = new ArrayList<>(n * n);
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                double cMinLon = minLon + j * dLon;
+                double cMinLat = minLat + i * dLat;
+                double cMaxLon = (j == n - 1) ? maxLon : minLon + (j + 1) * dLon;
+                double cMaxLat = (i == n - 1) ? maxLat : minLat + (i + 1) * dLat;
+                tileCalls.add(searchByCategory(category, cMinLon, cMinLat, cMaxLon, cMaxLat));
+            }
+        }
+
+        // Fire tile calls with limited concurrency and stagger to avoid Mapbox 429 rate limits.
+        List<List<PoiResult>> allBatches = Flux.fromIterable(tileCalls)
+                .delayElements(Duration.ofMillis(200))
+                .flatMap(m -> m, 3)
+                .collectList()
+                .block();
+
+        Map<String, PoiResult> dedup = new LinkedHashMap<>();
+        if (allBatches != null) {
+            for (List<PoiResult> batch : allBatches) {
+                for (PoiResult p : batch) {
+                    if (p != null) dedup.putIfAbsent(dedupKey(p), p);
+                }
+            }
+        }
+        return new ArrayList<>(dedup.values());
+    }
+
+    private static String dedupKey(PoiResult p) {
+        if (p.getMapboxId() != null && !p.getMapboxId().isBlank()) {
+            return p.getMapboxId();
+        }
+        if (p.getExternalId() != null && !p.getExternalId().isBlank()) {
+            return "fsq:" + p.getExternalId();
+        }
+        String name = p.getName() != null ? p.getName().toLowerCase(Locale.ROOT) : "";
+        return String.format(Locale.ROOT, "%s|%.5f|%.5f", name, p.getLat(), p.getLon());
     }
 
     /**
@@ -212,8 +281,8 @@ public class MapboxPoiSearchClient {
         // Step 1: suggest+retrieve — proximity-biased ranking keeps the canonical landmark
         // first (beats stale/duplicate Mapbox entries far from city center).
         // No bbox passed to suggest: Mapbox's suggest API changes result ranking when bbox is
-        // applied and can surface wrong entries. Post-result name validation handles disambiguation.
-        return suggestAndRetrieve(query, proxLon, proxLat)
+        // applied and can surface wrong entries. Name-based selection handles disambiguation.
+        return suggestAndRetrieve(query, placeName, proxLon, proxLat)
                 .doOnNext(r -> log.info("[RESOLVE] Step 1 (suggest+retrieve) hit for '{}'", placeName))
 
                 // Step 2: forward search in bbox
@@ -297,28 +366,31 @@ public class MapboxPoiSearchClient {
 
     /**
      * Suggest + Retrieve 2-step flow for fuzzy POI matching.
-     * /suggest finds candidates with fuzzy matching (handles multilingual names),
-     * /retrieve fetches exact coordinates for the best match.
      * Uses proximity bias only (no bbox) — call suggestAndRetrieveWithBbox for constrained search.
      */
-    public Mono<PoiResult> suggestAndRetrieve(String query, double proxLon, double proxLat) {
-        return suggestAndRetrieveWithBbox(query, proxLon, proxLat, null);
+    public Mono<PoiResult> suggestAndRetrieve(String query, String placeName, double proxLon, double proxLat) {
+        return suggestAndRetrieveWithBbox(query, placeName, proxLon, proxLat, null);
     }
 
     /**
      * Suggest + Retrieve with an optional bbox constraint.
-     * Combines proximity-biased ranking (correct landmark beats stale duplicates)
-     * with bbox filtering (stays within the destination area).
+     * Combines proximity-biased ranking with name-based selection to avoid accepting
+     * unrelated POIs that happen to share words with the query (e.g. "London Eye Bar"
+     * when searching for "London Eye").
      * Pass null for bbox to search globally with proximity bias only.
      */
-    public Mono<PoiResult> suggestAndRetrieveWithBbox(String query, double proxLon, double proxLat, double[] bbox) {
+    public Mono<PoiResult> suggestAndRetrieveWithBbox(String query, String placeName, double proxLon, double proxLat, double[] bbox) {
         String sessionToken = java.util.UUID.randomUUID().toString();
+        // Core name to match against: strip the ", Destination" suffix if present.
+        String coreName = placeName.contains(",")
+                ? placeName.substring(0, placeName.indexOf(',')).trim()
+                : placeName.trim();
         return webClient.get()
                 .uri(uriBuilder -> {
                     var b = uriBuilder
                             .path("/search/searchbox/v1/suggest")
                             .queryParam("q", query)
-                            .queryParam("limit", 3)
+                            .queryParam("limit", 5)
                             .queryParam("types", "poi")
                             .queryParam("proximity", proxLon + "," + proxLat)
                             .queryParam("language", "en")
@@ -334,29 +406,75 @@ public class MapboxPoiSearchClient {
                     if (resp == null || resp.getSuggestions() == null || resp.getSuggestions().isEmpty()) {
                         return Mono.empty();
                     }
-                    // Pick the first POI suggestion
+                    // Pick the best-matching POI suggestion by name similarity.
+                    // Prefer an exact/contained name match over the raw Mapbox rank, so a
+                    // high-ranked "London Eye Bar" does not win over "The London Eye".
                     Suggestion best = null;
+                    int bestScore = -1;
                     for (Suggestion s : resp.getSuggestions()) {
-                        if (s != null && s.getMapboxId() != null && !s.getMapboxId().isBlank()) {
-                            if ("poi".equals(s.getFeatureType())) {
-                                best = s;
-                                break;
-                            }
-                            if (best == null) {
-                                best = s; // fallback to any type
-                            }
+                        if (s == null || s.getMapboxId() == null || s.getMapboxId().isBlank()) continue;
+                        if (!"poi".equals(s.getFeatureType())) continue;
+                        int score = suggestionNameScore(coreName, s.getName());
+                        if (score > bestScore) {
+                            bestScore = score;
+                            best = s;
                         }
                     }
-                    if (best == null) return Mono.empty();
+                    // Only accept if the name is at least loosely related; otherwise fall through
+                    // to subsequent steps that can do bbox-constrained forward search.
+                    if (best == null || bestScore < 0) return Mono.empty();
                     String mapboxId = best.getMapboxId();
-                    log.info("[SUGGEST] best match for '{}': name='{}', id={}", query,
-                            best.getName(), mapboxId);
+                    log.info("[SUGGEST] best match for '{}': name='{}' score={} id={}",
+                            coreName, best.getName(), bestScore, mapboxId);
                     return retrieveByMapboxId(mapboxId, sessionToken);
                 })
                 .onErrorResume(e -> {
                     log.warn("[SUGGEST+RETRIEVE] failed for '{}': {}", query, e.getMessage());
                     return Mono.empty();
                 });
+    }
+
+    /**
+     * Name similarity score between the searched place name and a suggestion's name.
+     * Higher is better; negative means no meaningful overlap (suggestion rejected).
+     *   2 — exact match or full containment (e.g. "London Eye" ⊂ "The London Eye")
+     *   1 — all significant words (>3 chars) of the place name appear in suggestion
+     *   0 — at least one significant word matches
+     *  -1 — no overlap (suggestion should be skipped)
+     */
+    private static int suggestionNameScore(String placeName, String suggestionName) {
+        if (placeName == null || suggestionName == null) return -1;
+        String pn = placeName.toLowerCase(Locale.ROOT).trim();
+        String sn = suggestionName.toLowerCase(Locale.ROOT).trim();
+
+        // Search name contains suggestion → strong match (e.g. "Blue Mosque, Istanbul" ⊃ "Blue Mosque")
+        if (pn.contains(sn)) return 2;
+
+        // Suggestion contains search name → only accept if extra words are trivial (e.g. "The ")
+        // Prevents: "Alanya Beach" matching "Alanya Beach Hotel / Bar / Resort" as score 2
+        if (sn.contains(pn)) {
+            String extra = sn.replace(pn, "").trim();
+            String[] extraWords = extra.isEmpty() ? new String[0] : extra.split("[\\s,\\-/.']+");
+            boolean trivialExtra = extraWords.length == 0
+                    || (extraWords.length == 1 && extraWords[0].length() <= 3);
+            return trivialExtra ? 2 : 0;
+        }
+
+        // Word-level overlap
+        String[] pWords = pn.split("[\\s,\\-/.']+");
+        String[] sWords = sn.split("[\\s,\\-/.']+");
+        java.util.List<String> sigWords = new java.util.ArrayList<>();
+        for (String w : pWords) { if (w.length() > 3) sigWords.add(w); }
+        if (sigWords.isEmpty()) return -1;
+        int matched = 0;
+        for (String pw : sigWords) {
+            for (String sw : sWords) {
+                if (sw.equals(pw)) { matched++; break; }
+            }
+        }
+        if (matched == sigWords.size()) return 1;
+        if (matched > 0) return 0;
+        return -1;
     }
 
     /**

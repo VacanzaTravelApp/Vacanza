@@ -69,9 +69,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         '[Auth] sendEmailVerification: success email=${user.email}',
         name: 'Auth',
       );
-      if (!silent) {
-        _showSnackBar('Verification email sent. Please check your inbox.');
-      }
     } on fb.FirebaseAuthException catch (e) {
       dev.log(
         '[Auth] sendEmailVerification: error code=${e.code} message=${e.message}',
@@ -140,7 +137,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         name: 'Auth',
       );
       if (refreshed == null || !(refreshed.emailVerified)) {
-        _showSnackBar('Email not verified yet. Please click the link in your email.');
+        _showSnackBar(
+          'Email not verified yet. Please click the link in your email.',
+        );
         return;
       }
 
@@ -150,7 +149,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       } catch (e) {
         // If backend session cannot be synced, keep user informed and let AuthGate
         // handle clean session resolution on next app start.
-        _showSnackBar('Session could not be synchronized. Please try again or restart the app.');
+        _showSnackBar(
+          'Session could not be synchronized. Please try again or restart the app.',
+        );
       }
 
       if (mounted) {
@@ -186,9 +187,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     final tokens = context.vacanzaTokens;
     final accent = context.authAccent;
 
-    final titleStyle = AppTextStyles.titleLarge(context).copyWith(
-      color: tokens.textMain,
-    );
+    final titleStyle = AppTextStyles.titleLarge(
+      context,
+    ).copyWith(color: tokens.textMain);
     final bodyMedium = AppTextStyles.bodyMedium(context);
 
     final isBusy = _sending || _checking;
@@ -255,19 +256,22 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          child: _checking
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Text(
-                                  'I verified (manual check)',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
+                          child:
+                              _checking
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Text(
+                                    'I verified (manual check)',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
                         ),
                       ),
                       const SizedBox(height: 40),
@@ -292,4 +296,3 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     );
   }
 }
-

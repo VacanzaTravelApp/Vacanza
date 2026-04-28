@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, DatePicker, Modal, message } from "antd";
+import { Button, DatePicker, Modal } from "antd";
+import { toast } from "../../../components/toast/toast";
+import { getErrorNotificationMessage } from "../../../utils/notifications";
 import {
   LikeOutlined,
   LikeFilled,
@@ -97,9 +99,9 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
         /* ignore */
       }
       setVote(v);
-      message.success("Thanks, your route preference has been saved.");
+      // message.success("Thanks, your route preference has been saved.");
     } catch (e) {
-      message.error(e?.friendlyMessage || "Failed to send feedback.");
+      toast.error({ title: "Feedback not sent", message: getErrorNotificationMessage(e, "Please try again.") });
     } finally {
       setSending(false);
     }
@@ -121,12 +123,6 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
         routeId,
         eventDate: calendarDate.format("YYYY-MM-DD"),
       });
-      const n = Array.isArray(created) ? created.length : 1;
-      message.success(
-        n > 1
-          ? `${n} days added to your calendar (Day 1–${n}).`
-          : "Route added to your calendar."
-      );
       try {
         window.dispatchEvent(new CustomEvent("vacanza-trip-calendar-changed"));
       } catch {
@@ -136,9 +132,9 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
     } catch (e) {
       const status = e?.response?.status;
       if (status === 409) {
-        message.warning("This route is already on that day.");
+        toast.warning({ title: "Already added", message: "This route is already scheduled for that day." });
       } else {
-        message.error(e?.friendlyMessage || "Could not add to calendar.");
+        toast.error({ title: "Calendar error", message: getErrorNotificationMessage(e, "Couldn't add this route to your calendar.") });
       }
     } finally {
       setCalendarSaving(false);
@@ -179,12 +175,12 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
               setCalendarDate(dayjs());
               setCalendarOpen(true);
             }}
-            aria-label="Add this route to your calendar"
+            aria-label="Export this route to your calendar"
           >
-            Add to calendar
+            Export to calendar
           </Button>
           <Modal
-            title="Add route to calendar"
+            title="Export route to calendar"
             open={calendarOpen}
             onCancel={() => setCalendarOpen(false)}
             onOk={addRouteToCalendar}
