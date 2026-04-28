@@ -26,7 +26,11 @@ import '../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../checkin/presentation/bloc/location_event.dart';
 import '../../../checkin/presentation/bloc/location_state.dart';
 
+import '../../../gamification/data/models/badge_dto.dart';
 import '../../../gamification/presentation/cubit/gamification_cubit.dart';
+import '../../../gamification/presentation/cubit/gamification_state.dart';
+import '../../../gamification/presentation/widgets/badge_icon_mapper.dart';
+import '../../../../core/widgets/top_notification_banner.dart';
 
 import '../../../poi_search/data/api/poi_search_api_client.dart';
 import '../../../poi_search/data/models/area_source.dart';
@@ -170,6 +174,43 @@ class _HomeMapViewState extends State<_HomeMapView>
   /// ✅ Bottom sheet chip'leri sadece UI filter (backend'e istek atmaz)
   /// null => All
   String? _activeChipKey;
+
+  // ── Top notification queue ──────────────────────────────────────────────
+  TopNotifData? _activeTopNotif;
+  final List<TopNotifData> _notifQueue = [];
+
+  void _showTopNotification(TopNotifData notif) {
+    if (!mounted) return;
+    if (_activeTopNotif == null) {
+      setState(() => _activeTopNotif = notif);
+    } else {
+      _notifQueue.add(notif);
+    }
+  }
+
+  void _onTopNotifDismissed() {
+    if (!mounted) return;
+    setState(() {
+      _activeTopNotif =
+          _notifQueue.isNotEmpty ? _notifQueue.removeAt(0) : null;
+    });
+  }
+
+  TopNotifData _checkinNotif(String? poiName) => TopNotifData(
+        type: TopNotifType.checkin,
+        title: 'Checked in!',
+        subtitle: poiName != null ? 'at $poiName' : 'Location saved',
+        icon: Icons.location_on_rounded,
+        iconGradient: const [Color(0xFF00B4D8), Color(0xFF0096C7)],
+      );
+
+  TopNotifData _badgeNotif(BadgeDto badge) => TopNotifData(
+        type: TopNotifType.badge,
+        title: 'New badge earned!',
+        subtitle: badge.title,
+        icon: BadgeIconMapper.icon(badge.key),
+        iconGradient: BadgeIconMapper.gradient(badge.key),
+      );
 
   void _openFilters({required bool fromUserSelection}) {
     if (_filtersOpen) return;
@@ -557,16 +598,7 @@ class _HomeMapViewState extends State<_HomeMapView>
                   prev.status != next.status &&
                   next.status == CheckinStatus.newCreated,
           listener: (context, state) {
-            final poiName = state.response?.poiName;
-            final message =
-                poiName != null ? 'Checked in at $poiName' : 'Checked in!';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(message),
-                duration: const Duration(seconds: 2),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            _showTopNotification(_checkinNotif(state.response?.poiName));
           },
         ),
 
@@ -584,6 +616,21 @@ class _HomeMapViewState extends State<_HomeMapView>
               'checkInId=${state.response?.checkInId}',
             );
             context.read<GamificationCubit>().refresh();
+          },
+        ),
+
+        // ================= Badge earned notification (MOB-12) =================
+        BlocListener<GamificationCubit, GamificationState>(
+          listenWhen:
+              (prev, next) =>
+                  next is GamificationLoaded &&
+                  next.newlyEarnedBadges.isNotEmpty,
+          listener: (context, state) {
+            if (state is GamificationLoaded) {
+              for (final badge in state.newlyEarnedBadges) {
+                _showTopNotification(_badgeNotif(badge));
+              }
+            }
           },
         ),
 
@@ -698,6 +745,7 @@ class _HomeMapViewState extends State<_HomeMapView>
           listener: (context, state) {
             if (state.status == ActiveRouteStatus.ready &&
                 state.route != null) {
+              context.read<PoiSearchBloc>().add(const poi.HidePoiMarkers());
               if (mounted) setState(() => _routeOpen = true);
 
               final ps = context.read<PoiSearchBloc>().state;
@@ -764,7 +812,7 @@ class _HomeMapViewState extends State<_HomeMapView>
             showStreamLoadingMore: poiState.mapboxAreaStreamLoading,
           );
 
-          return HomeMapScaffold(
+          final scaffold = HomeMapScaffold(
             basemap: state.basemap,
             perspective: state.perspective,
             isDrawing: state.isDrawing,
@@ -1031,6 +1079,23 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ===== Blur preview sadece polygon sonrası filter açıldıysa =====
             showResultsBlurUnderFilters: _filtersFromUserSelection,
+          );
+
+          return Stack(
+            children: [
+              scaffold,
+              if (_activeTopNotif != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: TopNotificationBanner(
+                    key: ValueKey(_activeTopNotif),
+                    data: _activeTopNotif!,
+                    onDismissed: _onTopNotifDismissed,
+                  ),
+                ),
+            ],
           );
         },
       ),
