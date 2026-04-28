@@ -17,16 +17,24 @@ class RouteHotelPickerSheet extends StatefulWidget {
   final String routeId;
   final String? defaultDestination;
 
+  /// Initial map viewport — first POI of the route if available.
+  final double? initialLat;
+  final double? initialLon;
+
   const RouteHotelPickerSheet({
     super.key,
     required this.routeId,
     this.defaultDestination,
+    this.initialLat,
+    this.initialLon,
   });
 
   static Future<void> show(
     BuildContext context, {
     required String routeId,
     String? defaultDestination,
+    double? initialLat,
+    double? initialLon,
   }) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -35,6 +43,8 @@ class RouteHotelPickerSheet extends StatefulWidget {
       builder: (ctx) => RouteHotelPickerSheet(
         routeId: routeId,
         defaultDestination: defaultDestination,
+        initialLat: initialLat,
+        initialLon: initialLon,
       ),
     );
   }
@@ -85,9 +95,9 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
   double? _pinLat;
   double? _pinLon;
 
-  double _viewportLat = 48.8566;
-  double _viewportLon = 2.3522;
-  double _viewportZoom = 3.5;
+  late double _viewportLat;
+  late double _viewportLon;
+  late double _viewportZoom;
 
   bool _pinPlaced = false;
 
@@ -102,9 +112,19 @@ class _RouteHotelPickerSheetState extends State<RouteHotelPickerSheet> {
     _nameCtrl.addListener(() => setState(() {}));
     _addressCtrl.addListener(_onAddressChanged);
 
-    final dest = widget.defaultDestination;
-    if (dest != null && dest.isNotEmpty) {
-      _geocodeForViewport(dest);
+    // First POI coordinates take priority — no geocoding round-trip needed.
+    if (widget.initialLat != null && widget.initialLon != null) {
+      _viewportLat = widget.initialLat!;
+      _viewportLon = widget.initialLon!;
+      _viewportZoom = 12.0;
+    } else {
+      _viewportLat = 48.8566;
+      _viewportLon = 2.3522;
+      _viewportZoom = 3.5;
+      final dest = widget.defaultDestination;
+      if (dest != null && dest.isNotEmpty) {
+        _geocodeForViewport(dest);
+      }
     }
   }
 

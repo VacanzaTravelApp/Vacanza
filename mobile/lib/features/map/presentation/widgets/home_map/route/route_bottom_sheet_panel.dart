@@ -938,10 +938,16 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
       setState(() {
         _hotelError = null;
       });
+      final firstWp = route.days.isNotEmpty &&
+              route.days[0].waypoints.isNotEmpty
+          ? route.days[0].waypoints[0]
+          : null;
       await RouteHotelPickerSheet.show(
         context,
         routeId: routeId,
         defaultDestination: route.destination,
+        initialLat: firstWp?.latitude,
+        initialLon: firstWp?.longitude,
       );
       if (!mounted) return;
       setState(() => _hotelSaving = true);
