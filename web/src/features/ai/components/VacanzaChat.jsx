@@ -1235,26 +1235,26 @@ export default function VacanzaChat({
                     <button
                       type="button"
                       className="chat-quick-chip"
-                      onClick={() => handleSendMessage("Plan a 3-day trip to Istanbul")}
+                      onClick={() => handleSendMessage("Plan a 3-day trip to New York")}
                       disabled={loading || messagesLoading}
                     >
-                      3-day Istanbul
+                      3-day New York
                     </button>
                     <button
                       type="button"
                       className="chat-quick-chip"
-                      onClick={() => handleSendMessage("Plan a 2-day trip to Rome")}
+                      onClick={() => handleSendMessage("Plan a 2-day trip to San Francisco")}
                       disabled={loading || messagesLoading}
                     >
-                      2-day Rome
+                      2-day San Francisco
                     </button>
                     <button
                       type="button"
                       className="chat-quick-chip"
-                      onClick={() => handleSendMessage("Create a 4-day Antalya vacation plan for me")}
+                      onClick={() => handleSendMessage("Plan 3-day Rome vacation plan for me")}
                       disabled={loading || messagesLoading}
                     >
-                      4-day Antalya
+                      3-day Rome
                     </button>
                   </div>
                 );
