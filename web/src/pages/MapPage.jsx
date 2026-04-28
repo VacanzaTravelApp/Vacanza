@@ -2869,7 +2869,7 @@ export default function MapPage() {
           >
             <Spin spinning={polygonRouteSubmitting}>
               <Form form={polygonRouteForm} layout="vertical" onFinish={submitPolygonRoute}>
-                <Form.Item name="totalDays" label="Trip Duration (Days)"><InputNumber min={1} max={14} style={{ width: "100%" }} /></Form.Item>
+                <Form.Item name="totalDays" label="Trip Duration (Days)"><InputNumber min={1} max={7} style={{ width: "100%" }} /></Form.Item>
                 <Form.Item name="travelStyle" label="Preferred Travel Style">
                   <Select
                     className="route-plan-select"
