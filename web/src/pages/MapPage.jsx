@@ -827,6 +827,8 @@ export default function MapPage() {
   /** Sohbet–harita bağlantısı (replan gün); VacanzaChat onConversationIdChange ile güncellenir. */
   const [mapChatConversationId, setMapChatConversationId] = useState(null);
   const [, setReplanDaySubmitting] = useState(false);
+  const [addDaysSubmitting, setAddDaysSubmitting] = useState(false);
+  const [drawToAddFromChat, setDrawToAddFromChat] = useState(false);
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3; // meters
@@ -1635,8 +1637,51 @@ export default function MapPage() {
     [selection, selectedBackendCats]
   );
 
+  const submitAddDaysFromPolygon = useCallback(async () => {
+    if (!selection?.polygon || selection.polygon.length < 3) {
+      toast.warning({ title: "Invalid area", message: "Please draw a valid area first." });
+      return;
+    }
+    const ring = selection.polygon.map((p) => [p.lng, p.lat]);
+    const categories = selectedBackendCats.map((k) => UI_KEY_TO_BACKEND_CATEGORY[k]).filter(Boolean);
+    setAddDaysSubmitting(true);
+    try {
+      const body = { coordinates: ring, totalDays: 1, travelStyle: "general" };
+      if (categories.length) body.categories = categories;
+      const res = await aiApi.createRouteFromPolygon(body);
+      const routeData = res.route_data || res.routeData;
+      if (routeData) {
+        const existingDays = activeRoute?.days || [];
+        const newDays = routeData.days || [];
+        const offset = existingDays.length;
+        const renumberedDays = newDays.map((d, i) => ({ ...d, day: offset + i + 1 }));
+        const base = activeRoute ?? normalizeRouteForMap(routeData);
+        const mergedRoute = {
+          ...base,
+          days: offset > 0 ? [...existingDays, ...renumberedDays] : newDays,
+          total_days: offset + newDays.length,
+          totalDays: offset + newDays.length,
+        };
+        setActiveRoute(normalizeRouteForMap(mergedRoute));
+        setDrawToAddFromChat(false);
+        setSelection({ mode: null, polygon: [] });
+        setMode("VIEWPORT");
+        setResultsOpen(false);
+        setActiveDay(offset + 1);
+      } else {
+        toast.warning({ title: "Route unavailable", message: "Couldn't generate days from the drawn area." });
+      }
+    } catch (e) {
+      const msg = getErrorNotificationMessage(e, "Failed to add days.");
+      toast.error(msg);
+    } finally {
+      setAddDaysSubmitting(false);
+    }
+  }, [selection, selectedBackendCats, activeRoute]);
+
   const handleRequestDrawToEditFromChat = useCallback(() => {
     setIsChatOpen(false);
+    setDrawToAddFromChat(true);
     setMode("SELECTION");
     setFreehandEnabled(true);
     if (viewState.zoom < MIN_ZOOM_FOR_AREA_DRAW) {
@@ -1647,7 +1692,7 @@ export default function MapPage() {
       toast.warning({ title: "Zoom out", message: "You're too zoomed in — zoom out a bit to draw a meaningful area." });
       return;
     }
-    toast.info({ title: "Draw on the map", message: "Select a day from the route panel, then update it from the banner above." });
+    toast.info({ title: "Draw on the map", message: "Draw an area on the map — then click \"Add Days to Route\" in the panel that appears." });
   }, [viewState.zoom]);
 
   const submitReplanDayFromPolygon = useCallback(async () => {
@@ -1814,8 +1859,9 @@ export default function MapPage() {
   // POI'ler: polygon içi filtre + UI filtre
   // Combined POI list (Backend + Mapbox Discoveries)
   const pois = useMemo(() => {
-    // Hide all POI markers while a route is active.
-    if (activeRoute) return [];
+    // Hide POI markers while a route is active, unless user drew a polygon (add-days flow).
+    const isPolygonDrawn = selection?.mode === "polygon" && (selection.polygon?.length ?? 0) >= 3;
+    if (activeRoute && !isPolygonDrawn && !drawToAddFromChat) return [];
 
     // 1. Performance Rule: Hide POIs at low zoom levels to prevent clutter
     // Drawn-area mode: still show markers so POIs appear while browsing results.
@@ -1861,7 +1907,7 @@ export default function MapPage() {
 
     // 2. Performance Rule: Cap at 1000 POIs to prevent memory bloating
     return out.slice(0, 1000);
-  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom, USE_MAPBOX_AREA_POI_SEARCH, activeRoute]);
+  }, [poisRaw, mapboxPois, mode, selection, selectedCats, viewState.zoom, USE_MAPBOX_AREA_POI_SEARCH, activeRoute, drawToAddFromChat]);
 
   const canShowResultsPanel = useMemo(() => {
     return resultsOpen && selection?.mode === "polygon" && selection.polygon.length >= 3;
@@ -2640,6 +2686,23 @@ export default function MapPage() {
                       className={`vivid-create-route-btn-glass${poiLoading || poiStreamLoading ? " vivid-create-route-btn-loading" : ""}`}
                     >
                       Create AI Route
+                    </Button>
+                  )}
+                  {user && (activeRoute || drawToAddFromChat) && (
+                    <Button
+                      type="primary"
+                      shape="round"
+                      loading={addDaysSubmitting}
+                      onClick={() => {
+                        if (poiLoading || poiStreamLoading) {
+                          toast.warning({ title: "Please wait", message: "Places are still loading." });
+                          return;
+                        }
+                        submitAddDaysFromPolygon();
+                      }}
+                      className={`vivid-create-route-btn-glass${poiLoading || poiStreamLoading ? " vivid-create-route-btn-loading" : ""}`}
+                    >
+                      Add Days to Route
                     </Button>
                   )}
                   <Button type="text" icon={<CloseOutlined />} onClick={clearSelectionOnly} />
