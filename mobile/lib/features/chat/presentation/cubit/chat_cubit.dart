@@ -57,7 +57,7 @@ class ChatCubit extends Cubit<ChatState> {
         stackTrace: st,
       );
       if (isClosed) return;
-      emit(ChatError(message: e.toString()));
+      emit(const ChatError(message: 'Could not load chat. Please try again.'));
     }
   }
 
@@ -147,7 +147,7 @@ class ChatCubit extends Cubit<ChatState> {
           conversationId: current.conversationId,
           lastResponse: current.lastResponse,
           isSending: false,
-          error: e.toString(),
+          error: 'Could not connect. Please check your connection and try again.',
         ),
       );
       return;
@@ -549,7 +549,7 @@ class ChatCubit extends Cubit<ChatState> {
         stackTrace: st,
       );
       if (isClosed) return;
-      emit(ChatError(message: e.toString()));
+      emit(const ChatError(message: 'Could not load conversation. Please try again.'));
     }
   }
 
