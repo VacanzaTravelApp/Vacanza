@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -58,6 +59,59 @@ public class PoiIngestService {
         }
 
         return totalSaved;
+    }
+
+    /**
+     * Persists Mapbox search results after area/stream search completes.
+     * Skips rows without a stable {@code externalId} / {@code mapboxId}, and skips existing {@code external_id}.
+     */
+    @Transactional
+    public int ingestFromMapboxResults(Collection<PoiResult> results) {
+        if (results == null || results.isEmpty()) {
+            return 0;
+        }
+        int saved = 0;
+        for (PoiResult r : results) {
+            if (r == null || r.getName() == null || r.getName().isBlank()) {
+                continue;
+            }
+
+            String externalId = r.getExternalId();
+            if (externalId == null || externalId.isBlank()) {
+                externalId = r.getMapboxId();
+            }
+            if (externalId == null || externalId.isBlank()) {
+                continue;
+            }
+
+            if (poiRepository.existsByExternalId(externalId)) {
+                continue;
+            }
+
+            PointOfInterest poi = new PointOfInterest();
+            poi.setExternalId(externalId);
+            poi.setName(r.getName().trim());
+            poi.setLatitude(r.getLat());
+            poi.setLongitude(r.getLon());
+            String cat = r.getCategory();
+            poi.setCategory(cat != null && !cat.isBlank() ? cat.toLowerCase(Locale.ROOT) : "others");
+
+            String fsqId = r.getExternalId();
+            if (fsqId != null && !fsqId.isBlank()) {
+                enrichFromFoursquare(poi, fsqId);
+            }
+
+            try {
+                poiRepository.save(poi);
+                saved++;
+            } catch (DataIntegrityViolationException e) {
+                log.debug("[POI-INGEST] mapbox batch duplicate skipped: {}", externalId);
+            }
+        }
+        if (saved > 0) {
+            log.info("[POI-INGEST] mapbox batch persisted {} new row(s), scanned {}", saved, results.size());
+        }
+        return saved;
     }
 
     private int ingestSingleCategory(

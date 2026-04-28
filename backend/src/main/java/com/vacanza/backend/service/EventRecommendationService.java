@@ -465,13 +465,13 @@ public class EventRecommendationService {
         if (prefs == null) {
             return null;
         }
-        return prefs.stream()
+        String joined = prefs.stream()
                 .filter(p -> p.getPreferenceKey() != null
                         && "event_interest".equalsIgnoreCase(p.getPreferenceKey().trim()))
                 .map(AiChatDto.ExtractedPreference::getPreferenceValue)
                 .filter(v -> v != null && !v.isBlank())
-                .findFirst()
-                .orElse(null);
+                .collect(Collectors.joining(", "));
+        return joined.isEmpty() ? null : joined;
     }
 
     private static AiChatDto.AvailableEventAi toAvailableEventAi(EventDTO e) {

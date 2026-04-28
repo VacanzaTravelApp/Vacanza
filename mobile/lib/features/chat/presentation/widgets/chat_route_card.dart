@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import 'package:mobile/core/widgets/vacanza_gradient_button.dart';
@@ -249,54 +250,6 @@ class _ChatRouteCardState extends State<ChatRouteCard> {
                 ),
               ),
             ],
-            // ── Day 1 preview (mirrors web) ──
-            if (route.days.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Builder(
-                builder: (context) {
-                  final day1 = route.days.first;
-                  final names = day1.waypoints
-                      .map((w) => w.name)
-                      .take(4)
-                      .toList();
-                  final more = (day1.waypoints.length - 4).clamp(0, 999);
-                  if (names.isEmpty) return const SizedBox.shrink();
-                  return Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Day 1: ',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: t.textSub,
-                          ),
-                        ),
-                        TextSpan(
-                          text: names.join(' · '),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: t.textSub,
-                          ),
-                        ),
-                        if (more > 0)
-                          TextSpan(
-                            text: ' +$more',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: accent,
-                            ),
-                          ),
-                      ],
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  );
-                },
-              ),
-            ],
             // ── "Updated via chat" badge ──
             if (widget.isRouteEdit) ...[
               const SizedBox(height: 8),
@@ -422,19 +375,10 @@ class _ChatRouteCardState extends State<ChatRouteCard> {
                       ),
                     if (_pricingRows != null && _pricingRows!.isNotEmpty) ...[
                       const SizedBox(height: 10),
-                      ..._pricingRows!.take(4).map(
+                      ..._pricingRows!.take(6).map(
                             (r) => Padding(
                               padding: const EdgeInsets.only(bottom: 6),
-                              child: Text(
-                                r.found && r.minPriceUsd != null
-                                    ? '${r.waypointName}: from \$${r.minPriceUsd!.toStringAsFixed(0)} ${r.currency}'
-                                    : '${r.waypointName}: ${r.message ?? '—'}',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  height: 1.25,
-                                  color: t.textMain,
-                                ),
-                              ),
+                              child: _PricingTile(row: r),
                             ),
                           ),
                     ],
@@ -482,55 +426,256 @@ class RouteDaysPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.vacanzaTokens;
     final days = route.days;
     if (days.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final d in days.take(4))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
+        for (int i = 0; i < days.length.clamp(0, 4); i++) ...[
+          if (i > 0) const SizedBox(height: 10),
+          _DaySection(day: days[i]),
+        ],
+      ],
+    );
+  }
+}
+
+class _DaySection extends StatelessWidget {
+  final ChatDayPlan day;
+
+  const _DaySection({required this.day});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
+    final accent = context.mapControlAccent;
+    final title = day.title?.trim();
+    final hasTitle = title != null && title.isNotEmpty;
+    final visibleWaypoints = day.waypoints.take(5).toList();
+    final overflow = day.waypoints.length - 5;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: t.vividSubtleBg,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: t.cardBorder.withValues(alpha: 0.8)),
+              ),
+              child: Text(
+                'Day ${day.day}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: t.textMain,
+                ),
+              ),
+            ),
+            if (hasTitle) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: t.textSub,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (visibleWaypoints.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          for (final wp in visibleWaypoints) _WaypointRow(wp: wp),
+          if (overflow > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 17, top: 2),
+              child: Text(
+                '+$overflow more',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PricingTile extends StatelessWidget {
+  final WaypointPricingRow row;
+
+  const _PricingTile({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
+    final accent = context.mapControlAccent;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final hasPrice = row.found && row.minPriceUsd != null;
+    final hasLink = row.bookingUrl != null && row.bookingUrl!.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isLight
+            ? Colors.white.withValues(alpha: 0.55)
+            : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: t.cardBorder.withValues(alpha: 0.7)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.confirmation_num_outlined,
+            size: 15,
+            color: hasPrice ? accent : t.textSub.withValues(alpha: 0.45),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: t.vividSubtleBg,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: t.cardBorder.withValues(alpha: 0.8)),
-                  ),
-                  child: Text(
-                    'Day ${d.day}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: t.textMain,
-                    ),
+                Text(
+                  row.waypointName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: t.textMain,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    d.waypoints.map((w) => w.name).take(6).join(', '),
+                if (row.productTitle != null && row.productTitle!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    row.productTitle!,
                     style: TextStyle(
-                      fontSize: 12,
-                      height: 1.28,
+                      fontSize: 10.5,
                       color: t.textSub,
                     ),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                ],
               ],
             ),
           ),
-      ],
+          const SizedBox(width: 8),
+          if (hasPrice)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: isLight ? 0.10 : 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: accent.withValues(alpha: 0.30)),
+              ),
+              child: Text(
+                'from ${row.minPriceUsd!.toStringAsFixed(0)} ${row.currency}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: accent,
+                ),
+              ),
+            )
+          else
+            Text(
+              '—',
+              style: TextStyle(
+                fontSize: 12,
+                color: t.textSub.withValues(alpha: 0.45),
+              ),
+            ),
+          if (hasLink) ...[
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () async {
+                final uri = Uri.tryParse(row.bookingUrl!);
+                if (uri != null) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Icon(
+                Icons.open_in_new_rounded,
+                size: 15,
+                color: accent.withValues(alpha: 0.75),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
+  }
+}
+
+class _WaypointRow extends StatelessWidget {
+  final ChatRouteWaypoint wp;
+
+  const _WaypointRow({required this.wp});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
+    final time = _formatTime(wp.arrivalTimeLocal);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(width: 4),
+          Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: t.textSub.withValues(alpha: 0.35),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              wp.name,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.3,
+                color: wp.unavailable
+                    ? t.textSub.withValues(alpha: 0.45)
+                    : t.textSub,
+                decoration: wp.unavailable ? TextDecoration.lineThrough : null,
+              ),
+            ),
+          ),
+          if (time != null) ...[
+            const SizedBox(width: 8),
+            Text(
+              time,
+              style: TextStyle(
+                fontSize: 10.5,
+                color: t.textSub.withValues(alpha: 0.55),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String? _formatTime(String? raw) {
+    if (raw == null || raw.length < 5) return null;
+    return raw.substring(0, 5);
   }
 }
 

@@ -78,6 +78,7 @@ class ActiveRouteCubit extends Cubit<ActiveRouteState> {
     String? travelStyle,
     List<String>? categories,
     bool? includeFavorites,
+    List<String>? poiIds,
   }) async {
     emit(state.copyWith(status: ActiveRouteStatus.loading, clearError: true));
     try {
@@ -87,6 +88,7 @@ class ActiveRouteCubit extends Cubit<ActiveRouteState> {
         travelStyle: travelStyle,
         categories: categories,
         includeFavorites: includeFavorites,
+        poiIds: poiIds,
       );
       if (res.routeData == null) {
         emit(

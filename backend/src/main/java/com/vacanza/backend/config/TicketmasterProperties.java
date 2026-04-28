@@ -22,9 +22,14 @@ import java.time.Duration;
 public class TicketmasterProperties {
 
     /**
-     * Ticketmaster Discovery API base URL.
+     * Ticketmaster Discovery API base URL (US/global).
      */
     private String baseUrl = "https://app.ticketmaster.com/discovery/v2";
+
+    /**
+     * Ticketmaster International Discovery API base URL (European markets).
+     */
+    private String euBaseUrl = "https://app.ticketmaster.eu/mfxapi/v2";
 
     /**
      * Ticketmaster API key (Consumer Key from developer.ticketmaster.com).

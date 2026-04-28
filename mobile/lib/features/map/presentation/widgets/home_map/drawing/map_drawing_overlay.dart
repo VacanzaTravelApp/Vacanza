@@ -23,6 +23,9 @@ class MapDrawingOverlay extends StatefulWidget {
   /// ✅ Map hareket edince (idle) selection polygon’un screen path’i yeniden hesaplanabilsin diye
   final int rebuildTick;
 
+  /// Zoom çok düşükse false: harita jestleri açık kalsın, çizim jestleri kapalı.
+  final bool allowDrawingGestures;
+
   final void Function(PolygonArea polygon) onPolygonFinished;
 
   const MapDrawingOverlay({
@@ -31,6 +34,7 @@ class MapDrawingOverlay extends StatefulWidget {
     required this.map,
     required this.activeSelectionPolygon,
     required this.rebuildTick,
+    this.allowDrawingGestures = true,
     required this.onPolygonFinished,
   });
 
@@ -141,7 +145,8 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
           // gesture sadece drawing ON iken
           Positioned.fill(
             child: IgnorePointer(
-              ignoring: !widget.isDrawing,
+              ignoring:
+                  !widget.isDrawing || !widget.allowDrawingGestures,
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onPanStart: (d) => unawaited(_onDrawPoint(d.localPosition)),
@@ -233,7 +238,10 @@ class _MapDrawingOverlayState extends State<MapDrawingOverlay> {
       final map = widget.map;
       if (map == null) return null;
 
-      final screen = mb.ScreenCoordinate(x: localPos.dx, y: localPos.dy);
+      final screen = mb.ScreenCoordinate(
+        x: localPos.dx,
+        y: localPos.dy,
+      );
 
       final point = await map.coordinateForPixel(screen);
 

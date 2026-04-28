@@ -13,7 +13,7 @@ import '../bloc/poi_search_state.dart';
 /// Web [UI_CATEGORIES] ile hizalı katalog.
 ///
 /// [hideZeroCountCategories]: yalnızca alan çizimi (user selection) akışında `true` —
-/// viewport’ta tüm kategoriler listelenir; 0 gizleme sadece çizim sonrası için.
+/// viewport'ta tüm kategoriler listelenir; 0 gizleme sadece çizim sonrası için.
 class PoiFilterPanel extends StatelessWidget {
   final VoidCallback onClose;
 
@@ -35,69 +35,111 @@ class PoiFilterPanel extends StatelessWidget {
       builder: (context, state) {
         final cs = Theme.of(context).colorScheme;
         final isDark = Theme.of(context).brightness == Brightness.dark;
+        final isLight = !isDark;
         final accent = context.mapControlAccent;
-        final secondary = cs.secondary;
+        final gradientColors = context.mapControlActiveGradientColors;
         final counts = state.countsByCategory;
         final allKeys = _allCatalogKeys();
-        // Çizim akışında: bu alanda gerçekten 0 POI olan satırları gösterme (sayılar tam listeden).
         final categories = hideZeroCountCategories
             ? allKeys
                 .where((key) => (counts[key] ?? 0) > 0)
                 .toList(growable: false)
             : allKeys;
-
         final selected = state.selectedCategories.toSet();
-
-        const radius = 18.0;
-        // Slightly more opaque than bare surface@0.76 so the map does not read muddy gray.
-        final panelTint = isDark
-            ? cs.surface.withValues(alpha: 0.88)
-            : context.lightGlassPanelColor;
+        const radius = 20.0;
 
         return SizedBox(
-          width: 200,
-          height: 400,
-          // Shadow outside clip so rounded corners stay clean (no square corner bleed).
+          width: 210,
+          height: 420,
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(radius),
-              boxShadow: [
-                BoxShadow(
-                  color: cs.shadow.withValues(alpha: isDark ? 0.28 : 0.12),
-                  blurRadius: 22,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              boxShadow: isLight
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x08000000),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                      BoxShadow(
+                        color: Color(0x0E000000),
+                        blurRadius: 28,
+                        offset: Offset(0, 10),
+                      ),
+                      BoxShadow(color: Color(0x05000000), blurRadius: 1),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: cs.shadow.withValues(alpha: 0.28),
+                        blurRadius: 22,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(radius),
               clipBehavior: Clip.antiAlias,
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                // No [BoxDecoration.borderRadius] here — clip defines the curve (avoids corner seams).
+                filter: ImageFilter.blur(
+                  sigmaX: isLight ? 14 : 0,
+                  sigmaY: isLight ? 14 : 0,
+                ),
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: panelTint,
+                    gradient: isLight
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Colors.white, Color(0xFFF8FAFC)],
+                          )
+                        : null,
+                    color: isDark ? cs.surface.withValues(alpha: 0.88) : null,
                     border: Border.all(
-                      color: (isDark ? accent : secondary)
-                          .withValues(alpha: isDark ? 0.26 : 0.22),
+                      color: isLight
+                          ? const Color(0xFFE2E8F0)
+                          : accent.withValues(alpha: 0.26),
+                      width: 1.2,
                     ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // ── Header ───────────────────────────────────
                       Row(
                         children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: gradientColors,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: accent.withValues(alpha: 0.32),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.filter_alt_rounded,
+                              size: 15,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               'Filter POIs',
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? cs.onSurface
-                                    : cs.onSurfaceVariant.withValues(alpha: 0.95),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface,
                               ),
                             ),
                           ),
@@ -105,34 +147,49 @@ class PoiFilterPanel extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                             onTap: onClose,
                             child: Container(
-                              width: 24,
-                              height: 24,
+                              width: 28,
+                              height: 28,
                               decoration: BoxDecoration(
-                                color: isDark
-                                    ? cs.surfaceContainerHighest
-                                        .withValues(alpha: 0.55)
-                                    : context.lightGlassFieldFill,
+                                color: isLight
+                                    ? Colors.white
+                                    : cs.surfaceContainerHighest
+                                        .withValues(alpha: 0.55),
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: accent.withValues(alpha: 0.22),
+                                  color: isLight
+                                      ? const Color(0xFFE2E8F0)
+                                      : accent.withValues(alpha: 0.22),
+                                  width: 1.2,
                                 ),
+                                boxShadow: isLight
+                                    ? const [
+                                        BoxShadow(
+                                          color: Color(0x08000000),
+                                          blurRadius: 4,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ]
+                                    : null,
                               ),
                               child: Icon(
                                 Icons.close_rounded,
-                                size: 16,
+                                size: 15,
                                 color: cs.onSurfaceVariant,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Divider(
                         height: 1,
-                        color: (isDark ? cs.outline : secondary)
-                            .withValues(alpha: isDark ? 0.35 : 0.22),
+                        thickness: 0.8,
+                        color: isLight
+                            ? const Color(0xFFE2E8F0)
+                            : cs.outline.withValues(alpha: 0.30),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
+                      // ── Quick filter buttons ─────────────────────
                       Row(
                         children: [
                           Expanded(
@@ -158,7 +215,8 @@ class PoiFilterPanel extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
+                      // ── Category list ────────────────────────────
                       Expanded(
                         child: categories.isEmpty
                             ? Center(
@@ -217,16 +275,37 @@ class _QuickFilterButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isLight = !isDark;
+
     return Material(
-      color: isDark
-          ? cs.surfaceContainerHighest.withValues(alpha: 0.55)
-          : context.lightGlassFieldFill,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: onPressed,
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isLight
+                ? Colors.white
+                : cs.surfaceContainerHighest.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isLight
+                  ? const Color(0xFFE2E8F0)
+                  : cs.outline.withValues(alpha: 0.35),
+              width: 1.0,
+            ),
+            boxShadow: isLight
+                ? const [
+                    BoxShadow(
+                      color: Color(0x07000000),
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
           child: Center(
             child: Text(
               label,
@@ -260,12 +339,10 @@ class _FilterRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isLight = !isDark;
     final def = PoiCategoryCatalog.definitionForUiKey(catKey);
-    // [counts] tam bbox/alan listesinden (kategori filtresinden bağımsız).
-    final displayCount = counts[catKey] ?? 0;
     final isOn = selected.contains(catKey);
-    final color =
-        def?.ringColor ?? Theme.of(context).colorScheme.primary;
+    final color = def?.ringColor ?? cs.primary;
     final icon = def?.iconData ?? Icons.place_rounded;
     final label = def?.label ?? catKey;
 
@@ -283,27 +360,46 @@ class _FilterRow extends StatelessWidget {
           onToggle(next);
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            color: isOn ? color.withValues(alpha: 0.10) : Colors.transparent,
+            color: isOn
+                ? (isLight ? Colors.white : color.withValues(alpha: 0.10))
+                : Colors.transparent,
+            border: isOn
+                ? Border.all(
+                    color: color.withValues(alpha: isLight ? 0.28 : 0.20),
+                    width: 1.0,
+                  )
+                : null,
+            boxShadow: isOn && isLight
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.10),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                    const BoxShadow(
+                      color: Color(0x07000000),
+                      blurRadius: 3,
+                      offset: Offset(0, 1),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             children: [
               Container(
-                width: 22,
-                height: 22,
+                width: 24,
+                height: 24,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: color.withValues(alpha: isOn ? 0.18 : 0.06),
+                  color: color.withValues(alpha: isOn ? 0.90 : 0.08),
                 ),
                 child: Icon(
                   icon,
                   size: 14,
-                  color: isOn ? color : cs.onSurfaceVariant,
+                  color: isOn ? Colors.white : cs.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 8),
@@ -311,29 +407,9 @@ class _FilterRow extends StatelessWidget {
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: isOn ? cs.onSurface : cs.onSurfaceVariant,
                     fontWeight: isOn ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? cs.surfaceContainerHighest.withValues(alpha: 0.55)
-                      : context.lightGlassFieldFill,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$displayCount',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isOn ? cs.onSurface : cs.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),

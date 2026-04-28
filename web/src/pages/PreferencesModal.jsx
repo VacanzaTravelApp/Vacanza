@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Modal, Form, InputNumber, Select, Row, Col, Typography, Button, message, Input, ConfigProvider } from "antd";
 import {
-    CloseOutlined,
     ThunderboltOutlined,
     RightOutlined,
     DownOutlined,
@@ -16,8 +15,25 @@ import dayjs from "dayjs";
 
 const { Title } = Typography;
 
+const LANGUAGE_LABELS = {
+    tr: "TR",
+    en: "EN",
+    turkish: "TR",
+    english: "EN",
+};
+
+function normalizeLanguageValue(value) {
+    if (value == null) return value;
+    const normalized = String(value).trim().toLowerCase();
+    if (normalized === "turkish") return "tr";
+    if (normalized === "english") return "en";
+    return normalized;
+}
+
 function formatLabel(str) {
     if (!str) return "";
+    const languageLabel = LANGUAGE_LABELS[String(str).trim().toLowerCase()];
+    if (languageLabel) return languageLabel;
     return str.replace(/_/g, " ").replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
@@ -195,7 +211,7 @@ const MultiSelectRow = ({ label, values, color, onClick }) => {
     );
 };
 
-const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeColor = "#0096FF", isDarkMode = true }) => {
+const FullScreenPickerView = ({ title, options, fieldName, form, onBack, onApplySelection, themeColor = "#0096FF", isDarkMode = true }) => {
     const [search, setSearch] = useState("");
     const [selectedValues, setSelectedValues] = useState(() => form.getFieldValue(fieldName) || []);
 
@@ -205,14 +221,20 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
         const normalize = (s) => String(s).toUpperCase().replace(/_/g, ' ');
         const uOpt = normalize(opt);
         const currentUpper = selectedValues.map(normalize);
-        const newValues = currentUpper.includes(uOpt)
-            ? selectedValues.filter(v => normalize(v) !== uOpt)
-            : [...selectedValues, opt];
+        const newValues = fieldName === "spokenLanguages"
+            ? [opt]
+            : currentUpper.includes(uOpt)
+                ? selectedValues.filter(v => normalize(v) !== uOpt)
+                : [...selectedValues, opt];
         setSelectedValues(newValues);
     };
 
     const handleDone = () => {
-        form.setFieldsValue({ [fieldName]: selectedValues });
+        if (onApplySelection) {
+            onApplySelection(selectedValues);
+        } else {
+            form.setFieldsValue({ [fieldName]: selectedValues });
+        }
         onBack();
     };
 
@@ -291,10 +313,10 @@ const FullScreenPickerView = ({ title, options, fieldName, form, onBack, themeCo
 const MainView = ({
     preferencesForm, updatePrefsMutation, watchCategories, watchTravelStyle, watchActivityLevel,
     watchCuisines, watchDietary, watchAccessibility, watchTripPace, watchAccommodationType,
-    watchTransportPreference, watchLanguage, watchSpokenLanguages,
+    watchTransportPreference, watchLanguage,
     showMoreTravel, setShowMoreTravel, showMoreAccommodation, setShowMoreAccommodation,
     showMoreTransport, setShowMoreTransport, showAdvanced, setShowAdvanced,
-    handleOpenPicker, onClose,
+    handleOpenPicker, handleLanguageChange, onClose, contentRef,
     accentBlue, accentOrange, accentRed, accentPurple, accentGreen,
     optionTravelStyle, optionTripPace, optionAccommodationType, optionTransportPreference, optionLanguages,
     isDarkMode = true, hidden
@@ -307,20 +329,10 @@ const MainView = ({
             <GrabHandle />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, marginTop: 12 }}>
                 <div style={{ fontFamily: "var(--font-display)", fontVariationSettings: "'SOFT' 80, 'WONK' 1", fontSize: 26, fontWeight: 800, color: "var(--text-main, #FFFFFF)", letterSpacing: "-1px" }}>Preferences</div>
-                <Button
-                    icon={<CloseOutlined style={{ fontSize: 14 }} />}
-                    type="text"
-                    style={{
-                        color: "var(--text-main, #FFFFFF)", padding: 0, width: 36, height: 36,
-                        borderRadius: "50%", background: "var(--card-border, rgba(255,255,255,0.1))",
-                        display: "flex", alignItems: "center", justifyContent: "center"
-                    }}
-                    onClick={onClose}
-                />
             </div>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 100px" }}>
+        <div ref={contentRef} style={{ flex: 1, overflowY: "auto", padding: "0 24px 100px" }}>
             <Form form={preferencesForm} layout="vertical" onFinish={(v) => updatePrefsMutation.mutate(v)}>
                 <Form.Item name="favoriteCategories" noStyle><input type="hidden" /></Form.Item>
                 <Form.Item name="cuisinePreferences" noStyle><input type="hidden" /></Form.Item>
@@ -404,8 +416,7 @@ const MainView = ({
                 <ChipSelector options={optionTransportPreference} value={watchTransportPreference} onChange={v => preferencesForm.setFieldsValue({ transportPreference: v })} color={accentBlue} maxVisible={3} isExpanded={showMoreTransport} onToggleMore={() => setShowMoreTransport(!showMoreTransport)} />
 
                 <FieldLabel text="Languages" />
-                <ChipSelector options={optionLanguages} value={watchLanguage} onChange={v => preferencesForm.setFieldsValue({ preferredLanguage: v })} color={accentBlue} circle={true} maxVisible={7} />
-                <MultiSelectRow label="Spoken languages" values={watchSpokenLanguages} color={accentGreen} onClick={() => handleOpenPicker('spokenLanguages')} />
+                <ChipSelector options={optionLanguages} value={watchLanguage} onChange={handleLanguageChange} color={accentBlue} circle={true} maxVisible={7} />
             </Form>
         </div>
 
@@ -420,6 +431,7 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
     const queryClient = useQueryClient();
     const [preferencesForm] = Form.useForm();
     const { data: preferences } = useUserPreferences();
+    const contentRef = useRef(null);
     const [view, setView] = useState("MAIN");
     const [pickerField, setPickerField] = useState(null);
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -443,12 +455,14 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
                 cuisinePreferences: preferences.cuisinePreferences || [],
                 dietaryRestrictions: preferences.dietaryRestrictions || [],
                 accessibilityNeeds: preferences.accessibilityNeeds || [],
-                spokenLanguages: preferences.spokenLanguages || [],
+                spokenLanguages: (preferences.spokenLanguages || [])
+                    .map(normalizeLanguageValue)
+                    .filter((lang) => lang === "tr" || lang === "en"),
                 travelStyle: preferences.travelStyle,
                 tripPace: preferences.tripPace,
                 accommodationType: preferences.accommodationType,
                 transportPreference: preferences.transportPreference,
-                preferredLanguage: preferences.preferredLanguage || 'EN',
+                preferredLanguage: normalizeLanguageValue(preferences.preferredLanguage || 'EN'),
                 activityLevel: preferences.activityLevel,
                 dailyBudget: preferences.dailyBudget,
                 budgetCurrency: preferences.budgetCurrency || 'EUR',
@@ -457,11 +471,36 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, preferences]);
 
+    useEffect(() => {
+        if (open && contentRef.current) {
+            contentRef.current.scrollTop = 0;
+        }
+    }, [open]);
+
+    const resetScrollPosition = () => {
+        if (contentRef.current) {
+            contentRef.current.scrollTop = 0;
+        }
+    };
+
+    const handleClose = () => {
+        resetScrollPosition();
+        onClose();
+    };
+
     const updatePrefsMutation = useMutation({
-        mutationFn: (values) => userApi.updatePreferences(values),
+        mutationFn: (values) => {
+            const normalizedLanguage = normalizeLanguageValue(values.preferredLanguage);
+            return userApi.updatePreferences({
+                ...values,
+                preferredLanguage: normalizedLanguage,
+                spokenLanguages: normalizedLanguage ? [normalizedLanguage] : [],
+            });
+        },
         onSuccess: () => {
-            message.success("Preferences updated");
+            // message.success("Preferences updated");
             queryClient.invalidateQueries(["userPreferences"]);
+            resetScrollPosition();
             onClose();
         }
     });
@@ -471,12 +510,21 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
         setView('PICKER');
     };
 
+    const handleLanguageChange = (lang) => {
+        const normalizedLanguage = normalizeLanguageValue(lang);
+        if (normalizedLanguage !== "en" && normalizedLanguage !== "tr") return;
+        preferencesForm.setFieldsValue({
+            preferredLanguage: normalizedLanguage,
+            spokenLanguages: [normalizedLanguage],
+        });
+    };
+
     const pickerData = useMemo(() => {
         if (pickerField === 'favoriteCategories') return { title: "Categories", options: ["PARK", "MUSEUM", "RESTAURANT", "NATURE", "NIGHTLIFE", "SHOPPING", "FOOD", "BEACH", "HISTORY", "ADVENTURE", "ART", "MUSIC", "SPORTS", "RELAXATION", "CAFE", "BAR"], color: isDarkMode ? "#38BDF8" : "#FF6B6B" };
         if (pickerField === 'cuisinePreferences') return { title: "Cuisines", options: ["ITALIAN", "FRENCH", "JAPANESE", "CHINESE", "MEXICAN", "INDIAN", "THAI", "SPANISH", "GREEK", "TURKISH", "LEBANESE", "VIETNAMESE", "KOREAN", "MEDITERRANEAN", "VEGETARIAN", "VEGAN", "LOCAL_SPECIALTY", "SEAFOOD", "BBQ"], color: "#F4A261" };
         if (pickerField === 'dietaryRestrictions') return { title: "Dietary", options: ["NO_RESTRICTIONS", "NONE", "VEGETARIAN", "VEGAN", "PESCATARIAN", "GLUTEN_FREE", "DAIRY_FREE", "NUT_ALLERGY", "SHELLFISH_ALLERGY", "KOSHER", "HALAL", "KETO", "PALEO"], color: "#FF6B6B" };
         if (pickerField === 'accessibilityNeeds') return { title: "Accessibility", options: ["WHEELCHAIR_ACCESSIBLE", "WHEELCHAIR", "NO_STAIRS", "ELEVATOR", "VISUAL_IMPAIRMENT", "HEARING_IMPAIRMENT", "SERVICE_ANIMAL", "EASY_WALKING"], color: "#9C27B0" };
-        if (pickerField === 'spokenLanguages') return { title: "Languages", options: ["en", "tr", "de", "fr", "es", "it", "pt", "ar", "zh", "ja", "ko", "ru", "nl", "sv", "no", "da", "fi", "pl", "el", "hi", "bn", "ur"], color: isDarkMode ? "#38BDF8" : "#FF6B6B" };
+        if (pickerField === 'spokenLanguages') return { title: "Languages", options: ["tr", "en"], color: isDarkMode ? "#38BDF8" : "#FF6B6B" };
         return { title: "", options: [], color: "#000" };
     }, [pickerField]);
 
@@ -489,14 +537,13 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
     const watchActivityLevel = Form.useWatch('activityLevel', preferencesForm);
     const watchAccommodationType = Form.useWatch('accommodationType', preferencesForm);
     const watchTravelStyle = Form.useWatch('travelStyle', preferencesForm);
-    const watchSpokenLanguages = Form.useWatch('spokenLanguages', preferencesForm) || [];
     const watchTransportPreference = Form.useWatch('transportPreference', preferencesForm);
 
     const optionTripPace = ["SLOW", "MODERATE", "FAST"];
     const optionAccommodationType = ["HOTEL", "HOSTEL", "APARTMENT", "RESORT", "BOUTIQUE", "ANY"];
     const optionTransportPreference = ["WALKING", "PUBLIC_TRANSPORT", "CAR_RENTAL", "TAXI", "ANY"];
     const optionTravelStyle = ["RELAXATION", "ADVENTURE", "LUXURY", "BACKPACKER", "CULTURAL", "NIGHTLIFE", "FAMILY", "ROMANTIC"];
-    const optionLanguages = ["en", "tr", "de", "fr", "es", "it", "pt", "ar", "zh", "ja", "ko", "ru"];
+    const optionLanguages = ["tr", "en"];
 
     const accentBlue = isDarkMode ? "#38BDF8" : "#FF6B6B";
     const accentOrange = "#F4A261";
@@ -522,7 +569,7 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
         >
             <Modal
                 open={open}
-                onCancel={onClose}
+                onCancel={handleClose}
                 footer={null}
                 closable={false}
                 maskClosable={false}
@@ -555,17 +602,23 @@ export default function PreferencesModal({ open, onClose, isDarkMode, themeClass
                     preferencesForm={preferencesForm} updatePrefsMutation={updatePrefsMutation}
                     watchCategories={watchCategories} watchTravelStyle={watchTravelStyle} watchActivityLevel={watchActivityLevel}
                     watchCuisines={watchCuisines} watchDietary={watchDietary} watchAccessibility={watchAccessibility} watchTripPace={watchTripPace} watchAccommodationType={watchAccommodationType}
-                    watchTransportPreference={watchTransportPreference} watchLanguage={watchLanguage} watchSpokenLanguages={watchSpokenLanguages}
+                    watchTransportPreference={watchTransportPreference} watchLanguage={watchLanguage}
                     showMoreTravel={showMoreTravel} setShowMoreTravel={setShowMoreTravel} showMoreAccommodation={showMoreAccommodation} setShowMoreAccommodation={setShowMoreAccommodation}
                     showMoreTransport={showMoreTransport} setShowMoreTransport={setShowMoreTransport} showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
-                    handleOpenPicker={handleOpenPicker} onClose={onClose}
+                    handleOpenPicker={handleOpenPicker} handleLanguageChange={handleLanguageChange} onClose={handleClose} contentRef={contentRef}
                     accentBlue={accentBlue} accentOrange={accentOrange} accentRed={accentRed} accentPurple={accentPurple} accentGreen={accentGreen}
                     optionTravelStyle={optionTravelStyle} optionTripPace={optionTripPace} optionAccommodationType={optionAccommodationType} optionTransportPreference={optionTransportPreference} optionLanguages={optionLanguages}
                 />
                 {view === 'PICKER' && (
                     <FullScreenPickerView
                         isDarkMode={isDarkMode}
-                        title={pickerData.title} options={pickerData.options} fieldName={pickerField} form={preferencesForm} onBack={() => setView('MAIN')} themeColor={pickerData.color}
+                        title={pickerData.title}
+                        options={pickerData.options}
+                        fieldName={pickerField}
+                        form={preferencesForm}
+                        onBack={() => setView('MAIN')}
+                        onApplySelection={pickerField === "spokenLanguages" ? (values) => handleLanguageChange(values[values.length - 1]) : undefined}
+                        themeColor={pickerData.color}
                     />
                 )}
             </Modal>

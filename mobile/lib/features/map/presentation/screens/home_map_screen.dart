@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
+import 'package:mobile/core/navigation/route_open_requests.dart';
 import 'package:mobile/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/favorite_poi_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/saved_pois_cubit.dart';
@@ -24,11 +25,16 @@ import '../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../checkin/presentation/bloc/location_event.dart';
 import '../../../checkin/presentation/bloc/location_state.dart';
 
+import '../../../gamification/data/models/badge_dto.dart';
 import '../../../gamification/presentation/cubit/gamification_cubit.dart';
+import '../../../gamification/presentation/cubit/gamification_state.dart';
+import '../../../gamification/presentation/widgets/badge_icon_mapper.dart';
+import '../../../../core/widgets/top_notification_banner.dart';
 
 import '../../../poi_search/data/api/poi_search_api_client.dart';
 import '../../../poi_search/data/models/area_source.dart';
 import '../../../poi_search/data/models/selected_area.dart';
+import '../../../poi_search/data/utils/polygon_contains.dart';
 import '../../../poi_search/data/repositories/composite_poi_search_repository.dart';
 import '../../../poi_search/data/repositories/poi_search_repository.dart';
 import '../../../poi_search/data/repositories/poi_search_repository_impl.dart';
@@ -51,6 +57,7 @@ import '../../../ai/presentation/cubit/active_route_cubit.dart';
 import '../../../ai/presentation/cubit/active_route_state.dart';
 import '../../../ai/data/api/ai_route_api_client.dart';
 import '../../../chat/data/api/chat_api_client.dart';
+import '../widgets/home_map/map_draw_area_zoom_hint_dialog.dart';
 import '../widgets/home_map/route/route_bottom_sheet.dart';
 import '../widgets/home_map/route/route_mini_pill.dart';
 import '../../../trip_agenda/trip_agenda_calendar_sheet.dart';
@@ -154,6 +161,7 @@ class _HomeMapViewState extends State<_HomeMapView>
   /// Cached reference to avoid context.read in dispose/lifecycle callbacks.
   late final LocationBloc _locationBloc;
   late final ChatCubit _chatCubit;
+  StreamSubscription<RouteOpenRequest>? _routeOpenSub;
 
   /// GPS tracking was active before app went to background
   bool _wasTracking = false;
@@ -165,6 +173,42 @@ class _HomeMapViewState extends State<_HomeMapView>
   /// ✅ Bottom sheet chip'leri sadece UI filter (backend'e istek atmaz)
   /// null => All
   String? _activeChipKey;
+
+  // ── Top notification queue ──────────────────────────────────────────────
+  TopNotifData? _activeTopNotif;
+  final List<TopNotifData> _notifQueue = [];
+
+  void _showTopNotification(TopNotifData notif) {
+    if (!mounted) return;
+    if (_activeTopNotif == null) {
+      setState(() => _activeTopNotif = notif);
+    } else {
+      _notifQueue.add(notif);
+    }
+  }
+
+  void _onTopNotifDismissed() {
+    if (!mounted) return;
+    setState(() {
+      _activeTopNotif = _notifQueue.isNotEmpty ? _notifQueue.removeAt(0) : null;
+    });
+  }
+
+  TopNotifData _checkinNotif(String? poiName) => TopNotifData(
+    type: TopNotifType.checkin,
+    title: 'Checked in!',
+    subtitle: poiName != null ? 'at $poiName' : 'Location saved',
+    icon: Icons.location_on_rounded,
+    iconGradient: const [Color(0xFF00B4D8), Color(0xFF0096C7)],
+  );
+
+  TopNotifData _badgeNotif(BadgeDto badge) => TopNotifData(
+    type: TopNotifType.badge,
+    title: 'New badge earned!',
+    subtitle: badge.title,
+    icon: BadgeIconMapper.icon(badge.key),
+    iconGradient: BadgeIconMapper.gradient(badge.key),
+  );
 
   void _openFilters({required bool fromUserSelection}) {
     if (_filtersOpen) return;
@@ -197,7 +241,7 @@ class _HomeMapViewState extends State<_HomeMapView>
     final ps = context.read<PoiSearchBloc>().state;
     if (ps.status == PoiSearchStatus.success &&
         ps.areaSource == AreaSource.userSelection &&
-        ps.pois.isNotEmpty) {
+        (ps.pois.isNotEmpty || ps.mapboxAreaStreamLoading)) {
       setState(() => _resultsOpen = true);
     }
   }
@@ -271,7 +315,7 @@ class _HomeMapViewState extends State<_HomeMapView>
     setState(() => _savedPlacesOpen = false);
   }
 
-  /// Closes results (and filters), then shows the two-step wizard + loading.
+  /// Closes results (and filters), then shows the route wizard.
   void _beginCreateRouteFromArea() {
     if (!mounted) return;
     setState(() {
@@ -304,66 +348,47 @@ class _HomeMapViewState extends State<_HomeMapView>
         .map((p) => <double>[p.lng, p.lat])
         .toList(growable: false);
 
+    // Collect IDs of loaded POIs that fall inside the drawn polygon so the
+    // backend only routes through places the user selected visually.
+    final allPois = context.read<PoiSearchBloc>().state.pois;
+    final poisInsidePolygon = allPois
+        .where((p) {
+          return pointInsidePolygonLatLng(
+            lat: p.latitude,
+            lng: p.longitude,
+            polygonLatLng: poly.points,
+          );
+        })
+        .toList(growable: false);
+    final poiIds = poisInsidePolygon
+        .map((p) => p.poiId)
+        .toList(growable: false);
+
     final options = await showCreateRouteFromAreaOptionsSheet(context);
     if (!mounted) return;
     if (options == null) {
-      // User dismissed the Plan a Route popup → clear the drawn area too.
       context.read<MapBloc>().add(SetDrawingEnabled(false));
       context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
       context.read<PoiSearchBloc>().add(const poi.AreaCleared());
       return;
     }
 
-    // Rota isteği başlarken çizimi ve poligon overlay’ini kaldır (koordinatlar zaten [coords]’ta).
     context.read<MapBloc>().add(SetDrawingEnabled(false));
     context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
     context.read<PoiSearchBloc>().add(const poi.AreaCleared());
 
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      useRootNavigator: true,
-      builder: (dialogCtx) {
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            content: Row(
-              children: [
-                const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(strokeWidth: 2.6),
-                ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Text(
-                    'Creating your route…',
-                    style: Theme.of(dialogCtx).textTheme.bodyLarge,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    try {
-      await context.read<ActiveRouteCubit>().createFromPolygon(
+    // Fire and forget — user continues using the app while AI builds the route.
+    // BlocListener on ActiveRouteStatus.ready shows the snackbar + opens the sheet.
+    unawaited(
+      context.read<ActiveRouteCubit>().createFromPolygon(
         coordinates: coords,
         totalDays: options.totalDays,
         travelStyle: options.travelStyle,
         categories: null,
         includeFavorites: options.includeFavorites,
-      );
-    } finally {
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-    }
+        poiIds: poiIds.isEmpty ? null : poiIds,
+      ),
+    );
   }
 
   @override
@@ -375,6 +400,41 @@ class _HomeMapViewState extends State<_HomeMapView>
       context.read<ChatApiClient>(),
       context.read<AiRouteApiClient>(),
     )..startConversation();
+
+    _routeOpenSub = RouteOpenRequests.stream.listen((req) async {
+      final routeCubit = context.read<ActiveRouteCubit>();
+      await routeCubit.loadSavedRoute(req.routeId);
+      if (!mounted) return;
+      routeCubit.showRouteOnMapAgain();
+      if (req.day != null) {
+        routeCubit.setActiveDay(req.day!);
+      }
+      setState(() => _routeOpen = true);
+
+      // Fit map camera to the selected day (or whole route).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final model = routeCubit.state.route;
+        if (model == null) return;
+        final day = req.day ?? routeCubit.state.activeDay;
+        var wps = waypointsForDay(model, day);
+        if (wps.isEmpty) {
+          wps = allWaypointsForMap(model);
+        }
+        final b = boundsOfWaypoints(wps);
+        final brg = bearingFirstToLast(wps);
+        if (b == null) return;
+        context.read<MapBloc>().add(
+          FitRouteBoundsRequested(
+            minLat: b.minLat,
+            maxLat: b.maxLat,
+            minLng: b.minLng,
+            maxLng: b.maxLng,
+            bearing: brg,
+          ),
+        );
+      });
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _locationBloc.add(const StartTracking());
@@ -388,6 +448,7 @@ class _HomeMapViewState extends State<_HomeMapView>
     // Stop GPS tracking before disposal (use cached ref — context is unsafe here)
     _locationBloc.add(const StopTracking());
     _chatCubit.close();
+    _routeOpenSub?.cancel();
     super.dispose();
   }
 
@@ -488,16 +549,7 @@ class _HomeMapViewState extends State<_HomeMapView>
                   prev.status != next.status &&
                   next.status == CheckinStatus.newCreated,
           listener: (context, state) {
-            final poiName = state.response?.poiName;
-            final message =
-                poiName != null ? 'Checked in at $poiName' : 'Checked in!';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(message),
-                duration: const Duration(seconds: 2),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            _showTopNotification(_checkinNotif(state.response?.poiName));
           },
         ),
 
@@ -515,6 +567,36 @@ class _HomeMapViewState extends State<_HomeMapView>
               'checkInId=${state.response?.checkInId}',
             );
             context.read<GamificationCubit>().refresh();
+          },
+        ),
+
+        // ================= Badge earned notification (MOB-12) =================
+        BlocListener<GamificationCubit, GamificationState>(
+          listenWhen:
+              (prev, next) =>
+                  next is GamificationLoaded &&
+                  next.newlyEarnedBadges.isNotEmpty,
+          listener: (context, state) {
+            if (state is GamificationLoaded) {
+              for (final badge in state.newlyEarnedBadges) {
+                _showTopNotification(_badgeNotif(badge));
+              }
+            }
+          },
+        ),
+
+        BlocListener<PoiSearchBloc, PoiSearchState>(
+          listenWhen:
+              (prev, next) =>
+                  next.streamSuggestedChipKey != null &&
+                  next.streamSuggestedChipKey != prev.streamSuggestedChipKey,
+          listener: (context, state) {
+            final k = state.streamSuggestedChipKey;
+            if (k == null || !mounted) return;
+            setState(() => _activeChipKey = k);
+            context.read<PoiSearchBloc>().add(
+              const poi.StreamChipSuggestionConsumed(),
+            );
           },
         ),
 
@@ -568,7 +650,8 @@ class _HomeMapViewState extends State<_HomeMapView>
                   prev.status != next.status ||
                   prev.areaSource != next.areaSource ||
                   prev.pois != next.pois ||
-                  prev.selectedCategories != next.selectedCategories,
+                  prev.selectedCategories != next.selectedCategories ||
+                  prev.mapboxAreaStreamLoading != next.mapboxAreaStreamLoading,
           listener: (context, state) {
             // MOB-2: forward POI list to candidate cubit on any POI change
             context.read<CandidatePoiCubit>().updatePois(state.pois);
@@ -577,10 +660,10 @@ class _HomeMapViewState extends State<_HomeMapView>
               return;
             }
 
-            // User selection + success -> sheet aç
+            // User selection + success -> sheet aç (stream başlarken boş liste olabilir)
             if (state.status == PoiSearchStatus.success &&
                 state.areaSource == AreaSource.userSelection &&
-                state.pois.isNotEmpty) {
+                (state.pois.isNotEmpty || state.mapboxAreaStreamLoading)) {
               if (!_resultsOpen && mounted) {
                 setState(() {
                   _resultsOpen = true;
@@ -613,6 +696,7 @@ class _HomeMapViewState extends State<_HomeMapView>
           listener: (context, state) {
             if (state.status == ActiveRouteStatus.ready &&
                 state.route != null) {
+              context.read<PoiSearchBloc>().add(const poi.HidePoiMarkers());
               if (mounted) setState(() => _routeOpen = true);
 
               final ps = context.read<PoiSearchBloc>().state;
@@ -676,12 +760,15 @@ class _HomeMapViewState extends State<_HomeMapView>
             isCreatingRoute:
                 activeRouteState.status == ActiveRouteStatus.loading,
             onCreateRouteFromArea: _beginCreateRouteFromArea,
+            showStreamLoadingMore: poiState.mapboxAreaStreamLoading,
           );
 
-          return HomeMapScaffold(
+          final scaffold = HomeMapScaffold(
             basemap: state.basemap,
             perspective: state.perspective,
             isDrawing: state.isDrawing,
+            areaDrawZoomOk: state.areaDrawZoomOk,
+            areaDrawZoomTooHigh: state.areaDrawZoomTooHigh,
             onCycleBasemap:
                 () => context.read<MapBloc>().add(const CycleBasemapPressed()),
             onTogglePerspective:
@@ -691,18 +778,25 @@ class _HomeMapViewState extends State<_HomeMapView>
             onRecenter:
                 () => context.read<MapBloc>().add(const RecenterPressed()),
             onToggleDrawing: () {
-              final isDrawingNow = context.read<MapBloc>().state.isDrawing;
-
-              if (isDrawingNow) {
+              final mapBloc = context.read<MapBloc>();
+              final s = mapBloc.state;
+              if (s.isDrawing) {
                 // Sadece çizim modunu kapat. Alan/POI reseti yalnızca sonuç sheet kapatma
                 // veya geçerli bir poligon tamamlandığında (MapDrawingOverlay) yapılır;
                 // aksi halde hiç çizmeden kapatınca gereksiz viewport yenilemesi olur.
-                context.read<MapBloc>().add(SetDrawingEnabled(false));
+                mapBloc.add(SetDrawingEnabled(false));
                 if (_filtersOpen) _closeFilters();
                 return;
               }
-
-              context.read<MapBloc>().add(SetDrawingEnabled(true));
+              if (!s.areaDrawZoomOk) {
+                if (!context.mounted) return;
+                unawaited(showMapDrawAreaZoomHint(
+                  context,
+                  tooHigh: s.areaDrawZoomTooHigh,
+                ));
+                return;
+              }
+              mapBloc.add(SetDrawingEnabled(true));
             },
 
             // ✅ manual filter tuşu -> blur preview OFF
@@ -714,11 +808,16 @@ class _HomeMapViewState extends State<_HomeMapView>
             // UC1.11 — Explore in AR entry point
             onOpenArMode: () {
               _dismissUserSelectionIfAny();
+              final checkinBloc = context.read<CheckinBloc>();
+              final poiSearchBloc = context.read<PoiSearchBloc>();
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder:
-                      (_) => BlocProvider.value(
-                        value: context.read<CheckinBloc>(),
+                      (_) => MultiBlocProvider(
+                        providers: [
+                          BlocProvider.value(value: checkinBloc),
+                          BlocProvider.value(value: poiSearchBloc),
+                        ],
                         child: const ArExplorePage(),
                       ),
                 ),
@@ -741,7 +840,19 @@ class _HomeMapViewState extends State<_HomeMapView>
             onOpenTripAgenda: () {
               _closeControlsMenu();
               _dismissUserSelectionIfAny();
-              showTripAgendaCalendar(context);
+              showTripAgendaCalendar(
+                context,
+                onOpenRouteFromCalendar: (rid) async {
+                  // Ensure we return to the map screen even if Trip Agenda
+                  // was opened from a pushed route (Profile/Settings).
+                  Navigator.of(context).popUntil((r) => r.isFirst);
+                  final routeCubit = context.read<ActiveRouteCubit>();
+                  await routeCubit.loadSavedRoute(rid);
+                  if (!context.mounted) return;
+                  routeCubit.showRouteOnMapAgain();
+                  setState(() => _routeOpen = true);
+                },
+              );
             },
 
             // ✅ Chatbot
@@ -781,9 +892,7 @@ class _HomeMapViewState extends State<_HomeMapView>
               } else {
                 return;
               }
-              context
-                  .read<PoiSearchBloc>()
-                  .add(const poi.HidePoiMarkers());
+              context.read<PoiSearchBloc>().add(const poi.HidePoiMarkers());
               setState(() {
                 _routeShowEventsInitially = nav.openEventsInitially;
                 _routeOpen = true;
@@ -869,12 +978,12 @@ class _HomeMapViewState extends State<_HomeMapView>
                       initialEvents: _routeShowEventsInitially,
                       onClose: () {
                         context.read<ActiveRouteCubit>().hideRouteFromMap();
-                        context
-                            .read<PoiSearchBloc>()
-                            .add(const poi.ShowPoiMarkers());
-                        context
-                            .read<MapBloc>()
-                            .add(const RefreshViewportRequested());
+                        context.read<PoiSearchBloc>().add(
+                          const poi.ShowPoiMarkers(),
+                        );
+                        context.read<MapBloc>().add(
+                          const RefreshViewportRequested(),
+                        );
                         if (mounted) setState(() => _routeOpen = false);
                       },
                     )
@@ -882,34 +991,39 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ===== Mini route pill =====
             showRouteMiniPill:
-                activeRouteState.status == ActiveRouteStatus.ready &&
-                activeRouteState.route != null &&
-                !activeRouteState.showRouteOnMap &&
                 !_filtersOpen &&
                 !_resultsOpen &&
-                !state.isDrawing,
+                !state.isDrawing &&
+                ((activeRouteState.status == ActiveRouteStatus.loading &&
+                        !_routeOpen) ||
+                    (activeRouteState.status == ActiveRouteStatus.ready &&
+                        activeRouteState.route != null &&
+                        !activeRouteState.showRouteOnMap)),
             routeMiniPill:
-                activeRouteState.status == ActiveRouteStatus.ready &&
+                activeRouteState.status == ActiveRouteStatus.loading &&
+                        !_routeOpen
+                    ? RouteLoadingPill(onTap: () {})
+                    : activeRouteState.status == ActiveRouteStatus.ready &&
                         activeRouteState.route != null &&
                         !activeRouteState.showRouteOnMap
                     ? RouteMiniPill(
                       day: activeRouteState.activeDay,
-                          onOpen: () {
-                            if (!mounted) return;
-                            context
-                                .read<PoiSearchBloc>()
-                                .add(const poi.HidePoiMarkers());
-                            context.read<ActiveRouteCubit>().showRouteOnMapAgain();
-                            setState(() => _routeOpen = true);
-                          },
+                      onOpen: () {
+                        if (!mounted) return;
+                        context.read<PoiSearchBloc>().add(
+                          const poi.HidePoiMarkers(),
+                        );
+                        context.read<ActiveRouteCubit>().showRouteOnMapAgain();
+                        setState(() => _routeOpen = true);
+                      },
                       onClear: () {
                         context.read<ActiveRouteCubit>().reset();
-                        context
-                            .read<PoiSearchBloc>()
-                            .add(const poi.ShowPoiMarkers());
-                        context
-                            .read<MapBloc>()
-                            .add(const RefreshViewportRequested());
+                        context.read<PoiSearchBloc>().add(
+                          const poi.ShowPoiMarkers(),
+                        );
+                        context.read<MapBloc>().add(
+                          const RefreshViewportRequested(),
+                        );
                         if (mounted) setState(() => _routeOpen = false);
                       },
                     )
@@ -917,6 +1031,23 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ===== Blur preview sadece polygon sonrası filter açıldıysa =====
             showResultsBlurUnderFilters: _filtersFromUserSelection,
+          );
+
+          return Stack(
+            children: [
+              scaffold,
+              if (_activeTopNotif != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: TopNotificationBanner(
+                    key: ValueKey(_activeTopNotif),
+                    data: _activeTopNotif!,
+                    onDismissed: _onTopNotifDismissed,
+                  ),
+                ),
+            ],
           );
         },
       ),

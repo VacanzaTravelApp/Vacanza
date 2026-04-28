@@ -20,6 +20,15 @@ class SetDrawingEnabled extends MapEvent {
   SetDrawingEnabled(this.enabled);
 }
 
+/// Kamera zoom'u alan çizimi için uygun aralıkta mı?
+/// [ok]: zoom [minZoomForAreaDraw, maxZoomForAreaDraw] içinde.
+/// [tooHigh]: zoom > maxZoomForAreaDraw (çok yakın — küçük alan).
+class AreaDrawZoomOkChanged extends MapEvent {
+  const AreaDrawZoomOkChanged({required this.ok, required this.tooHigh});
+  final bool ok;
+  final bool tooHigh;
+}
+
 /// Harita taban stilini döngüsel değiştirir: streets → dark → satellite.
 class CycleBasemapPressed extends MapEvent {
   const CycleBasemapPressed();

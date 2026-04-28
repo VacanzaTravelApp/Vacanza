@@ -212,7 +212,7 @@ class BookingCubit extends Cubit<BookingState> {
         originAirport: cur.originAirport.copyWith(
           loadingSuggestions: false,
           clearSuggestions: true,
-          suggestionError: e.toString(),
+          suggestionError: 'Could not load suggestions. Please try again.',
         ),
       );
     }
@@ -268,7 +268,7 @@ class BookingCubit extends Cubit<BookingState> {
         destinationAirport: cur.destinationAirport.copyWith(
           loadingSuggestions: false,
           clearSuggestions: true,
-          suggestionError: e.toString(),
+          suggestionError: 'Could not load suggestions. Please try again.',
         ),
       );
     }
@@ -376,7 +376,7 @@ class BookingCubit extends Cubit<BookingState> {
         hotelDestination: cur.hotelDestination.copyWith(
           loadingSuggestions: false,
           clearSuggestions: true,
-          suggestionError: e.toString(),
+          suggestionError: 'Could not load suggestions. Please try again.',
         ),
       );
     }
@@ -435,7 +435,7 @@ class BookingCubit extends Cubit<BookingState> {
     } catch (e) {
       if (isClosed) return;
       log('[BOOKING_CUBIT] searchHotels UNEXPECTED: $e');
-      emit(BookingError(type: BookingType.hotels, message: e.toString()));
+      emit(const BookingError(type: BookingType.hotels, message: 'Something went wrong. Please try again.'));
     }
   }
 
@@ -480,7 +480,7 @@ class BookingCubit extends Cubit<BookingState> {
     } catch (e) {
       if (isClosed) return;
       log('[BOOKING_CUBIT] searchFlights UNEXPECTED: $e');
-      emit(BookingError(type: BookingType.flights, message: e.toString()));
+      emit(const BookingError(type: BookingType.flights, message: 'Something went wrong. Please try again.'));
     }
   }
 

@@ -53,7 +53,8 @@ public class ChatProxyController {
          */
         private static final List<String> DEFAULT_POLYGON_CATEGORIES = List.of(
                         "museum", "monument", "historic_site", "church", "park", "neighborhood",
-                        "landmark", "art_gallery", "tourist_attraction", "restaurant", "cafe", "bar");
+                        "landmark", "art_gallery", "tourist_attraction",
+                        "restaurant", "cafe", "bar", "fast_food", "bakery");
 
         /**
          * Dining categories that should be fetched using a tight bbox around sightseeing POIs,
@@ -241,7 +242,9 @@ public class ChatProxyController {
                         applyTurn3RouteEnrichmentAndSave(user, conversationId, response, profile,
                                 parentRouteForTurn3, originalContent);
                 } else {
-                        applyRouteEnrichmentAndSave(user, conversationId, response, routePlanningWeather, profile);
+                        applyRouteEnrichmentAndSave(
+                                        user, conversationId, response, routePlanningWeather, profile,
+                                        originalContent);
                 }
 
                 return ResponseEntity.ok(response);
@@ -374,7 +377,7 @@ public class ChatProxyController {
                 }
 
                 saveExtractedPreferencesIfAny(user, response);
-                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile);
+                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile, null);
 
                 response.setConversationId(conversationId);
                 return ResponseEntity.ok(response);
@@ -515,7 +518,7 @@ public class ChatProxyController {
                 }
 
                 saveExtractedPreferencesIfAny(user, response);
-                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile);
+                applyRouteEnrichmentAndSave(user, conversationId, response, exec.planningWeather(), profile, null);
 
                 response.setConversationId(conversationId);
                 return ResponseEntity.ok(response);
@@ -538,12 +541,15 @@ public class ChatProxyController {
                         UUID conversationId,
                         AiChatDto.MessageSendResponse response,
                         WeatherPlanningForecast routePlanningWeather,
-                        UserProfileForAi profile) {
+                        UserProfileForAi profile,
+                        String userLocaleHint) {
                 try {
                         if (response != null && response.getRouteData() != null) {
                                 logRouteShape("received_from_ai", response.getRouteData());
-                                resolveNullCoordinates(response.getRouteData());
-                                stripNullCoordinateWaypoints(response.getRouteData());
+                                capRouteDays(response.getRouteData(), 7);
+                                var districtHints = resolveNullCoordinates(response.getRouteData());
+                                stripNullCoordinateWaypoints(response.getRouteData(), districtHints);
+                                enforceMaxDailyPois(response.getRouteData(), profile);
                                 logRouteShape("after_strip_null", response.getRouteData());
                                 if (routePlanningWeather != null && !routePlanningWeather.daily().isEmpty()) {
                                         response.getRouteData().setWeatherForecast(routePlanningWeather.daily());
@@ -556,13 +562,19 @@ public class ChatProxyController {
                                 // remove any museum/historic stops that ended up at or after 16:45 —
                                 // these venues close at 17:00 and the walking overhead pushed them past closing.
                                 stripLateClosingVenueStops(response.getRouteData());
+                                // If we adjusted any stops (replace/flag), recompute the day timeline once more
+                                // so the frontend receives consistent arrival/departure and travel legs.
+                                routeTimelineService.enrichTimeline(response.getRouteData(), profile);
+                                // Prevent the AI from scheduling the same landmark on multiple days:
+                                // keep first occurrence, replace later duplicates where possible.
+                                dedupeWaypointsAcrossDays(response.getRouteData());
                                 logRouteShape("final", response.getRouteData());
                                 UUID savedRouteId = saveRoute(user, conversationId, response.getRouteData());
                                 if (savedRouteId != null) {
                                         response.setRouteId(savedRouteId);
                                 }
                                 String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
-                                                response.getRouteData(), profile);
+                                                response.getRouteData(), profile, userLocaleHint);
                                 if (summaryMessage != null) {
                                         response.setRouteSummaryMessage(summaryMessage);
                                         if (response.getMessageId() != null) {
@@ -589,11 +601,15 @@ public class ChatProxyController {
                 try {
                         if (response == null || response.getRouteData() == null) return;
                         logRouteShape("turn3_received_from_ai", response.getRouteData());
-                        resolveNullCoordinates(response.getRouteData());
-                        stripNullCoordinateWaypoints(response.getRouteData());
+                        capRouteDays(response.getRouteData(), 7);
+                        var districtHints3 = resolveNullCoordinates(response.getRouteData());
+                        stripNullCoordinateWaypoints(response.getRouteData(), districtHints3);
+                        enforceMaxDailyPois(response.getRouteData(), profile);
                         logRouteShape("turn3_after_strip_null", response.getRouteData());
                         routeTimelineService.enrichTimeline(response.getRouteData(), profile);
                         stripLateClosingVenueStops(response.getRouteData());
+                        routeTimelineService.enrichTimeline(response.getRouteData(), profile);
+                        dedupeWaypointsAcrossDays(response.getRouteData());
                         logRouteShape("turn3_final", response.getRouteData());
 
                         // Build a short human-readable reason from the user's edit request
@@ -615,7 +631,7 @@ public class ChatProxyController {
                         response.setRouteId(saved.getRouteId());
 
                         String summaryMessage = routeSummaryMessageService.buildSummaryMessage(
-                                        response.getRouteData(), profile);
+                                        response.getRouteData(), profile, userMessage);
                         if (summaryMessage != null) {
                                 response.setRouteSummaryMessage(summaryMessage);
                                 if (response.getMessageId() != null) {
@@ -646,13 +662,25 @@ public class ChatProxyController {
          * Uses the trip destination's bounding box so generic names (e.g. "Blue Mosque") resolve
          * in the correct city instead of a same-named POI elsewhere (e.g. Jakarta).
          */
-        private void resolveNullCoordinates(AiChatDto.RouteData routeData) {
-                if (routeData == null || routeData.getDays() == null) return;
+        /**
+         * Geocode null-coord waypoints and return a per-day district hint map.
+         *
+         * <p>A "district hint" is the first geocoded coordinate that was rejected only for name
+         * incompatibility (not distance). When ALL waypoints in a day fail, the hint gives
+         * {@link #stripNullCoordinateWaypoints} a better anchor than the raw destination centre,
+         * preventing entire new days from landing in the wrong district (e.g., day 4 asking for
+         * Beyoğlu places ending up with Sultanahmet fallbacks).
+         */
+        private java.util.Map<Integer, double[]> resolveNullCoordinates(AiChatDto.RouteData routeData) {
+                java.util.Map<Integer, double[]> dayDistrictHints = new java.util.HashMap<>();
+                if (routeData == null || routeData.getDays() == null) return dayDistrictHints;
                 String destination = routeData.getDestination();
                 double minLon = -180;
                 double minLat = -90;
                 double maxLon = 180;
                 double maxLat = 90;
+                Double destCenterLat = null;
+                Double destCenterLon = null;
                 if (destination != null && !destination.isBlank()) {
                         var bboxOpt = mapboxPoiSearchClient.geocodeDestination(destination.trim()).blockOptional();
                         if (bboxOpt.isPresent()) {
@@ -661,6 +689,8 @@ public class ChatProxyController {
                                 minLat = g.getMinLat();
                                 maxLon = g.getMaxLon();
                                 maxLat = g.getMaxLat();
+                                destCenterLat = g.getCenterLat();
+                                destCenterLon = g.getCenterLon();
                                 log.info("[RESOLVE NULL] bbox from destination '{}' -> {},{},{},{}",
                                                 destination, minLon, minLat, maxLon, maxLat);
                         } else {
@@ -668,11 +698,18 @@ public class ChatProxyController {
                                                 destination);
                         }
                 }
+                // Max allowed distance from destination centre. Generous enough to keep
+                // restaurants at city edges; tight enough to reject results in other cities.
+                final double MAX_DIST_FROM_CENTER_M = 75_000;
                 for (AiChatDto.DayPlan dayPlan : routeData.getDays()) {
                         if (dayPlan.getWaypoints() == null) continue;
+                        int dayNum = dayPlan.getDay();
                         for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
                                 if (wp.getLatitude() != null && wp.getLongitude() != null) continue;
                                 if (wp.getName() == null || wp.getName().isBlank()) continue;
+                                // Internal placeholders (e.g. __LUNCH_PLACEHOLDER__) must not be geocoded.
+                                // stripNullCoordinateWaypoints will handle them via category-based search.
+                                if (wp.getName().startsWith("__") && wp.getName().endsWith("__")) continue;
                                 try {
                                         var result = mapboxPoiSearchClient.resolvePlace(
                                                         wp.getName(),
@@ -681,15 +718,29 @@ public class ChatProxyController {
                                                 .blockOptional();
                                         if (result.isPresent()) {
                                                 String resultName = result.get().getName();
-                                                if (isGeocodingNameCompatible(wp.getName(), resultName)) {
-                                                        wp.setLatitude(result.get().getLat());
-                                                        wp.setLongitude(result.get().getLon());
+                                                double rLat = result.get().getLat();
+                                                double rLon = result.get().getLon();
+                                                boolean nameOk = isGeocodingNameCompatible(wp.getName(), resultName);
+                                                boolean nearEnough = destCenterLat == null
+                                                        || haversineMeters(destCenterLat, destCenterLon, rLat, rLon) <= MAX_DIST_FROM_CENTER_M;
+                                                if (nameOk && nearEnough) {
+                                                        wp.setLatitude(rLat);
+                                                        wp.setLongitude(rLon);
                                                         log.info("[RESOLVE NULL] '{}' -> ({}, {}) ✓ (matched '{}')",
-                                                                        wp.getName(), result.get().getLat(),
-                                                                        result.get().getLon(), resultName);
-                                                } else {
-                                                        log.warn("[RESOLVE NULL] '{}' geocoded to unrelated '{}' — rejecting to avoid wrong pin",
+                                                                        wp.getName(), rLat, rLon, resultName);
+                                                } else if (!nameOk && nearEnough) {
+                                                        // Name rejected but location is within destination — keep as
+                                                        // district hint so fallback replacements land in the right area.
+                                                        dayDistrictHints.putIfAbsent(dayNum, new double[]{rLat, rLon});
+                                                        log.warn("[RESOLVE NULL] '{}' geocoded to unrelated '{}' — rejecting name, keeping district hint ({},{})",
+                                                                        wp.getName(), resultName, rLat, rLon);
+                                                } else if (!nameOk) {
+                                                        log.warn("[RESOLVE NULL] '{}' geocoded to unrelated '{}' — rejecting",
                                                                         wp.getName(), resultName);
+                                                } else {
+                                                        long distKm = Math.round(haversineMeters(destCenterLat, destCenterLon, rLat, rLon) / 1000.0);
+                                                        log.warn("[RESOLVE NULL] '{}' geocoded to ({}, {}) — {} km from destination centre, rejecting",
+                                                                        wp.getName(), rLat, rLon, distKm);
                                                 }
                                         } else {
                                                 log.warn("[RESOLVE NULL] All strategies exhausted for '{}' — waypoint has no coordinates",
@@ -700,29 +751,360 @@ public class ChatProxyController {
                                 }
                         }
                 }
+                return dayDistrictHints;
         }
 
         /**
          * Removes any waypoints that still have null coordinates after geocoding and renumbers order fields.
          * Prevents frontend from receiving route entries with no map position.
          */
-        private void stripNullCoordinateWaypoints(AiChatDto.RouteData routeData) {
+        private void stripNullCoordinateWaypoints(
+                        AiChatDto.RouteData routeData,
+                        java.util.Map<Integer, double[]> dayDistrictHints) {
                 if (routeData == null || routeData.getDays() == null) return;
+                if (dayDistrictHints == null) dayDistrictHints = java.util.Map.of();
+                String destination = routeData.getDestination();
+                DestinationGeocodeResult destGeo = null;
+                if (destination != null && !destination.isBlank()) {
+                        try {
+                                destGeo = mapboxPoiSearchClient.geocodeDestination(destination.trim()).blockOptional().orElse(null);
+                        } catch (Exception e) {
+                                destGeo = null;
+                        }
+                }
                 for (AiChatDto.DayPlan dayPlan : routeData.getDays()) {
                         if (dayPlan.getWaypoints() == null) continue;
+                        int removed = 0;
+                        int replaced = 0;
+
+                        java.util.Set<String> existingNames = new java.util.HashSet<>();
+                        for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
+                                if (wp.getName() != null && !wp.getName().isBlank()) {
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                }
+                        }
+
+                        double[] districtHint = dayDistrictHints.get(dayPlan.getDay());
+
+                        // Replace null-coordinate waypoints where possible; remove only as a last resort.
+                        for (int i = 0; i < dayPlan.getWaypoints().size(); i++) {
+                                AiChatDto.RouteWaypoint wp = dayPlan.getWaypoints().get(i);
+                                if (wp == null) continue;
+                                if (wp.getLatitude() != null && wp.getLongitude() != null) continue;
+                                if (wp.getName() == null || wp.getName().isBlank()) continue;
+
+                                PoiResult repl = findNullCoordReplacement(dayPlan.getWaypoints(), i, wp, existingNames, destGeo, districtHint);
+                                if (repl != null) {
+                                        String originalName = wp.getName();
+                                        existingNames.remove(originalName.trim().toLowerCase(java.util.Locale.ROOT));
+                                        wp.setName(repl.getName());
+                                        wp.setLatitude(repl.getLat());
+                                        wp.setLongitude(repl.getLon());
+                                        if (repl.getCategory() != null) {
+                                                wp.setCategory(repl.getCategory());
+                                        }
+                                        wp.setUnavailable(null);
+                                        wp.setArrivalTimeLocal(null);
+                                        wp.setDepartureTimeLocal(null);
+                                        wp.setTravelFromPreviousMin(null);
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                        replaced++;
+                                        log.info("[STRIP NULL] Day {} — '{}' had null coords → replaced with '{}' ({},{})",
+                                                dayPlan.getDay(), originalName, repl.getName(), repl.getLat(), repl.getLon());
+                                }
+                        }
+
                         int before = dayPlan.getWaypoints().size();
-                        dayPlan.getWaypoints().removeIf(
-                                wp -> wp.getLatitude() == null || wp.getLongitude() == null);
-                        int removed = before - dayPlan.getWaypoints().size();
-                        if (removed > 0) {
-                                log.warn("[STRIP NULL] Day {} — removed {} waypoint(s) with no coordinates; renumbering",
+                        dayPlan.getWaypoints().removeIf(wp -> wp == null || wp.getLatitude() == null || wp.getLongitude() == null);
+                        removed = before - dayPlan.getWaypoints().size();
+
+                        if (removed > 0 || replaced > 0) {
+                                if (removed > 0) {
+                                        log.warn("[STRIP NULL] Day {} — removed {} waypoint(s) with no coordinates (after replacement attempts); renumbering",
                                                 dayPlan.getDay(), removed);
+                                }
                                 int order = 1;
                                 for (AiChatDto.RouteWaypoint wp : dayPlan.getWaypoints()) {
                                         wp.setOrder(order++);
                                 }
                         }
                 }
+        }
+
+        /**
+         * Attempt to replace a null-coordinate waypoint with a nearby POI of a similar category.
+         *
+         * Strategy:
+         * - Anchor search around nearest neighbour waypoint with valid coordinates (prev/next/any in day).
+         * - If no neighbour has coordinates, fall back to destination center if available.
+         * - Category fallback is tourist_attraction.
+         */
+        private PoiResult findNullCoordReplacement(
+                List<AiChatDto.RouteWaypoint> dayWaypoints,
+                int idx,
+                AiChatDto.RouteWaypoint missing,
+                java.util.Set<String> existingNamesLower,
+                DestinationGeocodeResult destGeo,
+                double[] districtHint) {
+                if (missing == null) return null;
+
+                Double anchorLat = null;
+                Double anchorLon = null;
+
+                // 1) nearest prev with coords
+                for (int j = idx - 1; j >= 0; j--) {
+                        AiChatDto.RouteWaypoint w = dayWaypoints.get(j);
+                        if (w != null && w.getLatitude() != null && w.getLongitude() != null) {
+                                anchorLat = w.getLatitude();
+                                anchorLon = w.getLongitude();
+                                break;
+                        }
+                }
+                // 2) nearest next with coords
+                if (anchorLat == null || anchorLon == null) {
+                        for (int j = idx + 1; j < dayWaypoints.size(); j++) {
+                                AiChatDto.RouteWaypoint w = dayWaypoints.get(j);
+                                if (w != null && w.getLatitude() != null && w.getLongitude() != null) {
+                                        anchorLat = w.getLatitude();
+                                        anchorLon = w.getLongitude();
+                                        break;
+                                }
+                        }
+                }
+                // 3) any in day
+                if (anchorLat == null || anchorLon == null) {
+                        for (AiChatDto.RouteWaypoint w : dayWaypoints) {
+                                if (w != null && w.getLatitude() != null && w.getLongitude() != null) {
+                                        anchorLat = w.getLatitude();
+                                        anchorLon = w.getLongitude();
+                                        break;
+                                }
+                        }
+                }
+                // 4) district hint — coordinates from a name-rejected but geographically close geocode
+                //    result. Better than destination centre when an entire new day (e.g. a Beyoğlu day)
+                //    has no resolved waypoints yet, preventing all fallbacks from landing in the wrong district.
+                if ((anchorLat == null || anchorLon == null) && districtHint != null) {
+                        anchorLat = districtHint[0];
+                        anchorLon = districtHint[1];
+                }
+                // 5) destination center
+                if ((anchorLat == null || anchorLon == null) && destGeo != null) {
+                        anchorLat = destGeo.getCenterLat();
+                        anchorLon = destGeo.getCenterLon();
+                }
+                if (anchorLat == null || anchorLon == null) {
+                        return null;
+                }
+
+                // ~1.5km-ish bbox.
+                double r = 0.014;
+                double minLon = anchorLon - r;
+                double minLat = anchorLat - r;
+                double maxLon = anchorLon + r;
+                double maxLat = anchorLat + r;
+
+                String cat = missing.getCategory();
+                String category = (cat != null && !cat.isBlank()) ? cat.trim() : "tourist_attraction";
+
+                java.util.Set<String> diningCats = java.util.Set.of(
+                        "restaurant", "cafe", "bar", "fast_food", "bakery", "pub", "food", "market");
+                boolean isDining = diningCats.contains(category.toLowerCase(java.util.Locale.ROOT));
+
+                // For dining stops only try dining categories — never fall through to tourist attractions.
+                // For sightseeing stops use category-aware fallback chains so a beach/nature trip
+                // doesn't get replaced with a monument, and a history trip doesn't get replaced with a beach.
+                List<String> cats;
+                if (isDining) {
+                    cats = List.of("restaurant", "cafe", "bar", "fast_food");
+                } else {
+                    String catLower = category.toLowerCase(java.util.Locale.ROOT);
+                    if (java.util.Set.of("beach", "marina", "waterfront", "promenade").contains(catLower)) {
+                        cats = List.of("beach", "park", "viewpoint", "tourist_attraction");
+                    } else if (java.util.Set.of("viewpoint", "observation_deck", "scenic_lookout").contains(catLower)) {
+                        cats = List.of("viewpoint", "park", "tourist_attraction", "landmark");
+                    } else if (java.util.Set.of("park", "garden", "nature", "national_park").contains(catLower)) {
+                        cats = List.of("park", "viewpoint", "tourist_attraction", "landmark");
+                    } else if (java.util.Set.of("museum", "art_gallery").contains(catLower)) {
+                        cats = List.of("museum", "art_gallery", "tourist_attraction", "landmark");
+                    } else if (java.util.Set.of("historic_site", "ruins", "castle", "monument", "memorial", "palace").contains(catLower)) {
+                        cats = List.of(category, "monument", "historic_site", "landmark", "tourist_attraction");
+                    } else if (java.util.Set.of("shopping", "market", "bazaar", "shopping_mall").contains(catLower)) {
+                        cats = List.of("market", "shopping_mall", "tourist_attraction", "neighborhood");
+                    } else {
+                        cats = List.of(category, "tourist_attraction", "landmark", "monument",
+                                "park", "viewpoint", "neighborhood");
+                    }
+                }
+
+                for (String c : cats) {
+                        if (c == null || c.isBlank()) continue;
+                        List<PoiResult> candidates;
+                        try {
+                                candidates = mapboxPoiSearchClient
+                                        .searchByCategory(c, minLon, minLat, maxLon, maxLat)
+                                        .block(java.time.Duration.ofSeconds(4));
+                        } catch (Exception e) {
+                                candidates = null;
+                        }
+                        if (candidates == null || candidates.isEmpty()) continue;
+
+                        PoiResult best = null;
+                        double bestRating = -1.0;
+                        for (PoiResult p : candidates) {
+                                if (p == null || p.getName() == null || p.getName().isBlank()) continue;
+                                String nameLower = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                if (existingNamesLower != null && existingNamesLower.contains(nameLower)) continue;
+                                // Avoid obvious self / close-name reuse
+                                if (missing.getName() != null) {
+                                        String a = missing.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        String b = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        if (!a.isEmpty() && !b.isEmpty() && (a.contains(b) || b.contains(a))) {
+                                                continue;
+                                        }
+                                }
+                                double rating = p.getRating() != null ? p.getRating() : 0.0;
+                                if (rating > bestRating) {
+                                        bestRating = rating;
+                                        best = p;
+                                }
+                        }
+                        if (best != null) {
+                                return best;
+                        }
+                }
+                return null;
+        }
+
+        /**
+         * Deduplicate repeated landmarks across days.
+         *
+         * We use {@link PoiDedup} token-prefix + proximity to treat sub-features ("parking", "entrance")
+         * as the same landmark. First occurrence is kept; later duplicates are replaced with a nearby
+         * alternative of similar category around the duplicate's own coordinates. If no replacement is
+         * found, the duplicate is removed (last resort).
+         */
+        private void dedupeWaypointsAcrossDays(AiChatDto.RouteData routeData) {
+                if (routeData == null || routeData.getDays() == null) return;
+                java.util.List<PoiResult> seen = new java.util.ArrayList<>();
+
+                for (AiChatDto.DayPlan day : routeData.getDays()) {
+                        if (day == null || day.getWaypoints() == null || day.getWaypoints().isEmpty()) continue;
+
+                        java.util.Set<String> existingNames = new java.util.HashSet<>();
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                if (wp != null && wp.getName() != null && !wp.getName().isBlank()) {
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                }
+                        }
+
+                        java.util.List<AiChatDto.RouteWaypoint> toRemove = new java.util.ArrayList<>();
+
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                if (wp == null || wp.getName() == null || wp.getName().isBlank()) continue;
+                                if (wp.getLatitude() == null || wp.getLongitude() == null) continue;
+
+                                PoiResult asPoi = new PoiResult(wp.getName(), wp.getCategory(), wp.getLatitude(), wp.getLongitude());
+
+                                if (!PoiDedup.isNearDuplicateOfAny(asPoi, seen)) {
+                                        seen.add(asPoi);
+                                        continue;
+                                }
+
+                                PoiResult repl = findDuplicateReplacement(wp, existingNames);
+                                if (repl != null) {
+                                        String originalName = wp.getName();
+                                        existingNames.remove(originalName.trim().toLowerCase(java.util.Locale.ROOT));
+                                        wp.setName(repl.getName());
+                                        wp.setLatitude(repl.getLat());
+                                        wp.setLongitude(repl.getLon());
+                                        if (repl.getCategory() != null) {
+                                                wp.setCategory(repl.getCategory());
+                                        }
+                                        wp.setUnavailable(null);
+                                        wp.setArrivalTimeLocal(null);
+                                        wp.setDepartureTimeLocal(null);
+                                        wp.setTravelFromPreviousMin(null);
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                        log.info("[ROUTE_DEDUP] Day {} — duplicate '{}' → replaced with '{}'",
+                                                day.getDay(), originalName, repl.getName());
+                                        // Track the replacement as seen so it won't repeat later.
+                                        seen.add(new PoiResult(wp.getName(), wp.getCategory(), wp.getLatitude(), wp.getLongitude()));
+                                } else {
+                                        log.warn("[ROUTE_DEDUP] Day {} — duplicate '{}' removed (no replacement found)",
+                                                day.getDay(), wp.getName());
+                                        toRemove.add(wp);
+                                }
+                        }
+
+                        if (!toRemove.isEmpty()) {
+                                day.getWaypoints().removeAll(toRemove);
+                        }
+                        // Keep stable ordering
+                        int order = 1;
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                wp.setOrder(order++);
+                        }
+                }
+        }
+
+        private PoiResult findDuplicateReplacement(
+                AiChatDto.RouteWaypoint duplicate,
+                java.util.Set<String> existingNamesLower) {
+                if (duplicate == null || duplicate.getLatitude() == null || duplicate.getLongitude() == null) {
+                        return null;
+                }
+                double lat = duplicate.getLatitude();
+                double lon = duplicate.getLongitude();
+                double r = 0.012; // ~1.3km-ish
+
+                String category = (duplicate.getCategory() != null && !duplicate.getCategory().isBlank())
+                        ? duplicate.getCategory().trim()
+                        : "tourist_attraction";
+
+                java.util.Set<String> diningCats2 = java.util.Set.of(
+                        "restaurant", "cafe", "bar", "fast_food", "bakery", "pub", "food", "market");
+                boolean isDining2 = diningCats2.contains(category.toLowerCase(java.util.Locale.ROOT));
+
+                java.util.List<String> cats = isDining2
+                        ? java.util.List.of("restaurant", "cafe", "bar", "fast_food")
+                        : java.util.List.of(category, "tourist_attraction", "landmark",
+                                            "monument", "park", "viewpoint", "neighborhood");
+
+                for (String c : cats) {
+                        if (c == null || c.isBlank()) continue;
+                        java.util.List<PoiResult> candidates;
+                        try {
+                                candidates = mapboxPoiSearchClient
+                                        .searchByCategory(c, lon - r, lat - r, lon + r, lat + r)
+                                        .block(java.time.Duration.ofSeconds(4));
+                        } catch (Exception e) {
+                                candidates = null;
+                        }
+                        if (candidates == null || candidates.isEmpty()) continue;
+
+                        PoiResult best = null;
+                        double bestRating = -1.0;
+                        for (PoiResult p : candidates) {
+                                if (p == null || p.getName() == null || p.getName().isBlank()) continue;
+                                String nameLower = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                if (existingNamesLower != null && existingNamesLower.contains(nameLower)) continue;
+                                if (duplicate.getName() != null) {
+                                        String a = duplicate.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        String b = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        if (!a.isEmpty() && !b.isEmpty() && (a.contains(b) || b.contains(a))) {
+                                                continue;
+                                        }
+                                }
+                                double rating = p.getRating() != null ? p.getRating() : 0.0;
+                                if (rating > bestRating) {
+                                        bestRating = rating;
+                                        best = p;
+                                }
+                        }
+                        if (best != null) return best;
+                }
+                return null;
         }
 
         /**
@@ -735,14 +1117,32 @@ public class ChatProxyController {
                 if (queryName == null || resultName == null) return false;
                 String q = queryName.toLowerCase(Locale.ROOT);
                 String r = resultName.toLowerCase(Locale.ROOT);
-                // Direct containment (handles "Golden Gate Bridge" ⊂ "Golden Gate Bridge, Presidio…")
-                if (r.contains(q) || q.contains(r)) return true;
+
+                // Query contains result → strong match (e.g. "Blue Mosque, Istanbul" ⊃ "Blue Mosque")
+                if (q.contains(r)) return true;
+
+                // Result contains query — only accept if the extra part is trivial (e.g. article prefix).
+                // Prevents "Alanya Beach Hotel" / "Cleopatra Beach Resort" matching "Alanya Beach".
+                if (r.contains(q)) {
+                        String extra = r.replace(q, "").trim();
+                        String[] extraWords = extra.isEmpty() ? new String[0] : extra.split("[\\s,\\-/.']+");
+                        boolean trivialExtra = extraWords.length == 0
+                                || (extraWords.length == 1 && extraWords[0].length() <= 3);
+                        if (trivialExtra) return true;
+                }
+
                 // Compact containment: strip spaces/punctuation then compare.
                 // Handles compound-word vs spaced variants: "Göbeklitepe" ↔ "Göbekli Tepe",
                 // "Atatürkmausoleum" ↔ "Atatürk Mausoleum", etc.
                 String qCompact = q.replaceAll("[\\s,\\-/.']+", "");
                 String rCompact = r.replaceAll("[\\s,\\-/.']+", "");
-                if (qCompact.length() > 4 && (rCompact.contains(qCompact) || qCompact.contains(rCompact))) return true;
+                // Apply the same extra-word guard to compact containment
+                if (qCompact.length() > 4 && qCompact.contains(rCompact)) return true;
+                if (qCompact.length() > 4 && rCompact.contains(qCompact)) {
+                        // rCompact is longer — accept only if the extra chars are short
+                        String extraCompact = rCompact.replace(qCompact, "");
+                        if (extraCompact.length() <= 3) return true;
+                }
                 // Word-level overlap — count significant words (>4 chars) that match exactly.
                 // Prefix matching is intentionally disabled: "Bosphorus Bridge" vs "Bosphorus Strait"
                 // share the prefix "Bosphor" but are completely different places.
@@ -824,7 +1224,7 @@ public class ChatProxyController {
                         if (tool == null) return null;
                         String destination = n.path("destination").asText(null);
                         if (destination == null || destination.isBlank()) return null;
-                        Integer days = n.hasNonNull("days") ? n.path("days").asInt() : null;
+                        Integer days = n.hasNonNull("days") ? Math.min(Math.max(n.path("days").asInt(), 1), 7) : null;
                         String travelStyle = n.hasNonNull("travel_style")
                                         ? n.path("travel_style").asText(null)
                                         : n.path("travelStyle").asText(null);
@@ -887,35 +1287,55 @@ public class ChatProxyController {
                         cats.add("tourist_attraction");
                 }
 
-                // Phase 1: fetch sightseeing categories with full destination bbox
+                // Cap the geocoded bbox to CITY_CORE_RADIUS_M from the city centre.
+                // Large administrative bboxes (Istanbul, Tokyo) push Mapbox to return
+                // globally-ranked POIs scattered across the entire city. A tight core
+                // gives the same focused area as a user-drawn polygon, so restaurants
+                // and cafes are local and near the actual sightseeing spots.
+                double padLat = CITY_CORE_RADIUS_M / 111_000.0;
+                double padLon = CITY_CORE_RADIUS_M / (111_000.0 * Math.cos(Math.toRadians(dest.getCenterLat())));
+                double coreBboxMinLon = Math.max(dest.getCenterLon() - padLon, dest.getMinLon());
+                double coreBboxMinLat = Math.max(dest.getCenterLat() - padLat, dest.getMinLat());
+                double coreBboxMaxLon = Math.min(dest.getCenterLon() + padLon, dest.getMaxLon());
+                double coreBboxMaxLat = Math.min(dest.getCenterLat() + padLat, dest.getMaxLat());
+                log.info("[POI_BBOX] city-core: minLon={} minLat={} maxLon={} maxLat={} (cap={}m)",
+                        coreBboxMinLon, coreBboxMinLat, coreBboxMaxLon, coreBboxMaxLat, (int) CITY_CORE_RADIUS_M);
+
+                // Phase 1: sightseeing from city-core bbox.
+                // Using the capped core (not the huge administrative bbox) keeps landmarks
+                // concentrated in the tourist zone rather than scattered across the whole city.
                 List<String> sightCats = cats.stream()
-                                .filter(c -> c != null && !DINING_CATS.contains(c.toLowerCase(java.util.Locale.ROOT)))
-                                .toList();
+                        .filter(c -> c != null && !DINING_CATS.contains(c.toLowerCase(java.util.Locale.ROOT)))
+                        .toList();
                 List<String> diningCats = cats.stream()
-                                .filter(c -> c != null && DINING_CATS.contains(c.toLowerCase(java.util.Locale.ROOT)))
-                                .toList();
+                        .filter(c -> c != null && DINING_CATS.contains(c.toLowerCase(java.util.Locale.ROOT)))
+                        .toList();
 
                 List<PoiResult> all = new java.util.ArrayList<>();
                 for (String c : sightCats) {
                         if (c.isBlank()) continue;
                         var pois = mapboxPoiSearchClient
-                                        .searchByCategory(c, dest.getMinLon(), dest.getMinLat(), dest.getMaxLon(), dest.getMaxLat())
+                                        .searchByCategory(c, coreBboxMinLon, coreBboxMinLat, coreBboxMaxLon, coreBboxMaxLat)
                                         .blockOptional()
                                         .orElse(List.of());
                         all.addAll(pois);
                 }
 
-                // Phase 2: compute a tight bbox around sightseeing POIs (+1500 m padding)
-                // so dining results stay near where the traveller will actually be.
+                // Phase 2: compute a tight bbox around the sightseeing cluster.
+                // This gives Mapbox the same small, focused search area as a user-drawn polygon,
+                // so dining results are physically near the actual attractions (not 10 km away).
                 double[] dBbox = tightBboxWithPaddingMeters(all, dest, 1500.0);
+                log.info("[POI_DINING_BBOX] tight dining bbox: minLon={} minLat={} maxLon={} maxLat={}",
+                        dBbox[0], dBbox[1], dBbox[2], dBbox[3]);
 
-                // Phase 3: fetch dining categories with tight bbox
+                // Phase 3: dining from tight cluster bbox using tiled search.
+                // Tiled 2×2 grid: each tile returns up to 10 results → up to 40 unique venues
+                // per category, vs 10 before. Like draw area: small area = local gems, not
+                // globally-ranked chains from across the city.
                 for (String c : diningCats) {
                         if (c.isBlank()) continue;
-                        var pois = mapboxPoiSearchClient
-                                        .searchByCategory(c, dBbox[0], dBbox[1], dBbox[2], dBbox[3])
-                                        .blockOptional()
-                                        .orElse(List.of());
+                        List<PoiResult> pois = mapboxPoiSearchClient.searchByCategoryTiled(
+                                        c, dBbox[0], dBbox[1], dBbox[2], dBbox[3], 2);
                         all.addAll(pois);
                 }
 
@@ -1009,6 +1429,14 @@ public class ChatProxyController {
          */
         private static final double CLUSTER_FILTER_RADIUS_M = 7_000.0;
 
+        /**
+         * Radius (metres) used to cap the destination geocoded bbox to a city-core area.
+         * Large administrative bboxes (Istanbul, Tokyo) cause Mapbox to return globally-ranked
+         * POIs scattered across the whole city; a 10 km core gives the same focused search
+         * area as a user-drawn polygon, yielding better local restaurant / cafe results.
+         */
+        private static final double CITY_CORE_RADIUS_M = 10_000.0;
+
         private static double[] tightBboxWithPaddingMeters(
                         List<PoiResult> pois,
                         DestinationGeocodeResult dest,
@@ -1097,14 +1525,10 @@ public class ChatProxyController {
                 "church", "mosque", "castle", "aquarium", "zoo"
         );
 
-        /**
-         * Latest acceptable arrival at a venue that closes at 17:00.
-         * 16:45 gives the visitor 15 minutes inside — anything later is not worth visiting.
-         * Walking time is already baked into the computed arrival (enrichTimeline adds real Mapbox durations),
-         * so this check uses the final realistic time rather than the AI's naive estimate.
-         */
-        private static final java.time.LocalTime VENUE_LATEST_ARRIVAL =
-                java.time.LocalTime.of(16, 45);
+        /** Closing time for early-close venue categories (museums, palaces, etc.). */
+        private static final java.time.LocalTime VENUE_CLOSE_TIME = java.time.LocalTime.of(17, 0);
+        /** Minimum visit time kept as buffer even if estimatedDurationMin is missing. */
+        private static final int DEFAULT_VENUE_DURATION_MIN = 90;
 
         private static final java.time.format.DateTimeFormatter HH_MM_FMT =
                 java.time.format.DateTimeFormatter.ofPattern("HH:mm");
@@ -1115,34 +1539,221 @@ public class ChatProxyController {
          * naive schedule often pushes evening sightseeing past closing — this is the authoritative fix
          * because it runs after real walking durations are known.
          */
+        /** Trims a route to at most {@code maxDays} days — first line of defence against runaway LLM output. */
+        private static void capRouteDays(AiChatDto.RouteData routeData, int maxDays) {
+                if (routeData == null || routeData.getDays() == null) return;
+                if (routeData.getDays().size() <= maxDays) return;
+                routeData.getDays().subList(maxDays, routeData.getDays().size()).clear();
+                int actual = routeData.getDays().size();
+                routeData.setTotalDays(actual);
+                // Fix title: replace "N day / N-day / N gün / N günlük" where N > maxDays
+                if (routeData.getTitle() != null) {
+                        java.util.regex.Matcher m = java.util.regex.Pattern
+                                .compile("(?i)\\b(\\d+)(?=\\s*[-\\s]?(day|days|gün|günlük))")
+                                .matcher(routeData.getTitle());
+                        StringBuffer sb = new StringBuffer();
+                        while (m.find()) {
+                                try {
+                                        int n = Integer.parseInt(m.group(1));
+                                        m.appendReplacement(sb, n > maxDays ? String.valueOf(actual) : m.group(1));
+                                } catch (NumberFormatException ignored) {
+                                        m.appendReplacement(sb, m.group(1));
+                                }
+                        }
+                        m.appendTail(sb);
+                        routeData.setTitle(sb.toString());
+                }
+                log.warn("[CAP_DAYS] Route trimmed to {} days", actual);
+        }
+
+        /**
+         * Hard-caps each day's waypoint list to {@code profile.maxDailyPois}.
+         * Mandatory meals (lunch + dinner) are always kept; optional dining and sightseeing
+         * stops are trimmed from the end until the cap is satisfied.
+         * Called before timeline enrichment so that travel legs are computed on the final list.
+         */
+        private void enforceMaxDailyPois(AiChatDto.RouteData routeData, UserProfileForAi profile) {
+                if (routeData == null || routeData.getDays() == null) return;
+                if (profile == null || profile.getMaxDailyPois() == null) return;
+                int cap = Math.max(4, profile.getMaxDailyPois()); // floor = 4 (2 meals + 2 sights)
+
+                for (AiChatDto.DayPlan day : routeData.getDays()) {
+                        if (day.getWaypoints() == null || day.getWaypoints().size() <= cap) continue;
+
+                        java.util.Set<String> mealSlots = java.util.Set.of("lunch", "dinner");
+                        java.util.Set<String> mealCats  = java.util.Set.of("restaurant", "fast_food");
+
+                        // Partition into mandatory meals and everything else (preserving order).
+                        java.util.List<AiChatDto.RouteWaypoint> mandatory = new java.util.ArrayList<>();
+                        java.util.List<AiChatDto.RouteWaypoint> rest      = new java.util.ArrayList<>();
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                boolean isMandatoryMeal = (wp.getTimeSlot() != null
+                                        && mealSlots.contains(wp.getTimeSlot().toLowerCase(java.util.Locale.ROOT)))
+                                        || (wp.getCategory() != null
+                                        && mealCats.contains(wp.getCategory().toLowerCase(java.util.Locale.ROOT)));
+                                if (isMandatoryMeal) mandatory.add(wp);
+                                else rest.add(wp);
+                        }
+
+                        // Keep as many non-meal stops as the cap allows.
+                        int sightsAllowed = Math.max(0, cap - mandatory.size());
+                        java.util.List<AiChatDto.RouteWaypoint> kept = new java.util.ArrayList<>(mandatory);
+                        for (int i = 0; i < Math.min(sightsAllowed, rest.size()); i++) {
+                                kept.add(rest.get(i));
+                        }
+
+                        // Re-sort by original order field so the day flows chronologically.
+                        kept.sort(java.util.Comparator.comparingInt(AiChatDto.RouteWaypoint::getOrder));
+
+                        int trimmed = day.getWaypoints().size() - kept.size();
+                        if (trimmed > 0) {
+                                log.info("[MAX_POI] Day {} — trimmed {} waypoint(s) to enforce cap of {}",
+                                        day.getDay(), trimmed, cap);
+                                day.setWaypoints(kept);
+                                int order = 1;
+                                for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) wp.setOrder(order++);
+                        }
+                }
+        }
+
         private void stripLateClosingVenueStops(AiChatDto.RouteData routeData) {
                 if (routeData == null || routeData.getDays() == null) return;
                 for (AiChatDto.DayPlan day : routeData.getDays()) {
                         if (day.getWaypoints() == null) continue;
-                        int before = day.getWaypoints().size();
-                        day.getWaypoints().removeIf(wp -> {
+                        int lateCount = 0;
+                        java.util.Set<String> existingNames = new java.util.HashSet<>();
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
+                                if (wp.getName() != null && !wp.getName().isBlank()) {
+                                        existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                }
+                        }
+
+                        for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
                                 String cat = wp.getCategory() == null
                                         ? "" : wp.getCategory().trim().toLowerCase(java.util.Locale.ROOT);
-                                if (!EARLY_CLOSE_CATS.contains(cat)) return false;
+                                if (!EARLY_CLOSE_CATS.contains(cat)) continue;
                                 String arrival = wp.getArrivalTimeLocal();
-                                if (arrival == null || arrival.isBlank()) return false;
+                                if (arrival == null || arrival.isBlank()) continue;
+                                java.time.LocalTime t;
                                 try {
-                                        java.time.LocalTime t = java.time.LocalTime.parse(arrival.trim(), HH_MM_FMT);
-                                        return !t.isBefore(VENUE_LATEST_ARRIVAL);
+                                        t = java.time.LocalTime.parse(arrival.trim(), HH_MM_FMT);
                                 } catch (Exception e) {
-                                        return false; // can't parse → keep safe
+                                        continue; // can't parse → keep safe
                                 }
-                        });
-                        int removed = before - day.getWaypoints().size();
-                        if (removed > 0) {
-                                log.warn("[TIMELINE] Day {}: removed {} venue stop(s) with arrival ≥ {} (closes 17:00); renumbering",
-                                        day.getDay(), removed, VENUE_LATEST_ARRIVAL);
+                                // Latest arrival = closing time minus the stop's own visit duration.
+                                // A 90-min museum closing at 17:00 must be arrived at by 15:30 at the latest.
+                                int durationMin = (wp.getEstimatedDurationMin() != null && wp.getEstimatedDurationMin() > 0)
+                                        ? wp.getEstimatedDurationMin() : DEFAULT_VENUE_DURATION_MIN;
+                                java.time.LocalTime latestArrival = VENUE_CLOSE_TIME.minusMinutes(durationMin);
+                                if (t.isBefore(latestArrival)) continue;
+
+                                lateCount++;
+
+                                // Instead of removing the stop and leaving a "hole" in the day, try to replace it
+                                // with an outdoor/anytime-stop nearby (viewpoint/park/neighborhood/etc.).
+                                PoiResult replacement = findLateVenueReplacement(wp, existingNames);
+                                if (replacement != null) {
+                                        String originalName = wp.getName();
+                                        existingNames.remove(originalName == null ? "" : originalName.trim().toLowerCase(java.util.Locale.ROOT));
+                                        wp.setName(replacement.getName());
+                                        wp.setLatitude(replacement.getLat());
+                                        wp.setLongitude(replacement.getLon());
+                                        if (replacement.getCategory() != null) {
+                                                wp.setCategory(replacement.getCategory());
+                                        }
+                                        wp.setUnavailable(null);
+                                        wp.setArrivalTimeLocal(null);
+                                        wp.setDepartureTimeLocal(null);
+                                        wp.setTravelFromPreviousMin(null);
+                                        if (wp.getName() != null) {
+                                                existingNames.add(wp.getName().trim().toLowerCase(java.util.Locale.ROOT));
+                                        }
+                                        log.info("[TIMELINE] Day {}: '{}' arrived at {} (late) → replaced with '{}'",
+                                                day.getDay(), originalName, arrival.trim(), replacement.getName());
+                                } else {
+                                        // Fallback: keep it but flag unavailable so the user sees why the day is sparse.
+                                        wp.setUnavailable(true);
+                                        log.warn("[TIMELINE] Day {}: '{}' arrived at {} (late) — no replacement found, marked unavailable",
+                                                day.getDay(), wp.getName(), arrival.trim());
+                                }
+                        }
+
+                        if (lateCount > 0) {
+                                // Keep stable ordering in the list after replacements.
                                 int order = 1;
                                 for (AiChatDto.RouteWaypoint wp : day.getWaypoints()) {
                                         wp.setOrder(order++);
                                 }
                         }
                 }
+        }
+
+        /**
+         * Find a nearby replacement for a late-closing venue stop.
+         * We intentionally avoid early-closing categories and prefer "anytime" stops.
+         */
+        private PoiResult findLateVenueReplacement(
+                AiChatDto.RouteWaypoint wp,
+                java.util.Set<String> existingNamesLower) {
+                if (wp == null || wp.getLatitude() == null || wp.getLongitude() == null) {
+                        return null;
+                }
+                double lat = wp.getLatitude();
+                double lon = wp.getLongitude();
+                double r = 0.012; // ~1.3km-ish
+
+                // Priority order: outdoor / flexible categories first.
+                List<String> cats = List.of(
+                        "viewpoint",
+                        "park",
+                        "neighborhood",
+                        "landmark",
+                        "tourist_attraction",
+                        "monument"
+                );
+
+                for (String c : cats) {
+                        try {
+                                List<PoiResult> candidates = mapboxPoiSearchClient
+                                        .searchByCategory(c, lon - r, lat - r, lon + r, lat + r)
+                                        .block(java.time.Duration.ofSeconds(4));
+                                if (candidates == null || candidates.isEmpty()) {
+                                        continue;
+                                }
+                                PoiResult best = null;
+                                double bestRating = -1.0;
+                                for (PoiResult p : candidates) {
+                                        if (p == null || p.getName() == null || p.getName().isBlank()) continue;
+                                        String nameLower = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                        if (existingNamesLower != null && existingNamesLower.contains(nameLower)) continue;
+                                        if (wp.getName() != null) {
+                                                String a = wp.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                                String b = p.getName().trim().toLowerCase(java.util.Locale.ROOT);
+                                                if (!a.isEmpty() && !b.isEmpty() && (a.contains(b) || b.contains(a))) {
+                                                        continue;
+                                                }
+                                        }
+                                        // Avoid swapping late museum with another early-closing venue.
+                                        if (p.getCategory() != null) {
+                                                String pc = p.getCategory().trim().toLowerCase(java.util.Locale.ROOT);
+                                                if (EARLY_CLOSE_CATS.contains(pc)) continue;
+                                        }
+                                        double rating = p.getRating() != null ? p.getRating() : 0.0;
+                                        if (rating > bestRating) {
+                                                bestRating = rating;
+                                                best = p;
+                                        }
+                                }
+                                if (best != null) {
+                                        return best;
+                                }
+                        } catch (Exception e) {
+                                // Non-blocking: just try the next category.
+                                log.debug("[TIMELINE] Replacement search failed for cat={} name='{}': {}",
+                                        c, wp.getName(), e.getMessage());
+                        }
+                }
+                return null;
         }
 
         /**

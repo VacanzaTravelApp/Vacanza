@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:mobile/core/theme/app_theme.dart';
+import 'package:mobile/core/widgets/event_mini_card.dart';
 import 'package:mobile/features/ai/data/api/ai_route_api_client.dart';
 import 'package:mobile/features/map/presentation/bloc/map_bloc.dart';
 import 'package:mobile/features/map/presentation/bloc/map_event.dart';
@@ -56,6 +56,7 @@ class _RouteSheetEventsTabState extends State<RouteSheetEventsTab> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.vacanzaTokens;
+    final accent = context.mapControlAccent;
     final _ = _refresh;
 
     return FutureBuilder<Map<String, dynamic>>(
@@ -106,6 +107,9 @@ class _RouteSheetEventsTabState extends State<RouteSheetEventsTab> {
           );
         }
 
+        final window = data['eventSearchWindow']?.toString();
+        final isBroad = window == 'BROAD_30_DAYS';
+
         return CustomScrollView(
           controller: widget.scrollController,
           physics: const BouncingScrollPhysics(
@@ -113,121 +117,99 @@ class _RouteSheetEventsTabState extends State<RouteSheetEventsTab> {
           ),
           slivers: [
             SliverToBoxAdapter(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () {
-                    setState(() {
-                      _refresh++;
-                      _future = context
-                          .read<AiRouteApiClient>()
-                          .getEventRecommendations(
-                            widget.routeId,
-                            day: widget.day,
-                          );
-                    });
-                  },
-                  child: Text(
-                    'Refresh',
-                    style: TextStyle(
-                      color: context.mapControlAccent,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SliverList.separated(
-              itemCount: list.length,
-              separatorBuilder:
-                  (_, __) => Divider(
-                    height: 1,
-                    thickness: 0.5,
-                    color: tokens.cardBorder,
-                  ),
-              itemBuilder: (context, i) {
-                final e = list[i];
-                final name =
-                    (e is Map && e['name'] != null)
-                        ? e['name'].toString()
-                        : 'Event';
-                final venue =
-                    (e is Map && e['venueName'] != null)
-                        ? e['venueName'].toString()
-                        : null;
-                final start =
-                    (e is Map && e['startTime'] != null)
-                        ? e['startTime'].toString()
-                        : null;
-                final ticketLink =
-                    (e is Map)
-                        ? (e['ticketLink'] ?? e['ticket_link'])?.toString()
-                        : null;
-                num? lat;
-                num? lng;
-                if (e is Map) {
-                  lat = e['latitude'] as num? ?? e['lat'] as num?;
-                  lng = e['longitude'] as num? ?? e['lng'] as num?;
-                }
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 2,
-                  ),
-                  onTap: () async {
-                    if (ticketLink != null && ticketLink.isNotEmpty) {
-                      final u = Uri.tryParse(ticketLink);
-                      if (u != null && await canLaunchUrl(u)) {
-                        await launchUrl(
-                          u,
-                          mode: LaunchMode.externalApplication,
-                        );
-                      }
-                      return;
-                    }
-                    if (lat != null && lng != null) {
-                      widget.onFlyToEventOnMap?.call();
-                      collapseRouteSheetForMap(
-                        widget.sheetExtentController,
-                        widget.scrollController,
-                      );
-                      if (!context.mounted) return;
-                      context.read<MapBloc>().add(
-                        FlyToPoiRequested(
-                          latitude: lat.toDouble(),
-                          longitude: lng.toDouble(),
-                          zoom: 15,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isBroad)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Showing about a month since no specific date was provided.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.25,
+                          color: tokens.textSub,
                         ),
-                      );
-                    }
-                  },
-                  title: Text(
-                    name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: tokens.textMain,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                      ),
+                    ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        setState(() {
+                          _refresh++;
+                          _future = context
+                              .read<AiRouteApiClient>()
+                              .getEventRecommendations(
+                                widget.routeId,
+                                day: widget.day,
+                              );
+                        });
+                      },
+                      child: Text(
+                        'Refresh',
+                        style: TextStyle(
+                          color: accent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
-                  subtitle: Text(
-                    [venue, start]
-                        .whereType<String>()
-                        .where((s) => s.isNotEmpty)
-                        .join(' • '),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: tokens.textSub, fontSize: 13),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 142,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.only(right: 4),
+                      itemCount: list.length.clamp(0, 10),
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, i) {
+                        final e = list[i];
+                        if (e is! Map) return const SizedBox.shrink();
+                        num? lat = e['latitude'] as num? ?? e['lat'] as num?;
+                        num? lng =
+                            e['longitude'] as num? ?? e['lng'] as num?;
+                        return EventMiniCard(
+                          name: (e['name'] ?? 'Event').toString(),
+                          thumbnail: pickEventThumbnail(e),
+                          startLine: formatEventStartTime(
+                            e['startTime']?.toString(),
+                          ),
+                          venueName: e['venueName']?.toString(),
+                          category: e['category']?.toString(),
+                          matchedDay: int.tryParse(
+                            (e['matchedDay'] ?? '').toString(),
+                          ),
+                          matchReason: e['matchReason']?.toString(),
+                          ticketLink:
+                              (e['ticketLink'] ?? e['ticket_link'])
+                                  ?.toString(),
+                          onTapFallback:
+                              (lat != null && lng != null)
+                                  ? () {
+                                    widget.onFlyToEventOnMap?.call();
+                                    collapseRouteSheetForMap(
+                                      widget.sheetExtentController,
+                                      widget.scrollController,
+                                    );
+                                    if (!context.mounted) return;
+                                    context.read<MapBloc>().add(
+                                      FlyToPoiRequested(
+                                        latitude: lat.toDouble(),
+                                        longitude: lng.toDouble(),
+                                        zoom: 15,
+                                      ),
+                                    );
+                                  }
+                                  : null,
+                        );
+                      },
+                    ),
                   ),
-                  trailing: Icon(
-                    CupertinoIcons.arrow_up_right_square,
-                    size: 18,
-                    color: tokens.textSub,
-                  ),
-                );
-              },
+                ],
+              ),
             ),
           ],
         );

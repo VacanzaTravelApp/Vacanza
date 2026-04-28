@@ -25,11 +25,13 @@ class BookingResultsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Summary + filter row
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Column(
@@ -38,8 +40,8 @@ class BookingResultsView extends StatelessWidget {
                   Text(
                     '${results.length} ${type == BookingType.hotels ? 'Hotels' : 'Flights'} Found',
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
                       color: cs.onSurface,
                     ),
                   ),
@@ -57,18 +59,42 @@ class BookingResultsView extends StatelessWidget {
             GestureDetector(
               onTap: () => context.read<BookingCubit>().openFilters(),
               child: Container(
-                width: 40,
-                height: 40,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  color: isLight
+                      ? Colors.white
+                      : cs.surfaceContainerHighest.withValues(alpha: 0.70),
                   border: Border.all(
                     color: BookingSearchFieldStyles.fieldBorderInactive(context),
+                    width: 1.2,
                   ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: isLight
+                      ? [
+                          const BoxShadow(
+                            color: Color(0x08000000),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          )
+                        ]
+                      : [],
                 ),
-                child: Icon(
-                  Icons.tune_rounded,
-                  size: 18,
-                  color: cs.onSurfaceVariant,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.tune_rounded,
+                        size: 15, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Filter',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

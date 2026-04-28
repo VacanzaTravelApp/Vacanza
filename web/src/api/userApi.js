@@ -28,8 +28,6 @@ export const userApi = {
 
   // Photos
   getPhoto: () => http.get("/users/me/profile/photo", { responseType: "blob" }),
-  uploadPhoto: (formData) => http.post("/users/me/profile/photo", formData, {
-    headers: { "Content-Type": "multipart/form-data" }
-  }),
+  uploadPhoto: (formData) => http.post("/users/me/profile/photo", formData),
   deletePhoto: () => http.delete("/users/me/profile/photo"),
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
     Modal, Avatar, Typography, Tag, Spin, Progress,
     Form, Input, Select, DatePicker, InputNumber, Button,
-    Row, Col, Divider, message, Empty, Checkbox, Badge as AntBadge, ConfigProvider
+    Row, Col, Divider, Empty, Checkbox, Badge as AntBadge, ConfigProvider
 } from "antd";
 import {
     TrophyOutlined,
@@ -36,13 +36,14 @@ import {
     ShopOutlined,
     DeleteOutlined
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useUserPreferences } from "../hooks/useUserPreferences";
 import { useUserProfile, useUserStats, useUserCheckins } from "../hooks/useUserProfileData";
 import { useProfilePhoto } from "../hooks/useProfilePhoto";
 import { useGamificationProfile } from "../gamification/useGamificationProfile";
 import { userApi } from "../api/userApi";
+import { toast } from "../components/toast/toast";
+import { getErrorNotificationMessage } from "../utils/notifications";
 import dayjs from "dayjs";
 import CalendarModal from "./CalendarModal";
 import defaultAvatar from "../assets/default-avatar.png";
@@ -393,21 +394,11 @@ const GamificationView = ({ gamification, setView, onClose, isDarkMode = true })
                         onClick={() => setView('MAIN')}
                     />
                     <div style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                        <div style={{ fontSize: 12, fontWeight: 900, color: "var(--theme-primary)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: "var(--theme-primary)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>
                             Experience
                         </div>
                         <div style={{ fontFamily: "var(--font-display)", fontVariationSettings: "'SOFT' 80, 'WONK' 1", fontSize: 22, fontWeight: 800, color: "var(--card-text, #1c1c1e)", letterSpacing: "-0.5px" }}>Level and Badges</div>
                     </div>
-                    <Button
-                        icon={<CloseOutlined style={{ fontSize: 14 }} />}
-                        type="text"
-                        style={{
-                            position: "absolute", right: -8, color: "var(--card-text)", padding: 0, width: 36, height: 36,
-                            borderRadius: "50%", background: "var(--card-border, rgba(128,128,128,0.1))",
-                            display: "flex", alignItems: "center", justifyContent: "center"
-                        }}
-                        onClick={onClose}
-                    />
                 </div>
             </div>
 
@@ -521,18 +512,18 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
     const fileInputRef = React.useRef(null);
 
     useEffect(() => {
-        if (profile || user) {
+        if (profile) {
             form.setFieldsValue({
-                firstName: profile?.firstName,
-                middleName: profile?.middleName,
-                lastName: profile?.lastName,
-                preferredName: profile?.preferredName,
-                country: profile?.country,
-                birthDate: profile?.birthDate ? dayjs(profile.birthDate) : null,
-                gender: profile?.gender || ""
+                firstName: profile.firstName,
+                middleName: profile.middleName,
+                lastName: profile.lastName,
+                preferredName: profile.preferredName,
+                country: profile.country,
+                birthDate: profile.birthDate ? dayjs(profile.birthDate) : null,
+                gender: profile.gender || ""
             });
         }
-    }, [profile, user, form]);
+    }, [profile, form]);
 
     return (
         <div style={{ background: "var(--bg-main, #0D1526)", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", borderRadius: 40 }}>
@@ -560,16 +551,6 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                             <div style={{ fontFamily: "var(--font-display)", fontVariationSettings: "'SOFT' 80, 'WONK' 1", fontSize: 22, fontWeight: 800, color: "var(--text-main, #FFFFFF)", letterSpacing: "-0.5px" }}>Edit Profile</div>
                         </div>
                     </div>
-                    <Button
-                        icon={<CloseOutlined style={{ fontSize: 14 }} />}
-                        type="text"
-                        style={{
-                            color: "var(--card-text)", padding: 0, width: 36, height: 36,
-                            borderRadius: "50%", background: "var(--card-border, rgba(128,128,128,0.1))",
-                            display: "flex", alignItems: "center", justifyContent: "center"
-                        }}
-                        onClick={onClose}
-                    />
                 </div>
             </div>
 
@@ -609,7 +590,7 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                     </div>
                 </div>
 
-                {profile?.hasProfilePhoto && (
+                {(profile?.hasProfilePhoto || (!!profilePhotoUrl && profilePhotoUrl !== defaultAvatar)) && (
                     <div style={{ textAlign: "center", marginBottom: 32, marginTop: -20 }}>
                         <Button
                             type="text"
@@ -826,7 +807,6 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
 };
 
 const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPreferences, onOpenCalendar }) => {
-    const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [view, setView] = useState('MAIN');
 
@@ -836,7 +816,7 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
     const { data: checkins } = useUserCheckins();
     const { data: gamification } = useGamificationProfile();
 
-    const { profilePhotoUrl } = useProfilePhoto(profile);
+    const { profilePhotoUrl } = useProfilePhoto();
 
     const uploadPhotoMutation = useMutation({
         mutationFn: (file) => {
@@ -845,35 +825,90 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
             return userApi.uploadPhoto(formData);
         },
         onMutate: (file) => {
-            // Instantly show the selected image
             const previewUrl = URL.createObjectURL(file);
+            const previousPhotoUrl = queryClient.getQueryData(["user", "photo"]);
+            const previousProfile = queryClient.getQueryData(["user", "profile"]);
+
             setOptimisticPhotoUrl(previewUrl);
+            queryClient.setQueryData(["user", "photo"], previewUrl);
+            queryClient.setQueryData(["user", "profile"], (currentProfile) => {
+                if (!currentProfile) return currentProfile;
+                return {
+                    ...currentProfile,
+                    hasProfilePhoto: true,
+                    profileImageUrl: previewUrl,
+                };
+            });
+
+            return { previewUrl, previousPhotoUrl, previousProfile };
         },
-        onSuccess: () => {
+        onSuccess: (_data, _variables, context) => {
+            if (context?.previewUrl) {
+                queryClient.setQueryData(["user", "photo"], context.previewUrl);
+            }
+            queryClient.setQueryData(["user", "profile"], (currentProfile) => {
+                if (!currentProfile) return currentProfile;
+                return {
+                    ...currentProfile,
+                    hasProfilePhoto: true,
+                    profileImageUrl: context?.previewUrl || currentProfile.profileImageUrl,
+                };
+            });
+            setOptimisticPhotoUrl(null);
             queryClient.invalidateQueries(["user", "profile"]);
             queryClient.invalidateQueries(["user", "photo"]);
-            message.success("Profile photo updated!");
+            // message.success("Profile photo updated!");
         },
-        onError: (err) => {
+        onError: (err, _variables, context) => {
+            if (context?.previousPhotoUrl !== undefined) {
+                queryClient.setQueryData(["user", "photo"], context.previousPhotoUrl);
+            }
+            if (context?.previousProfile !== undefined) {
+                queryClient.setQueryData(["user", "profile"], context.previousProfile);
+            }
             setOptimisticPhotoUrl(null); // Revert on error
-            message.error(err?.friendlyMessage || "Failed to upload photo");
+            toast.error({
+                title: "Upload failed",
+                message: getErrorNotificationMessage(err, "Couldn't upload your photo. Please try again.")
+            });
         }
     });
 
     const deletePhotoMutation = useMutation({
         mutationFn: () => userApi.deletePhoto(),
         onMutate: () => {
+            const previousPhotoUrl = queryClient.getQueryData(["user", "photo"]);
+            const previousProfile = queryClient.getQueryData(["user", "profile"]);
+
             setOptimisticPhotoUrl(defaultAvatar);
+            queryClient.setQueryData(["user", "photo"], null);
+            localStorage.removeItem("profilePhotoBase64");
+            queryClient.setQueryData(["user", "profile"], (currentProfile) => {
+                if (!currentProfile) return currentProfile;
+                return {
+                    ...currentProfile,
+                    hasProfilePhoto: false,
+                    profileImageUrl: null,
+                };
+            });
+
+            return { previousPhotoUrl, previousProfile };
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(["user", "profile"]);
-            queryClient.invalidateQueries(["user", "photo"]);
             setOptimisticPhotoUrl(null);
-            message.success("Photo removed");
         },
-        onError: (err) => {
+        onError: (err, _variables, context) => {
+            if (context?.previousPhotoUrl !== undefined) {
+                queryClient.setQueryData(["user", "photo"], context.previousPhotoUrl);
+            }
+            if (context?.previousProfile !== undefined) {
+                queryClient.setQueryData(["user", "profile"], context.previousProfile);
+            }
             setOptimisticPhotoUrl(null);
-            message.error(err?.friendlyMessage || "Failed to remove photo");
+            toast.error({
+                title: "Couldn't remove photo",
+                message: getErrorNotificationMessage(err, "Please try again.")
+            });
         }
     });
 
@@ -890,11 +925,14 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
         mutationFn: (values) => userApi.updateProfile(values),
         onSuccess: () => {
             queryClient.invalidateQueries(["user", "profile"]);
-            message.success("Your profile is all set!");
+            // message.success("Your profile is all set!");
             setView('MAIN');
         },
         onError: (err) => {
-            message.error(err?.friendlyMessage || "Failed to update profile");
+            toast.error({
+                title: "Update failed",
+                message: getErrorNotificationMessage(err, "Couldn't save your profile changes. Please try again.")
+            });
         }
     });
 

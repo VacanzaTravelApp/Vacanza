@@ -1,11 +1,15 @@
 import 'dart:developer';
 
+import 'package:dio/dio.dart';
+
+import '../api/poi_mapbox_stream_event.dart';
 import '../api/poi_search_in_area_request_dto.dart';
 import '../api/poi_search_in_area_response_dto.dart';
 import '../models/poi.dart';
 import '../models/poi_category_catalog.dart';
 import '../models/selected_area.dart';
 import '../utils/hybrid_poi_merge.dart';
+import '../utils/polygon_contains.dart';
 import '../services/mapbox_style_poi_discovery.dart';
 import '../services/style_poi_discovery_binding.dart';
 import 'poi_search_repository.dart';
@@ -121,5 +125,68 @@ class CompositePoiSearchRepository implements PoiSearchRepository {
           ),
         )
         .toList();
+  }
+
+  @override
+  Stream<PoiMapboxStreamEvent> searchInAreaMapboxStream({
+    required SelectedArea area,
+    List<String>? categories,
+    int page = 0,
+    int? limit,
+    PoiSort? sort,
+    CancelToken? cancelToken,
+  }) async* {
+    // Style discovery'yi backend stream ile paralel başlat.
+    final styleFuture = _tryStyleDiscovery();
+
+    PoiMapboxStreamDone? pendingDone;
+
+    await for (final event in _backend.searchInAreaMapboxStream(
+      area: area,
+      categories: categories,
+      page: page,
+      limit: limit,
+      sort: sort,
+      cancelToken: cancelToken,
+    )) {
+      if (event is PoiMapboxStreamDone) {
+        // Done'u beklet — önce style POI'lerini enjekte et.
+        pendingDone = event;
+      } else {
+        yield event;
+      }
+    }
+
+    // Backend bitti: style POI'lerini filtrele ve chunk olarak ekle.
+    try {
+      var stylePois = await styleFuture;
+      if (stylePois.isNotEmpty) {
+        if (area is PolygonArea) {
+          stylePois = stylePois
+              .where(
+                (p) => pointInsidePolygonLatLng(
+                  lat: p.latitude,
+                  lng: p.longitude,
+                  polygonLatLng: area.points,
+                ),
+              )
+              .toList();
+        }
+        final filtered = _applyCategoryFilter(stylePois, categories: categories);
+        if (filtered.isNotEmpty) {
+          log('[CompositePoiSearchRepository] injecting ${filtered.length} style POIs into stream');
+          yield PoiMapboxStreamChunk(
+            uiCategory: '',
+            chunkIndex: -1,
+            pois: List.unmodifiable(filtered),
+            countsSoFar: const {},
+          );
+        }
+      }
+    } catch (e, st) {
+      log('[CompositePoiSearchRepository] stream style discovery failed: $e\n$st');
+    }
+
+    if (pendingDone != null) yield pendingDone;
   }
 }

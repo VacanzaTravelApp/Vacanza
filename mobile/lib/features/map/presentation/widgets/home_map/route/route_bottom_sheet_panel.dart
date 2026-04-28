@@ -11,6 +11,7 @@ import 'package:mobile/features/ai/presentation/cubit/active_route_state.dart';
 import 'package:mobile/features/ai/utils/route_map.dart';
 import 'package:mobile/features/map/presentation/bloc/map_bloc.dart';
 import 'package:mobile/features/map/presentation/bloc/map_event.dart';
+import 'package:mobile/features/trip_calendar/services/ics_export_service.dart';
 
 import 'route_sheet_events_tab.dart';
 import 'route_sheet_extent.dart';
@@ -56,6 +57,7 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
 
   bool _hotelSaving = false;
   String? _hotelError;
+  bool _calendarExporting = false;
 
   ScrollController get _effectiveScrollController =>
       widget.scrollController ?? _ownedScrollController!;
@@ -173,6 +175,55 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
         }
         final waypoints = waypointsForDay(route, activeDay);
         final routeId = state.routeId;
+        final tripStart = IcsExportService.tryParseIsoDate(route.tripStartDate);
+
+        Future<DateTime?> pickDate({required DateTime initial}) async {
+          final today = DateTime.now();
+          final d = await showDatePicker(
+            context: context,
+            initialDate: initial.isBefore(today) ? today : initial,
+            firstDate: DateTime(today.year - 1),
+            lastDate: DateTime(today.year + 5),
+            helpText: 'Select first trip day',
+          );
+          return d;
+        }
+
+        Future<void> exportToCalendar() async {
+          if (routeId == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Save this route first to export a calendar file.'),
+              ),
+            );
+            return;
+          }
+          if (_calendarExporting) return;
+          setState(() => _calendarExporting = true);
+          try {
+            final initial = tripStart ?? DateTime.now();
+            final chosen = await pickDate(initial: initial);
+            if (chosen == null) return;
+            await context.read<IcsExportService>().registerAndOpenRouteIcs(
+              routeId: routeId,
+              eventDate: chosen,
+            );
+          } catch (e) {
+            if (!context.mounted) return;
+            if (IcsExportService.isConflict409(e)) {
+              // Mirrors web: route already on that day.
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('This route is already on that day.')),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Could not export calendar file.')),
+              );
+            }
+          } finally {
+            if (mounted) setState(() => _calendarExporting = false);
+          }
+        }
 
         Widget fixedHeightBody({required double height}) {
           return SizedBox(
@@ -282,6 +333,29 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                    CupertinoButton(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      onPressed:
+                                          _calendarExporting ? null : exportToCalendar,
+                                      child:
+                                          _calendarExporting
+                                              ? const SizedBox(
+                                                width: 22,
+                                                height: 22,
+                                                child: CupertinoActivityIndicator(
+                                                  radius: 10,
+                                                ),
+                                              )
+                                              : Icon(
+                                                CupertinoIcons.calendar_badge_plus,
+                                                color:
+                                                    routeId != null
+                                                        ? accent
+                                                        : tokens.textSub
+                                                            .withValues(alpha: 0.45),
+                                                size: compact ? 23 : 25,
+                                              ),
+                                    ),
                                   CupertinoButton(
                                     padding: const EdgeInsets.only(top: 2),
                                     onPressed: () {
@@ -627,6 +701,29 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
                                   children: [
                                     CupertinoButton(
                                       padding: const EdgeInsets.only(top: 2),
+                                      onPressed: _calendarExporting
+                                          ? null
+                                          : exportToCalendar,
+                                      child: _calendarExporting
+                                          ? const SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CupertinoActivityIndicator(
+                                              radius: 10,
+                                            ),
+                                          )
+                                          : Icon(
+                                            CupertinoIcons.calendar_badge_plus,
+                                            color: routeId != null
+                                                ? accent
+                                                : tokens.textSub.withValues(
+                                                  alpha: 0.45,
+                                                ),
+                                            size: compact ? 23 : 25,
+                                          ),
+                                    ),
+                                    CupertinoButton(
+                                      padding: const EdgeInsets.only(top: 2),
                                       onPressed: () {
                                         final wps = allWaypointsForMap(route);
                                         final b = boundsOfWaypoints(wps);
@@ -841,10 +938,16 @@ class _RouteBottomSheetState extends State<RouteBottomSheet> {
       setState(() {
         _hotelError = null;
       });
+      final firstWp = route.days.isNotEmpty &&
+              route.days[0].waypoints.isNotEmpty
+          ? route.days[0].waypoints[0]
+          : null;
       await RouteHotelPickerSheet.show(
         context,
         routeId: routeId,
         defaultDestination: route.destination,
+        initialLat: firstWp?.latitude,
+        initialLon: firstWp?.longitude,
       );
       if (!mounted) return;
       setState(() => _hotelSaving = true);

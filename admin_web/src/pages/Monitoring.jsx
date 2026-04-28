@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Row, Col, Card, Typography, Tag, Space, Spin, Badge, Progress, Table, message, Button, Empty, Tooltip as AntTooltip } from "antd";
+import { Row, Col, Card, Typography, Tag, Space, Spin, Badge, Progress, Table, Button, Empty, Tooltip as AntTooltip, Grid } from "antd";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { LoadingOutlined, DatabaseOutlined, CloudServerOutlined, BugFilled, CheckCircleFilled, WarningFilled, CopyOutlined, CheckCircleOutlined, SyncOutlined, CloseCircleFilled } from "@ant-design/icons";
 import http from "../api/http";
@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const THEME = {
     primary: '#FF6B6B',
@@ -28,7 +29,6 @@ const TerminalCommandBlock = ({ cmdString }) => {
     const handleCopy = () => {
         navigator.clipboard.writeText(cmdString);
         setCopied(true);
-        message.success('Command copied to clipboard!');
         setTimeout(() => setCopied(false), 2000);
     };
     return (
@@ -65,6 +65,9 @@ const TerminalCommandBlock = ({ cmdString }) => {
 };
 
 const Monitoring = () => {
+    const screens = useBreakpoint();
+    const isMobile = !screens.md;
+    const isTablet = !!screens.md && !screens.lg;
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -370,6 +373,37 @@ const Monitoring = () => {
         },
     ];
 
+    const activityCategoryMeta = {
+        coreSystemOperations: {
+            name: "System Actions",
+            description: "Route planning, monitoring, and internal app actions"
+        },
+        contentAndLocationData: {
+            name: "Travel & Map Data",
+            description: "POI, map, destination, and trip data processing"
+        },
+        authenticationAndSecurityEvents: {
+            name: "User & Security Activity",
+            description: "Login, access control, and security-related actions"
+        },
+        userOperations: {
+            name: "User Operations",
+            description: "User account activity and profile-related processing"
+        },
+        dataIntelligence: {
+            name: "Data Intelligence",
+            description: "Analytics generation and reporting-related processing"
+        }
+    };
+
+    const getActivityCategory = (apiName = "") => {
+        if (apiName.includes('admin')) return activityCategoryMeta.coreSystemOperations;
+        if (apiName.includes('auth')) return activityCategoryMeta.authenticationAndSecurityEvents;
+        if (apiName.includes('user')) return activityCategoryMeta.userOperations;
+        if (apiName.includes('analytics')) return activityCategoryMeta.dataIntelligence;
+        return activityCategoryMeta.contentAndLocationData;
+    };
+
     if (loading) return (
         <div style={{ height: '70vh', width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
             <motion.div
@@ -396,8 +430,8 @@ const Monitoring = () => {
     );
 
     return (
-        <div className="dashboard-container">
-            <Row gutter={[48, 48]}>
+        <div className="dashboard-container" style={{ overflowX: 'hidden' }}>
+            <Row gutter={[isMobile ? 24 : 48, isMobile ? 24 : 48]}>
                 <Col span={24}>
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
                         <Title
@@ -429,15 +463,23 @@ const Monitoring = () => {
                 </Col>
 
                 <Col xs={24} lg={16}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Service Usage Distribution</span>}>
-                        <div style={{ padding: '0 20px' }}>
+                    <Card
+                        className="glass-card dashboard-section-card"
+                        variant="borderless"
+                        title={
+                            <div>
+                                <span style={{ fontSize: 20 }}>System Activity Breakdown</span>
+                                <Text style={{ display: 'block', marginTop: 6, color: THEME.subtext, fontSize: 13, fontWeight: 500 }}>
+                                    Shows how today&apos;s processed system operations are distributed across core service groups.
+                                </Text>
+                            </div>
+                        }
+                    >
+                        <div style={{ padding: isMobile ? '0 4px' : '0 20px' }}>
                             {Object.values((data?.apiMetrics || []).reduce((acc, curr) => {
-                                const name = curr.apiName.includes('admin') ? 'Platform Controls' :
-                                    curr.apiName.includes('auth') ? 'Access & Security' :
-                                        curr.apiName.includes('user') ? 'User Operations' :
-                                            curr.apiName.includes('analytics') ? 'Data Intelligence' : 'General Assets';
-                                if (!acc[name]) acc[name] = { name: name, value: 0 };
-                                acc[name].value += (curr.totalCalls || 0);
+                                const category = getActivityCategory(curr.apiName);
+                                if (!acc[category.name]) acc[category.name] = { ...category, value: 0 };
+                                acc[category.name].value += (curr.totalCalls || 0);
                                 return acc;
                             }, {})).sort((a, b) => b.value - a.value).map((item, index) => {
                                 const COLORS = [THEME.coral, THEME.navy, '#2DD4A8', '#FFB347', '#00B4D8'];
@@ -446,15 +488,18 @@ const Monitoring = () => {
 
                                 return (
                                     <div key={index} style={{ marginBottom: 24 }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                            <Space>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 8, gap: 12, flexWrap: 'wrap' }}>
+                                            <Space size="small" style={{ minWidth: 0 }}>
                                                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[index % COLORS.length] }} />
                                                 <Text strong style={{ color: THEME.navy, fontSize: 13 }}>{item.name}</Text>
                                             </Space>
-                                            <Text style={{ fontSize: 13, fontWeight: 700, color: THEME.subtext }}>
-                                                {item.value.toLocaleString()} <span style={{ color: 'rgba(0,0,0,0.2)', fontWeight: 400 }}>({percentage}%)</span>
+                                            <Text style={{ fontSize: 13, fontWeight: 700, color: THEME.subtext, marginLeft: 'auto' }}>
+                                                {item.value.toLocaleString()} <span style={{ color: 'rgba(0,0,0,0.2)', fontWeight: 400 }}>({percentage}% of total activity)</span>
                                             </Text>
                                         </div>
+                                        <Text style={{ display: 'block', color: THEME.subtext, fontSize: 12, marginBottom: 10, lineHeight: 1.45 }}>
+                                            {item.description}
+                                        </Text>
                                         <div style={{ height: 12, background: 'rgba(26, 35, 50, 0.04)', borderRadius: '6px', overflow: 'hidden' }}>
                                             <motion.div
                                                 initial={{ width: 0 }}
@@ -479,16 +524,16 @@ const Monitoring = () => {
                                 border: '1px solid rgba(26, 35, 50, 0.05)',
                                 textAlign: 'center'
                             }}>
-                                <Text style={{ display: 'block', fontSize: 11, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>Global Data Throughput</Text>
+                                <Text style={{ display: 'block', fontSize: 11, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 2, fontWeight: 700, marginBottom: 4 }}>Total Operations Today</Text>
                                 <Title level={2} style={{ margin: '4px 0', fontWeight: 900, color: THEME.navy }}>
                                     {(data?.apiMetrics?.reduce((acc, curr) => acc + (curr.totalCalls || 0), 0) || 0).toLocaleString()}
                                 </Title>
-                                <Text style={{ display: 'block', fontSize: 12, color: 'rgba(26, 35, 50, 0.4)', fontWeight: 600 }}>Total processed operations across all Vacanza nodes today.</Text>
+                                <Text style={{ display: 'block', fontSize: 12, color: 'rgba(26, 35, 50, 0.4)', fontWeight: 600 }}>Total actions processed across Vacanza services today.</Text>
                             </div>
                         </div>
                     </Card>
 
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>Service Node Topography</span>} style={{ marginTop: 48 }}>
+                    <Card className="glass-card dashboard-section-card" variant="borderless" title={<span style={{ fontSize: 20 }}>Service Node Topography</span>} style={{ marginTop: isMobile ? 24 : 48 }}>
                         <Table
                             columns={serviceColumns}
                             dataSource={[...(data?.services || [])].sort((a, b) => {
@@ -501,6 +546,7 @@ const Monitoring = () => {
                             pagination={false}
                             rowKey="name"
                             style={{ marginTop: 24 }}
+                            scroll={{ x: 760 }}
                         />
                         <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(26, 35, 50, 0.02)', borderRadius: '12px', border: '1px dashed rgba(26, 35, 50, 0.1)' }}>
                             <Text type="secondary" style={{ fontSize: 12 }}>
@@ -515,20 +561,20 @@ const Monitoring = () => {
                 </Col>
 
                 <Col xs={24} lg={8}>
-                    <Card className="glass-card" bordered={false} title={<span style={{ fontSize: 20 }}>System Vitality Monitor</span>}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-                            <div style={{ padding: '32px', background: 'rgba(26, 35, 50, 0.04)', borderRadius: '24px' }}>
+                    <Card className="glass-card dashboard-section-card" variant="borderless" title={<span style={{ fontSize: 20 }}>System Vitality Monitor</span>}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 20 : 32 }}>
+                            <div style={{ padding: isMobile ? '20px' : '32px', background: 'rgba(26, 35, 50, 0.04)', borderRadius: '24px' }}>
                                 <Text style={{ fontSize: 12, color: THEME.subtext, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 12 }}>Overall System Integrity</Text>
-                                <Title level={1} style={{ margin: '0 0 12px 0', color: THEME.navy, fontWeight: 800, fontSize: 48 }}>{Math.round((data?.systemHealth || 0) * 100)}%</Title>
-                                <Progress percent={Math.round((data?.systemHealth || 0) * 100)} strokeColor={THEME.green} status="active" strokeWidth={12} />
+                                <Title level={1} style={{ margin: '0 0 12px 0', color: THEME.navy, fontWeight: 800, fontSize: isMobile ? 38 : 48 }}>{Math.round((data?.systemHealth || 0) * 100)}%</Title>
+                                <Progress percent={Math.round((data?.systemHealth || 0) * 100)} strokeColor={THEME.green} status="active" size={12} />
                             </div>
 
-                            <div style={{ padding: '32px', background: `${THEME.navy}`, borderRadius: '24px', color: 'white' }}>
+                            <div style={{ padding: isMobile ? '20px' : '32px', background: `${THEME.navy}`, borderRadius: '24px', color: 'white' }}>
                                 <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700, display: 'block', marginBottom: 16 }}>Network Continuity</Text>
 
                                 <div style={{ marginBottom: 20 }}>
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                                        <Title level={1} style={{ margin: 0, color: 'white', fontWeight: 900, fontSize: 42 }}>
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                                        <Title level={1} style={{ margin: 0, color: 'white', fontWeight: 900, fontSize: isMobile ? 34 : 42 }}>
                                             {Math.floor((data?.uptimeSeconds || 0) / 86400)}
                                         </Title>
                                         <Text style={{ color: THEME.green, fontWeight: 800, fontSize: 16 }}>DAYS ONLINE</Text>
@@ -543,7 +589,9 @@ const Monitoring = () => {
                                     paddingTop: 16,
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'space-between'
+                                    justifyContent: 'space-between',
+                                    gap: 12,
+                                    flexWrap: 'wrap'
                                 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <Badge status="processing" color={THEME.green} />
@@ -555,11 +603,12 @@ const Monitoring = () => {
                         </div>
 
                         <div style={{
-                            marginTop: 48,
+                            marginTop: isMobile ? 24 : 48,
                             background: '#06080b',
                             borderRadius: '32px',
-                            padding: '24px',
-                            height: 520,
+                            padding: isMobile ? '16px' : '24px',
+                            height: isMobile ? 'auto' : 520,
+                            minHeight: isMobile ? 320 : undefined,
                             display: 'flex',
                             flexDirection: 'column',
                             boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
@@ -584,6 +633,7 @@ const Monitoring = () => {
 
                             <div style={{
                                 flex: 1,
+                                minHeight: 0,
                                 overflowY: 'auto',
                                 paddingRight: 8,
                                 scrollbarWidth: 'thin',
@@ -591,15 +641,15 @@ const Monitoring = () => {
                             }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                                     {(data?.logs || []).map((log, idx) => (
-                                        <div key={idx} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', lineHeight: 1.6, display: 'flex' }}>
+                                        <div key={idx} style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', lineHeight: 1.6, display: 'flex', flexWrap: 'wrap' }}>
                                             <span style={{ color: THEME.green, opacity: 0.8, whiteSpace: 'nowrap' }}>[{dayjs(log.timestamp).format('HH:mm:ss')}]</span>
                                             <span style={{
                                                 color: log.level === 'ERROR' ? THEME.coral : log.level === 'WARN' ? THEME.amber : '#5A6B7A',
                                                 marginLeft: 12,
                                                 fontWeight: 800,
-                                                minWidth: 50
+                                                minWidth: isMobile ? 'auto' : 50
                                             }}>{log.level}</span>
-                                            <span style={{ color: '#e2e8f0', marginLeft: 12 }}>{log.message}</span>
+                                            <span style={{ color: '#e2e8f0', marginLeft: 12, wordBreak: 'break-word' }}>{log.message}</span>
                                         </div>
                                     ))}
                                 </div>

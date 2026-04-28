@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/auth/presentation/screens/login_screen.dart';
 import 'package:mobile/features/auth/presentation/screens/verify_email_screen.dart';
 
@@ -24,9 +25,35 @@ class NavigationService {
     final ctx = _context;
     if (ctx == null) return;
 
+    final theme = Theme.of(ctx);
+    final cs = theme.colorScheme;
+    final tokens = ctx.vacanzaTokens;
+    final isLight = theme.brightness == Brightness.light;
+
     ScaffoldMessenger.of(ctx).hideCurrentSnackBar();
     ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        backgroundColor: isLight
+            ? tokens.cardBg.withValues(alpha: 0.96)
+            : cs.surface.withValues(alpha: 0.94),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: tokens.cardBorder.withValues(alpha: isLight ? 0.22 : 0.55),
+            width: 1.0,
+          ),
+        ),
+        elevation: 10,
+        content: Text(
+          message,
+          style: TextStyle(
+            color: tokens.textMain,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 

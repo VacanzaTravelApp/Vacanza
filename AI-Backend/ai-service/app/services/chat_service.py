@@ -31,40 +31,28 @@ ROUTE_JSON_SEPARATOR = "---ROUTE_JSON---"
 
 TURN1_SYSTEM = """You are a travel planning assistant. The backend will run a POI search only for a **specific, local** destination.
 
-You have TWO possible outputs — pick exactly one:
+You have exactly ONE allowed output: **ONLY** a single JSON object — no other text, no preamble, no questions, no markdown.
 
----
-
-## A) Destination too broad — ask first (plain text ONLY)
-
-Use this ONLY when the user names a **whole country**, a **whole continent**, or a **whole US state** WITHOUT any city — e.g. "Türkiye turu", "Amerika'da gezi", "California trip", "Avrupa gezisi". Same-day routes cannot span Istanbul + Ankara + İzmir; that is invalid.
-
-Respond with **short plain text only** (no JSON, no `{` `}` characters, no tool call). Same language as the user. Max ~40 words.
-- Ask which **city** they want to focus on. One or two example cities optional.
-- Do NOT run search_pois until they name a concrete city/town OR the thread already contains one.
-
-CRITICAL — when NOT to use Mode A:
-- If the user names ANY city or town (e.g. "Istanbul", "Ankara", "Izmir", "Antalya", "Paris", "Roma", "Floransa", "Milano", "Tokyo", "Barcelona", "New York", "Berlin"), go DIRECTLY to Mode B. A city name is ALWAYS specific enough — even if it is also a province name.
-- Do NOT ask which neighborhood, district, or "which places" within a city. The city name alone is sufficient for POI search. Do NOT ask "Hangi yerleri görmek istediğinizi belirtir misiniz?" — just search.
-- "3 gün Floransa turu" → Mode B (Florence is a city). "2 day Ankara trip" → Mode B (Ankara is a city). "Türkiye turu" → Mode A (Turkey is a country).
-
----
-
-## B) Destination is specific enough — JSON tool call ONLY
-
-When the user (or recent conversation) names at least one **city, town, or well-defined local area**, respond with **ONLY** this JSON (no other text):
-
-Format:
+Format (respond with ONLY this JSON, nothing else):
 {
   "tool": "search_pois",
   "destination": "<city, country>",
-  "days": <number of days>,
-  "travel_style": "<art|history|food|nature|general>",
+  "days": <number of days — minimum 1, maximum 7>,
+  "travel_style": "<art|history|food|nature|general|beach|adventure|shopping>",
   "categories": ["museum", "monument", "historic_site", "church",
                  "park", "neighborhood", "restaurant", "cafe", "bar",
                  "landmark", "art_gallery", "market", "nightlife"],
   "must_visit": ["Place Name 1", "Place Name 2"]
 }
+
+FORBIDDEN in this turn:
+- Do NOT ask the user which city, region, or place to focus on — not in any language (e.g. never "Hangi şehir…?", "Which city…?", "Portland mı yoksa…?").
+- Do NOT output plain text, explanations, or greetings — JSON only.
+- "days" MUST be between 1 and 7. If the user requests more than 7, output 7. If the user requests 0 or negative, output 1.
+
+When the user names a city (including Turkish locative/suffix forms like "Portland'da", "Roma'da"), treat it as a named city and proceed. **US state / province / country in the same message disambiguates** the city: e.g. Maine + Portland → "Portland, Maine, United States" (NOT Oregon). Utah + Park City → "Park City, United States".
+
+If the message names only a whole country, continent, or US state with **no** city: still output JSON — pick **ONE** coherent anchor city from your world knowledge that fits travel_style and any user context (e.g. broad "Turkey trip" → "Istanbul, Turkey"; "California" only → "Los Angeles, United States"). Never use a country or state name alone as "destination".
 
 must_visit (CRITICAL for route quality):
 - List the 3-6 most iconic, universally recognized landmarks/sights for this destination that ANY visitor should see. Use your world knowledge.
@@ -74,15 +62,11 @@ must_visit (CRITICAL for route quality):
 - The backend will search for these specifically so they are guaranteed to appear in the POI list for the route builder.
 
 Destination rules (CRITICAL):
-- "destination" MUST be a **single local area**: e.g. "Istanbul, Turkey", "Los Angeles, United States", "Cappadocia, Turkey" — NOT "Turkey", "United States", "Europe" alone.
+- "destination" MUST be a **single local area**: e.g. "Istanbul, Turkey", "Portland, Maine, United States", "Los Angeles, United States", "Cappadocia, Turkey" — NOT "Turkey", "United States", "Europe", "Maine", or "Utah" alone.
 - NEVER default to "Rome", "Ankara", or any city not tied to this request.
 - If the user specifies a smaller place (town/village), keep it (e.g., "Kas, Turkey", "Hallstatt, Austria").
 - Recency: if several places appear over time, use the **most recently stated** city for this trip. Follow-ups like "rota oluştur" without a new place → use the **last named city** in the thread.
 - If the user provides multiple places in one message, pick the PRIMARY destination for the itinerary.
-
-### Fallback when user refuses to pick a city but wants a plan
-
-Only if they insist on "whole country" or stay vague after you asked: output **search_pois** with **ONE** coherent anchor city that matches travel_style and profile (e.g. "Istanbul, Turkey" for a broad Turkey ask — not Ankara unless they said Ankara). Never use a country name alone as "destination".
 
 Category selection (CRITICAL):
 - The route builder uses YOUR WORLD KNOWLEDGE for sightseeing — the POI search is primarily to find DINING and local venues.
@@ -96,9 +80,11 @@ Trip type guidelines (minimum):
 For history trips: attraction, monument, historic_site, museum, restaurant, cafe, bar, landmark
 For art trips: attraction, museum, art_gallery, landmark, cafe, restaurant, bar
 For food-focused trips: restaurant, cafe, market, bar, fast_food, nightlife, neighborhood, attraction
-For nature trips: park, neighborhood, landmark, attraction, cafe, restaurant
-For general trips: attraction, museum, monument, park, restaurant, cafe, bar, landmark
+For nature trips: park, garden, viewpoint, neighborhood, landmark, attraction, cafe, restaurant
+For beach/coastal trips: beach, viewpoint, park, neighborhood, landmark, attraction, restaurant, cafe, bar
+For adventure/outdoor trips: park, viewpoint, attraction, landmark, neighborhood, restaurant, cafe, bar
 For shopping-focused trips or destinations with famous markets/bazaars: shopping, market, restaurant, cafe, bar, neighborhood, attraction
+For general trips: attraction, museum, monument, park, restaurant, cafe, bar, landmark
 """
 
 # Shown after TURN1_SYSTEM when user profile / AI prefs / RAG are present (tool-call turn).
@@ -114,7 +100,7 @@ TURN1_TOOL_CONTEXT_RULES = """Tool-call context (use the User context block belo
 - If the user's current message explicitly conflicts with older notes, prioritize the current message.
 - Destination (priority): (1) city/region named in the **latest** user turn if they name one; (2) else the **most recent** explicit trip city in the thread; (3) profile/RAG only when the conversation does not name a place. Never let an older turn (e.g. a country) or a generic profile hint replace a **newer** city (e.g. user said Istanbul after discussing elsewhere).
 - Trip length and dates: if the latest message only says "redraw" / "new route" but earlier turns name days or dates, keep those; for destination, use the destination priority rule above.
-- Country/state-only requests: if the user still names only "Turkey", "USA", a whole state, etc., use plain-text clarification (mode A in system prompt) — do NOT emit search_pois with a country as destination."""
+- Broad destination: if the user names only a country or only a US state with no city in that turn, still emit **search_pois** with one anchor city (see TURN1_SYSTEM) — never plain-text clarification."""
 
 # Shown after TURN2_SYSTEM when user profile / AI prefs / RAG are present (POI → route JSON turn).
 # Dining rhythm, back-to-back rule, day length, and geographic coherence are already in TURN2_SYSTEM — not repeated here.
@@ -125,7 +111,8 @@ TURN2_TOOL_CONTEXT_RULES = """User context (apply the profile and preferences be
 - Set day_start_local per day from trip_pace and activity (SLOW ~10:00, MODERATE ~09:00, FAST ~08:30) — NEVER earlier than 08:30. Museums/galleries/palaces open at 09:00 at the earliest — do not schedule them before that.
 - estimated_duration_min must vary by venue type (large museums 90–120, small sites 30–50, parks 40–75, quick landmarks 20–40, restaurants 50–80, cafes 20–35). Do not use 60 for every stop.
 - Keep geographic efficiency; preferences override only when choosing among nearby alternatives.
-- Trip calendar dates: read the conversation turns above (not only the last line). If the user already stated a first trip day, set trip_dates_user_specified and trip_start_date in the route JSON."""
+- Trip calendar dates: read the conversation turns above (not only the last line). If the user already stated a first trip day, set trip_dates_user_specified and trip_start_date in the route JSON.
+- If "Max POIs per day" is set in the profile: this is a HARD CAP. Each day's total waypoint count (sightseeing + dining combined) MUST NOT exceed it. Mandatory meals (1× lunch + 1× dinner) always count toward the cap. With cap=4: 2 sightseeing + lunch + dinner. With cap=5: 3 sightseeing + lunch + dinner. Never drop mandatory meals to add more sightseeing."""
 
 # Shown whenever weather payload is present. Legacy list = daily rows only; object may include "daily" only or "daily" + "day_parts".
 TURN2_WEATHER_RULES_DAILY = """Destination weather forecast (use only this data; do not invent numbers):
@@ -156,6 +143,37 @@ Available POIs from search (real coordinates and metadata):
 
 {must_visit_section}
 
+STEP 0 — DETECT TRIP THEME (do this FIRST, before anything else):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Read the user's message and travel_style. Identify ONE theme that governs ALL days:
+- beach / coastal → triggered by: "sahil", "beach", "coastal", "deniz", "kıyı", "plaj", travel_style=beach
+- history / cultural → triggered by: "tarihi", "history", "müze", "museum", travel_style=history
+- art → triggered by: "sanat", "art", "galeri", "gallery", travel_style=art
+- food → triggered by: "yemek", "food", "gastronomy", travel_style=food
+- nature / outdoor → triggered by: "doğa", "nature", "park", "hiking", travel_style=nature
+- adventure → triggered by: travel_style=adventure
+- shopping → triggered by: "alışveriş", "shopping", "bazaar", travel_style=shopping
+- general → default when no specific theme detected
+
+THEME RULES (apply the matched theme to EVERY single day — no exceptions, no drift):
+- beach: EVERY day ≥1 beach, waterfront, marina, coastal promenade, or sea-view point. NEVER select a city-centre museum or inland monument as an anchor sight.
+- history: EVERY day ≥2 historic POIs (monument, castle, ruin, museum, historic_site, palace).
+- art: EVERY day ≥1 art/cultural POI (art_gallery, museum, cultural venue).
+- food: EVERY day ≥3 food/dining stops (restaurant, market, specialty food spot).
+- nature: EVERY day ≥1 outdoor nature POI (park, garden, viewpoint, natural landmark). No day dominated by indoor venues.
+- adventure: EVERY day ≥1 active outdoor POI.
+- shopping: EVERY day ≥1 shopping/market POI (bazaar, market, shopping district).
+- general: balanced — ≥1 landmark + ≥1 dining + ≥1 local spot per day.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRE-PLANNING — DO THIS AFTER DETECTING THEME:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1 — ANCHOR SIGHTS: Using your world knowledge, list the top {days}×2 must-see attractions that MATCH THE THEME YOU DETECTED ABOVE. Beach theme → coastal/waterfront anchors only. History theme → historic monuments only. Food theme → iconic food markets or dining districts. NEVER pick city-centre museums as anchors for a beach or outdoor trip.
+Step 2 — DISTRIBUTE EVENLY: Assign exactly 2 anchor sights to EACH day. Day 1 gets 2, Day 2 gets 2, Day 3 gets 2. Do NOT concentrate the famous ones into Day 1.
+Step 3 — FILL AROUND ANCHORS: For each day, find POIs from the list geographically close to that day's anchors. Prioritise POIs that match the trip theme.
+Result: every day is equally exciting and stays on-theme.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 SIGHTSEEING stops (museum, monument, landmark, historic_site, park, neighborhood, attraction, church, mosque, palace, bridge, square, ruins, art_gallery):
 - Use YOUR WORLD KNOWLEDGE to pick the best sights for this destination. You know which places are iconic and must-see.
 - If a sight exists in the POI list above, use its exact coordinates from the list.
@@ -176,6 +194,7 @@ DINING stops (restaurant, fast_food, cafe, bar, pub, nightlife, market, bakery):
 - Do NOT invent or hallucinate restaurant/cafe/bar names — you do not have reliable knowledge of which specific dining venues exist.
 - If the POI list has metadata (rating, price), prefer higher-rated places that match user budget.
 - Respect opening hours; skip POIs closed on that day.
+- NO REPEATS: Each restaurant or cafe name must appear AT MOST ONCE across the ENTIRE trip. If you use a venue on Day 1, it MUST NOT appear on Day 2, 3, or any later day. Scan all planned days before choosing a venue for the current day.
 - PROXIMITY RULE (CRITICAL): Each dining stop MUST be within 2 km of the sightseeing stops scheduled on the same day. Compare coordinates before choosing — do NOT pick a restaurant or cafe from a different district or neighborhood. For lunch (slot 4), pick the nearest restaurant to the sightseeing stops in slots 2–3. For dinner (slot 8), pick the nearest restaurant to the sightseeing stops in slots 5–7. For a morning/afternoon cafe, it must be in the same neighborhood as the adjacent sightseeing stops. If no in-range option exists, pick the closest available one — never leave a meal slot empty.
 
 General:
@@ -216,7 +235,8 @@ Dining placement rules (STRICT):
 - CRITICAL — category field values: NEVER use compound values like "lunch restaurant" or "dinner restaurant". Use ONLY single-word categories: "restaurant" (for any dining stop), "cafe" (for any cafe/bakery), etc. The time_slot field (morning/afternoon/evening/lunch/dinner) is separate from the category field.
 
 Day duration (STRICT):
-- Each day: 6–8 waypoints total (including 2–3 dining stops + 4–5 sightseeing stops).
+- Each day: 6–8 waypoints total (including 2–3 dining stops + 4–5 sightseeing stops) — UNLESS a max POI cap applies (see below), in which case that cap overrides this range (minimum 4: 2 sightseeing + lunch + dinner).
+- MAX WAYPOINTS CAP (check BOTH sources): (1) If the user profile includes "Max POIs per day: N", enforce it. (2) If the user stated a maximum anywhere in the conversation (e.g. "max 4 POI", "günde 4 yer", "sadece 4 durak", "en fazla 5 stop"), enforce that number. Whichever source applies, it is a HARD CAP — mandatory meals count toward it, never exceed it.
 - Sum of estimated_duration_min across all waypoints in one day must be at least 420 minutes (~7 hours of activity). If your total is less, increase sightseeing durations (museums 90–120, parks 60–75, monuments 45–60).
 - Do NOT end the day before 18:00. The last waypoint should finish around 18:00–19:00 (or 20:00–21:00 if dinner is the last stop).
 - SLOW pace: end ~17:30–18:00. MODERATE: ~18:00–19:00. FAST: ~19:00–21:00.
@@ -224,16 +244,29 @@ Day duration (STRICT):
 SELF-CHECK (do this mentally before outputting each day):
   ✓ Does this day have a lunch restaurant between 12:00–14:00? If NO → add one.
   ✓ Does this day have a dinner restaurant between 18:00–21:00? If NO → add one.
-  ✓ Does this day have at least 6 waypoints? If NO → add more sights.
+  ✓ Does this day have at least 6 waypoints (or ≤ max_daily_waypoints if set)? If NO → add more sights.
   ✓ Does the day end after 18:00? If NO → extend with dinner or evening stop.
   ✓ Are ALL sightseeing stops within 3 km of each other? If NO → split distant ones to a different day.
   ✓ Does day_start_local leave enough time to reach the first sight before it opens (09:00)? If NO → adjust.
+  ✓ Does this day have at least 2 iconic/landmark-level sights? If NO → add one from world knowledge (null coordinates).
+  ✓ Does EVERY day include ≥1 POI matching the theme detected in STEP 0? If NO → swap in a theme-appropriate sight.
+  ✓ Is the theme consistent across ALL days (Day 2 and Day 3 same theme as Day 1)? If NO → replace drifted stops.
+  ✓ Are any two dining stops ADJACENT (no sightseeing stop between them)? If YES → insert a sightseeing stop between them or remove one of the dining stops.
+  ✓ Is every dining stop within 2 km of that day's sightseeing stops? Compare the lat/lon of the restaurant with the lat/lon of the sightseeing stops on the same day. If a dining stop is >2 km away from all sightseeing on that day → replace it with a closer option from the dining list.
 
-GEOGRAPHIC CLUSTERING (CRITICAL — prevents costly back-and-forth travel):
+QUALITY BALANCE ACROSS DAYS (CRITICAL — prevents day-1 bias):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Before assigning POIs to days, mentally cluster them by distance:
-- POIs within ~3 km of each other → assign to the SAME day.
-- POIs more than 5 km apart → assign to DIFFERENT days.
+- You already assigned 2 anchor sights per day in the PRE-PLANNING step above. Honour those assignments — do NOT quietly move all the famous ones back to Day 1.
+- Each day MUST contain at least 2 landmark-level or iconic sights. If a day's anchors turned out less impressive, add one from world knowledge (null coordinates).
+- Final gut-check: "Would a traveller be equally excited about Day 3 as Day 1?" If NO → swap a stronger attraction into the weaker day or add one from world knowledge.
+- The POI list is a resource pool, NOT a quality ranking. Position 50 in the list may be more iconic than position 5.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GEOGRAPHIC CLUSTERING (applies WITHIN each day — after anchor assignment):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Each day already has its 2 anchor sights from the PRE-PLANNING step. Now fill the remaining slots with POIs that are geographically close to those anchors:
+- POIs within ~3 km of the day's anchors → assign to that day.
+- POIs more than 5 km from all of that day's anchors → save for another day.
 - NEVER put two POIs on the same day if reaching both requires going 5+ km out, then 5+ km back (a "detour"). Example: Sultanahmet cluster + Rumeli Fortress 12 km away = two separate days, NOT one day.
 - Order each day's waypoints as a continuous walking/transit path — each next stop must be the nearest unvisited stop. NO zigzagging.
 
@@ -248,7 +281,7 @@ WATER CROSSING RULE (prevents unnecessary ferry/boat rides):
 OPENING HOURS (CRITICAL):
 - Museums, palaces, art galleries, historic sites, churches, mosques open at 09:00 at the earliest. NEVER schedule them before 09:00.
 - Museums, palaces, art galleries, historic sites, ruins, monuments CLOSE around 17:00. The visit (arrival + estimated_duration_min) MUST finish BY 17:00. NEVER place these in the afternoon-late or evening slots. NEVER set time_slot: "evening" for museum/gallery/palace/historic_site/monument/ruins.
-- HARD RULE: A museum/gallery/palace/historic_site must ARRIVE before 16:30 so there is at least 30 min of visit time before closing. If the cumulative day schedule would push a museum past 16:30, place it EARLIER in the day (before lunch) instead.
+- HARD RULE: Museums, palaces, and galleries need 90–120 min to visit properly. If they close at 17:00, the LATEST acceptable arrival is 15:00 (= 17:00 − 120 min). Arriving at 16:30 gives only 30 minutes — that is NOT acceptable. If the cumulative day schedule would push a museum past 15:00, move it to BEFORE lunch or replace it with an outdoor landmark (bridge, square, viewpoint, park) that has no closing time.
 - After 17:00: only restaurants, cafes, bars, nightlife, and outdoor landmarks (bridges, squares, viewpoints) may be scheduled. No museums, no palaces, no galleries, no mosques, no churches.
 - day_start_local MUST be 08:30 or later (FAST pace), 09:00 or later (MODERATE/default), 09:30 or later (SLOW). NEVER set it before 08:30 for any reason.
 - If you have a morning cafe in SLOT 1 (~09:00), the first sightseeing stop (SLOT 2) starts at ~09:30–10:00 — still within opening hours.
@@ -313,6 +346,7 @@ WHAT YOU MUST DO
 2. Identify WHICH day(s) and WHICH waypoints need changing.
 3. Apply ONLY the requested change — keep everything else identical.
 4. Output the COMPLETE updated route JSON (all days, including unchanged ones).
+5. FROZEN DAYS RULE: Any day NOT explicitly mentioned in the user's request must be copied into the output EXACTLY as-is — same waypoints, same order, same times, same coordinates. NEVER rearrange, remove, or redistribute waypoints across days "to improve flow" or "to balance". If the user says "add day 4", days 1–3 are frozen.
 
 CONFIRMATION PATTERN (very common): The user previously asked "suggest an alternative for X" and you offered options A and B. Now the user says "I choose A" or "seçiyorum". In this case: replace X with A in the route, then output the full updated route JSON. Do NOT ask for further confirmation — just apply and output.
 
@@ -330,6 +364,7 @@ FULL DAY REGENERATION ("redo day 1", "1. günü tekrar yap", "1. günü yeniden 
 - Day ends no earlier than 18:00.
 - Set latitude: null, longitude: null for all new waypoints (app will geocode).
 - GEOCODING CRITICAL: Waypoints that cannot be geocoded will be silently removed from the route. To avoid losing stops: choose only world-famous or internationally-recognized landmarks; use the official English name with district (e.g. "Topkapi Palace, Fatih", "Blue Mosque, Sultanahmet"). Never use neighborhood-only names (e.g. "Hamamonu", "Balat") as standalone waypoints — they will fail to geocode. Prefer 6 highly-geocodable POIs over 8 risky ones.
+- STREET NAMES CANNOT GEOCODE — use a specific landmark ON or near the street: ❌ "Istiklal Street" → ✅ "Galatasaray Square, Beyoglu"; ❌ "Champs-Élysées" → ✅ "Arc de Triomphe, Paris". Always add the district to the name: "Galata Tower, Karakoy" not just "Galata Tower".
 
 PARTIAL DAY REBUILD ("keep Hagia Sophia and Blue Mosque, change the rest", "Ayasofya kalsın diğerlerini değiştir"):
 - The user explicitly names which waypoints to KEEP. Preserve those exactly (same name, times, order position).
@@ -378,6 +413,22 @@ ADD A DAY ("işim uzadı 4 gün kalacağım", "add a day", "extend to 4 days", "
 - Append new days at the end (day N+1, N+2 …).
 - Update total_days in the JSON to reflect the new total.
 - Set latitude: null, longitude: null for all new waypoints (app will geocode). GEOCODING CRITICAL: POIs that fail geocoding will be silently removed — use only internationally-recognized English names with district context.
+- FROZEN EXISTING DAYS: Copy all existing days (day 1 through day N) byte-for-byte into the output. Do NOT rearrange, remove, modify, or "redistribute" any waypoint from any existing day. Only append the new day(s) at the end.
+
+ADD A DAY WITH SPECIFIC REQUIRED PLACES ("4. gün için İstiklal ve Galata Tower oluştur", "add a day 4 with Colosseum and Trastevere", "ekstra gün ekle, Kapalıçarşı ve Eminönü olsun"):
+- The user has named specific places that MUST appear in the new day as anchor sightseeing stops.
+- REQUIRED places must appear verbatim as waypoints — do NOT substitute, omit, or swap them for something else. If the user says "Galata Tower", the waypoint name must be "Galata Tower, Karakoy" — not "Pera Museum" or any other venue.
+- Plan the entire new day around those named anchors: place them first in your planning.
+- Identify the neighborhood/district of the named anchors (e.g. İstiklal + Galata Tower → Beyoğlu/Galata district).
+- Add ALL other stops — including dining — within ~2 km of those anchors. Do NOT mix in POIs from a different neighborhood or district.
+- Apply the full dining rhythm (morning cafe → lunch → afternoon cafe → dinner), all from the same neighborhood as the anchors.
+- STREET NAMES CANNOT GEOCODE — use a specific landmark ON or near the street instead:
+  ❌ "Istiklal Street" / "Istiklal Caddesi" → ✅ "Galatasaray Square, Beyoglu" or "Cicek Pasaji, Beyoglu"
+  ❌ "Champs-Élysées" → ✅ "Arc de Triomphe, Paris" or "Grand Palais, Paris"
+  ❌ "Via del Corso" → ✅ "Piazza del Popolo, Rome"
+- Always include the district in the name for better geocoding: "Galata Tower, Karakoy" not just "Galata Tower"; "Pera Museum, Beyoglu" not just "Pera Museum".
+- Set latitude: null, longitude: null for all waypoints (app will geocode).
+- FROZEN EXISTING DAYS: Copy all existing days byte-for-byte. Do NOT touch them.
 
 REMOVE A DAY ("3. günü çıkar", "remove day 2", "2. günü sil", "trip is shorter now"):
 - Delete the specified day entirely.
@@ -525,9 +576,9 @@ _DESTINATION_CLARIFICATION_RE = re.compile(
 
 
 def _is_itinerary_followup(history: list[HumanMessage | AIMessage]) -> bool:
-    """Detect if the user is answering a Turn1 Mode-A destination clarification.
+    """Detect if the user is answering an older assistant message that asked for a city.
 
-    When Turn1 fires Mode A (asks "which city?"), the user's follow-up often
+    Legacy chats may still have "which city?" in the last assistant turn; the user's follow-up often
     doesn't contain itinerary keywords, causing it to fall through to the
     base_prompt fallback.  This function catches that scenario so the answer
     re-enters the Turn1 pipeline.
@@ -849,47 +900,151 @@ def _build_must_visit_section(must_visit: list[str] | None) -> str:
     )
 
 
+async def _extract_turn3_must_visit_llm(
+    llm,
+    user_request: str,
+    destination_hint: str | None = None,
+) -> list[str]:
+    """LLM-only extractor for "add this place" Turn3 edits.
+
+    This avoids brittle string matching in downstream services. Output is a best-effort
+    list of place names the user explicitly requested to add/visit.
+    """
+    if not user_request or not user_request.strip():
+        return []
+    dest = (destination_hint or "").strip()
+    sys = (
+        "You extract MUST-VISIT places from a user's route-edit request.\n"
+        "Return ONLY valid JSON with this exact shape:\n"
+        '{ "must_visit": ["Place 1", "Place 2"] }\n'
+        "Rules:\n"
+        "- Include ONLY places the user explicitly asked to add/visit/see.\n"
+        "- If none, return {\"must_visit\": []}.\n"
+        "- Use the official English/international name if known; otherwise return the user's wording.\n"
+        "- Do not include generic terms like 'restaurant' or 'museum' without a specific name.\n"
+        + (f"- Destination context: {dest}\n" if dest else "")
+    )
+    try:
+        resp = await llm.ainvoke(
+            [SystemMessage(content=sys), HumanMessage(content=user_request.strip())]
+        )
+        data = _extract_json_object(str(resp.content))
+        mv = data.get("must_visit") if isinstance(data, dict) else None
+        if not isinstance(mv, list):
+            return []
+        out: list[str] = []
+        for x in mv:
+            if isinstance(x, str) and x.strip():
+                out.append(x.strip())
+        # De-dup while preserving order
+        seen: set[str] = set()
+        uniq: list[str] = []
+        for name in out:
+            k = name.lower()
+            if k in seen:
+                continue
+            seen.add(k)
+            uniq.append(name)
+        return uniq[:8]
+    except Exception:
+        return []
+
+
+def _format_single_poi(p: dict, idx: int) -> str | None:
+    name = p.get("name")
+    cat = p.get("category")
+    lat = p.get("lat")
+    lon = p.get("lon")
+    if name is None or lat is None or lon is None:
+        return None
+    sub_cats = p.get("poiCategoryIds") or []
+    cat_label = cat
+    if sub_cats:
+        useful = [s for s in sub_cats if s and s != cat]
+        if useful:
+            cat_label = f"{cat}: {', '.join(useful[:3])}"
+    parts = [f"{idx}. {name} ({cat_label}) — lat: {lat}, lon: {lon}"]
+    extras: list[str] = []
+    rating = p.get("rating")
+    if rating is not None:
+        extras.append(f"rating: {rating}")
+    price = p.get("priceLevel")
+    if price:
+        extras.append(f"price: {price}")
+    start_t = p.get("startTimeLocal")
+    end_t = p.get("endTimeLocal")
+    if start_t and end_t:
+        extras.append(f"hours: {start_t}–{end_t}")
+    elif start_t:
+        extras.append(f"opens: {start_t}")
+    closed = p.get("closedWeekdays")
+    if closed:
+        extras.append(f"closed: {', '.join(closed)}")
+    dur = p.get("estimatedDurationMin")
+    if dur:
+        extras.append(f"~{dur} min")
+    hint = _dining_time_hint(cat)
+    if hint:
+        extras.append(hint)
+    if extras:
+        parts.append(" | ".join(extras))
+    return " | ".join(parts)
+
+
 def _format_poi_list(pois: list[dict]) -> str:
+    """Format POI list with sightseeing and dining in separate sections.
+
+    Dining POIs are shuffled within quality tiers so the LLM doesn't develop
+    positional bias (always picking the first restaurant for every day).
+    Sightseeing stays relevance-sorted so anchor quality is preserved.
+    """
+    import random
+
+    sightseeing: list[dict] = []
+    dining: list[dict] = []
+    for p in pois:
+        cat = (p.get("category") or "").lower()
+        if cat in _DINING_CATS:
+            dining.append(p)
+        else:
+            sightseeing.append(p)
+
+    # Shuffle dining within rating tiers so different sessions surface different venues.
+    # Tiers: high (≥4.0), mid (3.0–3.99), low (<3.0 or no rating).
+    def tier(p: dict) -> int:
+        r = p.get("rating")
+        if r is None:
+            return 2
+        return 0 if r >= 4.0 else (1 if r >= 3.0 else 2)
+
+    high = [p for p in dining if tier(p) == 0]
+    mid  = [p for p in dining if tier(p) == 1]
+    low  = [p for p in dining if tier(p) == 2]
+    random.shuffle(high)
+    random.shuffle(mid)
+    random.shuffle(low)
+    dining_shuffled = high + mid + low
+
     lines: list[str] = []
-    for i, p in enumerate(pois, start=1):
-        name = p.get("name")
-        cat = p.get("category")
-        lat = p.get("lat")
-        lon = p.get("lon")
-        if name is None or lat is None or lon is None:
-            continue
-        sub_cats = p.get("poiCategoryIds") or []
-        cat_label = cat
-        if sub_cats:
-            useful = [s for s in sub_cats if s and s != cat]
-            if useful:
-                cat_label = f"{cat}: {', '.join(useful[:3])}"
-        parts = [f"{i}. {name} ({cat_label}) — lat: {lat}, lon: {lon}"]
-        extras: list[str] = []
-        rating = p.get("rating")
-        if rating is not None:
-            extras.append(f"rating: {rating}")
-        price = p.get("priceLevel")
-        if price:
-            extras.append(f"price: {price}")
-        start_t = p.get("startTimeLocal")
-        end_t = p.get("endTimeLocal")
-        if start_t and end_t:
-            extras.append(f"hours: {start_t}–{end_t}")
-        elif start_t:
-            extras.append(f"opens: {start_t}")
-        closed = p.get("closedWeekdays")
-        if closed:
-            extras.append(f"closed: {', '.join(closed)}")
-        dur = p.get("estimatedDurationMin")
-        if dur:
-            extras.append(f"~{dur} min")
-        hint = _dining_time_hint(cat)
-        if hint:
-            extras.append(hint)
-        if extras:
-            parts.append(" | ".join(extras))
-        lines.append(" | ".join(parts))
+
+    if sightseeing:
+        lines.append("=== SIGHTSEEING / ATTRACTIONS (use for landmark and activity stops) ===")
+        idx = 1
+        for p in sightseeing:
+            row = _format_single_poi(p, idx)
+            if row:
+                lines.append(row)
+                idx += 1
+
+    if dining_shuffled:
+        lines.append("=== DINING (restaurants, cafes, bars — pick by proximity to that day's sightseeing, NOT by list position) ===")
+        idx = 1
+        for p in dining_shuffled:
+            row = _format_single_poi(p, idx)
+            if row:
+                lines.append(row)
+                idx += 1
+
     return "\n".join(lines) if lines else "(no POIs returned)"
 
 
@@ -1233,6 +1388,54 @@ def _fix_route_dining(route_data: RouteData) -> RouteData:
                 for wp in sight_wps:
                     wp.estimated_duration_min = (wp.estimated_duration_min or 45) + bump
 
+        # --- Pass 4: flag missing lunch so _fix_dining_proximity can insert one ---
+        has_lunch = any(
+            (wp.category or "").lower() in _RESTAURANT_CATS
+            and (wp.time_slot or "").lower() in ("lunch", "")
+            and wp.order <= max(3, len(wps) // 2)
+            for wp in wps
+        )
+        # Simpler check: any restaurant in the first half of the day
+        restaurant_positions = [
+            i for i, wp in enumerate(wps)
+            if (wp.category or "").lower() in _RESTAURANT_CATS
+        ]
+        has_lunch = any(pos < len(wps) * 0.6 for pos in restaurant_positions)
+        if not has_lunch:
+            logger.warning(
+                "[FIX_DINING] Day %s has no lunch restaurant — will be enforced by _fix_dining_proximity",
+                day_plan.day,
+            )
+            insert_at = min(3, len(wps))
+            wps.insert(insert_at, RouteWaypoint(
+                name="__LUNCH_PLACEHOLDER__",
+                category="restaurant",
+                day=day_plan.day,
+                order=insert_at + 1,
+                estimated_duration_min=60,
+                time_slot="lunch",
+                latitude=None,
+                longitude=None,
+            ))
+
+        # --- Pass 5: flag missing dinner ---
+        has_dinner = any(pos >= len(wps) * 0.5 for pos in restaurant_positions)
+        if not has_dinner:
+            logger.warning(
+                "[FIX_DINING] Day %s has no dinner restaurant — will be enforced by _fix_dining_proximity",
+                day_plan.day,
+            )
+            wps.append(RouteWaypoint(
+                name="__DINNER_PLACEHOLDER__",
+                category="restaurant",
+                day=day_plan.day,
+                order=len(wps) + 1,
+                estimated_duration_min=65,
+                time_slot="dinner",
+                latitude=None,
+                longitude=None,
+            ))
+
         # --- Renumber order ---
         for idx, wp in enumerate(wps):
             wp.order = idx + 1
@@ -1264,6 +1467,21 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
     if not route_data.days or not dining_pool:
         return route_data
 
+    # Build a cross-day set of committed dining names so placeholder replacements
+    # never pick a restaurant already placed in another day (would cause _fix_duplicate_waypoints
+    # to silently delete the replacement, leaving the day without that meal).
+    globally_committed_dining: set[str] = set()
+    for dp in route_data.days:
+        for wp in (dp.waypoints or []):
+            cat = (wp.category or "").lower()
+            if cat not in _DINING_CATS:
+                continue
+            name = (wp.name or "").lower()
+            if name.startswith("__") and name.endswith("__"):
+                continue  # skip placeholders
+            if wp.latitude is not None:
+                globally_committed_dining.add(name)
+
     for day_plan in route_data.days:
         wps = day_plan.waypoints
         if not wps:
@@ -1284,6 +1502,30 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             """Minimum haversine distance from (lat, lon) to any sightseeing stop."""
             return min(_haversine_meters(s_lat, s_lon, lat, lon) for s_lat, s_lon in sight_coords)
 
+        def _adjacent_score(idx: int, lat: float, lon: float) -> float:
+            """Max distance to the nearest sightseeing stop before AND after a dining stop.
+
+            After _optimize_route_order the sightseeing chunks are already sorted, so
+            the stop immediately before/after the dining index is the true neighbour.
+            Minimising this score picks a restaurant that is 'on the way' between the
+            surrounding sights rather than just near any sight in the day.
+            """
+            prev_dist: float | None = None
+            for j in range(idx - 1, -1, -1):
+                w = wps[j]
+                if (w.category or "").lower() not in _DINING_CATS and w.latitude is not None:
+                    prev_dist = _haversine_meters(w.latitude, w.longitude, lat, lon)
+                    break
+            next_dist: float | None = None
+            for j in range(idx + 1, len(wps)):
+                w = wps[j]
+                if (w.category or "").lower() not in _DINING_CATS and w.latitude is not None:
+                    next_dist = _haversine_meters(w.latitude, w.longitude, lat, lon)
+                    break
+            if prev_dist is not None and next_dist is not None:
+                return max(prev_dist, next_dist)
+            return prev_dist or next_dist or _min_sight_dist(lat, lon)
+
         # Track names already in this day to prevent duplicates
         used_names = {(wp.name or "").lower() for wp in wps}
 
@@ -1291,29 +1533,47 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             cat = (wp.category or "").lower()
             if cat not in _DINING_CATS:
                 continue
+
+            is_placeholder = (wp.name or "").startswith("__") and (wp.name or "").endswith("__")
+
             if wp.latitude is None or wp.longitude is None:
-                continue
+                # Null-coord dining (including placeholders): always try to replace with a nearby real venue.
+                if not is_placeholder:
+                    # Skip non-placeholder nulls here; Java resolveNullCoordinates handles them.
+                    continue
+                # Placeholder: fall through to replacement logic below.
+                dist = float("inf")
+                adj_score = float("inf")
+            else:
+                # Trigger replacement if the dining stop is far from any sightseeing stop
+                # OR if it's far from its immediate neighbours (the stops it sits between).
+                dist = _min_sight_dist(wp.latitude, wp.longitude)
+                adj_score = _adjacent_score(i, wp.latitude, wp.longitude)
+                if dist <= _MAX_DINING_DISTANCE_M and adj_score <= _MAX_DINING_DISTANCE_M:
+                    continue
 
-            dist = _min_sight_dist(wp.latitude, wp.longitude)
-            if dist <= _MAX_DINING_DISTANCE_M:
-                continue
+            def _score_candidate(p_lat: float, p_lon: float) -> float:
+                return _adjacent_score(i, p_lat, p_lon)
 
-            # Find the in-range replacement closest to the day's sightseeing area
+            # Find the in-range replacement with the best adjacent score.
+            # Exclude names used in this day AND names already committed to other days
+            # (cross-day duplicates would be removed by _fix_duplicate_waypoints, leaving no meal).
             best: dict | None = None
-            best_dist = float("inf")
+            best_score = float("inf")
             for p in dining_pool:
                 p_name = (p.get("name") or "").lower()
-                if p_name in used_names:
+                if p_name in used_names or p_name in globally_committed_dining:
                     continue
                 p_cat = (p.get("category") or "").lower()
-                # Preserve meal type: restaurant stays restaurant, cafe stays cafe
                 if cat in _RESTAURANT_CATS and p_cat not in _RESTAURANT_CATS:
                     continue
                 if cat in ("cafe", "bakery") and p_cat not in ("cafe", "bakery"):
                     continue
-                d = _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0)
-                if d < best_dist and d <= _MAX_DINING_DISTANCE_M:
-                    best_dist = d
+                if _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0) > _MAX_DINING_DISTANCE_M:
+                    continue
+                score = _score_candidate(p.get("lat") or 0.0, p.get("lon") or 0.0)
+                if score < best_score:
+                    best_score = score
                     best = p
 
             # Fallback: if no same-type replacement found, accept any in-range dining type
@@ -1321,11 +1581,13 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             if best is None:
                 for p in dining_pool:
                     p_name = (p.get("name") or "").lower()
-                    if p_name in used_names:
+                    if p_name in used_names or p_name in globally_committed_dining:
                         continue
-                    d = _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0)
-                    if d < best_dist and d <= _MAX_DINING_DISTANCE_M:
-                        best_dist = d
+                    if _min_sight_dist(p.get("lat") or 0.0, p.get("lon") or 0.0) > _MAX_DINING_DISTANCE_M:
+                        continue
+                    score = _score_candidate(p.get("lat") or 0.0, p.get("lon") or 0.0)
+                    if score < best_score:
+                        best_score = score
                         best = p
                 if best is not None:
                     used_fallback = True
@@ -1333,10 +1595,11 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
             if best is not None:
                 log_suffix = " [type fallback]" if used_fallback else ""
                 logger.info(
-                    "[DINING_PROXIMITY] Day %s: '%s' is %.0fm from nearest sight → replaced by '%s' (%.0fm)%s",
-                    day_plan.day, wp.name, dist, best.get("name"), best_dist, log_suffix,
+                    "[DINING_PROXIMITY] Day %s: '%s' (any_sight=%.0fm adj=%.0fm) → replaced by '%s' (adj=%.0fm)%s",
+                    day_plan.day, wp.name, dist, adj_score, best.get("name"), best_score, log_suffix,
                 )
                 used_names.discard((wp.name or "").lower())
+                best_name_lower = (best.get("name") or "").lower()
                 wps[i] = RouteWaypoint(
                     name=best.get("name"),
                     description=wp.description,
@@ -1348,12 +1611,28 @@ def _fix_dining_proximity(route_data: RouteData, tool_pois: list[dict]) -> Route
                     estimated_duration_min=wp.estimated_duration_min,
                     time_slot=wp.time_slot,
                 )
-                used_names.add((best.get("name") or "").lower())
+                used_names.add(best_name_lower)
+                globally_committed_dining.add(best_name_lower)
             else:
-                logger.warning(
-                    "[DINING_PROXIMITY] Day %s: '%s' is %.0fm from nearest sight — no in-range replacement found in pool",
-                    day_plan.day, wp.name, dist,
-                )
+                if is_placeholder:
+                    # No nearby restaurant found — remove the placeholder rather than leaving garbage in the route.
+                    wps[i] = None  # type: ignore[assignment]
+                    logger.warning(
+                        "[DINING_PROXIMITY] Day %s: lunch placeholder removed — no in-range restaurant in pool",
+                        day_plan.day,
+                    )
+                else:
+                    logger.warning(
+                        "[DINING_PROXIMITY] Day %s: '%s' is %.0fm from nearest sight — no in-range replacement found in pool",
+                        day_plan.day, wp.name, dist,
+                    )
+
+    # Remove None slots left by failed placeholder replacements and renumber.
+    for day_plan in route_data.days:
+        if day_plan.waypoints:
+            day_plan.waypoints = [wp for wp in day_plan.waypoints if wp is not None]
+            for idx, wp in enumerate(day_plan.waypoints):
+                wp.order = idx + 1
 
     return route_data
 
@@ -1729,26 +2008,28 @@ def _poi_names_are_related(
 
 
 def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dict]) -> RouteData:
-    """Post-process: detect waypoints that carry ANOTHER POI's coordinates (coordinate theft).
+    """Enforce that every waypoint's coordinates come from Mapbox (via tool_pois or geocoding).
 
-    The AI reads a long POI list and occasionally copies a different POI's lat/lon to a
-    waypoint. This covers ALL categories (sightseeing and dining alike).
+    All non-null coordinates that cannot be traced back to a verified Mapbox entry in
+    tool_pois are cleared so the Java backend re-fetches them via resolveNullCoordinates.
+    This guarantees coordinates are never sourced from AI training-data knowledge.
 
-    Detection: for each waypoint with non-null coordinates, look up those coordinates
-    (≤ 4 decimal places ≈ 11 m) in the full POI index. If a match is found and the
-    matched POI's name is UNRELATED to the waypoint name, the coordinates are cleared so
-    the Java backend can geocode the correct location via Mapbox.
+    Two failure modes caught:
+    1. AI used coordinates of a *different* POI in the list (coordinate theft).
+    2. AI invented coordinates not in the list at all (hallucination).
 
-    common_words: words that appear in ≥ 3 POI names are excluded from name matching
-    (city names, generic category words like "museum"/"mosque" share across many POIs
-    and would produce false positives if used as the sole discriminating signal).
+    When tool_pois is empty (e.g. Turn-3 edit with no new POI search), every non-null
+    coordinate is cleared — all coordinates are re-verified against Mapbox.
+
+    common_words: words appearing in ≥ 3 POI names are excluded from name matching
+    to avoid false positives on shared city/category terms.
     """
-    if not route_data.days or not tool_pois:
+    if not route_data.days:
         return route_data
 
-    # Index ALL POI coordinates: (lat4, lon4) -> poi name
+    # Index verified Mapbox coordinates: (lat4, lon4) -> poi name
     coord_to_poi: dict[tuple[float, float], str] = {}
-    for p in tool_pois:
+    for p in (tool_pois or []):
         lat = p.get("lat")
         lon = p.get("lon")
         name = p.get("name") or ""
@@ -1756,17 +2037,10 @@ def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dic
             key = (round(float(lat), 4), round(float(lon), 4))
             coord_to_poi[key] = name
 
-    if not coord_to_poi:
-        return route_data
-
-    # Build common_words: words (>3 chars) that appear in ≥ 3 POI names.
-    # These are non-discriminating (city names, generic terms) and must not
-    # be counted as a match signal — prevents false positives like
-    # "Istanbul Museum of Modern Art" matching "Istanbul Archaeology Museums"
-    # solely because both contain "istanbul".
+    # Build common_words from whatever pool we have (may be empty).
     from collections import Counter
     word_counts: Counter = Counter()
-    for p in tool_pois:
+    for p in (tool_pois or []):
         name = (p.get("name") or "").lower()
         for w in name.split():
             if len(w) > 3:
@@ -1780,16 +2054,27 @@ def _validate_sightseeing_coordinates(route_data: RouteData, tool_pois: list[dic
 
             key = (round(wp.latitude, 4), round(wp.longitude, 4))
             poi_name = coord_to_poi.get(key)
+
             if poi_name is None:
-                continue  # Coordinates not from list — AI world knowledge, leave alone
+                # Coordinates not traceable to any verified Mapbox entry.
+                # This covers both hallucinated coords and the case where tool_pois is
+                # empty (Turn-3 edit): clear so Java geocodes via Mapbox.
+                logger.warning(
+                    "[COORD_MISMATCH] Day %s: '%s' (%s) has unverified coordinates"
+                    " → clearing for Mapbox geocode",
+                    day_plan.day, wp.name, wp.category,
+                )
+                wp.latitude = None
+                wp.longitude = None
+                continue
 
             if _poi_names_are_related(wp.name, poi_name, common_words):
-                continue  # Correct: waypoint correctly references this POI's coordinates
+                continue  # Correct: coordinates match this waypoint's Mapbox entry
 
-            # Coordinate theft detected — waypoint name and list POI name are unrelated
+            # Coordinate theft: AI assigned a different POI's coordinates to this waypoint.
             logger.warning(
                 "[COORD_MISMATCH] Day %s: '%s' (%s) has coordinates of unrelated POI '%s'"
-                " → clearing for proper geocode",
+                " → clearing for Mapbox geocode",
                 day_plan.day, wp.name, wp.category, poi_name,
             )
             wp.latitude = None
@@ -2100,6 +2385,8 @@ def _build_profile_prompt(profile: UserProfileForAi | None) -> str:
     sl = _join_list(profile.spokenLanguages)
     if sl:
         travel.append(f"Spoken languages: {sl}")
+    if profile.maxDailyPois is not None:
+        travel.append(f"Max POIs per day: {profile.maxDailyPois} (HARD CAP — never exceed this waypoint count per day, mandatory meals count toward the cap)")
     saved = _join_list(profile.savedPoiNames)
     if saved:
         travel.append(f"Saved / favorited places (PRIORITIZE in itinerary if in destination): {saved}")
@@ -2344,7 +2631,7 @@ Vacanza app features (mention ONLY when directly relevant):
 
 Route generation (fallback — most route requests use a dedicated pipeline automatically):
 - If the user asks for a trip plan, itinerary, or route:
-  0. Country/state without a city → ask which city first (no JSON).
+  0. Do NOT ask which city to focus on — pick a concrete destination (or the city they already named) and output JSON.
   1. MAX 40 words summary. Do NOT list places in text.
   2. Next line, exactly: ---ROUTE_JSON---
   3. Next line: single valid JSON (no markdown, no code block):
@@ -2371,7 +2658,7 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
     llm_messages.extend(history)
     llm_messages.append(HumanMessage(content=user_content))
 
-    llm = create_chat_model(settings)
+    llm = create_chat_model(settings, temperature=0.3)
 
     # Turn2: backend sends POI list as a tool result marker (and may include the original tool call)
     tool_pois = _parse_tool_result_pois(user_content)
@@ -2452,10 +2739,10 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
         if route_data:
             _log_route("AI_RAW", route_data)           # what AI produced before any fix
             route_data = _fix_route_dining(route_data)
-            route_data = _fix_dining_proximity(route_data, tool_pois)
             route_data = _fix_opening_hours(route_data)
             route_data = _fix_geographic_spread(route_data)
             route_data = _optimize_route_order(route_data)
+            route_data = _fix_dining_proximity(route_data, tool_pois)
             # Validate AFTER all post-processing so any coordinate changes made by
             # _fix_route_dining / _fix_dining_proximity are also checked.
             route_data = _validate_sightseeing_coordinates(route_data, tool_pois)
@@ -2476,6 +2763,25 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             # Strip the __EXISTING_ROUTE__ block from user_content before sending to the LLM
             # (it is already baked into the system prompt; sending it twice wastes tokens).
             clean_user_content = user_content.split("\n" + EXISTING_ROUTE_MARKER)[0].strip()
+            # Optional: extract "must-visit" places from the edit request and enforce them
+            # via the same MUST-VISIT section used in tool-based flows.
+            must_visit_turn3 = await _extract_turn3_must_visit_llm(
+                llm,
+                clean_user_content,
+                destination_hint=getattr(existing_route, "destination", None),
+            )
+            if must_visit_turn3:
+                logger.info("[TURN3] extracted must_visit=%s", must_visit_turn3)
+                places_str = ", ".join(must_visit_turn3)
+                turn3_add_note = (
+                    f"PLACES TO ADD (user explicitly requested these — MANDATORY):\n"
+                    f"  {places_str}\n"
+                    f"- INSERT each place into the day the user specified (or the most geographically sensible day).\n"
+                    f"- Set latitude: null, longitude: null — the app will geocode.\n"
+                    f"- Do NOT remove or replace existing waypoints to make room. Simply insert the new stop.\n"
+                    f"- Adjust surrounding arrival/departure times to accommodate the new stop."
+                )
+                turn3_system = f"{turn3_system}\n\n{turn3_add_note}"
             # Strip large JSON payloads (POI lists, previous route JSONs) from history.
             # The current route is already in the system prompt — keeping old route JSONs
             # in history only wastes tokens and can cause the model to truncate its output
@@ -2521,10 +2827,10 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
                 ]
                 _log_route("TURN3_RAW", route_data)
                 route_data = _fix_route_dining(route_data)
-                route_data = _fix_dining_proximity(route_data, turn3_poi_pool)
                 route_data = _fix_opening_hours(route_data)
                 route_data = _fix_geographic_spread(route_data)
                 route_data = _optimize_route_order(route_data)
+                route_data = _fix_dining_proximity(route_data, turn3_poi_pool)
                 route_data = _validate_sightseeing_coordinates(route_data, turn3_poi_pool)
                 route_data = _fix_duplicate_waypoints(route_data)
                 _log_route("TURN3_FINAL", route_data)
@@ -2535,7 +2841,7 @@ Route generation (fallback — most route requests use a dedicated pipeline auto
             raw_ai_content = str(response.content)
             ai_content, route_data = _parse_route_from_response(raw_ai_content)
 
-    # Turn1: itinerary request OR answering a Mode-A clarification => tool-call JSON
+    # Turn1: itinerary request OR follow-up after a legacy "which city?" assistant message
     elif _is_itinerary_request(user_content) or _is_itinerary_followup(history):
         turn1_system = TURN1_SYSTEM
         if itinerary_user_context:
