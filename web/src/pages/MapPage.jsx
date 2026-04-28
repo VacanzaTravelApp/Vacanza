@@ -16,13 +16,14 @@ import {
   ControlOutlined,
   HeartOutlined,
   HeartFilled,
+  AimOutlined,
 } from "@ant-design/icons";
 import { FiFilter } from "react-icons/fi";
 import defaultAvatar from "../assets/default-avatar.png";
 import { useNavigate } from "react-router-dom";
 import webIcon from "../web-icon.svg";
 
-import MapGL, { NavigationControl, GeolocateControl, Marker, Source, Layer } from "react-map-gl";
+import MapGL, { NavigationControl, Marker, Source, Layer } from "react-map-gl";
 
 import { auth } from "../firebase";
 import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
@@ -905,6 +906,82 @@ export default function MapPage() {
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, [user]);
+
+  const locateBtnRef = useRef(null);
+  const userLocRef = useRef(null);
+  useEffect(() => {
+    userLocRef.current = userLocation;
+  }, [userLocation]);
+
+  const handleLocateUser = useCallback(() => {
+    console.log("Locate user clicked", userLocRef.current);
+    const loc = userLocRef.current;
+    const map = mapRef.current;
+    if (!map) {
+      console.warn("Map ref is null");
+      return;
+    }
+
+    if (loc) {
+      map.flyTo({
+        center: [loc.lng, loc.lat],
+        zoom: 16,
+        duration: 1200
+      });
+    } else {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        map.flyTo({
+          center: [pos.coords.longitude, pos.coords.latitude],
+          zoom: 16,
+          duration: 1200
+        });
+      }, (err) => {
+        console.error("Geolocation error:", err);
+      }, { enableHighAccuracy: true });
+    }
+  }, []);
+
+  // Set the click handler once or whenever the button is injected
+  useEffect(() => {
+    if (locateBtnRef.current) {
+      locateBtnRef.current.onclick = handleLocateUser;
+    }
+  }, [handleLocateUser]);
+
+  // Inject custom "My Location" button into Mapbox +/- control group for perfect alignment
+  useEffect(() => {
+    const injectBtn = () => {
+      const ctrlGroup = document.querySelector('.mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-group');
+      if (ctrlGroup && !ctrlGroup.querySelector('#custom-locate-btn')) {
+        // Remove old one if it's floating detached for some reason
+        const oldBtn = document.getElementById('custom-locate-btn');
+        if (oldBtn) oldBtn.remove();
+
+        const btn = document.createElement('button');
+        btn.id = 'custom-locate-btn';
+        btn.className = 'mapboxgl-ctrl-icon custom-locate-btn';
+        btn.type = 'button';
+        btn.title = 'My Location';
+        btn.innerHTML = `
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display: block; pointer-events: none;">
+            <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+          </svg>
+        `;
+        btn.onclick = handleLocateUser;
+        locateBtnRef.current = btn;
+        // Prepend to put it above +
+        ctrlGroup.prepend(btn);
+      }
+    };
+
+    const timer = setInterval(injectBtn, 500);
+    return () => {
+      clearInterval(timer);
+      const btn = document.getElementById('custom-locate-btn');
+      if (btn) btn.remove();
+      locateBtnRef.current = null;
+    };
+  }, [handleLocateUser]);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(false);
@@ -2201,7 +2278,17 @@ export default function MapPage() {
           maxZoom={20}
         >
           <NavigationControl position="bottom-left" showCompass={false} />
-          <GeolocateControl position="bottom-left" />
+          {/* Custom "My Location" button — GeolocateControl doesn't work with controlled viewState */}
+
+          {userLocation && (
+            <Marker latitude={userLocation.lat} longitude={userLocation.lng} anchor="center">
+              <div style={{
+                width: 16, height: 16, borderRadius: '50%',
+                background: '#4285F4', border: '3px solid #fff',
+                boxShadow: '0 0 8px rgba(66,133,244,0.6)',
+              }} />
+            </Marker>
+          )}
 
           <Source id="selection-src" type="geojson" data={selectionGeoJSON}>
             <Layer {...selectionFillLayer} />
@@ -2399,32 +2486,46 @@ export default function MapPage() {
               </Marker>
             );
           })}
+
+          {/* Location dot with pulse */}
+          {userLocation && (
+            <Marker latitude={userLocation.lat} longitude={userLocation.lng} anchor="center">
+              <div className="vivid-user-location-dot">
+                <div className="vivid-user-location-pulse" />
+                <div className="vivid-user-location-inner" />
+              </div>
+            </Marker>
+          )}
         </MapGL>
 
-        {showDrawZoomGate ? (
-          <div className="map-draw-zoom-gate" aria-live="polite">
-            <div className="map-draw-zoom-gate__hint glass-panel">
-              <div className="map-draw-zoom-gate__title">Zoom in to draw</div>
-              <p className="map-draw-zoom-gate__text">
-                This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area.
-              </p>
+        {
+          showDrawZoomGate ? (
+            <div className="map-draw-zoom-gate" aria-live="polite">
+              <div className="map-draw-zoom-gate__hint glass-panel">
+                <div className="map-draw-zoom-gate__title">Zoom in to draw</div>
+                <p className="map-draw-zoom-gate__text">
+                  This tool is for neighborhoods and districts. Zoom in until the warning disappears, then sketch your area.
+                </p>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null
+        }
 
         {/* 4. AI Sticky Pill (CENTRAL) - ONLY show if results panel and chat are closed */}
-        {!canShowResultsPanel && !isChatOpen && (
-          <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
-            setFilterOpen(false);
-            setFabExpanded(false);
-            setIsChatOpen(true);
-          }}>
-            <div className="pill-content">
-              <CompassOutlined className="pill-icon" />
-              <span className="pill-text">Ask Vacanza AI</span>
-            </div>
-          </button>
-        )}
+        {
+          !canShowResultsPanel && !isChatOpen && (
+            <button className="vivid-ai-sticky-pill vivid-interactive" onClick={() => {
+              setFilterOpen(false);
+              setFabExpanded(false);
+              setIsChatOpen(true);
+            }}>
+              <div className="pill-content">
+                <CompassOutlined className="pill-icon" />
+                <span className="pill-text">Ask Vacanza AI</span>
+              </div>
+            </button>
+          )
+        }
 
         {/* 5. Unified Action FAB (RIGHT) */}
         <div className="vivid-fab-group">
@@ -2457,8 +2558,8 @@ export default function MapPage() {
                 drawAreaZoomTooLow
                   ? "Zoom in closer — draw area works at neighborhood scale"
                   : drawAreaZoomTooHigh
-                  ? "Zoom out a bit — you're too close to draw a useful area"
-                  : "Draw Area"
+                    ? "Zoom out a bit — you're too close to draw a useful area"
+                    : "Draw Area"
               }
               placement="left"
             >
@@ -2487,205 +2588,211 @@ export default function MapPage() {
         </div>
 
         {/* Saved Places Panel */}
-        {savedPoisOpen && (
-          <SavedPoisPanel
-            onClose={() => setSavedPoisOpen(false)}
-            onFlyTo={(lat, lng) => {
-              const map = mapRef.current?.getMap?.();
-              if (map) {
-                map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 });
-              }
-            }}
-          />
-        )}
+        {
+          savedPoisOpen && (
+            <SavedPoisPanel
+              onClose={() => setSavedPoisOpen(false)}
+              onFlyTo={(lat, lng) => {
+                const map = mapRef.current?.getMap?.();
+                if (map) {
+                  map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 });
+                }
+              }}
+            />
+          )
+        }
 
         {/* 5. Filter Panel (Glass) */}
-        {filterOpen && (
-          <div className="glass-panel filter-panel">
-            <div className="filter-header">
-              <span className="filter-title">Filter Places</span>
-              <div className="filter-header-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <Button size="small" type="link" onClick={handleSelectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>All</Button>
-                <div style={{ height: 12, width: 1, background: "rgba(0,0,0,0.1)" }} />
-                <Button size="small" type="link" onClick={handleDeselectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>None</Button>
-                <Button type="text" size="small" icon={<CloseOutlined />} onClick={clearSelectionOnly} style={{ marginLeft: 4 }} />
+        {
+          filterOpen && (
+            <div className="glass-panel filter-panel">
+              <div className="filter-header">
+                <span className="filter-title">Filter Places</span>
+                <div className="filter-header-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <Button size="small" type="link" onClick={handleSelectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>All</Button>
+                  <div style={{ height: 12, width: 1, background: "rgba(0,0,0,0.1)" }} />
+                  <Button size="small" type="link" onClick={handleDeselectAllFilters} style={{ padding: "0 4px", fontSize: 13, height: "auto" }}>None</Button>
+                  <Button type="text" size="small" icon={<CloseOutlined />} onClick={clearSelectionOnly} style={{ marginLeft: 4 }} />
+                </div>
+              </div>
+              <div className="filter-body">
+                {UI_CATEGORIES.map((c) => (
+                  <div key={c.key} className="cat-pill vivid-interactive" onClick={() => setSelectedCats(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
+                    style={{
+                      background: selectedCats[c.key] ? c.pill : "rgba(var(--vivid-navy-rgb, 26,35,50), 0.05)",
+                      border: selectedCats[c.key] ? `2.5px solid ${c.ring}` : "1.5px solid rgba(255,255,255,0.08)",
+                      opacity: selectedCats[c.key] ? 1 : 0.6
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <div className="cat-pill-icon" style={{ color: selectedCats[c.key] ? c.ring : "var(--text-sub)" }}>{c.icon}</div>
+                      <span className="cat-pill-label">{c.label}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="filter-body">
-              {UI_CATEGORIES.map((c) => (
-                <div key={c.key} className="cat-pill vivid-interactive" onClick={() => setSelectedCats(prev => ({ ...prev, [c.key]: !prev[c.key] }))}
-                  style={{
-                    background: selectedCats[c.key] ? c.pill : "rgba(var(--vivid-navy-rgb, 26,35,50), 0.05)",
-                    border: selectedCats[c.key] ? `2.5px solid ${c.ring}` : "1.5px solid rgba(255,255,255,0.08)",
-                    opacity: selectedCats[c.key] ? 1 : 0.6
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    <div className="cat-pill-icon" style={{ color: selectedCats[c.key] ? c.ring : "var(--text-sub)" }}>{c.icon}</div>
-                    <span className="cat-pill-label">{c.label}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          )
+        }
 
         {/* 6. Results Sheet (Glass) */}
-        {canShowResultsPanel && (
-          <div className="glass-panel results-sheet">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 18 }}>Discover Local Gems</div>
-                <div style={{ fontSize: 13, color: "var(--text-sub)" }}>{resultsPois.length} curated spots found</div>
+        {
+          canShowResultsPanel && (
+            <div className="glass-panel results-sheet">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 18 }}>Discover Local Gems</div>
+                  <div style={{ fontSize: 13, color: "var(--text-sub)" }}>{resultsPois.length} curated spots found</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {user && !activeRoute && (
+                    <Button
+                      type="primary"
+                      shape="round"
+                      onClick={() => {
+                        if (poiLoading || poiStreamLoading) {
+                          toast.warning({ title: "Please wait", message: "All places in the area must finish loading before creating a route." });
+                          return;
+                        }
+                        openPolygonRouteParams();
+                      }}
+                      className={`vivid-create-route-btn-glass${poiLoading || poiStreamLoading ? " vivid-create-route-btn-loading" : ""}`}
+                    >
+                      Create AI Route
+                    </Button>
+                  )}
+                  <Button type="text" icon={<CloseOutlined />} onClick={clearSelectionOnly} />
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {user && !activeRoute && (
-                  <Button
-                    type="primary"
-                    shape="round"
-                    onClick={() => {
-                      if (poiLoading || poiStreamLoading) {
-                        toast.warning({ title: "Please wait", message: "All places in the area must finish loading before creating a route." });
-                        return;
-                      }
-                      openPolygonRouteParams();
-                    }}
-                    className={`vivid-create-route-btn-glass${poiLoading || poiStreamLoading ? " vivid-create-route-btn-loading" : ""}`}
-                  >
-                    Create AI Route
-                  </Button>
-                )}
-                <Button type="text" icon={<CloseOutlined />} onClick={clearSelectionOnly} />
-              </div>
-            </div>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                marginBottom: 4,
-              }}
-            >
               <div
-                ref={resultsTabsScrollRef}
                 style={{
-                  flex: 1,
-                  minWidth: 0,
                   display: "flex",
-                  gap: 10,
-                  overflowX: "auto",
-                  paddingBottom: 12,
+                  alignItems: "center",
+                  gap: 12,
+                  marginBottom: 4,
                 }}
               >
-                {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...resultsCategories].map(t => {
-                  const active = resultsTab === t.key;
-                  return (
-                    <button key={t.key} type="button" data-results-tab={t.key} onClick={() => setResultsTab(t.key)}
-                      style={{
-                        flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
-                        border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
-                        background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
-                        color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
-                      }}
-                    >
-                      {t.icon || <GlobalOutlined />} {t.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {poiStreamLoading ? (
                 <div
+                  ref={resultsTabsScrollRef}
                   style={{
-                    flex: "0 0 auto",
+                    flex: 1,
+                    minWidth: 0,
                     display: "flex",
-                    alignItems: "center",
-                    gap: 8,
+                    gap: 10,
+                    overflowX: "auto",
                     paddingBottom: 12,
                   }}
-                  title="More place categories are still loading"
                 >
-                  <Spin size="small" />
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-sub)", whiteSpace: "nowrap" }}>
-                    Loading more…
-                  </span>
+                  {[{ key: "all", label: "Overview", icon: <GlobalOutlined /> }, ...resultsCategories].map(t => {
+                    const active = resultsTab === t.key;
+                    return (
+                      <button key={t.key} type="button" data-results-tab={t.key} onClick={() => setResultsTab(t.key)}
+                        style={{
+                          flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 20,
+                          border: active ? "1px solid var(--vivid-blue)" : "1px solid rgba(0,0,0,0.1)",
+                          background: active ? "rgba(61, 168, 200, 0.1)" : "rgba(255,255,255,0.5)",
+                          color: active ? "var(--vivid-blue)" : "var(--text-main)", fontWeight: 600, cursor: "pointer"
+                        }}
+                      >
+                        {t.icon || <GlobalOutlined />} {t.label}
+                      </button>
+                    );
+                  })}
                 </div>
-              ) : null}
-            </div>
+                {poiStreamLoading ? (
+                  <div
+                    style={{
+                      flex: "0 0 auto",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      paddingBottom: 12,
+                    }}
+                    title="More place categories are still loading"
+                  >
+                    <Spin size="small" />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-sub)", whiteSpace: "nowrap" }}>
+                      Loading more…
+                    </span>
+                  </div>
+                ) : null}
+              </div>
 
-            <div style={{ height: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4, display: "flex", flexDirection: "column" }}>
-              {poiLoading ? (
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, opacity: 0.8 }}>
-                  <Spin size="large" />
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sub)" }}>Finding nearby gems...</div>
-                </div>
-              ) : resultsPois.length > 0 ? (
-                resultsPois.map((p) => {
-                  const favRowKey = getMapPoiRowKey(p);
-                  const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
-                  return (
-                    <div key={favRowKey} style={{
-                      display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
-                      borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
-                      marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
-                      backdropFilter: "blur(4px)",
-                      flexShrink: 0
-                    }}>
-                      <div style={{
-                        width: 48, height: 48, borderRadius: 14,
-                        background: "rgba(255,255,255,0.05)",
-                        display: "grid", placeItems: "center",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                        border: "1px solid rgba(255,255,255,0.1)"
+              <div style={{ height: resultsMaxHeight, overflowY: "auto", marginTop: 8, paddingRight: 4, display: "flex", flexDirection: "column" }}>
+                {poiLoading ? (
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, opacity: 0.8 }}>
+                    <Spin size="large" />
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-sub)" }}>Finding nearby gems...</div>
+                  </div>
+                ) : resultsPois.length > 0 ? (
+                  resultsPois.map((p) => {
+                    const favRowKey = getMapPoiRowKey(p);
+                    const mapPoiFavored = deriveMapPoiFavorited(feedbackAffinity, p);
+                    return (
+                      <div key={favRowKey} style={{
+                        display: "flex", alignItems: "center", gap: 16, padding: "14px 18px",
+                        borderRadius: 20, background: "rgba(var(--vivid-navy-rgb, 255,255,255), 0.08)",
+                        marginBottom: 10, border: "1px solid rgba(255,255,255,0.06)",
+                        backdropFilter: "blur(4px)",
+                        flexShrink: 0
                       }}>
                         <div style={{
-                          color: poiIconByCategory(p)?.ring,
-                          fontSize: 20,
-                          filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                          width: 48, height: 48, borderRadius: 14,
+                          background: "rgba(255,255,255,0.05)",
+                          display: "grid", placeItems: "center",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                          border: "1px solid rgba(255,255,255,0.1)"
                         }}>
-                          {poiIconByCategory(p)?.icon}
+                          <div style={{
+                            color: poiIconByCategory(p)?.ring,
+                            fontSize: 20,
+                            filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.1))"
+                          }}>
+                            {poiIconByCategory(p)?.icon}
+                          </div>
                         </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
+                          <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p)}</div>
+                        </div>
+                        {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
+                          <Tooltip title={mapPoiFavored ? "Remove favorite" : "Favorite"}>
+                            <button
+                              type="button"
+                              className={`map-poi-fav-hit map-poi-fav-hit--in-sheet${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
+                              aria-label={mapPoiFavored ? "Remove favorite" : "Add favorite"}
+                              aria-pressed={mapPoiFavored}
+                              disabled={favSendingKey === favRowKey}
+                              onClick={() => toggleMapPoiFavorite(p)}
+                            >
+                              {favSendingKey === favRowKey ? (
+                                <Spin size="small" className="map-poi-fav-hit__spin" />
+                              ) : (
+                                <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
+                                  {mapPoiFavored ? (
+                                    <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
+                                  ) : (
+                                    <HeartOutlined className="map-poi-fav-hit__heart" />
+                                  )}
+                                </span>
+                              )}
+                            </button>
+                          </Tooltip>
+                        ) : null}
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, fontSize: 16 }}>{getSafePoiTitle(p)}</div>
-                        <div style={{ fontSize: 12, opacity: 0.7 }}>{labelByCategory(p)}</div>
-                      </div>
-                      {user && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) ? (
-                        <Tooltip title={mapPoiFavored ? "Remove favorite" : "Favorite"}>
-                          <button
-                            type="button"
-                            className={`map-poi-fav-hit map-poi-fav-hit--in-sheet${mapPoiFavored ? " map-poi-fav-hit--active" : ""}`}
-                            aria-label={mapPoiFavored ? "Remove favorite" : "Add favorite"}
-                            aria-pressed={mapPoiFavored}
-                            disabled={favSendingKey === favRowKey}
-                            onClick={() => toggleMapPoiFavorite(p)}
-                          >
-                            {favSendingKey === favRowKey ? (
-                              <Spin size="small" className="map-poi-fav-hit__spin" />
-                            ) : (
-                              <span className="map-poi-fav-hit__icon-wrap" aria-hidden>
-                                {mapPoiFavored ? (
-                                  <HeartFilled className="map-poi-fav-hit__heart map-poi-fav-hit__heart--filled" />
-                                ) : (
-                                  <HeartOutlined className="map-poi-fav-hit__heart" />
-                                )}
-                              </span>
-                            )}
-                          </button>
-                        </Tooltip>
-                      ) : null}
-                    </div>
-                  );
-                })
-              ) : (
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
-                  <GlobalOutlined style={{ fontSize: 32, marginBottom: 12 }} />
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>No results in this area</div>
-                </div>
-              )}
+                    );
+                  })
+                ) : (
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", opacity: 0.5 }}>
+                    <GlobalOutlined style={{ fontSize: 32, marginBottom: 12 }} />
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>No results in this area</div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         <ConfigProvider
           theme={{
@@ -2759,17 +2866,19 @@ export default function MapPage() {
         <BookingSheet open={bookingOpen} onClose={() => setBookingOpen(false)} />
 
         {/* 7. Itinerary/Route Card (RoutePanel) - RESTORED */}
-        {activeRoute && (
-          <RoutePanel
-            route={activeRoute}
-            activeDay={activeDay}
-            onDayChange={setActiveDay}
-            onClose={() => { setActiveRoute(null); setRouteViewActive(false); scheduleViewportFetch(); }}
-            onWaypointClick={handleWaypointClick}
-            onMarkUnavailable={handleMarkUnavailable}
-            onRouteUpdate={setActiveRoute}
-          />
-        )}
+        {
+          activeRoute && (
+            <RoutePanel
+              route={activeRoute}
+              activeDay={activeDay}
+              onDayChange={setActiveDay}
+              onClose={() => { setActiveRoute(null); setRouteViewActive(false); scheduleViewportFetch(); }}
+              onWaypointClick={handleWaypointClick}
+              onMarkUnavailable={handleMarkUnavailable}
+              onRouteUpdate={setActiveRoute}
+            />
+          )
+        }
 
         <VacanzaChat
           isOpen={isChatOpen}
@@ -2837,7 +2946,7 @@ export default function MapPage() {
             }
           }}
         />
-      </main>
-    </div>
+      </main >
+    </div >
   );
 }
