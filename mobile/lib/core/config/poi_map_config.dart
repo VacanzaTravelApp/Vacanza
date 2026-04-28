@@ -9,5 +9,9 @@ class PoiMapConfig {
   );
 
   /// Alan çizimi: web `MIN_ZOOM_FOR_AREA_DRAW` ile aynı.
-  static const double minZoomForAreaDraw = 13.0;
+  static const double minZoomForAreaDraw = 11.0;
+
+  /// Alan çizimi: web `MAX_ZOOM_FOR_AREA_DRAW` ile aynı.
+  /// Bu zoom seviyesinden yakın çizim yapılamaz (alan çok küçük kalır).
+  static const double maxZoomForAreaDraw = 18.0;
 }
