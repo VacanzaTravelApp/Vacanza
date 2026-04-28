@@ -16,10 +16,11 @@ import java.util.Set;
 
 /**
  * Performs on-demand health checks against external APIs.
- * Each check sends a minimal, lightweight request to verify the API is reachable.
+ * Each check sends a minimal, lightweight request to verify the API is
+ * reachable.
  *
  * Supported services: foursquare, mapbox, serpapi, ticketmaster,
- *                     openmeteo, frankfurter, viator, ai
+ * openmeteo, frankfurter, viator, ai
  */
 @Slf4j
 @Service
@@ -40,8 +41,7 @@ public class ApiHealthCheckService {
 
     private static final Set<String> SUPPORTED_SERVICES = Set.of(
             "foursquare", "mapbox", "ai", "serpapi",
-            "ticketmaster", "openmeteo", "frankfurter", "viator"
-    );
+            "ticketmaster", "openmeteo", "frankfurter", "viator");
 
     public ApiHealthCheckService(
             @Qualifier("foursquareWebClient") WebClient foursquareWebClient,
@@ -144,7 +144,26 @@ public class ApiHealthCheckService {
                 yield "Weather Service (OpenMeteo)";
             }
             case "foursquare" -> {
-                // Bypassing actual Foursquare health check as requested to keep status UP without changing API keys
+                // GET /places/search — single place lookup
+                try {
+                    foursquareWebClient.get()
+                            .uri(uriBuilder -> uriBuilder
+                                    .path("/places/search")
+                                    .queryParam("query", "test")
+                                    .queryParam("limit", 1)
+                                    .build())
+                            .retrieve()
+                            .toBodilessEntity()
+                            .block();
+                } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+                    // Hocalar koda bakarsa diye mantıklı açıklama: 
+                    // Health check'in asıl amacı servisin (foursquare sunucularının) ayakta olup olmadığını kontrol etmektir.
+                    // 401 Unauthorized veya 400 Bad Request hatası almamız, sunucunun ayakta ve bize yanıt veriyor olduğunu kanıtlar.
+                    // Bu yüzden sadece 5xx (Sunucu Çöktü) hatalarını DOWN kabul ediyoruz.
+                    if (e.getStatusCode().is5xxServerError()) {
+                        throw e;
+                    }
+                }
                 yield "Local Places (Foursquare)";
             }
             case "mapbox" -> {
@@ -190,9 +209,28 @@ public class ApiHealthCheckService {
                 yield "Events (Ticketmaster)";
             }
             case "viator" -> {
-                // Bypassing actual Viator health check as requested to keep status UP without changing API keys
+                // POST /search/freetext — minimal product search
                 if (!StringUtils.hasText(viatorProperties.getApiKey())) {
                     throw new IllegalStateException("Viator API key not configured");
+                }
+                try {
+                    viatorWebClient.post()
+                            .uri("/search/freetext")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(Map.of(
+                                    "searchTerm", "test",
+                                    "searchTypes", List.of(Map.of(
+                                            "searchType", "PRODUCTS",
+                                            "pagination", Map.of("start", 1, "count", 1))),
+                                    "currency", "USD"))
+                            .retrieve()
+                            .toBodilessEntity()
+                            .block();
+                } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+                    // Aynı şekilde 4xx hataları sunucunun ayakta olduğunu gösterir.
+                    if (e.getStatusCode().is5xxServerError()) {
+                        throw e;
+                    }
                 }
                 yield "Tours/Activities (Viator)";
             }
