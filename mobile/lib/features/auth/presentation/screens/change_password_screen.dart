@@ -31,6 +31,24 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     super.dispose();
   }
 
+  static String _mapPasswordError(String code) {
+    switch (code) {
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'The current password is incorrect.';
+      case 'weak-password':
+        return 'The new password is too weak. Use at least 6 characters.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again later.';
+      case 'requires-recent-login':
+        return 'Please sign out and sign in again before changing your password.';
+      case 'network-request-failed':
+        return 'No internet connection. Please check your connection and try again.';
+      default:
+        return 'Could not update password. Please try again.';
+    }
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
@@ -67,7 +85,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Could not update password.')),
+          SnackBar(content: Text(_mapPasswordError(e.code))),
         );
     } catch (e) {
       dev.log('[Auth] change password error $e', name: 'Auth');

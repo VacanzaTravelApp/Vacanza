@@ -38,6 +38,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
+  static String _mapResetError(String code) {
+    switch (code) {
+      case 'user-not-found':
+      case 'invalid-email':
+        return 'No account found with this email address.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again later.';
+      case 'network-request-failed':
+        return 'No internet connection. Please check your connection and try again.';
+      default:
+        return 'Could not send reset email. Please try again.';
+    }
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
@@ -65,7 +79,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text(e.message ?? 'Could not send reset email.'),
+            content: Text(_mapResetError(e.code)),
             behavior: SnackBarBehavior.floating,
           ),
         );
