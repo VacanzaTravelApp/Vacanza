@@ -34,6 +34,16 @@ public class PoiController {
         this.poiStreamExecutor = poiStreamExecutor;
     }
 
+    private static boolean isClientDisconnected(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            String cn = t.getClass().getName();
+            if (cn.contains("AsyncRequestNotUsableException") || cn.contains("EofException")) return true;
+            String msg = t.getMessage();
+            if (msg != null && (msg.contains("Broken pipe") || msg.contains("Connection reset"))) return true;
+        }
+        return false;
+    }
+
     @PostMapping("/search-in-area")
     public ResponseEntity<PoiSearchInAreaResponseDTO> searchInArea(@RequestBody PoiSearchInAreaRequestDTO req) {
         return new ResponseEntity<>(poiSearchService.searchInArea(req), HttpStatus.OK);
@@ -65,8 +75,13 @@ public class PoiController {
                 });
                 emitter.complete();
             } catch (Exception e) {
-                log.warn("[POI SSE] failed: {}", e.toString());
-                emitter.completeWithError(e);
+                if (isClientDisconnected(e)) {
+                    log.debug("[POI SSE] client disconnected mid-stream");
+                    emitter.complete();
+                } else {
+                    log.warn("[POI SSE] failed: {}", e.toString());
+                    emitter.completeWithError(e);
+                }
             }
         });
         return emitter;
