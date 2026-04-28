@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.text.Normalizer;
@@ -171,24 +172,34 @@ public class MapboxPoiSearchClient {
     public List<PoiResult> searchByCategoryTiled(String category,
             double minLon, double minLat, double maxLon, double maxLat, int gridN) {
         int n = Math.max(1, Math.min(gridN, 8));
-        Map<String, PoiResult> dedup = new LinkedHashMap<>();
         double dLon = (maxLon - minLon) / n;
         double dLat = (maxLat - minLat) / n;
         if (dLon <= 0 || dLat <= 0) {
             return List.of();
         }
+
+        List<Mono<List<PoiResult>>> tileCalls = new ArrayList<>(n * n);
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
                 double cMinLon = minLon + j * dLon;
                 double cMinLat = minLat + i * dLat;
                 double cMaxLon = (j == n - 1) ? maxLon : minLon + (j + 1) * dLon;
                 double cMaxLat = (i == n - 1) ? maxLat : minLat + (i + 1) * dLat;
-                List<PoiResult> batch = searchByCategory(category, cMinLon, cMinLat, cMaxLon, cMaxLat)
-                        .blockOptional()
-                        .orElse(List.of());
+                tileCalls.add(searchByCategory(category, cMinLon, cMinLat, cMaxLon, cMaxLat));
+            }
+        }
+
+        // Fire all tile calls concurrently; collect and deduplicate results.
+        List<List<PoiResult>> allBatches = Flux.fromIterable(tileCalls)
+                .flatMap(m -> m, n * n)
+                .collectList()
+                .block();
+
+        Map<String, PoiResult> dedup = new LinkedHashMap<>();
+        if (allBatches != null) {
+            for (List<PoiResult> batch : allBatches) {
                 for (PoiResult p : batch) {
-                    if (p == null) continue;
-                    dedup.putIfAbsent(dedupKey(p), p);
+                    if (p != null) dedup.putIfAbsent(dedupKey(p), p);
                 }
             }
         }
