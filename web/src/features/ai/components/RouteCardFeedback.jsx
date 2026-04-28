@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button, DatePicker, Modal } from "antd";
 import { toast } from "../../../components/toast/toast";
+import { getErrorNotificationMessage } from "../../../utils/notifications";
 import {
   LikeOutlined,
   LikeFilled,
@@ -100,7 +101,7 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
       setVote(v);
       // message.success("Thanks, your route preference has been saved.");
     } catch (e) {
-      toast.error({ title: "Feedback not sent", message: e?.friendlyMessage || "Please try again." });
+      toast.error({ title: "Feedback not sent", message: getErrorNotificationMessage(e, "Please try again.") });
     } finally {
       setSending(false);
     }
@@ -141,7 +142,7 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
       if (status === 409) {
         toast.warning({ title: "Already added", message: "This route is already scheduled for that day." });
       } else {
-        toast.error({ title: "Calendar error", message: e?.friendlyMessage || "Couldn't add this route to your calendar." });
+        toast.error({ title: "Calendar error", message: getErrorNotificationMessage(e, "Couldn't add this route to your calendar.") });
       }
     } finally {
       setCalendarSaving(false);

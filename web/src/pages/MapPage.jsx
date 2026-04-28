@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, Spin, Popover, ConfigProvider, theme } from "antd";
 import { toast } from "../components/toast/toast";
+import { getErrorNotificationMessage, pickEnglishNotificationMessage } from "../utils/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   LogoutOutlined,
@@ -827,7 +828,13 @@ export default function MapPage() {
       const detail = await aiApi.getRoute(data.newRouteId);
       const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
       setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? data.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
-      toast.info({ title: "Route updated", message: data.userMessage || "One or more stops were automatically updated." });
+      toast.info({
+        title: "Route updated",
+        message: pickEnglishNotificationMessage(
+          data.userMessage,
+          "One or more stops were automatically updated."
+        ),
+      });
     } catch {
       // silently ignore — route will update on next manual refresh
     }
@@ -1169,7 +1176,10 @@ export default function MapPage() {
         await queryClient.invalidateQueries({ queryKey: ["feedback", "saved-pois"] });
         // message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
       } catch (e) {
-        toast.error({ title: "Couldn't update", message: e?.friendlyMessage || "Failed to update your favorites. Please try again." });
+        toast.error({
+          title: "Couldn't update",
+          message: getErrorNotificationMessage(e, "Failed to update your favorites. Please try again."),
+        });
       } finally {
         setFavSendingKey(null);
       }
@@ -1558,11 +1568,7 @@ export default function MapPage() {
           toast.warning({ title: "Route unavailable", message: "Couldn't load the route data. Please try again." });
         }
       } catch (e) {
-        const msg =
-          e?.response?.data?.message ||
-          e?.friendlyMessage ||
-          e?.message ||
-          "Failed to create route.";
+        const msg = getErrorNotificationMessage(e, "Failed to create route.");
         toast.error(msg);
       } finally {
         setPolygonRouteSubmitting(false);
@@ -1633,11 +1639,7 @@ export default function MapPage() {
         toast.warning("Could not retrieve route data.");
       }
     } catch (e) {
-      const msg =
-        e?.response?.data?.message ||
-        e?.friendlyMessage ||
-        e?.message ||
-        "Failed to replan day.";
+      const msg = getErrorNotificationMessage(e, "Failed to replan day.");
       toast.error(msg);
     } finally {
       setReplanDaySubmitting(false);
@@ -2833,7 +2835,10 @@ export default function MapPage() {
               setActiveDay(1);
               setIsChatOpen(false);
             } catch (e) {
-              toast.error({ title: "Couldn't load route", message: e?.friendlyMessage || "Please try again." });
+              toast.error({
+                title: "Couldn't load route",
+                message: getErrorNotificationMessage(e, "Please try again."),
+              });
             }
           }}
         />

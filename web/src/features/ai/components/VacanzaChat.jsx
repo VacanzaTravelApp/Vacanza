@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { aiApi } from "../../../api/aiApi";
 import { Spin, Tooltip } from "antd";
 import { toast } from "../../../components/toast/toast";
+import { getErrorNotificationMessage } from "../../../utils/notifications";
 import {
   CloseOutlined,
   CompassOutlined,
@@ -551,7 +552,10 @@ export default function VacanzaChat({
       const history = await loadMessagesForConversation(id);
     } catch (e) {
       console.error(e);
-      toast.error({ title: "Couldn't load messages", message: "Please try again." });
+      toast.error({
+        title: "Couldn't load messages",
+        message: getErrorNotificationMessage(e, "Please try again."),
+      });
     } finally {
       setMessagesLoading(false);
     }

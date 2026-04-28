@@ -43,6 +43,8 @@ import { useUserProfile, useUserStats, useUserCheckins } from "../hooks/useUserP
 import { useProfilePhoto } from "../hooks/useProfilePhoto";
 import { useGamificationProfile } from "../gamification/useGamificationProfile";
 import { userApi } from "../api/userApi";
+import { toast } from "../components/toast/toast";
+import { getErrorNotificationMessage } from "../utils/notifications";
 import dayjs from "dayjs";
 import CalendarModal from "./CalendarModal";
 import defaultAvatar from "../assets/default-avatar.png";
@@ -856,7 +858,10 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
         },
         onError: (err) => {
             setOptimisticPhotoUrl(null); // Revert on error
-            toast.error({ title: "Upload failed", message: err?.friendlyMessage || "Couldn't upload your photo. Please try again." });
+            toast.error({
+                title: "Upload failed",
+                message: getErrorNotificationMessage(err, "Couldn't upload your photo. Please try again.")
+            });
         }
     });
 
@@ -873,7 +878,10 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
         },
         onError: (err) => {
             setOptimisticPhotoUrl(null);
-            toast.error({ title: "Couldn't remove photo", message: err?.friendlyMessage || "Please try again." });
+            toast.error({
+                title: "Couldn't remove photo",
+                message: getErrorNotificationMessage(err, "Please try again.")
+            });
         }
     });
 
@@ -894,7 +902,10 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
             setView('MAIN');
         },
         onError: (err) => {
-            toast.error({ title: "Update failed", message: err?.friendlyMessage || "Couldn't save your profile changes. Please try again." });
+            toast.error({
+                title: "Update failed",
+                message: getErrorNotificationMessage(err, "Couldn't save your profile changes. Please try again.")
+            });
         }
     });
 

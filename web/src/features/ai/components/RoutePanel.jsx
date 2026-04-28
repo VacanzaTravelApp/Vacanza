@@ -10,6 +10,7 @@ import { aiApi } from "../../../api/aiApi";
 import { createTripCalendarEvent, exportRouteICS } from "../../../api/tripCalendarApi";
 import { Tooltip } from "antd";
 import { toast } from "../../../components/toast/toast";
+import { getErrorNotificationMessage } from "../../../utils/notifications";
 import { Rnd } from "react-rnd";
 import "../styles/routePanel.css";
 
@@ -206,7 +207,7 @@ export default function RoutePanel({
       });
     } catch (err) {
       console.error("Failed to save hotel", err);
-      const msg = err?.friendlyMessage || err?.response?.data?.message || err?.message || "Failed to save hotel.";
+      const msg = getErrorNotificationMessage(err, "Failed to save hotel.");
       setHotelError(msg);
     } finally {
       setSavingHotel(false);
@@ -222,7 +223,7 @@ export default function RoutePanel({
       onRouteUpdate?.({ ...route, selectedHotel: null });
     } catch (err) {
       console.error("Failed to remove hotel", err);
-      const msg = err?.friendlyMessage || err?.response?.data?.message || err?.message || "Failed to remove hotel.";
+      const msg = getErrorNotificationMessage(err, "Failed to remove hotel.");
       setHotelError(msg);
     } finally {
       setSavingHotel(false);
