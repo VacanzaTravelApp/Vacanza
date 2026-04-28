@@ -123,14 +123,6 @@ export default function RouteCardFeedback({ route, storageKey, routeId, initialD
         routeId,
         eventDate: calendarDate.format("YYYY-MM-DD"),
       });
-      const n = Array.isArray(created) ? created.length : 1;
-      /*
-      message.success(
-        n > 1
-          ? `${n} days added to your calendar (Day 1–${n}).`
-          : "Route added to your calendar."
-      );
-      */
       try {
         window.dispatchEvent(new CustomEvent("vacanza-trip-calendar-changed"));
       } catch {

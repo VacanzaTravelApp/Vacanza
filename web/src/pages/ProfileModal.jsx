@@ -36,7 +36,6 @@ import {
     ShopOutlined,
     DeleteOutlined
 } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useUserPreferences } from "../hooks/useUserPreferences";
 import { useUserProfile, useUserStats, useUserCheckins } from "../hooks/useUserProfileData";
@@ -395,21 +394,11 @@ const GamificationView = ({ gamification, setView, onClose, isDarkMode = true })
                         onClick={() => setView('MAIN')}
                     />
                     <div style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                        <div style={{ fontSize: 12, fontWeight: 900, color: "var(--theme-primary)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: "var(--theme-primary)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 2 }}>
                             Experience
                         </div>
                         <div style={{ fontFamily: "var(--font-display)", fontVariationSettings: "'SOFT' 80, 'WONK' 1", fontSize: 22, fontWeight: 800, color: "var(--card-text, #1c1c1e)", letterSpacing: "-0.5px" }}>Level and Badges</div>
                     </div>
-                    <Button
-                        icon={<CloseOutlined style={{ fontSize: 14 }} />}
-                        type="text"
-                        style={{
-                            position: "absolute", right: -8, color: "var(--card-text)", padding: 0, width: 36, height: 36,
-                            borderRadius: "50%", background: "var(--card-border, rgba(128,128,128,0.1))",
-                            display: "flex", alignItems: "center", justifyContent: "center"
-                        }}
-                        onClick={onClose}
-                    />
                 </div>
             </div>
 
@@ -562,16 +551,6 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                             <div style={{ fontFamily: "var(--font-display)", fontVariationSettings: "'SOFT' 80, 'WONK' 1", fontSize: 22, fontWeight: 800, color: "var(--text-main, #FFFFFF)", letterSpacing: "-0.5px" }}>Edit Profile</div>
                         </div>
                     </div>
-                    <Button
-                        icon={<CloseOutlined style={{ fontSize: 14 }} />}
-                        type="text"
-                        style={{
-                            color: "var(--card-text)", padding: 0, width: 36, height: 36,
-                            borderRadius: "50%", background: "var(--card-border, rgba(128,128,128,0.1))",
-                            display: "flex", alignItems: "center", justifyContent: "center"
-                        }}
-                        onClick={onClose}
-                    />
                 </div>
             </div>
 
@@ -611,7 +590,7 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
                     </div>
                 </div>
 
-                {profile?.hasProfilePhoto && (
+                {(profile?.hasProfilePhoto || (!!profilePhotoUrl && profilePhotoUrl !== defaultAvatar)) && (
                     <div style={{ textAlign: "center", marginBottom: 32, marginTop: -20 }}>
                         <Button
                             type="text"
@@ -828,7 +807,6 @@ const EditProfileView = ({ profile, user, setView, onClose, updateMutation, uplo
 };
 
 const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPreferences, onOpenCalendar }) => {
-    const navigate = useNavigate();
     const queryClient = useQueryClient();
     const [view, setView] = useState('MAIN');
 
@@ -847,16 +825,47 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
             return userApi.uploadPhoto(formData);
         },
         onMutate: (file) => {
-            // Instantly show the selected image
             const previewUrl = URL.createObjectURL(file);
+            const previousPhotoUrl = queryClient.getQueryData(["user", "photo"]);
+            const previousProfile = queryClient.getQueryData(["user", "profile"]);
+
             setOptimisticPhotoUrl(previewUrl);
+            queryClient.setQueryData(["user", "photo"], previewUrl);
+            queryClient.setQueryData(["user", "profile"], (currentProfile) => {
+                if (!currentProfile) return currentProfile;
+                return {
+                    ...currentProfile,
+                    hasProfilePhoto: true,
+                    profileImageUrl: previewUrl,
+                };
+            });
+
+            return { previewUrl, previousPhotoUrl, previousProfile };
         },
-        onSuccess: () => {
+        onSuccess: (_data, _variables, context) => {
+            if (context?.previewUrl) {
+                queryClient.setQueryData(["user", "photo"], context.previewUrl);
+            }
+            queryClient.setQueryData(["user", "profile"], (currentProfile) => {
+                if (!currentProfile) return currentProfile;
+                return {
+                    ...currentProfile,
+                    hasProfilePhoto: true,
+                    profileImageUrl: context?.previewUrl || currentProfile.profileImageUrl,
+                };
+            });
+            setOptimisticPhotoUrl(null);
             queryClient.invalidateQueries(["user", "profile"]);
             queryClient.invalidateQueries(["user", "photo"]);
             // message.success("Profile photo updated!");
         },
-        onError: (err) => {
+        onError: (err, _variables, context) => {
+            if (context?.previousPhotoUrl !== undefined) {
+                queryClient.setQueryData(["user", "photo"], context.previousPhotoUrl);
+            }
+            if (context?.previousProfile !== undefined) {
+                queryClient.setQueryData(["user", "profile"], context.previousProfile);
+            }
             setOptimisticPhotoUrl(null); // Revert on error
             toast.error({
                 title: "Upload failed",
@@ -868,15 +877,33 @@ const ProfileModal = ({ open, onClose, user, themeClass, isDarkMode, onOpenPrefe
     const deletePhotoMutation = useMutation({
         mutationFn: () => userApi.deletePhoto(),
         onMutate: () => {
+            const previousPhotoUrl = queryClient.getQueryData(["user", "photo"]);
+            const previousProfile = queryClient.getQueryData(["user", "profile"]);
+
             setOptimisticPhotoUrl(defaultAvatar);
+            queryClient.setQueryData(["user", "photo"], null);
+            localStorage.removeItem("profilePhotoBase64");
+            queryClient.setQueryData(["user", "profile"], (currentProfile) => {
+                if (!currentProfile) return currentProfile;
+                return {
+                    ...currentProfile,
+                    hasProfilePhoto: false,
+                    profileImageUrl: null,
+                };
+            });
+
+            return { previousPhotoUrl, previousProfile };
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(["user", "profile"]);
-            queryClient.invalidateQueries(["user", "photo"]);
             setOptimisticPhotoUrl(null);
-            // message.success("Photo removed");
         },
-        onError: (err) => {
+        onError: (err, _variables, context) => {
+            if (context?.previousPhotoUrl !== undefined) {
+                queryClient.setQueryData(["user", "photo"], context.previousPhotoUrl);
+            }
+            if (context?.previousProfile !== undefined) {
+                queryClient.setQueryData(["user", "profile"], context.previousProfile);
+            }
             setOptimisticPhotoUrl(null);
             toast.error({
                 title: "Couldn't remove photo",

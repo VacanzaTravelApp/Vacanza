@@ -665,23 +665,7 @@ export default function VacanzaChat({
         const extractedPrefs =
           response.extracted_preferences ?? response.extractedPreferences ?? null;
         if (Array.isArray(extractedPrefs) && extractedPrefs.length > 0) {
-          const snippets = extractedPrefs
-            .map((p) => p.preference_value ?? p.preferenceValue)
-            .filter((v) => v != null && String(v).trim() !== "")
-            .map((v) => {
-              const s = String(v).trim();
-              return s.length > 48 ? `${s.slice(0, 45)}…` : s;
-            })
-            .slice(0, 2);
-          const more =
-            extractedPrefs.length > 2 ? ` (+${extractedPrefs.length - 2})` : "";
-          /*
-          message.success(
-            snippets.length > 0
-              ? `Preferences saved: ${snippets.join(" · ")}${more}`
-              : `${extractedPrefs.length} preferences saved to your profile.`
-          );
-          */
+          // Preferences are still extracted and persisted, but no success popup is shown.
         }
       }
       await refreshConversations();
