@@ -228,14 +228,26 @@ class AreaResultsSheet extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // handle bar
+                // Gradient accent hairline
+                SizedBox(
+                  height: 3,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: t.accentGradient),
+                    ),
+                  ),
+                ),
+
+                // Handle bar
                 const SizedBox(height: 10),
-                Container(
-                  width: 46,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: t.textSub.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(8),
+                Center(
+                  child: Container(
+                    width: 46,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: t.textSub.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -343,36 +355,39 @@ class _ChipBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final allSelected = activeChipKey == null;
     final t = context.vacanzaTokens;
-    final accent = Theme.of(context).colorScheme.primary;
+    final accent = context.mapControlAccent;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return SizedBox(
-      height: 46,
+      height: 50,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(12, 2, 12, 10),
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
         children: [
           _buildChip(
             t: t,
             label: 'All',
-            icon: Icons.apps_rounded,
+            icon: Icons.travel_explore_rounded,
             color: accent,
             selected: allSelected,
+            isLight: isLight,
             onTap: () => onChipSelected(null),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 7),
 
           ...chips.map((key) {
             final k = key.trim().toLowerCase();
             final selected = !allSelected && activeChipKey == k;
 
             return Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.only(right: 7),
               child: _buildChip(
                 t: t,
                 label: labelFor(k),
                 icon: iconFor(k),
                 color: colorFor(k),
                 selected: selected,
+                isLight: isLight,
                 onTap: () => onChipSelected(k),
               ),
             );
@@ -388,35 +403,66 @@ class _ChipBar extends StatelessWidget {
     required IconData icon,
     required Color color,
     required bool selected,
+    required bool isLight,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return Material(
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? color.withValues(alpha: 0.14) : t.pillSurface,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected ? color.withValues(alpha: 0.45) : t.cardBorder,
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16, color: selected ? color : t.textSub),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: selected ? t.textMain : t.textSub,
-              ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        splashColor: color.withValues(alpha: 0.12),
+        highlightColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            gradient: selected
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      color.withValues(alpha: isLight ? 0.18 : 0.22),
+                      color.withValues(alpha: isLight ? 0.10 : 0.12),
+                    ],
+                  )
+                : null,
+            color: selected ? null : t.pillSurface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? color.withValues(alpha: isLight ? 0.50 : 0.55)
+                  : t.cardBorder,
+              width: selected ? 1.2 : 1,
             ),
-          ],
+            boxShadow: selected && !isLight
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.18),
+                      blurRadius: 8,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color: selected ? color : t.textSub.withValues(alpha: 0.75),
+              ),
+              const SizedBox(width: 7),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: selected ? color : t.textSub,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
