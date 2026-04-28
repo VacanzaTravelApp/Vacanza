@@ -402,6 +402,8 @@ export default function VacanzaChat({
   const [currentTip, setCurrentTip] = useState(null);
   const tipPoolRef = useRef([]);
   const tipIndexRef = useRef(0);
+  const pollIntervalRef = useRef(null);
+  const [pollingForRoute, setPollingForRoute] = useState(false);
 
   const ticketStateKey = (msgId, rIdx) => `${msgId}-r${rIdx}`;
 
@@ -419,6 +421,17 @@ export default function VacanzaChat({
       setTicketLoadingByKey((prev) => ({ ...prev, [key]: false }));
     }
   }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    setPollingForRoute(false);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
 
   const scrollToBottom = () => {
     const el = scrollContainerRef.current;
@@ -458,6 +471,31 @@ export default function VacanzaChat({
       setMessages(mergeHistoryWithSavedRoutes(history, routeDetails));
     }
   }, []);
+
+  const startPollingForRoute = useCallback((convId, sentAtMs) => {
+    setPollingForRoute(true);
+    let tries = 0;
+    pollIntervalRef.current = setInterval(async () => {
+      tries += 1;
+      if (tries > 24) {
+        stopPolling();
+        toast.error({ title: "Request timed out", message: "Route generation took too long. Please try again." });
+        return;
+      }
+      try {
+        const routes = await aiApi.getRoutesForConversation(convId);
+        const hasNew = routes.some((r) => {
+          const t = routeGeneratedAtMs(r);
+          return t > 0 && t >= sentAtMs - 10_000;
+        });
+        if (hasNew) {
+          stopPolling();
+          await loadMessagesForConversation(convId);
+          await refreshConversations();
+        }
+      } catch { /* keep polling */ }
+    }, 5000);
+  }, [stopPolling, loadMessagesForConversation, refreshConversations]);
 
   useEffect(() => {
     if (isOpen) {
@@ -579,6 +617,7 @@ export default function VacanzaChat({
     const textToSend = (customText || inputText)?.trim();
     if (!textToSend || loading || messagesLoading) return;
 
+    stopPolling();
     setSendError(false);
     lastSentTextRef.current = textToSend;
     abortControllerRef.current = new AbortController();
@@ -610,6 +649,8 @@ export default function VacanzaChat({
     setMessages((prev) => [...prev, userMsg]);
     setInputText("");
 
+    const sentAtMs = Date.now();
+    let isPolling = false;
     try {
       const response = await aiApi.sendMessage(activeConvId, textToSend, { signal, includeFavorites });
       if (response && response.content) {
@@ -675,11 +716,17 @@ export default function VacanzaChat({
         e?.code === "ERR_CANCELED" ||
         e?.name === "AbortError";
       if (!isAbort) {
-        toast.error({ title: "Too many requests", message: "Please wait a moment and try again." });
-        setSendError(true);
+        const status = e?.response?.status;
+        if (status === 504 || status === 502 || status === 503 || !status) {
+          isPolling = true;
+          startPollingForRoute(activeConvId, sentAtMs);
+        } else {
+          toast.error({ title: "Too many requests", message: "Please wait a moment and try again." });
+          setSendError(true);
+        }
       }
     } finally {
-      setLoading(false);
+      if (!isPolling) setLoading(false);
     }
   };
 
@@ -1129,7 +1176,7 @@ export default function VacanzaChat({
                     <div className="message-bubble ai-bubble chat-typing-bubble">
                       <span className="chat-typing-label">
                         <span className="chat-typing-dots" aria-hidden><span /><span /><span /></span>
-                        Thinking…
+                        {pollingForRoute ? "Finalizing your route…" : "Thinking…"}
                       </span>
                       {currentTip && (
                         <div className="chat-tip-card" key={currentTip.tip}>
