@@ -20,10 +20,13 @@ class SetDrawingEnabled extends MapEvent {
   SetDrawingEnabled(this.enabled);
 }
 
-/// Mevcut kamera zoom'u alan çizimi için yeterli mi (web [PoiMapConfig] ile aynı eşik).
+/// Kamera zoom'u alan çizimi için uygun aralıkta mı?
+/// [ok]: zoom [minZoomForAreaDraw, maxZoomForAreaDraw] içinde.
+/// [tooHigh]: zoom > maxZoomForAreaDraw (çok yakın — küçük alan).
 class AreaDrawZoomOkChanged extends MapEvent {
-  const AreaDrawZoomOkChanged(this.ok);
+  const AreaDrawZoomOkChanged({required this.ok, required this.tooHigh});
   final bool ok;
+  final bool tooHigh;
 }
 
 /// Harita taban stilini döngüsel değiştirir: streets → dark → satellite.

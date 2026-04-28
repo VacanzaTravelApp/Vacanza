@@ -112,9 +112,13 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     AreaDrawZoomOkChanged event,
     Emitter<MapState> emit,
   ) {
-    if (state.areaDrawZoomOk == event.ok) return;
-    emit(state.copyWith(areaDrawZoomOk: event.ok));
-    log('[MapBloc] AreaDrawZoomOkChanged -> areaDrawZoomOk=${event.ok}');
+    if (state.areaDrawZoomOk == event.ok &&
+        state.areaDrawZoomTooHigh == event.tooHigh) return;
+    emit(state.copyWith(
+      areaDrawZoomOk: event.ok,
+      areaDrawZoomTooHigh: event.tooHigh,
+    ));
+    log('[MapBloc] AreaDrawZoomOkChanged -> ok=${event.ok} tooHigh=${event.tooHigh}');
   }
 
   void _onSyncBasemapToAppTheme(

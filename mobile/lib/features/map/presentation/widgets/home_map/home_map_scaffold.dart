@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:mobile/core/theme/app_theme.dart';
 
 import 'package:mobile/features/map/presentation/widgets/home_map/mapbox/map_canvas_mapbox.dart';
 import 'package:mobile/features/map/presentation/widgets/home_map/action_icon_button.dart';
@@ -23,6 +24,7 @@ class HomeMapScaffold extends StatelessWidget {
   final MapPerspective perspective;
   final bool isDrawing;
   final bool areaDrawZoomOk;
+  final bool areaDrawZoomTooHigh;
 
   final VoidCallback onCycleBasemap;
   final VoidCallback onTogglePerspective;
@@ -84,6 +86,7 @@ class HomeMapScaffold extends StatelessWidget {
     required this.perspective,
     required this.isDrawing,
     required this.areaDrawZoomOk,
+    this.areaDrawZoomTooHigh = false,
     required this.onCycleBasemap,
     required this.onTogglePerspective,
     required this.onRecenter,
@@ -203,6 +206,7 @@ class HomeMapScaffold extends StatelessWidget {
               perspective: perspective,
               isDrawing: isDrawing,
               areaDrawZoomOk: areaDrawZoomOk,
+              areaDrawZoomTooHigh: areaDrawZoomTooHigh,
               onToggleDrawing: onToggleDrawing,
               onOpenSavedPlaces: onOpenSavedPlaces,
               onOpenFilters: onOpenFilters,
@@ -299,7 +303,156 @@ class HomeMapScaffold extends StatelessWidget {
               top: padding.top + 56,
               child: AnimatedRouteSheetEntrance(child: routeSheet!),
             ),
+
+          // ================= DRAW ZOOM GATE (çizerken zoom aralığı dışına çıkınca) =================
+          if (isDrawing && !areaDrawZoomOk)
+            _DrawZoomGateOverlay(tooHigh: areaDrawZoomTooHigh),
         ],
+      ),
+    );
+  }
+}
+
+/// Web `map-draw-zoom-gate` ile eşdeğer: çizim modundayken zoom aralığı dışına
+/// çıkılınca haritanın üstünde beliren yarı-saydam uyarı paneli.
+/// Pointer olaylarını geçirir — kullanıcı haritayı zoom'layabilir.
+class _DrawZoomGateOverlay extends StatelessWidget {
+  final bool tooHigh;
+  const _DrawZoomGateOverlay({required this.tooHigh});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.vacanzaTokens;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final accent = context.mapControlAccent;
+
+    final title = tooHigh ? 'Zoom out to draw' : 'Zoom in to draw';
+    final body = tooHigh
+        ? "You're too zoomed in — zoom out a bit to select a meaningful area."
+        : 'This tool is for neighbourhoods and districts. Zoom in until the warning disappears, then sketch your area.';
+    final icon = tooHigh ? Icons.zoom_out_map_rounded : Icons.zoom_in_map_rounded;
+
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: true,
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 2.5, sigmaY: 2.5),
+            child: Container(
+              color: isLight
+                  ? Colors.white.withValues(alpha: 0.18)
+                  : const Color(0xFF020617).withValues(alpha: 0.42),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 340),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+                      decoration: BoxDecoration(
+                        color: isLight
+                            ? context.lightGlassPanelColor
+                            : t.glassBg,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isLight
+                              ? accent.withValues(alpha: 0.22)
+                              : t.cardBorder,
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: isLight ? 0.10 : 0.35,
+                            ),
+                            blurRadius: 32,
+                            offset: const Offset(0, 12),
+                          ),
+                          if (!isLight)
+                            BoxShadow(
+                              color: accent.withValues(alpha: 0.12),
+                              blurRadius: 24,
+                            ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Gradient accent hairline
+                          SizedBox(
+                            height: 3,
+                            width: double.infinity,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: t.accentGradient,
+                                ),
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(20),
+                                  topRight: Radius.circular(20),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Icon
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: accent.withValues(
+                                alpha: isLight ? 0.10 : 0.14,
+                              ),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: accent.withValues(
+                                  alpha: isLight ? 0.22 : 0.32,
+                                ),
+                                width: 1,
+                              ),
+                              boxShadow: isLight
+                                  ? null
+                                  : [
+                                      BoxShadow(
+                                        color: accent.withValues(alpha: 0.22),
+                                        blurRadius: 14,
+                                      ),
+                                    ],
+                            ),
+                            child: Icon(icon, size: 26, color: accent),
+                          ),
+                          const SizedBox(height: 16),
+
+                          Text(
+                            title,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              color: t.textMain,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            body,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              height: 1.45,
+                              color: t.textSub,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

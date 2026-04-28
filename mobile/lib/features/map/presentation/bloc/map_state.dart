@@ -22,8 +22,11 @@ class MapState {
   final bool isDrawing;
   final int refreshViewportTick;
 
-  /// `true` when camera zoom is at/above [PoiMapConfig.minZoomForAreaDraw].
+  /// `true` when camera zoom is within [PoiMapConfig.minZoomForAreaDraw]..[PoiMapConfig.maxZoomForAreaDraw].
   final bool areaDrawZoomOk;
+
+  /// `true` when camera zoom exceeds [PoiMapConfig.maxZoomForAreaDraw] (too close to draw a meaningful area).
+  final bool areaDrawZoomTooHigh;
 
   const MapState({
     required this.basemap,
@@ -44,6 +47,7 @@ class MapState {
     this.lastErrorMessage,
     this.refreshViewportTick = 0,
     this.areaDrawZoomOk = true,
+    this.areaDrawZoomTooHigh = false,
   });
 
   factory MapState.initial() => const MapState(
@@ -65,6 +69,7 @@ class MapState {
     isDrawing: false,
     refreshViewportTick: 0,
     areaDrawZoomOk: true,
+    areaDrawZoomTooHigh: false,
   );
 
   MapState copyWith({
@@ -86,6 +91,7 @@ class MapState {
     bool? isDrawing,
     int? refreshViewportTick,
     bool? areaDrawZoomOk,
+    bool? areaDrawZoomTooHigh,
   }) {
     return MapState(
       basemap: basemap ?? this.basemap,
@@ -106,6 +112,7 @@ class MapState {
       isDrawing: isDrawing ?? this.isDrawing,
       refreshViewportTick: refreshViewportTick ?? this.refreshViewportTick,
       areaDrawZoomOk: areaDrawZoomOk ?? this.areaDrawZoomOk,
+      areaDrawZoomTooHigh: areaDrawZoomTooHigh ?? this.areaDrawZoomTooHigh,
     );
   }
 }
