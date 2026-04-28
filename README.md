@@ -1,5 +1,7 @@
 # Vacanza — AI-Powered Travel Planning Platform
 
+> **📁 Project Assets (designs, docs, media):** [Google Drive](https://drive.google.com/drive/folders/1G7XVxhCo5CTIcgqupdS9eRUt3uzgTTFB?usp=sharing)
+
 Vacanza is a full-stack travel planning platform that generates personalized multi-day trip itineraries using AI. Users describe their destination, travel style, and preferences in natural language; the system produces a route on an interactive map complete with waypoints, weather forecasts, hotel suggestions, live event recommendations, and activity booking options.
 
 ---
