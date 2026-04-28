@@ -236,11 +236,15 @@ public class TicketmasterResponse {
                 builder.fullAddress(address);
             }
             if (venue.getLocation() != null) {
-                try {
-                    builder.latitude(Double.parseDouble(venue.getLocation().getLatitude()));
-                    builder.longitude(Double.parseDouble(venue.getLocation().getLongitude()));
-                } catch (NumberFormatException e) {
-                    // Skip coordinates if parsing fails
+                String lat = venue.getLocation().getLatitude();
+                String lon = venue.getLocation().getLongitude();
+                if (lat != null && lon != null) {
+                    try {
+                        builder.latitude(Double.parseDouble(lat));
+                        builder.longitude(Double.parseDouble(lon));
+                    } catch (NumberFormatException e) {
+                        // Skip coordinates if parsing fails
+                    }
                 }
             }
         }
