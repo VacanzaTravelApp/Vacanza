@@ -1,19 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Layout, Button, Card, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, Spin, Popover, ConfigProvider, theme } from "antd";
+import { Button, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, Spin, Popover, ConfigProvider, theme } from "antd";
 import { toast } from "../components/toast/toast";
+import { getErrorNotificationMessage, pickEnglishNotificationMessage } from "../utils/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  LogoutOutlined,
   GlobalOutlined,
-  HeatMapOutlined,
-  InfoCircleOutlined,
   CalendarOutlined,
   SunOutlined,
   MoonOutlined,
   UserOutlined,
   CompassOutlined,
   CloseOutlined,
-  ControlOutlined,
   HeartOutlined,
   HeartFilled,
   AimOutlined,
@@ -26,7 +23,7 @@ import webIcon from "../web-icon.svg";
 import MapGL, { NavigationControl, Marker, Source, Layer } from "react-map-gl";
 
 import { auth } from "../firebase";
-import { onAuthStateChanged, signOut, sendEmailVerification } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useGamificationProfile } from "../gamification/useGamification";
 import { useUserProfile } from "../hooks/useUserProfileData";
 import { useProfilePhoto } from "../hooks/useProfilePhoto";
@@ -50,16 +47,6 @@ import { buildMapPoiFeedbackPayload, deriveMapPoiFavorited } from "../features/a
 import "./MapPage.css";
 
 
-
-const { Header, Content, Footer } = Layout;
-
-const INITIAL_VIEW_STATE = {
-  longitude: 32.8200,
-  latitude: 39.8950,
-  zoom: 11.5,
-  bearing: 0,
-  pitch: 0,
-};
 
 const STYLES = [
   "mapbox://styles/mapbox/streets-v12",          // 0: Day (Streets)
@@ -162,7 +149,6 @@ const SettingsIcon = () => (
 );
 
 // Results panel haritayı kapatmasın diye padding hesabında kullanıyoruz
-const RESULTS_PANEL_APPROX_HEIGHT_DESKTOP = 320;
 const FILTER_PANEL_APPROX_WIDTH_DESKTOP = 320;
 
 /**
@@ -183,9 +169,6 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
-function normalizeCategory(raw) {
-  return String(raw || "").trim().toLowerCase();
-}
 
 /** Map filter keys → backend /chat/routes/from-polygon category strings (MapboxPoiSearchClient). */
 const UI_KEY_TO_BACKEND_CATEGORY = {
@@ -465,7 +448,7 @@ function getSafePoiTitle(p) {
 
   if (hasValidName) return rawName;
 
-  const label = labelByCategory(p?.category);
+  const label = labelByCategory(p);
   if (label) return label;
 
   const cat = (p?.category && String(p.category).trim()) || "";
@@ -597,15 +580,14 @@ function ensureMapbox3D(map, enabled) {
   // Force globe projection EARLY and ALWAYS
   try {
     map.setProjection("globe");
-  } catch (e) {
+  } catch {
     // ignore
   }
 
   if (!enabled) {
     try {
       map.setTerrain(null);
-      // eslint-disable-next-line no-unused-vars
-    } catch (e) {
+    } catch {
       // ignore
     }
     safeRemoveLayer(SKY_LAYER_ID);
@@ -625,8 +607,7 @@ function ensureMapbox3D(map, enabled) {
 
   try {
     map.setTerrain({ source: DEM_SOURCE_ID, exaggeration: 1.2 });
-    // eslint-disable-next-line no-unused-vars
-  } catch (e) {
+  } catch {
     // ignore
   }
 
@@ -641,8 +622,7 @@ function ensureMapbox3D(map, enabled) {
           "sky-atmosphere-sun-intensity": 8,
         },
       });
-      // eslint-disable-next-line no-unused-vars
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
@@ -670,8 +650,7 @@ function ensureMapbox3D(map, enabled) {
         },
         beforeId
       );
-      // eslint-disable-next-line no-unused-vars
-    } catch (e) {
+    } catch {
       // ignore
     }
   }
@@ -682,8 +661,7 @@ function ensureMapbox3D(map, enabled) {
       "space-color": "#000000",
       "star-intensity": 0.0,
     });
-    // eslint-disable-next-line no-unused-vars
-  } catch (e) {
+  } catch {
     // ignore
   }
 }
@@ -694,8 +672,7 @@ export default function MapPage() {
   const isMobile = useIsMobile(768);
   const { data: profile } = useUserProfile();
   const { profilePhotoUrl } = useProfilePhoto();
-  const { data: gamification, isLoading: gamificationLoading, error: gamificationError } =
-    useGamificationProfile();
+  const { data: gamification } = useGamificationProfile();
 
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -828,7 +805,13 @@ export default function MapPage() {
       const detail = await aiApi.getRoute(data.newRouteId);
       const routeData = (detail?.routeData && typeof detail.routeData === "object") ? detail.routeData : detail;
       setActiveRoute(normalizeRouteForMap({ ...routeData, routeId: detail.routeId ?? data.newRouteId, selectedHotel: detail.selectedHotel ?? null }));
-      toast.info({ title: "Route updated", message: data.userMessage || "One or more stops were automatically updated." });
+      toast.info({
+        title: "Route updated",
+        message: pickEnglishNotificationMessage(
+          data.userMessage,
+          "One or more stops were automatically updated."
+        ),
+      });
     } catch {
       // silently ignore — route will update on next manual refresh
     }
@@ -843,7 +826,7 @@ export default function MapPage() {
   const [chatConversationRefreshNonce, setChatConversationRefreshNonce] = useState(0);
   /** Sohbet–harita bağlantısı (replan gün); VacanzaChat onConversationIdChange ile güncellenir. */
   const [mapChatConversationId, setMapChatConversationId] = useState(null);
-  const [replanDaySubmitting, setReplanDaySubmitting] = useState(false);
+  const [, setReplanDaySubmitting] = useState(false);
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3; // meters
@@ -880,17 +863,19 @@ export default function MapPage() {
 
       const triggerAutoCheckIn = async () => {
         try {
-          const { data } = await userApi.autoCheckIn({
+          const { data } = await http.post("/checkins/auto", {
             latitude: userLocation.lat,
             longitude: userLocation.lng,
-            poiId: nearest.poiId
+            poiId: nearest.poiId,
           });
 
           toast.success({ title: 'Auto Check-in!', message: `You've arrived at ${nearest.name || "a point of interest"}. +${data.xpGained || 50} XP earned!` });
 
           queryClient.invalidateQueries(["gamification", "profile"]);
           queryClient.invalidateQueries(["user", "stats"]);
-        } catch (err) { }
+        } catch (err) {
+          console.error("[MapPage] Auto check-in failed:", err);
+        }
       };
       triggerAutoCheckIn();
     }
@@ -1018,9 +1003,8 @@ export default function MapPage() {
   };
 
   const themeClass = isDarkMode ? "theme-night" : "theme-day";
-  const mapStyleIndex = isDarkMode ? 1 : 0;
 
-  const [formattedTime, setFormattedTime] = useState("");
+  const [, setFormattedTime] = useState("");
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -1042,7 +1026,7 @@ export default function MapPage() {
       if (bookingOpen) setBookingOpen(false);
       if (fabExpanded) setFabExpanded(false);
     }
-  }, [resultsOpen]); // Only react when resultsOpen changes
+  }, [resultsOpen, filterOpen, isChatOpen, bookingOpen, fabExpanded]);
 
   useEffect(() => {
     if (filterOpen) {
@@ -1050,7 +1034,7 @@ export default function MapPage() {
       if (isChatOpen) setIsChatOpen(false);
       if (bookingOpen) setBookingOpen(false);
     }
-  }, [filterOpen]);
+  }, [filterOpen, resultsOpen, isChatOpen, bookingOpen]);
 
   useEffect(() => {
     if (isChatOpen) {
@@ -1058,7 +1042,7 @@ export default function MapPage() {
       if (resultsOpen) setResultsOpen(false);
       if (bookingOpen) setBookingOpen(false);
     }
-  }, [isChatOpen]);
+  }, [isChatOpen, filterOpen, resultsOpen, bookingOpen]);
 
   useEffect(() => {
     if (bookingOpen) {
@@ -1067,7 +1051,7 @@ export default function MapPage() {
       if (resultsOpen) setResultsOpen(false);
       if (fabExpanded) setFabExpanded(false);
     }
-  }, [bookingOpen]);
+  }, [bookingOpen, filterOpen, isChatOpen, resultsOpen, fabExpanded]);
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -1077,7 +1061,7 @@ export default function MapPage() {
       if (resultsOpen) setResultsOpen(false);
       if (fabExpanded) setFabExpanded(false);
     }
-  }, [sidebarOpen]);
+  }, [sidebarOpen, filterOpen, isChatOpen, bookingOpen, resultsOpen, fabExpanded]);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
   /** When true, drawn-area POI search uses Mapbox Search Box (tiled) via backend instead of DB-first. */
@@ -1246,7 +1230,10 @@ export default function MapPage() {
         await queryClient.invalidateQueries({ queryKey: ["feedback", "saved-pois"] });
         // message.success(favored ? "Removed from your favorites." : "Saved to your favorites.");
       } catch (e) {
-        toast.error({ title: "Couldn't update", message: e?.friendlyMessage || "Failed to update your favorites. Please try again." });
+        toast.error({
+          title: "Couldn't update",
+          message: getErrorNotificationMessage(e, "Failed to update your favorites. Please try again."),
+        });
       } finally {
         setFavSendingKey(null);
       }
@@ -1515,6 +1502,7 @@ export default function MapPage() {
     handleSelectAllFilters();
     await clearSelectionOnly();
   }, [handleSelectAllFilters, clearSelectionOnly]);
+  void handleResetFilters;
 
   const onMouseDownFreehand = useCallback(
     (e) => {
@@ -1592,7 +1580,10 @@ export default function MapPage() {
   const submitPolygonRoute = useCallback(
     async (values) => {
       if (!selection?.polygon || selection.polygon.length < 3) {
-        toast.warning("Please select a valid area first.");
+        toast.warning({
+          title: "Invalid area",
+          message: "Please select a valid area first.",
+        });
         return;
       }
       const ring = selection.polygon.map((p) => [p.lng, p.lat]);
@@ -1628,18 +1619,14 @@ export default function MapPage() {
             setMapChatConversationId(String(convId));
             setChatConversationRefreshNonce((n) => n + 1);
           }
-          const summary = res.route_summary_message || res.routeSummaryMessage;
+          // const summary = res.route_summary_message || res.routeSummaryMessage;
           // if (summary) message.success(summary);
           // else message.success("Route is being displayed on the map.");
         } else {
           toast.warning({ title: "Route unavailable", message: "Couldn't load the route data. Please try again." });
         }
       } catch (e) {
-        const msg =
-          e?.response?.data?.message ||
-          e?.friendlyMessage ||
-          e?.message ||
-          "Failed to create route.";
+        const msg = getErrorNotificationMessage(e, "Failed to create route.");
         toast.error(msg);
       } finally {
         setPolygonRouteSubmitting(false);
@@ -1665,7 +1652,10 @@ export default function MapPage() {
 
   const submitReplanDayFromPolygon = useCallback(async () => {
     if (!selection?.polygon || selection.polygon.length < 3) {
-      toast.error("Please draw a valid area.");
+      toast.error({
+        title: "Invalid area",
+        message: "Please draw a valid area.",
+      });
       return;
     }
     const convId = mapChatConversationId || getSessionConversationId();
@@ -1679,7 +1669,10 @@ export default function MapPage() {
     }
     const td = Number(activeRoute.total_days || activeRoute.totalDays || activeRoute.days.length);
     if (!Number.isFinite(activeDay) || activeDay < 1 || activeDay > td) {
-      toast.error("Please select a valid day.");
+      toast.error({
+        title: "Invalid day",
+        message: "Please select a valid day.",
+      });
       return;
     }
     const ring = selection.polygon.map((p) => [p.lng, p.lat]);
@@ -1703,26 +1696,26 @@ export default function MapPage() {
         setIsChatOpen(true);
         linkPolygonRouteConversation(convId);
         setChatConversationRefreshNonce((n) => n + 1);
-        const summary = res.route_summary_message || res.routeSummaryMessage;
+        // const summary = res.route_summary_message || res.routeSummaryMessage;
         // if (summary) message.success(summary);
         // else message.success(`Day ${activeDay} has been updated based on your drawing. You can check the chat.`);
       } else {
-        toast.warning("Could not retrieve route data.");
+        toast.warning({
+          title: "Route unavailable",
+          message: "Could not retrieve route data.",
+        });
       }
     } catch (e) {
-      const msg =
-        e?.response?.data?.message ||
-        e?.friendlyMessage ||
-        e?.message ||
-        "Failed to replan day.";
+      const msg = getErrorNotificationMessage(e, "Failed to replan day.");
       toast.error(msg);
     } finally {
       setReplanDaySubmitting(false);
     }
   }, [selection, mapChatConversationId, activeRoute, activeDay, selectedBackendCats]);
+  void submitReplanDayFromPolygon;
 
   /** Band kapatıldı + sonuç paneli kapalıyken küçük yedek CTA */
-  const showCompactPolygonRouteCta = useMemo(
+  const SHOW_COMPACT_POLYGON_ROUTE_CTA = useMemo(
     () =>
       Boolean(
         user &&
@@ -1736,7 +1729,7 @@ export default function MapPage() {
   );
 
   /** Rota açıkken çizilen alanla tek günü yeniden planlama (sohbet + kayıtlı rota gerekir). */
-  const showReplanDayBanner = useMemo(
+  const SHOW_REPLAN_DAY_BANNER = useMemo(
     () =>
       Boolean(
         user &&
@@ -1772,7 +1765,7 @@ export default function MapPage() {
       try {
         map.setProjection("globe");
         map.setFog({ "horizon-blend": 0.1, "space-color": "#000000", "star-intensity": 0.0 });
-      } catch (err) {
+      } catch {
         // ignore
       }
 
@@ -1780,7 +1773,9 @@ export default function MapPage() {
       setTimeout(() => {
         try {
           if (map) map.setProjection("globe");
-        } catch (e) { }
+        } catch {
+          // ignore
+        }
       }, 500);
     }
   }, [is3D]);
@@ -1799,7 +1794,7 @@ export default function MapPage() {
           "space-color": "#000000",
           "star-intensity": 0.1,
         });
-      } catch (err) {
+      } catch {
         // ignore
       }
 
@@ -1809,7 +1804,9 @@ export default function MapPage() {
           if (map) {
             map.setProjection({ name: "globe" });
           }
-        } catch (e) { }
+        } catch {
+          // ignore
+        }
       }, 300);
     }
   }, [is3D]);
@@ -2021,7 +2018,6 @@ export default function MapPage() {
         // Debug: see raw Mapbox-based geometry and inputs in browser console
         // so we can tune routing later if needed.
         // Not spamming: only logs when a route is actually fetched.
-        // eslint-disable-next-line no-console
         console.log("[Vacanza][RouteGeometry] request", body, "response", res?.data);
 
         const coords = res?.data?.coordinates;
@@ -2089,7 +2085,6 @@ export default function MapPage() {
     }
   }, [activeWaypoints]);
 
-  // ✅ Results panel açılınca: polygon panel altında kalmasın diye fitBounds + padding
   useEffect(() => {
     if (!canShowResultsPanel) return;
 
@@ -2130,20 +2125,6 @@ export default function MapPage() {
   if (loadingAuth || !user) return null;
 
   // ---------- Responsive sizes ----------
-  const headerHeight = isMobile ? 54 : 64;
-  const contentPadding = isMobile ? 0 : 24;
-  const mapContainerRadius = isMobile ? 0 : 12;
-  const mapContainerHeight = isMobile ? `calc(100vh - ${headerHeight}px)` : `calc(100vh - ${headerHeight + contentPadding * 2}px)`;
-
-  const fabSize = isMobile ? 44 : 48;
-  const fabGap = isMobile ? 8 : 10;
-
-  const filterPanelWidth = isMobile ? "min(92vw, 360px)" : 280;
-  const filterPanelTop = isMobile ? headerHeight + 10 : 28;
-  const filterPanelRight = isMobile ? 12 : 78;
-
-  const resultsWidth = isMobile ? "calc(100% - 24px)" : "min(760px, calc(100% - 48px))";
-  const resultsBottom = isMobile ? 12 : 18;
   const resultsMaxHeight = isMobile ? 220 : 240;
 
   const isDrawAreaSession = freehandEnabled && selection?.mode !== "polygon";
@@ -2942,7 +2923,10 @@ export default function MapPage() {
               setActiveDay(1);
               setIsChatOpen(false);
             } catch (e) {
-              toast.error({ title: "Couldn't load route", message: e?.friendlyMessage || "Please try again." });
+              toast.error({
+                title: "Couldn't load route",
+                message: getErrorNotificationMessage(e, "Please try again."),
+              });
             }
           }}
         />

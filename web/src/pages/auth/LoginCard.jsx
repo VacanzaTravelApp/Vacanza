@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Form, Input, Button, Modal } from "antd";
 import { toast } from "../../components/toast/toast";
+import { getErrorNotificationMessage } from "../../utils/notifications";
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import "./RegisterCard.css";
 import { useNavigate } from "react-router-dom";
@@ -50,7 +51,7 @@ const LoginCard = () => {
       } else if (error?.code === "auth/too-many-requests") {
         toast.error({ title: "Too many attempts", message: "Please wait a while or reset your password." });
       } else {
-        toast.error({ title: "Login failed", message: error.friendlyMessage || "Please try again." });
+        toast.error({ title: "Login failed", message: getErrorNotificationMessage(error, "Please try again.") });
       }
     } finally {
       setLoading(false);
