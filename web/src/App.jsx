@@ -53,57 +53,57 @@ const App = () => {
 
     return (
         <Router>
-          <VacanzaToastProvider>
-            <SessionManager>
-                <Routes>
-                    <Route path="/" element={<Navigate to="/register" replace />} />
+            <VacanzaToastProvider>
+                <SessionManager>
+                    <Routes>
+                        <Route path="/" element={<Navigate to="/register" replace />} />
 
-                    <Route
-                        path="/register"
-                        element={
-                            <AuthLayout>
-                                <RegisterCard />
-                            </AuthLayout>
-                        }
-                    />
+                        <Route
+                            path="/register"
+                            element={
+                                <AuthLayout>
+                                    <RegisterCard />
+                                </AuthLayout>
+                            }
+                        />
 
-                    <Route
-                        path="/login"
-                        element={
-                            <AuthLayout>
-                                <LoginCard />
-                            </AuthLayout>
-                        }
-                    />
+                        <Route
+                            path="/login"
+                            element={
+                                <AuthLayout>
+                                    <LoginCard />
+                                </AuthLayout>
+                            }
+                        />
 
-                    {/* NEW ROUTES */}
-                    <Route
-                        path="/verify-email"
-                        element={
-                            <AuthLayout>
-                                <EmailVerificationPage />
-                            </AuthLayout>
-                        }
-                    />
-                    {/* Not under /auth/* — in production that prefix is often proxied to the Java API, which made /auth/action return JSON and download as a file named "action". */}
-                    <Route
-                        path="/confirm-email"
-                        element={
-                            <AuthLayout>
-                                <AuthActionPage />
-                            </AuthLayout>
-                        }
-                    />
-                    <Route path="/auth/action" element={<LegacyFirebaseAuthLinkRedirect />} />
+                        {/* NEW ROUTES */}
+                        <Route
+                            path="/verify-email"
+                            element={
+                                <AuthLayout>
+                                    <EmailVerificationPage />
+                                </AuthLayout>
+                            }
+                        />
+                        {/* Not under /auth/* — in production that prefix is often proxied to the Java API, which made /auth/action return JSON and download as a file named "action". */}
+                        <Route
+                            path="/confirm-email"
+                            element={
+                                <AuthLayout>
+                                    <AuthActionPage />
+                                </AuthLayout>
+                            }
+                        />
+                        <Route path="/auth/action" element={<LegacyFirebaseAuthLinkRedirect />} />
 
-                    <Route path="/map" element={<MapPage />} />
-                    <Route path="/gamification" element={<GamificationSummary />} />
+                        <Route path="/map" element={<MapPage />} />
+                        <Route path="/gamification" element={<GamificationSummary />} />
 
-                    {/* Catch-all route */}
-                    <Route path="*" element={<Navigate to="/login" replace />} />
-                </Routes>
-            </SessionManager>
-          </VacanzaToastProvider>
+                        {/* Catch-all route */}
+                        <Route path="*" element={<Navigate to="/login" replace />} />
+                    </Routes>
+                </SessionManager>
+            </VacanzaToastProvider>
         </Router>
     );
 };

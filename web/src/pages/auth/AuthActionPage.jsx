@@ -45,7 +45,6 @@ const AuthActionPage = () => {
     );
 
     const handleVerifyResetCode = useCallback(async (code) => {
-        // Dev mode: skip Firebase verification for local testing
         if (import.meta.env.DEV && code.startsWith("test")) {
             setResetEmail("test@vacanza.app");
             setStatus("resetPassword");
@@ -94,14 +93,12 @@ const AuthActionPage = () => {
         }
         setResetting(true);
         try {
-            // Dev mode: skip actual Firebase call for local testing
             if (import.meta.env.DEV && oobCode.startsWith("test")) {
                 await new Promise(r => setTimeout(r, 800));
             } else {
                 await confirmPasswordReset(auth, oobCode, values.password);
             }
             setStatus("resetSuccess");
-            // message.success("Password updated successfully!");
         } catch (error) {
             console.error("Password reset error:", error);
             if (error.code === "auth/weak-password") {
