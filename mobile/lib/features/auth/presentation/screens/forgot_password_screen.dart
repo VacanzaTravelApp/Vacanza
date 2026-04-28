@@ -63,17 +63,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         email: _email.text.trim(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('A password reset link has been sent to your email.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
       Navigator.of(context).pop();
     } on fb.FirebaseAuthException catch (e) {
-      dev.log('[Auth] sendPasswordResetEmail error code=${e.code} message=${e.message}', name: 'Auth');
+      dev.log(
+        '[Auth] sendPasswordResetEmail error code=${e.code} message=${e.message}',
+        name: 'Auth',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -103,20 +98,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     final tokens = context.vacanzaTokens;
     final accent = context.authAccent;
-    final titleStyle = AppTextStyles.titleLarge(context).copyWith(
-      color: tokens.textMain,
-    );
-    final body = AppTextStyles.bodyMedium(context).copyWith(
-      color: tokens.textSub,
-    );
+    final titleStyle = AppTextStyles.titleLarge(
+      context,
+    ).copyWith(color: tokens.textMain);
+    final body = AppTextStyles.bodyMedium(
+      context,
+    ).copyWith(color: tokens.textSub);
 
     return AnimatedBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
+        appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -149,13 +141,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           controller: _email,
                           keyboardType: TextInputType.emailAddress,
                           autofillHints: const [AutofillHints.email],
-                          decoration: const InputDecoration(
-                            labelText: 'Email',
-                          ),
+                          decoration: const InputDecoration(labelText: 'Email'),
                           validator: (v) {
                             final value = (v ?? '').trim();
                             if (value.isEmpty) return 'Email is required.';
-                            if (!_emailRegex.hasMatch(value)) return 'Enter a valid email.';
+                            if (!_emailRegex.hasMatch(value))
+                              return 'Enter a valid email.';
                             return null;
                           },
                         ),
@@ -183,4 +174,3 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 }
-

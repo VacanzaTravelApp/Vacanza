@@ -57,7 +57,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final email = user?.email;
     if (user == null || email == null || email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No active session. Please log in again.')),
+        const SnackBar(
+          content: Text('No active session. Please log in again.'),
+        ),
       );
       return;
     }
@@ -73,20 +75,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       await user.updatePassword(_newPassword.text);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Password updated successfully.')),
-        );
       Navigator.of(context).pop();
     } on fb.FirebaseAuthException catch (e) {
-      dev.log('[Auth] change password error code=${e.code} message=${e.message}', name: 'Auth');
+      dev.log(
+        '[Auth] change password error code=${e.code} message=${e.message}',
+        name: 'Auth',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(_mapPasswordError(e.code))),
-        );
+        ..showSnackBar(SnackBar(content: Text(_mapPasswordError(e.code))));
     } catch (e) {
       dev.log('[Auth] change password error $e', name: 'Auth');
       if (!mounted) return;
@@ -104,20 +102,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     final tokens = context.vacanzaTokens;
     final accent = context.authAccent;
-    final titleStyle = AppTextStyles.titleLarge(context).copyWith(
-      color: tokens.textMain,
-    );
-    final body = AppTextStyles.bodyMedium(context).copyWith(
-      color: tokens.textSub,
-    );
+    final titleStyle = AppTextStyles.titleLarge(
+      context,
+    ).copyWith(color: tokens.textMain);
+    final body = AppTextStyles.bodyMedium(
+      context,
+    ).copyWith(color: tokens.textSub);
 
     return AnimatedBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
+        appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -155,7 +150,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                 labelText: 'Current password',
                               ),
                               validator: (v) {
-                                if ((v ?? '').isEmpty) return 'Current password is required.';
+                                if ((v ?? '').isEmpty)
+                                  return 'Current password is required.';
                                 return null;
                               },
                             ),
@@ -168,8 +164,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               ),
                               validator: (v) {
                                 final value = (v ?? '').trim();
-                                if (value.isEmpty) return 'New password is required.';
-                                if (value.length < 6) return 'Password must be at least 6 characters.';
+                                if (value.isEmpty)
+                                  return 'New password is required.';
+                                if (value.length < 6)
+                                  return 'Password must be at least 6 characters.';
                                 return null;
                               },
                             ),
@@ -181,7 +179,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                 labelText: 'Confirm new password',
                               ),
                               validator: (v) {
-                                if ((v ?? '') != _newPassword.text) return 'Passwords do not match.';
+                                if ((v ?? '') != _newPassword.text)
+                                  return 'Passwords do not match.';
                                 return null;
                               },
                             ),
@@ -211,4 +210,3 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 }
-
