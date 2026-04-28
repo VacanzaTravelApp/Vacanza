@@ -9,7 +9,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'package:mobile/core/navigation/route_open_requests.dart';
-import 'package:mobile/core/theme/app_theme.dart';
 import 'package:mobile/features/chat/presentation/cubit/chat_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/favorite_poi_cubit.dart';
 import 'package:mobile/features/behavior/presentation/cubit/saved_pois_cubit.dart';
@@ -26,7 +25,11 @@ import '../../../checkin/presentation/bloc/location_bloc.dart';
 import '../../../checkin/presentation/bloc/location_event.dart';
 import '../../../checkin/presentation/bloc/location_state.dart';
 
+import '../../../gamification/data/models/badge_dto.dart';
 import '../../../gamification/presentation/cubit/gamification_cubit.dart';
+import '../../../gamification/presentation/cubit/gamification_state.dart';
+import '../../../gamification/presentation/widgets/badge_icon_mapper.dart';
+import '../../../../core/widgets/top_notification_banner.dart';
 
 import '../../../poi_search/data/api/poi_search_api_client.dart';
 import '../../../poi_search/data/models/area_source.dart';
@@ -171,6 +174,42 @@ class _HomeMapViewState extends State<_HomeMapView>
   /// null => All
   String? _activeChipKey;
 
+  // ── Top notification queue ──────────────────────────────────────────────
+  TopNotifData? _activeTopNotif;
+  final List<TopNotifData> _notifQueue = [];
+
+  void _showTopNotification(TopNotifData notif) {
+    if (!mounted) return;
+    if (_activeTopNotif == null) {
+      setState(() => _activeTopNotif = notif);
+    } else {
+      _notifQueue.add(notif);
+    }
+  }
+
+  void _onTopNotifDismissed() {
+    if (!mounted) return;
+    setState(() {
+      _activeTopNotif = _notifQueue.isNotEmpty ? _notifQueue.removeAt(0) : null;
+    });
+  }
+
+  TopNotifData _checkinNotif(String? poiName) => TopNotifData(
+    type: TopNotifType.checkin,
+    title: 'Checked in!',
+    subtitle: poiName != null ? 'at $poiName' : 'Location saved',
+    icon: Icons.location_on_rounded,
+    iconGradient: const [Color(0xFF00B4D8), Color(0xFF0096C7)],
+  );
+
+  TopNotifData _badgeNotif(BadgeDto badge) => TopNotifData(
+    type: TopNotifType.badge,
+    title: 'New badge earned!',
+    subtitle: badge.title,
+    icon: BadgeIconMapper.icon(badge.key),
+    iconGradient: BadgeIconMapper.gradient(badge.key),
+  );
+
   void _openFilters({required bool fromUserSelection}) {
     if (_filtersOpen) return;
     if (!mounted) return;
@@ -276,57 +315,6 @@ class _HomeMapViewState extends State<_HomeMapView>
     setState(() => _savedPlacesOpen = false);
   }
 
-  void _showRouteLoadingMessage(BuildContext context) {
-    if (!mounted) return;
-    final theme = Theme.of(context);
-    final tokens = context.vacanzaTokens;
-    final accent = context.mapControlAccent;
-    final isLight = theme.brightness == Brightness.light;
-
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-        duration: const Duration(seconds: 3),
-        backgroundColor: isLight
-            ? tokens.cardBg.withValues(alpha: 0.96)
-            : theme.colorScheme.surface.withValues(alpha: 0.94),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: tokens.cardBorder.withValues(
-              alpha: isLight ? 0.22 : 0.55,
-            ),
-          ),
-        ),
-        elevation: 10,
-        content: Row(
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.8,
-                color: accent,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Vacanza is building your route…',
-                style: TextStyle(
-                  color: tokens.textMain,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// Closes results (and filters), then shows the route wizard.
   void _beginCreateRouteFromArea() {
     if (!mounted) return;
@@ -363,14 +351,18 @@ class _HomeMapViewState extends State<_HomeMapView>
     // Collect IDs of loaded POIs that fall inside the drawn polygon so the
     // backend only routes through places the user selected visually.
     final allPois = context.read<PoiSearchBloc>().state.pois;
-    final poisInsidePolygon = allPois.where((p) {
-      return pointInsidePolygonLatLng(
-        lat: p.latitude,
-        lng: p.longitude,
-        polygonLatLng: poly.points,
-      );
-    }).toList(growable: false);
-    final poiIds = poisInsidePolygon.map((p) => p.poiId).toList(growable: false);
+    final poisInsidePolygon = allPois
+        .where((p) {
+          return pointInsidePolygonLatLng(
+            lat: p.latitude,
+            lng: p.longitude,
+            polygonLatLng: poly.points,
+          );
+        })
+        .toList(growable: false);
+    final poiIds = poisInsidePolygon
+        .map((p) => p.poiId)
+        .toList(growable: false);
 
     final options = await showCreateRouteFromAreaOptionsSheet(context);
     if (!mounted) return;
@@ -557,16 +549,7 @@ class _HomeMapViewState extends State<_HomeMapView>
                   prev.status != next.status &&
                   next.status == CheckinStatus.newCreated,
           listener: (context, state) {
-            final poiName = state.response?.poiName;
-            final message =
-                poiName != null ? 'Checked in at $poiName' : 'Checked in!';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(message),
-                duration: const Duration(seconds: 2),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+            _showTopNotification(_checkinNotif(state.response?.poiName));
           },
         ),
 
@@ -584,6 +567,21 @@ class _HomeMapViewState extends State<_HomeMapView>
               'checkInId=${state.response?.checkInId}',
             );
             context.read<GamificationCubit>().refresh();
+          },
+        ),
+
+        // ================= Badge earned notification (MOB-12) =================
+        BlocListener<GamificationCubit, GamificationState>(
+          listenWhen:
+              (prev, next) =>
+                  next is GamificationLoaded &&
+                  next.newlyEarnedBadges.isNotEmpty,
+          listener: (context, state) {
+            if (state is GamificationLoaded) {
+              for (final badge in state.newlyEarnedBadges) {
+                _showTopNotification(_badgeNotif(badge));
+              }
+            }
           },
         ),
 
@@ -698,6 +696,7 @@ class _HomeMapViewState extends State<_HomeMapView>
           listener: (context, state) {
             if (state.status == ActiveRouteStatus.ready &&
                 state.route != null) {
+              context.read<PoiSearchBloc>().add(const poi.HidePoiMarkers());
               if (mounted) setState(() => _routeOpen = true);
 
               final ps = context.read<PoiSearchBloc>().state;
@@ -764,7 +763,7 @@ class _HomeMapViewState extends State<_HomeMapView>
             showStreamLoadingMore: poiState.mapboxAreaStreamLoading,
           );
 
-          return HomeMapScaffold(
+          final scaffold = HomeMapScaffold(
             basemap: state.basemap,
             perspective: state.perspective,
             isDrawing: state.isDrawing,
@@ -809,13 +808,14 @@ class _HomeMapViewState extends State<_HomeMapView>
               final poiSearchBloc = context.read<PoiSearchBloc>();
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => MultiBlocProvider(
-                    providers: [
-                      BlocProvider.value(value: checkinBloc),
-                      BlocProvider.value(value: poiSearchBloc),
-                    ],
-                    child: const ArExplorePage(),
-                  ),
+                  builder:
+                      (_) => MultiBlocProvider(
+                        providers: [
+                          BlocProvider.value(value: checkinBloc),
+                          BlocProvider.value(value: poiSearchBloc),
+                        ],
+                        child: const ArExplorePage(),
+                      ),
                 ),
               );
             },
@@ -888,9 +888,7 @@ class _HomeMapViewState extends State<_HomeMapView>
               } else {
                 return;
               }
-              context
-                  .read<PoiSearchBloc>()
-                  .add(const poi.HidePoiMarkers());
+              context.read<PoiSearchBloc>().add(const poi.HidePoiMarkers());
               setState(() {
                 _routeShowEventsInitially = nav.openEventsInitially;
                 _routeOpen = true;
@@ -976,12 +974,12 @@ class _HomeMapViewState extends State<_HomeMapView>
                       initialEvents: _routeShowEventsInitially,
                       onClose: () {
                         context.read<ActiveRouteCubit>().hideRouteFromMap();
-                        context
-                            .read<PoiSearchBloc>()
-                            .add(const poi.ShowPoiMarkers());
-                        context
-                            .read<MapBloc>()
-                            .add(const RefreshViewportRequested());
+                        context.read<PoiSearchBloc>().add(
+                          const poi.ShowPoiMarkers(),
+                        );
+                        context.read<MapBloc>().add(
+                          const RefreshViewportRequested(),
+                        );
                         if (mounted) setState(() => _routeOpen = false);
                       },
                     )
@@ -989,48 +987,63 @@ class _HomeMapViewState extends State<_HomeMapView>
 
             // ===== Mini route pill =====
             showRouteMiniPill:
-                !_filtersOpen && !_resultsOpen && !state.isDrawing &&
-                (
-                  (activeRouteState.status == ActiveRouteStatus.loading && !_routeOpen) ||
-                  (activeRouteState.status == ActiveRouteStatus.ready &&
-                      activeRouteState.route != null &&
-                      !activeRouteState.showRouteOnMap)
-                ),
+                !_filtersOpen &&
+                !_resultsOpen &&
+                !state.isDrawing &&
+                ((activeRouteState.status == ActiveRouteStatus.loading &&
+                        !_routeOpen) ||
+                    (activeRouteState.status == ActiveRouteStatus.ready &&
+                        activeRouteState.route != null &&
+                        !activeRouteState.showRouteOnMap)),
             routeMiniPill:
-                activeRouteState.status == ActiveRouteStatus.loading && !_routeOpen
-                    ? RouteLoadingPill(
-                        onTap: () => _showRouteLoadingMessage(context),
-                      )
+                activeRouteState.status == ActiveRouteStatus.loading &&
+                        !_routeOpen
+                    ? RouteLoadingPill(onTap: () {})
                     : activeRouteState.status == ActiveRouteStatus.ready &&
-                            activeRouteState.route != null &&
-                            !activeRouteState.showRouteOnMap
-                        ? RouteMiniPill(
-                            day: activeRouteState.activeDay,
-                            onOpen: () {
-                              if (!mounted) return;
-                              context
-                                  .read<PoiSearchBloc>()
-                                  .add(const poi.HidePoiMarkers());
-                              context
-                                  .read<ActiveRouteCubit>()
-                                  .showRouteOnMapAgain();
-                              setState(() => _routeOpen = true);
-                            },
-                            onClear: () {
-                              context.read<ActiveRouteCubit>().reset();
-                              context
-                                  .read<PoiSearchBloc>()
-                                  .add(const poi.ShowPoiMarkers());
-                              context
-                                  .read<MapBloc>()
-                                  .add(const RefreshViewportRequested());
-                              if (mounted) setState(() => _routeOpen = false);
-                            },
-                          )
-                        : null,
+                        activeRouteState.route != null &&
+                        !activeRouteState.showRouteOnMap
+                    ? RouteMiniPill(
+                      day: activeRouteState.activeDay,
+                      onOpen: () {
+                        if (!mounted) return;
+                        context.read<PoiSearchBloc>().add(
+                          const poi.HidePoiMarkers(),
+                        );
+                        context.read<ActiveRouteCubit>().showRouteOnMapAgain();
+                        setState(() => _routeOpen = true);
+                      },
+                      onClear: () {
+                        context.read<ActiveRouteCubit>().reset();
+                        context.read<PoiSearchBloc>().add(
+                          const poi.ShowPoiMarkers(),
+                        );
+                        context.read<MapBloc>().add(
+                          const RefreshViewportRequested(),
+                        );
+                        if (mounted) setState(() => _routeOpen = false);
+                      },
+                    )
+                    : null,
 
             // ===== Blur preview sadece polygon sonrası filter açıldıysa =====
             showResultsBlurUnderFilters: _filtersFromUserSelection,
+          );
+
+          return Stack(
+            children: [
+              scaffold,
+              if (_activeTopNotif != null)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: TopNotificationBanner(
+                    key: ValueKey(_activeTopNotif),
+                    data: _activeTopNotif!,
+                    onDismissed: _onTopNotifDismissed,
+                  ),
+                ),
+            ],
           );
         },
       ),

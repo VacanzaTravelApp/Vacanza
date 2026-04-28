@@ -85,7 +85,7 @@ class _PastConversationsSheetState extends State<PastConversationsSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = 'Could not load past conversations. Please try again.';
         _loading = false;
       });
     }
