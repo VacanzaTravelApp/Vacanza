@@ -255,7 +255,7 @@ class _HomeMapViewState extends State<_HomeMapView>
       _activeChipKey = null;
     });
 
-    // ✅ A senaryosu: selection temizle + viewport’a dön
+    // ✅ A senaryosu: selection temizle + viewport'a dön
     context.read<AreaQueryBloc>().add(const aq.ClearUserSelection());
     context.read<PoiSearchBloc>().add(const poi.AreaCleared());
 
@@ -725,7 +725,7 @@ class _HomeMapViewState extends State<_HomeMapView>
               return;
             }
 
-            // Viewport’a dönünce -> sheet kapat
+            // Viewport'a dönünce -> sheet kapat
             if (state.areaSource == AreaSource.viewport &&
                 state.status == PoiSearchStatus.idle) {
               if (_resultsOpen && mounted) {
@@ -734,6 +734,17 @@ class _HomeMapViewState extends State<_HomeMapView>
                   _activeChipKey = null;
                 });
               }
+            }
+
+            // Search error -> snackbar
+            if (state.status == PoiSearchStatus.error &&
+                (state.errorMessage ?? '').isNotEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.errorMessage!),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
             }
           },
         ),
@@ -752,7 +763,7 @@ class _HomeMapViewState extends State<_HomeMapView>
               if (mounted) setState(() => _routeOpen = true);
 
               final ps = context.read<PoiSearchBloc>().state;
-              // Çizilen alan akışı: sonuç sheet’i önceden kapatılmış olsa da (Create route sihirbazı)
+              // Çizilen alan akışı: sonuç sheet'i önceden kapatılmış olsa da (Create route sihirbazı)
               // user selection + poligon overlay mutlaka temizlensin.
               if (ps.areaSource == AreaSource.userSelection) {
                 if (mounted && _resultsOpen) {
@@ -792,7 +803,7 @@ class _HomeMapViewState extends State<_HomeMapView>
               poiState.areaSource == AreaSource.userSelection &&
               areaCtx.area is PolygonArea;
 
-          // resultsSheet widget (hem normal hem blur preview’da kullanılacak)
+          // resultsSheet widget (hem normal hem blur preview'da kullanılacak)
           final sheetWidget = AreaResultsSheet(
             isVisible: true, // görünürlük HomeMapScaffold kontrol edecek
             count: poiState.count,

@@ -16,6 +16,10 @@ class GamificationCubit extends Cubit<GamificationState> {
   /// Populated on the first successful fetch; used to diff subsequent refreshes.
   Set<int>? _knownEarnedIds;
 
+  /// Set to true when refresh() is called while a fetch is already in-flight.
+  /// The queued refresh runs immediately after the in-flight fetch completes.
+  bool _pendingRefresh = false;
+
   static const _cooldown = Duration(seconds: 15);
 
   GamificationCubit({required GamificationRepository repository})
@@ -27,7 +31,7 @@ class GamificationCubit extends Cubit<GamificationState> {
     final stateName = state.runtimeType.toString();
 
     if (state is GamificationLoading) {
-      log('[GAM_CUBIT] #$reqId SKIPPED_LOADING state=$stateName');
+      log('[GAM_CUBIT] #$reqId SKIPPED_LOADING state=$stateName pendingRefresh=$_pendingRefresh');
       return;
     }
 
@@ -67,12 +71,26 @@ class GamificationCubit extends Cubit<GamificationState> {
     } on GamificationException catch (e) {
       log('[GAM_CUBIT] #$reqId ERROR ${e.message}');
       emit(GamificationError(e.message));
+    } finally {
+      // If refresh() was called while this fetch was in-flight, run it now.
+      if (_pendingRefresh) {
+        _pendingRefresh = false;
+        log('[GAM_CUBIT] #$reqId executing queued refresh');
+        await fetchProfile();
+      }
     }
   }
 
   /// Force re-fetch bypassing cooldown. Used after check-in (MOB-12).
   Future<void> refresh() async {
     _lastFetchTime = null;
+    if (state is GamificationLoading) {
+      // A fetch is already in-flight; queue this refresh to run after it finishes.
+      _pendingRefresh = true;
+      log('[GAM_CUBIT] REFRESH_QUEUED (fetch in-flight)');
+      return;
+    }
+    _pendingRefresh = false;
     return fetchProfile();
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:dio/dio.dart';
+import 'package:mobile/core/network/backend_error_parser.dart';
 
 import '../api/poi_mapbox_stream_event.dart';
 import '../api/poi_search_api_client.dart';
@@ -110,6 +111,14 @@ class PoiSearchRepositoryImpl implements PoiSearchRepository {
   /// Backend error body'sinden "message" çekmeye çalışır.
   /// Yoksa fallback üretir.
   String _extractBackendMessage(DioException e) {
+    // Connectivity / timeout — use the shared parser for consistent messages.
+    if (e.type == DioExceptionType.connectionError ||
+        e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.sendTimeout) {
+      return extractBackendMessage(e);
+    }
+
     final status = e.response?.statusCode;
     final data = e.response?.data;
 
@@ -119,7 +128,7 @@ class PoiSearchRepositoryImpl implements PoiSearchRepository {
     if (data is String && data.trim().isNotEmpty) return data;
 
     if (status != null) return 'HTTP_$status: Empty error body';
-    return e.message ?? 'UNKNOWN_ERROR: Request failed';
+    return 'Request failed. Please try again.';
   }
 
   /// Case-insensitive olsun diye: trim + lowercase + uniq.
