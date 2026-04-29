@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 class BackendError {
@@ -17,14 +19,12 @@ class BackendError {
 
     // Connectivity / timeout errors — never show Dio internals
     if (_isConnectivityError(e)) {
-      return const BackendError(
-        message: 'No internet connection. Please check your connection and try again.',
-      );
+      return BackendError(message: _connectivityMessage(e));
     }
     if (e.type == DioExceptionType.receiveTimeout ||
         e.type == DioExceptionType.sendTimeout) {
       return const BackendError(
-        message: 'The request timed out. Please try again.',
+        message: 'The server is not responding. Please try again later.',
       );
     }
 
@@ -65,6 +65,28 @@ class BackendError {
 bool _isConnectivityError(DioException e) =>
     e.type == DioExceptionType.connectionError ||
     e.type == DioExceptionType.connectionTimeout;
+
+/// Gercekten internet mi yok, yoksa sunucu mu erisilemez?
+/// SocketException mesajina bakarak ayirt etmeye calisir.
+/// Kesin degil ama cogu durumda dogru sonuc verir.
+String _connectivityMessage(DioException e) {
+  final err = e.error;
+  if (err is SocketException) {
+    final msg = err.message.toLowerCase();
+    // "connection refused" veya "connection reset" = sunucu ayakta degil
+    if (msg.contains('refused') || msg.contains('reset')) {
+      return 'Unable to reach the server. Please try again later.';
+    }
+    // "network is unreachable" veya "no address" = cihazda internet yok
+    if (msg.contains('unreachable') ||
+        msg.contains('no address') ||
+        msg.contains('failed host lookup')) {
+      return 'No internet connection. Please check your connection and try again.';
+    }
+  }
+  // Belirsiz durum: her iki ihtimali de kapsar
+  return 'Unable to reach the server. Please check your connection and try again.';
+}
 
 String _statusMessage(int status) {
   switch (status) {
