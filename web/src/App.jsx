@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import AppErrorBoundary from "./components/AppErrorBoundary";
 
 import AuthLayout from "./pages/auth/AuthLayout";
 import RegisterCard from "./pages/auth/RegisterCardtempclass";
@@ -52,6 +53,7 @@ const App = () => {
     }, []);
 
     return (
+        <AppErrorBoundary>
         <Router>
             <VacanzaToastProvider>
                 <SessionManager>
@@ -105,6 +107,7 @@ const App = () => {
                 </SessionManager>
             </VacanzaToastProvider>
         </Router>
+        </AppErrorBoundary>
     );
 };
 

@@ -1378,6 +1378,10 @@ export default function MapPage() {
         if (e?.name === "AbortError") return;
         console.error(e);
         if (!useStream) setPoisRaw([]);
+        toast.error({
+          title: "Search failed",
+          message: e?.friendlyMessage || "Could not load places. Please check your connection.",
+        });
       } finally {
         setPoiLoading(false);
         if (useStream) {
