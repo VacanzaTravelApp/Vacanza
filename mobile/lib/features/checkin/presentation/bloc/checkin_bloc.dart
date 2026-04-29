@@ -110,6 +110,12 @@ class CheckinBloc extends Bloc<CheckinEvent, CheckinState> {
         status: CheckinStatus.failure,
         errorMessage: e.message,
       ));
+    } catch (e, st) {
+      log('[CheckinBloc] unexpected error: $e\n$st');
+      emit(state.copyWith(
+        status: CheckinStatus.failure,
+        errorMessage: 'Something went wrong. Please try again.',
+      ));
     }
   }
 }

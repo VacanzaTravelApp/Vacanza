@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -43,6 +45,12 @@ import 'features/auth/presentation/screens/auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Catch uncaught async errors in the root isolate (prevents silent crashes).
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[Unhandled error] $error\n$stack');
+    return true;
+  };
 
   final mapboxToken = MapboxConfig.accessToken.trim();
   MapboxOptions.setAccessToken(mapboxToken);
