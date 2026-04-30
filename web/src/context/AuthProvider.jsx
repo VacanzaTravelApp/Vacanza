@@ -30,13 +30,20 @@ export default function AuthProvider({ children }) {
         setAuthDto(res.data);
       } catch (error) {
         console.error("Auth sync failed, backend connection required:", error);
-        toast.error({ title: "Signed out", message: "Server is unreachable. Please log in again." });
+        toast.error({
+          title: "Server unreachable",
+          message: error?.friendlyMessage || "We are performing a quick maintenance. Please try again in a few minutes.",
+        });
         setAuthDto(null);
 
         try {
           await signOut(auth);
         } catch (signOutErr) {
           console.warn("Firebase signOut failed during sync error:", signOutErr);
+          // signOut failed but we still need to redirect away from the map
+          if (window.location.pathname === "/map") {
+            window.location.href = "/login";
+          }
         }
       } finally {
         setLoading(false);

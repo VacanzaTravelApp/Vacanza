@@ -719,11 +719,16 @@ export default function VacanzaChat({
         e?.name === "AbortError";
       if (!isAbort) {
         const status = e?.response?.status;
-        if (status === 504 || status === 502 || status === 503 || !status) {
+        if (status === 504 || status === 502 || status === 503) {
+          // AI service gateway error — poll in case the service recovers
           isPolling = true;
           startPollingForRoute(activeConvId, sentAtMs);
         } else {
-          toast.error({ title: "Too many requests", message: "Please wait a moment and try again." });
+          // Network error (!status) or 4xx — show immediate error
+          toast.error({
+            title: "Couldn't send message",
+            message: getErrorNotificationMessage(e, "Service unavailable. Please try again."),
+          });
           setSendError(true);
         }
       }

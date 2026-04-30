@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback, useContext } from "react";
 import { Button, Avatar, Tooltip, Modal, Form, InputNumber, Select, Switch, Spin, Popover, ConfigProvider, theme } from "antd";
 import { toast } from "../components/toast/toast";
 import { getErrorNotificationMessage, pickEnglishNotificationMessage } from "../utils/notifications";
@@ -44,6 +44,7 @@ import { useFeedbackAffinity } from "../hooks/useFeedbackAffinity";
 import { normalizeRouteForMap } from "../features/ai/utils/routeMap";
 import { useAdjustmentStream } from "../hooks/useAdjustmentStream";
 import { buildMapPoiFeedbackPayload, deriveMapPoiFavorited } from "../features/ai/utils/feedbackVoteUtils";
+import { AuthContext } from "../context/AuthContext";
 import "./MapPage.css";
 
 
@@ -674,6 +675,7 @@ export default function MapPage() {
   const { profilePhotoUrl } = useProfilePhoto();
   const { data: gamification } = useGamificationProfile();
 
+  const { loading: loadingBackendAuth } = useContext(AuthContext);
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
@@ -1356,6 +1358,13 @@ export default function MapPage() {
 
           if (!res.ok) {
             setPoisRaw([]);
+            toast.error({
+              title: "Search failed",
+              message:
+                res.status >= 500
+                  ? "We are performing a quick maintenance. Please try again in a few minutes."
+                  : `Could not load places (${res.status}). Please check your connection.`,
+            });
             return;
           }
 
@@ -2172,7 +2181,7 @@ export default function MapPage() {
     right: (isChatOpen || activeRoute) ? (isMobile ? 0 : 440) : 0
   }), [isChatOpen, activeRoute, isMobile]);
 
-  if (loadingAuth || !user) return null;
+  if (loadingAuth || loadingBackendAuth || !user) return null;
 
   // ---------- Responsive sizes ----------
   const resultsMaxHeight = isMobile ? 220 : 240;
