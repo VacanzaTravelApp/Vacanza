@@ -2200,14 +2200,13 @@ export default function MapPage() {
         <div className="header-left">
           <div
             className="brand-logo vivid-brand"
-            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
             onClick={() => window.location.reload()}
           >
-            <img src={webIcon} alt="Vacanza" style={{ width: 44, height: 44, display: 'block' }} />
-            <span style={{ lineHeight: 1 }}>Vacanza</span>
+            <img src={webIcon} alt="Vacanza" className="brand-logo-img" />
+            <span className="brand-logo-text">Vacanza</span>
           </div>
         </div>
-        <div className="header-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="header-right">
           <button
             className="header-action-btn vivid-interactive"
             onClick={() => setBookingOpen(true)}

@@ -131,19 +131,178 @@
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .ai-chat-container {
-    right: 15px;
-    left: 15px;
-    bottom: max(80px, env(safe-area-inset-bottom, 0px));
-    width: auto;
-    height: min(70vh, calc(100dvh - 120px));
-    border-radius: 22px;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    z-index: 2000;
+    animation: chatOpenMobile 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     transform-origin: bottom center;
+  }
+
+  @keyframes chatOpenMobile {
+    from {
+      transform: translateY(100%);
+      opacity: 0.5;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  /* Header — compact for mobile */
+  .chat-header-refined {
+    padding: 12px 14px calc(12px + env(safe-area-inset-top, 0px));
+    gap: 8px;
+  }
+
+  .ai-brand-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    font-size: 20px;
+  }
+
+  .ai-brand-avatar svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .ai-name {
+    font-size: 14px;
+  }
+
+  .ai-subline {
+    font-size: 9px;
+  }
+
+  .chat-header-icon-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  /* Content area */
+  .chat-content-scroll {
+    padding: 12px;
+    gap: 4px;
+  }
+
+  /* Bubbles — wider on mobile */
+  .message-bubble {
+    max-width: 92%;
+    padding: 10px 13px;
+    font-size: 14px;
+    line-height: 1.5;
+    border-radius: 16px;
+  }
+
+  .ai-bubble {
+    border-bottom-left-radius: 4px;
+  }
+
+  .user-bubble {
+    border-bottom-right-radius: 4px;
+  }
+
+  /* Route cards — full width */
+  .route-card-outer {
+    max-width: 100%;
+  }
+
+  .route-card {
+    border-radius: 16px;
+  }
+
+  /* Footer — touch friendly */
+  .chat-footer-refined {
+    padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Quick actions — scroll horizontally */
+  .chat-quick-actions {
+    gap: 5px;
+    margin-bottom: 8px;
+  }
+
+  .chat-quick-label {
+    font-size: 9px;
+  }
+
+  .chat-quick-chip {
+    padding: 6px 11px;
+    font-size: 12px;
+  }
+
+  /* Input — larger touch targets */
+  .chat-input-field-group {
+    border-radius: 14px;
+    padding: 2px 4px 2px 12px;
+  }
+
+  .chat-input-field-group input {
+    padding: 10px 0;
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  .chat-send-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 16px;
+  }
+
+  /* History panel — full width */
+  .chat-history-drawer {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 !important;
+    border-right: none !important;
+  }
+
+  /* Conversation rows — touch friendly */
+  .chat-conv-row {
+    padding: 14px 16px;
+    gap: 10px;
+  }
+
+  .chat-conv-row-title {
+    font-size: 14px;
+  }
+
+  .chat-conv-row-meta {
+    font-size: 12px;
+  }
+
+  /* Typing indicator */
+  .chat-typing-bubble {
+    padding: 10px 14px;
+  }
+
+  /* Tip card */
+  .chat-tip-text {
+    font-size: 12.5px;
+  }
+
+  /* Weather strip — stack on very narrow screens */
+  .route-card-weather-strip-multi {
+    gap: 6px;
+  }
+
+  .weather-mini-card {
+    padding: 6px 8px;
+    min-width: 70px;
   }
 }
 
-@media (min-height: 800px) {
+@media (min-height: 800px) and (min-width: 601px) {
   .ai-chat-container {
     height: 720px;
   }

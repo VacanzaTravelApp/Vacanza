@@ -578,6 +578,26 @@ a,
     color: var(--theme-primary);
     letter-spacing: 0.5px;
     margin-left: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.brand-logo-img {
+    width: 44px;
+    height: 44px;
+    display: block;
+}
+
+.brand-logo-text {
+    line-height: 1;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 /* Sidebar section heading — NOT brand text, intentionally uses display font not Unica One */
@@ -1728,25 +1748,25 @@ a,
 }
 
 /* ═══ Mobile Responsive ═══ */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
     .vivid-map-header {
-        padding: 0 12px;
-        height: 56px;
-        gap: 12px;
+        padding: 0 12px !important;
+        height: 56px !important;
+        gap: 12px !important;
     }
 
     .header-left {
-        gap: 8px;
-        min-width: 0;
-        flex-shrink: 0;
+        gap: 8px !important;
+        min-width: 0 !important;
+        flex-shrink: 0 !important;
     }
 
     .header-left .brand-logo {
-        font-size: 22px;
+        font-size: 22px !important;
         gap: 6px !important;
     }
 
-    .header-left .brand-logo img {
+    .header-left .brand-logo-img {
         width: 32px !important;
         height: 32px !important;
     }
