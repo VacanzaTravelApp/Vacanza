@@ -93,7 +93,10 @@
   --btn-primary-hover-shadow: rgba(56, 189, 248, 0.35);
 }
 
-html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+/* Scope overflow:hidden to auth pages only — prevents leaking to MapPage etc. in SPA */
+html:has(.vivid-auth), html:has(.vivid-auth) body, html:has(.vivid-auth) #root {
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
+}
 
 .vivid-auth {
   position: relative;
@@ -392,16 +395,21 @@ html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 }
 
 @media (max-width: 800px) {
+  /* On mobile, unlock scroll for auth pages */
+  html:has(.vivid-auth), html:has(.vivid-auth) body, html:has(.vivid-auth) #root {
+    height: auto; min-height: 100%; overflow-y: auto; overflow-x: hidden;
+  }
+
   .float-top-left { position: relative; top: 0; left: 0; text-align: center; margin: 0 auto; margin-bottom: 20px;}
   .floating-ornaments { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: auto; padding-top: 10px;}
   
-  .vivid-auth { overflow-y: auto; height: auto; min-height: 100vh;}
-  .auth-content-layer { height: auto; }
+  .vivid-auth { overflow-y: auto; height: auto; min-height: 100vh; -webkit-overflow-scrolling: touch; }
+  .auth-content-layer { height: auto; min-height: 100vh; }
   .auth-background { height: 100%; min-height: 100vh; position: fixed; }
   
   .float-bottom-left, .float-bottom-right { display: none; }
   .vivid-topbar { padding: 16px 20px; }
-  .vivid-form-wrapper { padding: 20px; align-items: flex-start;}
+  .vivid-form-wrapper { padding: 20px 20px 40px; align-items: flex-start; min-height: auto; }
 }
 
 @media (max-height: 700px) {
