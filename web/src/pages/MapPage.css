@@ -1726,3 +1726,59 @@ a,
         opacity: 0;
     }
 }
+
+/* ═══ Mobile Responsive ═══ */
+@media (max-width: 600px) {
+    .vivid-map-header {
+        padding: 0 12px;
+        height: 56px;
+        gap: 12px;
+    }
+
+    .header-left {
+        gap: 8px;
+        min-width: 0;
+        flex-shrink: 0;
+    }
+
+    .header-left .brand-logo {
+        font-size: 22px;
+        gap: 6px !important;
+    }
+
+    .header-left .brand-logo img {
+        width: 32px !important;
+        height: 32px !important;
+    }
+
+    .header-right {
+        gap: 6px !important;
+        flex-shrink: 1;
+        min-width: 0;
+    }
+
+    .header-action-btn {
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 10px;
+    }
+
+    .header-action-label {
+        padding: 0 2px !important;
+    }
+
+    .header-profile-btn .ant-avatar {
+        width: 30px !important;
+        height: 30px !important;
+    }
+
+    .vivid-theme-toggle .toggle-btn {
+        width: 30px;
+        height: 30px;
+    }
+
+    .vivid-sidebar {
+        width: 85vw;
+        max-width: 360px;
+    }
+}
