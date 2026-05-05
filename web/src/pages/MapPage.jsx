@@ -2306,6 +2306,9 @@ export default function MapPage() {
           onMouseDown={onMouseDownFreehand}
           onMouseMove={onMouseMoveFreehand}
           onMouseUp={onMouseUpFreehand}
+          onTouchStart={onMouseDownFreehand}
+          onTouchMove={onMouseMoveFreehand}
+          onTouchEnd={onMouseUpFreehand}
           onLoad={onMapLoad}
           onStyleData={onStyleData}
           projection="globe"
